@@ -1,5 +1,0 @@
-[install]
-peer = true
-
-[install.cache]
-dir = ".bun-cache"
