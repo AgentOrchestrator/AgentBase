@@ -18,10 +18,19 @@ CREATE INDEX IF NOT EXISTS idx_chat_histories_created_at ON public.chat_historie
 ALTER TABLE public.chat_histories ENABLE ROW LEVEL SECURITY;
 
 -- Create policy to allow all operations for now (adjust based on your security needs)
-CREATE POLICY "Enable all access for authenticated users" ON public.chat_histories
-    FOR ALL
-    USING (true)
-    WITH CHECK (true);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE tablename = 'chat_histories'
+        AND policyname = 'Enable all access for authenticated users'
+    ) THEN
+        CREATE POLICY "Enable all access for authenticated users" ON public.chat_histories
+            FOR ALL
+            USING (true)
+            WITH CHECK (true);
+    END IF;
+END $$;
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.update_chat_histories_updated_at()
@@ -33,7 +42,15 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to automatically update updated_at
-CREATE TRIGGER update_chat_histories_updated_at
-    BEFORE UPDATE ON public.chat_histories
-    FOR EACH ROW
-    EXECUTE FUNCTION public.update_chat_histories_updated_at();
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'update_chat_histories_updated_at'
+    ) THEN
+        CREATE TRIGGER update_chat_histories_updated_at
+            BEFORE UPDATE ON public.chat_histories
+            FOR EACH ROW
+            EXECUTE FUNCTION public.update_chat_histories_updated_at();
+    END IF;
+END $$;
