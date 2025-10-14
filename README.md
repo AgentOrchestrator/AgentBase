@@ -1,35 +1,18 @@
-# Agent Orchestrator
+<div align="center">
 
-A multi-repository system for managing AI coding assistant chat histories with real-time web UI and intelligent AI summaries.
+# 🤖 Agent Orchestrator
 
-## Architecture
+**Ever co-vibed? Quickly gain overview of what your teammates are working on.**
 
-This is an **orchestrator repository** containing multiple submodules and shared infrastructure:
+Collaborate with agents across Claude Code, Cursor, and more (Windsurf, Codex coming soon) — view real-time chat histories with AI-powered summaries in a unified dashboard.
 
-```
-agent-orchestrator/           # Parent orchestrator repo
-├── agent-orchestrator-daemon/  # Backend daemon (submodule)
-├── web/                        # Web UI (submodule)
-├── supabase/                   # Shared database migrations
-├── AI_SUMMARY_README.md        # AI summary feature documentation
-└── README.md                   # This file
-```
+[Quick Start](#-quick-start) • [Preview](#-preview) • [Features](#-features) • [Architecture](#-architecture)
 
-### Submodules
+</div>
 
-- **[agent-orchestrator-daemon](./agent-orchestrator-daemon/)** - Backend service that watches for new chat histories, uploads to Supabase, and generates AI summaries
-- **[web](./web/)** - Next.js web application for viewing chat histories with real-time updates
+---
 
-### Shared Infrastructure
-
-- **supabase/** - PostgreSQL database migrations and configuration
-  - Chat history storage
-  - Real-time subscriptions
-  - AI summary fields
-
-## Getting Started
-
-### Quick Start
+## 🚀 Quick Start
 
 1. **Clone the repository**:
    ```bash
@@ -67,12 +50,53 @@ agent-orchestrator/           # Parent orchestrator repo
    - **Web UI**: http://localhost:3000
    - **Supabase Studio**: http://localhost:54323
 
-### Manual Setup (Alternative)
+---
 
-If you prefer manual setup or the script doesn't work for your environment:
+## 📸 Preview
+
+> _Coming soon: Screenshots and demo of the web dashboard_
+
+**What you'll see:**
+- 👥 Team member activities across Claude Code, Cursor, and more
+- 📊 Real-time chat history dashboard for all teammates
+- 🔍 AI-generated summaries for each conversation
+- 📁 Project-based organization for easy navigation
+- ⚡ Live updates as your team codes with AI assistants
+
+---
+
+## ✨ Features
+
+- **Team Collaboration** - See what your teammates are working on in real-time
+- **Multi-Agent Support** - Works with Claude Code, Cursor (Windsurf & Codex coming soon)
+- **AI Summaries** - GPT-4o-mini analyzes conversations and identifies key insights
+- **Project Organization** - Chat histories grouped by project for easy navigation
+- **Real-time Updates** - Live dashboard updates as teammates code with AI assistants
+- **Secure by Design** - Read-only web UI, all secrets in backend daemon
+
+---
+
+## 🏗️ Architecture
+
+This is a multi-repo system with submodules:
+
+```
+agent-orchestrator/           # Parent orchestrator repo
+├── agent-orchestrator-daemon/  # Backend daemon (submodule)
+├── web/                        # Web UI (submodule)
+└── supabase/                   # Shared database migrations
+```
+
+- **[agent-orchestrator-daemon](./agent-orchestrator-daemon/)** - Watches for new chat histories and generates AI summaries
+- **[web](./web/)** - Next.js dashboard with real-time updates
+- **supabase/** - PostgreSQL database with real-time capabilities
+
+---
 
 <details>
-<summary>Click to expand manual setup instructions</summary>
+<summary><b>📚 Manual Setup (Advanced)</b></summary>
+
+<br>
 
 #### 1. Pull Submodules
 
@@ -149,42 +173,9 @@ npm run dev
 
 </details>
 
-### Stopping Services
+---
 
-To stop all services, press `Ctrl+C` in the terminal running `./start.sh`.
-
-To stop Supabase:
-```bash
-supabase stop
-```
-
-## Features
-
-### 1. Chat History Management
-
-- Automatic upload of Claude Code chat histories to Supabase
-- Real-time synchronization across devices
-- Grouping by project path
-- Session metadata tracking (agent type, timestamps)
-
-### 2. AI-Powered Summaries
-
-- GPT-4o-mini analyzes each chat session
-- Identifies user intent and problems
-- Tracks progress patterns (making progress vs. stuck)
-- Automatic updates every 5 minutes for recent sessions
-- **Secure**: All AI processing happens in the backend daemon
-
-See [AI_SUMMARY_README.md](./AI_SUMMARY_README.md) for detailed documentation.
-
-### 3. Real-Time Web UI
-
-- Live updates using Supabase real-time subscriptions
-- Project-based grouping with collapsible sections
-- Relative timestamps ("5 minutes ago")
-- Session detail view with full conversation history
-
-## Security Architecture
+## 🔒 Security Architecture
 
 ```
 ┌─────────────┐                    ┌──────────────────┐
@@ -203,13 +194,13 @@ See [AI_SUMMARY_README.md](./AI_SUMMARY_README.md) for detailed documentation.
                                     └──────────────────┘
 ```
 
-**Security Best Practices:**
-- ✅ Web app only has read-only access (anon key)
-- ✅ All secrets stored in backend daemon only
-- ✅ Service role key never exposed to client
-- ✅ OpenAI API calls only from backend
+- ✅ **Web app** has read-only access (anon key)
+- ✅ **Backend daemon** holds all secrets (service role key, OpenAI key)
+- ✅ **OpenAI API calls** only from backend, never exposed to client
 
-## Development Workflow
+---
+
+## 🛠️ Development
 
 ### Working with Submodules
 
@@ -242,44 +233,31 @@ supabase migration new my_new_migration
 supabase db reset  # Apply migrations locally
 ```
 
-### Making Changes
+**Stop all services:** Press `Ctrl+C` in the terminal running `./start.sh`
 
-1. **Backend changes**: Work in `agent-orchestrator-daemon/` submodule
-2. **Frontend changes**: Work in `web/` submodule
-3. **Database changes**: Add migrations to `supabase/migrations/`
-4. **Update parent**: Commit submodule pointer updates when needed
+**Stop Supabase:** `supabase stop`
 
-## Repository Structure Rationale
+---
 
-This multi-repo (submodule) structure provides:
+## 📚 Documentation
 
-✅ **Independent Versioning** - Each component has its own version history
-✅ **Separate CI/CD** - Deploy daemon and web independently
-✅ **Team Permissions** - Different teams can have different access levels
-✅ **Cleaner History** - Component commits don't clutter the main repo
-✅ **Reusability** - Components can be reused in other projects
-✅ **Shared Infrastructure** - Database migrations stay in parent repo
+- [AI Summary Feature](./AI_SUMMARY_README.md) - Detailed docs on AI-powered summaries
+- [Daemon Repository](https://github.com/AgentOrchestrator/agent-orchestrator-daemon) - Backend service
+- [Web UI Repository](https://github.com/AgentOrchestrator/agent-orchestrator-web) - Frontend dashboard
 
-## Contributing
+---
 
-1. Fork the appropriate repository (parent or submodule)
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+## 🤝 Contributing
 
-## License
+Contributions welcome! Please open an issue or PR in the appropriate repository:
+- **Architecture/Docs**: This repo
+- **Backend**: agent-orchestrator-daemon
+- **Frontend**: agent-orchestrator-web
 
-[Your License Here]
+---
 
-## Support
+<div align="center">
 
-- **Issues**: Report bugs in the appropriate repository
-  - Parent repo issues: Overall architecture, documentation
-  - Daemon issues: Backend processing, AI summaries
-  - Web issues: Frontend bugs, UI/UX
+Made with ❤️ for AI coding assistants
 
-## Links
-
-- [Agent Orchestrator Daemon Repository](https://github.com/AgentOrchestrator/agent-orchestrator-daemon)
-- [Web UI Repository](https://github.com/AgentOrchestrator/agent-orchestrator-web)
-- [AI Summary Documentation](./AI_SUMMARY_README.md)
+</div>
