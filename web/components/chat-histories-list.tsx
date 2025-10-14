@@ -244,12 +244,10 @@ export function ChatHistoriesList({
                               </div>
                               <div className="flex flex-col items-end gap-1">
                                 <span className="text-xs text-muted-foreground">
-                                  Created:{" "}
-                                  {new Date(session.created_at).toLocaleString()}
+                                  Created: {formatLastActive(session.created_at)}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  Updated:{" "}
-                                  {new Date(session.updated_at).toLocaleString()}
+                                  Updated: {formatLastActive(session.updated_at)}
                                 </span>
                               </div>
                             </div>
