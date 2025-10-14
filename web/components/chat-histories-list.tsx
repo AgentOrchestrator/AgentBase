@@ -258,6 +258,26 @@ export function ChatHistoriesList({
                                   {messageCount} message
                                   {messageCount !== 1 ? "s" : ""} in this session
                                 </div>
+
+                                {/* AI Summary Section */}
+                                {session.ai_summary && (
+                                  <div className="text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 mt-2">
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                                        AI Summary:
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-blue-900 dark:text-blue-100 mt-1 leading-relaxed">
+                                      {session.ai_summary}
+                                    </p>
+                                    {session.ai_summary_generated_at && (
+                                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 opacity-70">
+                                        Generated: {formatLastActive(session.ai_summary_generated_at)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
                                 {lastMessage && (
                                   <div className="text-sm">
                                     <span className="font-medium">

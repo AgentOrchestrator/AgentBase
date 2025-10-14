@@ -20,4 +20,7 @@ export type ChatHistory = {
   account_id: string | null;
   created_at: string;
   updated_at: string;
+  ai_summary: string | null;
+  ai_summary_generated_at: string | null;
+  ai_summary_message_count: number | null;
 };
