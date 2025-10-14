@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.bun-cache/
+
+# Environment variables
+.env
+.env.local
+.env*.local
+lenv
+
+# Build outputs
+dist/
+build/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# Lock files (keep package-lock.json if needed)
+# Uncomment if you want to ignore:
+# package-lock.json
+# bun.lockb
