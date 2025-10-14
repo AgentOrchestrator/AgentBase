@@ -54,15 +54,28 @@ const StartApp = () => {
 				throw new Error('Dependencies not installed. Please run ./install.sh first');
 			}
 
-			// Start Supabase
-			updateService('Supabase', { status: 'starting', message: 'Checking status...' });
-			try {
-				await execAsync('supabase status');
-				updateService('Supabase', { status: 'running', message: 'Already running' });
-			} catch {
-				updateService('Supabase', { status: 'starting', message: 'Starting...' });
-				await execAsync('supabase start', { maxBuffer: 1024 * 1024 * 10 });
-				updateService('Supabase', { status: 'running', message: 'Started' });
+			// Check if using remote Supabase
+			const rootEnvContent = fs.readFileSync(rootEnv, 'utf-8');
+			const isRemoteSupabase = rootEnvContent.includes('https://') && rootEnvContent.includes('.supabase.co');
+			
+			if (isRemoteSupabase) {
+				// Using remote Supabase - skip local startup
+				updateService('Supabase', { 
+					status: 'running', 
+					message: 'Using remote Supabase',
+					url: 'Remote instance'
+				});
+			} else {
+				// Start local Supabase
+				updateService('Supabase', { status: 'starting', message: 'Checking status...' });
+				try {
+					await execAsync('supabase status');
+					updateService('Supabase', { status: 'running', message: 'Already running' });
+				} catch {
+					updateService('Supabase', { status: 'starting', message: 'Starting...' });
+					await execAsync('supabase start', { maxBuffer: 1024 * 1024 * 10 });
+					updateService('Supabase', { status: 'running', message: 'Started' });
+				}
 			}
 
 			// Start Daemon

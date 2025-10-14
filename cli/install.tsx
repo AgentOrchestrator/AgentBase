@@ -8,6 +8,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
+import { useInput } from 'ink';
 
 const execAsync = promisify(exec);
 
@@ -35,6 +36,14 @@ const InstallApp = () => {
 	const [supabaseServiceKey, setSupabaseServiceKey] = useState('');
 	const [completed, setCompleted] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [useRemoteSupabase, setUseRemoteSupabase] = useState<boolean | null>(null);
+	const [needsSupabaseChoice, setNeedsSupabaseChoice] = useState(false);
+	const [needsRemoteCredentials, setNeedsRemoteCredentials] = useState(false);
+	const [remoteSupabaseUrl, setRemoteSupabaseUrl] = useState('');
+	const [remoteSupabaseAnonKey, setRemoteSupabaseAnonKey] = useState('');
+	const [remoteSupabaseServiceKey, setRemoteSupabaseServiceKey] = useState('');
+	const [currentCredentialInput, setCurrentCredentialInput] = useState<'url' | 'anon' | 'service'>('url');
+	const [supabaseChoiceInput, setSupabaseChoiceInput] = useState('');
 
 	const updateStep = (index: number, status: Step['status'], message?: string) => {
 		setSteps(prev => {
@@ -65,86 +74,20 @@ const InstallApp = () => {
 				throw submoduleError;
 			}
 
-			// Step 1: Check Supabase CLI
+			// Step 1: Check Supabase CLI and ask user preference
 			setCurrentStep(1);
 			updateStep(1, 'running');
 			try {
 				const { stdout } = await execAsync('supabase --version');
-				updateStep(1, 'success', stdout.trim());
+				updateStep(1, 'success', `Supabase CLI found: ${stdout.trim()}`);
 			} catch {
-				// Try to install Supabase CLI
-				updateStep(1, 'running', 'Installing Supabase CLI...');
-				const isMac = process.platform === 'darwin';
-				if (isMac) {
-					try {
-						await execAsync('brew --version');
-						await execAsync('brew install supabase/tap/supabase');
-						updateStep(1, 'success', 'Installed via Homebrew');
-					} catch {
-						throw new Error('Homebrew not found. Please install Homebrew first.');
-					}
-				} else if (process.platform === 'linux') {
-					await execAsync('curl -fsSL https://supabase.com/install.sh | sh');
-					updateStep(1, 'success', 'Installed via curl');
-				} else {
-					throw new Error('Unsupported OS. Please install Supabase CLI manually.');
-				}
+				updateStep(1, 'success', 'Supabase CLI not found');
 			}
-
-			// Step 2: Start Supabase
-			setCurrentStep(2);
-			updateStep(2, 'running');
-			try {
-				await execAsync('supabase status');
-				updateStep(2, 'success', 'Already running');
-			} catch {
-				updateStep(2, 'running', 'Starting Supabase (this may take a minute)...');
-				await execAsync('supabase start', { maxBuffer: 1024 * 1024 * 10 });
-				updateStep(2, 'success', 'Started successfully');
-			}
-
-			// Step 3: Extract Supabase credentials
-			setCurrentStep(3);
-			updateStep(3, 'running');
-			const { stdout: envOutput } = await execAsync('supabase status -o env');
-
-			// Match both old format (SUPABASE_URL=...) and new format (API_URL="...")
-			const urlMatch = envOutput.match(/API_URL="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_URL="?([^"\n]+)"?/);
-			const anonMatch = envOutput.match(/ANON_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_ANON_KEY="?([^"\n]+)"?/);
-			const serviceMatch = envOutput.match(/SERVICE_ROLE_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)"?/);
-
-			if (!urlMatch || !anonMatch || !serviceMatch) {
-				throw new Error('Failed to extract Supabase credentials');
-			}
-
-			setSupabaseUrl(urlMatch[1].trim());
-			setSupabaseAnonKey(anonMatch[1].trim());
-			setSupabaseServiceKey(serviceMatch[1].trim());
-			updateStep(3, 'success');
-
-			// Step 4: Get OpenAI key
-			setCurrentStep(4);
-			updateStep(4, 'running');
-
-			// Check if already exists
-			const daemonEnvPath = path.join(process.cwd(), 'agent-orchestrator-daemon', '.env');
-			let existingKey = '';
-			if (fs.existsSync(daemonEnvPath)) {
-				const existingEnv = fs.readFileSync(daemonEnvPath, 'utf-8');
-				const keyMatch = existingEnv.match(/OPENAI_API_KEY=(.+)/);
-				if (keyMatch && keyMatch[1] !== 'sk-your_openai_api_key_here') {
-					existingKey = keyMatch[1].trim();
-				}
-			}
-
-			if (existingKey) {
-				setOpenaiKey(existingKey);
-				updateStep(4, 'success', 'Using existing key');
-				setCurrentStep(5);
-				await continueInstall(existingKey, urlMatch[1].trim(), anonMatch[1].trim(), serviceMatch[1].trim());
-			} else {
-				setNeedsOpenaiInput(true);
-			}
+			
+			// Always ask user for their preference
+			updateStep(1, 'running', 'Choose Supabase setup method...');
+			setNeedsSupabaseChoice(true);
+			return; // Wait for user input
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 			updateStep(currentStep, 'error', errorMessage);
@@ -272,12 +215,195 @@ const InstallApp = () => {
 		runInstall();
 	}, []);
 
+	// Handle keyboard input for choices
+	useInput((input, key) => {
+		if (needsSupabaseChoice) {
+			if (input === '1') {
+				handleSupabaseChoice(false);
+			} else if (input === '2') {
+				handleSupabaseChoice(true);
+			}
+		}
+	});
+
+	const handleSupabaseChoice = async (useRemote: boolean) => {
+		setUseRemoteSupabase(useRemote);
+		setNeedsSupabaseChoice(false);
+		
+		if (useRemote) {
+			// Skip local Supabase installation
+			updateStep(1, 'success', 'Using remote Supabase (skipped local installation)');
+			// Skip steps 2 and 3 (Start Supabase and Extract credentials)
+			updateStep(2, 'success', 'Skipped (using remote)');
+			updateStep(3, 'success', 'Skipped (using remote)');
+			
+			// Ask for remote Supabase credentials
+			setCurrentStep(4);
+			updateStep(4, 'running', 'Please provide your remote Supabase credentials...');
+			setNeedsRemoteCredentials(true);
+		} else {
+			// Use local Supabase CLI
+			try {
+				// Check if Supabase CLI is already installed
+				await execAsync('supabase --version');
+				updateStep(1, 'success', 'Using existing Supabase CLI');
+			} catch {
+				// Install Supabase CLI locally
+				updateStep(1, 'running', 'Installing Supabase CLI...');
+				try {
+					const isMac = process.platform === 'darwin';
+					if (isMac) {
+						// Try common Homebrew paths with explicit environment
+						const brewPaths = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'];
+						let brewPath = '';
+						
+						for (const path of brewPaths) {
+							try {
+								await execAsync(`${path} --version`, {
+									env: { 
+										...process.env, 
+										PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+									}
+								});
+								brewPath = path;
+								break;
+							} catch {
+								continue;
+							}
+						}
+						
+						if (!brewPath) {
+							// Fallback: try to install Supabase CLI directly without Homebrew
+							updateStep(1, 'running', 'Installing Supabase CLI via curl...');
+							await execAsync('curl -fsSL https://supabase.com/install.sh | sh', {
+								env: { 
+									...process.env, 
+									PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+								}
+							});
+							updateStep(1, 'success', 'Installed via curl');
+						} else {
+							await execAsync(`${brewPath} install supabase/tap/supabase`, {
+								env: { 
+									...process.env, 
+									PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+								}
+							});
+							updateStep(1, 'success', 'Installed via Homebrew');
+						}
+					} else if (process.platform === 'linux') {
+						await execAsync('curl -fsSL https://supabase.com/install.sh | sh');
+						updateStep(1, 'success', 'Installed via curl');
+					} else {
+						throw new Error('Unsupported OS. Please install Supabase CLI manually.');
+					}
+				} catch (error) {
+					throw new Error(`Failed to install Supabase CLI: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				}
+			}
+			
+			// Continue with local Supabase setup
+			await continueLocalSupabaseSetup();
+		}
+	};
+
+	const continueLocalSupabaseSetup = async () => {
+		// Step 2: Start Supabase
+		setCurrentStep(2);
+		updateStep(2, 'running');
+		try {
+			await execAsync('supabase status');
+			updateStep(2, 'success', 'Already running');
+		} catch {
+			updateStep(2, 'running', 'Starting Supabase (this may take a minute)...');
+			await execAsync('supabase start', { maxBuffer: 1024 * 1024 * 10 });
+			updateStep(2, 'success', 'Started successfully');
+		}
+
+		// Step 3: Extract Supabase credentials
+		setCurrentStep(3);
+		updateStep(3, 'running');
+		const { stdout: envOutput } = await execAsync('supabase status -o env');
+
+		// Match both old format (SUPABASE_URL=...) and new format (API_URL="...")
+		const urlMatch = envOutput.match(/API_URL="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_URL="?([^"\n]+)"?/);
+		const anonMatch = envOutput.match(/ANON_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_ANON_KEY="?([^"\n]+)"?/);
+		const serviceMatch = envOutput.match(/SERVICE_ROLE_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)"?/);
+
+		if (!urlMatch || !anonMatch || !serviceMatch) {
+			throw new Error('Failed to extract Supabase credentials');
+		}
+
+		setSupabaseUrl(urlMatch[1].trim());
+		setSupabaseAnonKey(anonMatch[1].trim());
+		setSupabaseServiceKey(serviceMatch[1].trim());
+		updateStep(3, 'success');
+
+		// Continue with OpenAI setup
+		await continueWithOpenAI(urlMatch[1].trim(), anonMatch[1].trim(), serviceMatch[1].trim());
+	};
+
+	const continueWithOpenAI = async (url: string, anonKey: string, serviceKey: string) => {
+		// Step 4: Get OpenAI key
+		setCurrentStep(4);
+		updateStep(4, 'running');
+
+		// Check if already exists
+		const daemonEnvPath = path.join(process.cwd(), 'agent-orchestrator-daemon', '.env');
+		let existingKey = '';
+		if (fs.existsSync(daemonEnvPath)) {
+			const existingEnv = fs.readFileSync(daemonEnvPath, 'utf-8');
+			const keyMatch = existingEnv.match(/OPENAI_API_KEY=(.+)/);
+			if (keyMatch && keyMatch[1] !== 'sk-your_openai_api_key_here') {
+				existingKey = keyMatch[1].trim();
+			}
+		}
+
+		if (existingKey) {
+			setOpenaiKey(existingKey);
+			updateStep(4, 'success', 'Using existing key');
+			setCurrentStep(5);
+			await continueInstall(existingKey, url, anonKey, serviceKey);
+		} else {
+			setNeedsOpenaiInput(true);
+		}
+	};
+
+	const handleRemoteCredentialSubmit = (value: string) => {
+		if (currentCredentialInput === 'url') {
+			setRemoteSupabaseUrl(value);
+			setCurrentCredentialInput('anon');
+		} else if (currentCredentialInput === 'anon') {
+			setRemoteSupabaseAnonKey(value);
+			setCurrentCredentialInput('service');
+		} else if (currentCredentialInput === 'service') {
+			setRemoteSupabaseServiceKey(value);
+			setNeedsRemoteCredentials(false);
+			updateStep(3, 'success', 'Remote credentials provided');
+			
+			// Set the credentials for use
+			setSupabaseUrl(remoteSupabaseUrl);
+			setSupabaseAnonKey(remoteSupabaseAnonKey);
+			setSupabaseServiceKey(value);
+			
+			// Continue with OpenAI setup
+			setCurrentStep(4);
+			updateStep(4, 'running');
+			setNeedsOpenaiInput(true);
+		}
+	};
+
 	const handleOpenAISubmit = (value: string) => {
 		setOpenaiKey(value);
 		setNeedsOpenaiInput(false);
 		updateStep(4, 'success');
 		setCurrentStep(5);
-		continueInstall(value, supabaseUrl, supabaseAnonKey, supabaseServiceKey);
+		
+		if (useRemoteSupabase) {
+			continueInstall(value, remoteSupabaseUrl, remoteSupabaseAnonKey, remoteSupabaseServiceKey);
+		} else {
+			continueInstall(value, supabaseUrl, supabaseAnonKey, supabaseServiceKey);
+		}
 	};
 
 	const getStatusIcon = (status: Step['status']) => {
@@ -320,6 +446,47 @@ const InstallApp = () => {
 					</Box>
 				</Box>
 			))}
+
+			{needsSupabaseChoice && (
+				<Box marginTop={1} flexDirection="column">
+					<Text color="yellow">
+						<Newline />
+						How would you like to set up Supabase?
+					</Text>
+					<Text color="cyan">1. Use local Supabase (install CLI and start local instance)</Text>
+					<Text color="cyan">2. Use remote Supabase (connect to existing project)</Text>
+					<Newline />
+					<Text color="white">Press 1 for local, 2 for remote:</Text>
+					<Text color="gray">(Just press the number key, no need to press Enter)</Text>
+				</Box>
+			)}
+
+			{needsRemoteCredentials && (
+				<Box marginTop={1} flexDirection="column">
+					<Text color="yellow">
+						<Newline />
+						Enter your remote Supabase credentials:
+					</Text>
+					{currentCredentialInput === 'url' && (
+						<>
+							<Text color="cyan">1. Supabase URL (e.g., https://your-project.supabase.co):</Text>
+							<TextInput value={remoteSupabaseUrl} onChange={setRemoteSupabaseUrl} onSubmit={handleRemoteCredentialSubmit} />
+						</>
+					)}
+					{currentCredentialInput === 'anon' && (
+						<>
+							<Text color="cyan">2. Supabase Anon Key:</Text>
+							<TextInput value={remoteSupabaseAnonKey} onChange={setRemoteSupabaseAnonKey} onSubmit={handleRemoteCredentialSubmit} />
+						</>
+					)}
+					{currentCredentialInput === 'service' && (
+						<>
+							<Text color="cyan">3. Supabase Service Role Key:</Text>
+							<TextInput value={remoteSupabaseServiceKey} onChange={setRemoteSupabaseServiceKey} onSubmit={handleRemoteCredentialSubmit} />
+						</>
+					)}
+				</Box>
+			)}
 
 			{needsOpenaiInput && (
 				<Box marginTop={1} flexDirection="column">
