@@ -12,6 +12,25 @@ import {
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+/**
+ * Format timestamp to show relative time for recent activity
+ * Shows "X minutes ago" if within the last hour, otherwise full date/time
+ */
+function formatLastActive(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) {
+    return "Just now";
+  } else if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes !== 1 ? "s" : ""} ago`;
+  } else {
+    return date.toLocaleString();
+  }
+}
+
 type GroupedChat = {
   path: string;
   sessions: ChatHistory[];
@@ -191,8 +210,7 @@ export function ChatHistoriesList({
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Last active:{" "}
-                      {new Date(group.lastActivity).toLocaleString()}
+                      Last active: {formatLastActive(group.lastActivity)}
                     </div>
                   </div>
                 </CardHeader>
