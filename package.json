@@ -1,0 +1,22 @@
+{
+  "name": "agent-orchestrator",
+  "version": "1.0.0",
+  "description": "Agent Orchestrator - Installation and startup scripts",
+  "type": "module",
+  "scripts": {
+    "install-cli": "tsx cli/install.tsx",
+    "start-cli": "tsx cli/start.tsx"
+  },
+  "dependencies": {
+    "ink": "^5.2.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
