@@ -7,7 +7,6 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { waitForHealthy } from './utils/health-check.js';
 
 const execAsync = promisify(exec);
 
@@ -23,8 +22,8 @@ const StartApp = () => {
 	const { exit } = useApp();
 	const [services, setServices] = useState<Service[]>([
 		{ name: 'Supabase', status: 'starting', url: 'http://localhost:54323' },
-		{ name: 'Web App', status: 'starting', url: 'http://localhost:3000' },
 		{ name: 'Daemon', status: 'starting' },
+		{ name: 'Web App', status: 'starting', url: 'http://localhost:3000' },
 	]);
 	const [allRunning, setAllRunning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -79,40 +78,7 @@ const StartApp = () => {
 				}
 			}
 
-			// Start Web App FIRST (daemon needs web to be ready for auth)
-			updateService('Web App', { status: 'starting', message: 'Launching...' });
-			const webProcess = spawn('npm', ['run', 'dev'], {
-				cwd: path.join(process.cwd(), 'web'),
-				stdio: ['ignore', 'pipe', 'pipe'],
-				detached: false,
-			});
-
-			processesRef.current.push(webProcess);
-
-			// Pipe web logs to file
-			const webLog = fs.createWriteStream(path.join(process.cwd(), 'web.log'), { flags: 'a' });
-			webProcess.stdout?.pipe(webLog);
-			webProcess.stderr?.pipe(webLog);
-
-			// Wait for web app to be healthy
-			updateService('Web App', { status: 'starting', message: 'Waiting for health check...' });
-			const webHealthy = await waitForHealthy('http://localhost:3000', 60000, 1000);
-
-			if (!webHealthy) {
-				throw new Error('Web app failed to become healthy within 60 seconds');
-			}
-
-			if (webProcess.killed) {
-				throw new Error('Web app process died');
-			}
-
-			updateService('Web App', {
-				status: 'running',
-				pid: webProcess.pid,
-				message: `PID: ${webProcess.pid}`,
-			});
-
-			// Now start Daemon (web is ready for auth redirects)
+			// Start Daemon
 			updateService('Daemon', { status: 'starting', message: 'Launching...' });
 			const daemonProcess = spawn('npm', ['run', 'dev'], {
 				cwd: path.join(process.cwd(), 'agent-orchestrator-daemon'),
@@ -121,13 +87,6 @@ const StartApp = () => {
 			});
 
 			processesRef.current.push(daemonProcess);
-
-			// Pipe daemon logs to file
-			const daemonLog = fs.createWriteStream(path.join(process.cwd(), 'daemon.log'), {
-				flags: 'a',
-			});
-			daemonProcess.stdout?.pipe(daemonLog);
-			daemonProcess.stderr?.pipe(daemonLog);
 
 			// Wait a bit for daemon to start
 			await new Promise(resolve => setTimeout(resolve, 2000));
@@ -141,6 +100,41 @@ const StartApp = () => {
 				pid: daemonProcess.pid,
 				message: `PID: ${daemonProcess.pid}`,
 			});
+
+			// Pipe daemon logs to file
+			const daemonLog = fs.createWriteStream(path.join(process.cwd(), 'daemon.log'), {
+				flags: 'a',
+			});
+			daemonProcess.stdout?.pipe(daemonLog);
+			daemonProcess.stderr?.pipe(daemonLog);
+
+			// Start Web App
+			updateService('Web App', { status: 'starting', message: 'Launching...' });
+			const webProcess = spawn('npm', ['run', 'dev'], {
+				cwd: path.join(process.cwd(), 'web'),
+				stdio: ['ignore', 'pipe', 'pipe'],
+				detached: false,
+			});
+
+			processesRef.current.push(webProcess);
+
+			// Wait a bit for web to start
+			await new Promise(resolve => setTimeout(resolve, 3000));
+
+			if (webProcess.killed) {
+				throw new Error('Web app failed to start');
+			}
+
+			updateService('Web App', {
+				status: 'running',
+				pid: webProcess.pid,
+				message: `PID: ${webProcess.pid}`,
+			});
+
+			// Pipe web logs to file
+			const webLog = fs.createWriteStream(path.join(process.cwd(), 'web.log'), { flags: 'a' });
+			webProcess.stdout?.pipe(webLog);
+			webProcess.stderr?.pipe(webLog);
 
 			setAllRunning(true);
 
