@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 
-import { useState, useEffect, useRef } from 'react';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import React, { useState, useEffect, useRef } from 'react'; // React is required for JSX
 import { render, Box, Text, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 import { spawn, exec } from 'child_process';
