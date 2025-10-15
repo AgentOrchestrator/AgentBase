@@ -38,12 +38,17 @@ Only commit to the parent repository when:
    # Resolve any conflicts if they occur
    # Test your changes after merging to ensure everything still works
    ```
-4. Push your feature branch: `git push origin <your-branch-name>`
+4. Push your feature branch: `git push -u origin <your-branch-name>`
 5. Create a Pull Request (PR) to merge into main
 6. Wait for code review and approval (if working with a team)
 7. Merge the PR on GitHub (or via `gh` CLI)
-8. Pull the latest main locally: `git checkout main && git pull origin main`
-9. Delete the feature branch: `git branch -d <your-branch-name>`
+8. **After PR is merged, clean up locally:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git branch -d <your-branch-name>
+   ```
+9. **Important:** Always delete your local feature branch after the PR is merged to keep your workspace clean
 
 ### Pull Request Guidelines
 - Write clear PR titles and descriptions explaining the changes
