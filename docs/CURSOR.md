@@ -28,17 +28,38 @@
 - Workspace links to global via `composer.composerData` → `composerId` (99.6% success)
 - Composer uses `conversation` array, Copilot uses `requests` array
 
+## Message Storage Details
+
+### Composer Messages (Global DB)
+- **Conversation structure**: `composerData:{composerId}`
+  - Contains `fullConversationHeadersOnly` array with bubble references
+- **Actual messages**: `bubbleId:{composerId}:{bubbleId}`
+  - `type: 1` = User message
+  - `type: 2` = Assistant response
+  - Each bubble contains: `text`, `codeBlocks`, `toolResults`, `capabilities`, etc.
+
+### Workspace Metadata (Workspace DBs)
+- **Prompts metadata**: `aiService.prompts` (prompt text + commandType)
+- **Generation tracking**: `aiService.generations` (UUID + timestamp + type)
+- **Session UI state**: `composer.composerData` (links to global via composerId)
+
 ## Quick SQL Queries
 
 ```sql
--- Get all Composer conversations
+-- Get all Composer conversations (global DB)
 SELECT value FROM cursorDiskKV WHERE key LIKE 'composerData:%';
 
--- Get Copilot sessions in workspace
+-- Get specific conversation messages (global DB)
+SELECT value FROM cursorDiskKV WHERE key LIKE 'bubbleId:{composerId}:%';
+
+-- Get Copilot sessions (workspace DB)
 SELECT value FROM ItemTable WHERE key = 'interactive.sessions';
 
--- Get workspace metadata
+-- Get workspace metadata (workspace DB)
 SELECT value FROM ItemTable WHERE key = 'composer.composerData';
+
+-- Get prompt history (workspace DB)
+SELECT value FROM ItemTable WHERE key = 'aiService.generations';
 ```
 
 ## Analysis Tools
