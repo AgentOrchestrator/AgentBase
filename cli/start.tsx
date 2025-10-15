@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { render, Box, Text, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 import { spawn, exec } from 'child_process';
@@ -24,6 +24,11 @@ type AuthPrompt = {
 	timestamp: number;
 };
 
+type LogLine = {
+	text: string;
+	timestamp: number;
+};
+
 const StartApp = () => {
 	const { exit } = useApp();
 	const [services, setServices] = useState<Service[]>([
@@ -34,7 +39,9 @@ const StartApp = () => {
 	const [allRunning, setAllRunning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [authPrompt, setAuthPrompt] = useState<AuthPrompt | null>(null);
+	const [daemonLogs, setDaemonLogs] = useState<LogLine[]>([]);
 	const processesRef = useRef<any[]>([]);
+	const MAX_LOG_LINES = 15; // Keep last 15 lines of daemon logs
 
 	const updateService = (name: string, updates: Partial<Service>) => {
 		setServices(prev =>
@@ -122,25 +129,26 @@ const StartApp = () => {
 			updateService('Daemon', { status: 'starting', message: 'Launching...' });
 			const daemonProcess = spawn('npm', ['run', 'dev'], {
 				cwd: path.join(process.cwd(), 'agent-orchestrator-daemon'),
-				stdio: ['ignore', 'pipe', 'pipe'],
+				stdio: ['ignore', 'pipe', 'pipe'], // Capture logs for display
 				detached: false,
 			});
 
 			processesRef.current.push(daemonProcess);
 
-			// Pipe daemon logs to file and monitor for auth messages
-			const daemonLog = fs.createWriteStream(path.join(process.cwd(), 'daemon.log'), {
-				flags: 'a',
-			});
-
-			// Monitor stdout for auth messages
+			// Monitor daemon output for logs and auth messages
 			let stdoutBuffer = '';
 			daemonProcess.stdout?.on('data', (data) => {
 				const text = data.toString();
-				daemonLog.write(data);
-
-				// Buffer the output to detect auth URL
 				stdoutBuffer += text;
+
+				// Add logs to state (keep last MAX_LOG_LINES lines)
+				const lines = text.split('\n').filter((line: string) => line.trim());
+				lines.forEach((line: string) => {
+					setDaemonLogs(prev => {
+						const newLogs = [...prev, { text: line, timestamp: Date.now() }];
+						return newLogs.slice(-MAX_LOG_LINES);
+					});
+				});
 
 				// Check for authentication URL pattern
 				const urlMatch = stdoutBuffer.match(/daemon-auth\?device_id=([a-f0-9-]+)/);
@@ -161,7 +169,16 @@ const StartApp = () => {
 				}
 			});
 
-			daemonProcess.stderr?.pipe(daemonLog);
+			daemonProcess.stderr?.on('data', (data) => {
+				const text = data.toString();
+				const lines = text.split('\n').filter((line: string) => line.trim());
+				lines.forEach((line: string) => {
+					setDaemonLogs(prev => {
+						const newLogs = [...prev, { text: line, timestamp: Date.now() }];
+						return newLogs.slice(-MAX_LOG_LINES);
+					});
+				});
+			});
 
 			// Wait a bit for daemon to start
 			await new Promise(resolve => setTimeout(resolve, 2000));
@@ -297,12 +314,20 @@ const StartApp = () => {
 					<Box borderStyle="round" borderColor="green" padding={1}>
 						<Text color="green">✨ All services running!</Text>
 					</Box>
+
+					{daemonLogs.length > 0 && (
+						<Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="blue" paddingX={1}>
+							<Text bold color="blue">📋 Daemon Logs (last {MAX_LOG_LINES} lines):</Text>
+							{daemonLogs.map((log, idx) => (
+								<Text key={idx} dimColor>
+									{log.text}
+								</Text>
+							))}
+						</Box>
+					)}
+
 					<Box marginTop={1} flexDirection="column">
-						<Text>Logs:</Text>
-						<Text>  Web:    </Text>
-						<Text color="gray">tail -f web.log</Text>
-						<Text>  Daemon: </Text>
-						<Text color="gray">tail -f daemon.log</Text>
+						<Text dimColor>Full logs: <Text color="gray">tail -f web.log daemon.log</Text></Text>
 					</Box>
 					<Box marginTop={1}>
 						<Text color="yellow">Press Ctrl+C to stop all services</Text>
