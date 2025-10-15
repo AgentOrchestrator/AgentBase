@@ -179,9 +179,26 @@ const InstallApp = () => {
 				CLAUDE_CODE_HOME: '',
 			});
 
-			// Web .env.local
-			const webEnvPath = path.join(process.cwd(), 'web', '.env.local');
+			// Web .env (server-side)
+			const webEnvPath = path.join(process.cwd(), 'web', '.env');
+			if (!fs.existsSync(webEnvPath)) {
+				// Create with comments if new
+				const header = `# Supabase Local Development Credentials
+# These are default local development keys from \`supabase start\`
+# DO NOT use these in production!
+
+`;
+				fs.writeFileSync(webEnvPath, header);
+			}
 			mergeEnvFile(webEnvPath, {
+				SUPABASE_URL: url,
+				SUPABASE_ANON_KEY: anonKey,
+				SUPABASE_SERVICE_ROLE_KEY: serviceKey,
+			});
+
+			// Web .env.local (client-side)
+			const webEnvLocalPath = path.join(process.cwd(), 'web', '.env.local');
+			mergeEnvFile(webEnvLocalPath, {
 				NEXT_PUBLIC_SUPABASE_URL: url,
 				NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
 			});
@@ -204,10 +221,20 @@ const InstallApp = () => {
 
 			updateStep(6, 'success');
 			setCompleted(true);
+
+			// Exit after a short delay to allow the completion message to render
+			setTimeout(() => {
+				process.exit(0);
+			}, 100);
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 			updateStep(currentStep, 'error', errorMessage);
 			setError(errorMessage);
+
+			// Exit with error code after a short delay
+			setTimeout(() => {
+				process.exit(1);
+			}, 100);
 		}
 	};
 
