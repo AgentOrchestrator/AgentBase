@@ -80,3 +80,24 @@ export default async function Page() {
 'use client';
 export function ClientWrapper({ data }) { ... }
 ```
+
+## Environment Variables & Server-Only Code
+
+### Critical: Separate Server-Only Modules
+**PROBLEM:** Module-level code in Next.js runs on BOTH client and server during bundling, even in Server Components.
+
+**SOLUTION:** Keep server-only code (admin clients, service keys) in separate files imported ONLY by server code.
+
+### Quick Rule
+- ❌ **WRONG:** Mixing public and admin clients in one file → Client bundle tries to access server-only env vars
+- ✅ **CORRECT:** Separate files (`lib/supabase.ts` vs `lib/supabase-admin.ts`) → Server-only file never bundled for client
+
+### File Naming Convention
+- `*-admin.ts` → Server-only (admin/service role operations)
+- `*-server.ts` → Server-only (private server logic)
+- Regular files → Can be used anywhere (public env vars only)
+
+### Environment Variable Rules
+- `NEXT_PUBLIC_*` → Exposed to client (safe for public keys)
+- `SUPABASE_SERVICE_ROLE_KEY` → Server-only (NEVER use NEXT_PUBLIC_ prefix)
+- API routes → Can use any env var (always server-side)

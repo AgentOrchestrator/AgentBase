@@ -108,5 +108,62 @@ export default async function Page() {  // ← Error: async in client component
 2. Extract client logic to separate component file
 3. Server fetches data → passes to Client Component → handles interactivity
 
+## Environment Variables & Server-Side Only Code
+
+### Critical Rule: Separate Server-Only Modules
+**PROBLEM:** Even Server Components get bundled into the client-side JavaScript, which means any module-level code runs on both server AND client.
+
+**SOLUTION:** Keep server-only code (like admin clients with service role keys) in separate files that are ONLY imported by server-side code.
+
+### The Core Issue
+When you import a module in Next.js:
+- ❌ Module-level code executes immediately when imported
+- ❌ This happens even in Server Components during bundling
+- ❌ If the module uses `process.env.SOME_SECRET`, it will try to access it on the client side too
+
+### Example Problem
+```tsx
+// ❌ WRONG: lib/supabase.ts
+export const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY  // ← Will try to access on client!
+);
+
+// page.tsx (Server Component)
+import { supabaseAdmin } from '@/lib/supabase';  // ← Triggers client-side evaluation!
+```
+
+**Error:** `supabaseKey is required` - because `SUPABASE_SERVICE_ROLE_KEY` is not available on the client.
+
+### Correct Solution: Separate Files
+```tsx
+// ✅ CORRECT: lib/supabase.ts (can be imported anywhere)
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+// ✅ CORRECT: lib/supabase-admin.ts (ONLY import in server code)
+export const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY  // ← Safe, only evaluated server-side
+);
+
+// page.tsx (Server Component)
+import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';  // ← Only imports server-side
+```
+
+### Best Practices
+1. **Separate server-only modules** - Keep admin clients, service role keys, and server-only logic in separate files
+2. **Never use `NEXT_PUBLIC_` for secrets** - Only use it for truly public values
+3. **Test imports** - If you get "X is required" errors for env vars, check if server-only code is being bundled
+4. **File naming convention** - Use `-admin`, `-server`, or `-private` suffixes for server-only modules
+
+### Environment Variable Naming
+- `NEXT_PUBLIC_*` → Exposed to client (bundled in JavaScript)
+- `SUPABASE_SERVICE_ROLE_KEY` → Server-only (never exposed)
+- API routes can safely use any env var (always server-side)
+
 ## Additional Notes
 - Handling Cursor Messages in CURSOR_MESSAGES.md
