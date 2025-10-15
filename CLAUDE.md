@@ -23,17 +23,35 @@ Only commit to the parent repository when:
 ### Branch Management
 - **Always create a new branch** for any code edits or features
 - Branch naming convention: Use descriptive names (e.g., `feature/add-auth`, `fix/install-env-vars`, `refactor/cleanup-types`)
-- **Never commit directly to main branch**
-- After completing work, merge the branch with main before pushing
+- **NEVER commit directly to main branch**
+- **NEVER push directly to main branch**
+- **Always create a Pull Request** for code review before merging
 - Delete feature branches after successful merge to keep the repository clean
 
 ### Workflow Steps
 1. Create a new branch: `git checkout -b <descriptive-branch-name>`
 2. Make your changes and commit them
-3. Switch to main: `git checkout main`
-4. Merge your feature branch: `git merge <your-branch-name>`
-5. Push to remote: `git push origin main`
-6. Delete the feature branch: `git branch -d <your-branch-name>`
+3. **Before pushing, merge main into your branch to resolve conflicts:**
+   ```bash
+   git fetch origin main
+   git merge origin/main
+   # Resolve any conflicts if they occur
+   # Test your changes after merging to ensure everything still works
+   ```
+4. Push your feature branch: `git push origin <your-branch-name>`
+5. Create a Pull Request (PR) to merge into main
+6. Wait for code review and approval (if working with a team)
+7. Merge the PR on GitHub (or via `gh` CLI)
+8. Pull the latest main locally: `git checkout main && git pull origin main`
+9. Delete the feature branch: `git branch -d <your-branch-name>`
+
+### Pull Request Guidelines
+- Write clear PR titles and descriptions explaining the changes
+- Reference any related issues or tickets
+- Ensure all tests pass before requesting review
+- Respond to review comments promptly
+- Keep PRs focused on a single feature or fix for easier review
+- Include screenshots or examples for UI changes
 
 ## Code Standards
 - Follow existing code conventions in the repository
