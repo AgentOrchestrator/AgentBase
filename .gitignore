@@ -36,3 +36,6 @@ supabase/.temp/
 # Uncomment if you want to ignore:
 # package-lock.json
 # bun.lockb
+# Build outputs
+.next/
+
