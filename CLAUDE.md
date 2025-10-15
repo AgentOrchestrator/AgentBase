@@ -165,5 +165,55 @@ import { supabaseAdmin } from '@/lib/supabase-admin';  // ← Only imports serve
 - `SUPABASE_SERVICE_ROLE_KEY` → Server-only (never exposed)
 - API routes can safely use any env var (always server-side)
 
+## Database Migrations (Supabase)
+
+### Critical Rule: Always Create Migration Files First
+**NEVER** apply migrations directly using MCP tools without creating local migration files first.
+
+### Migration Workflow
+1. **Create migration file locally** in `supabase/migrations/`
+   ```bash
+   # Generate timestamped migration file
+   npx supabase migration new <descriptive_name>
+   ```
+
+2. **Write the migration SQL** in the generated file
+   - Include comments explaining the changes
+   - Add rollback instructions if needed
+   - Test queries locally when possible
+
+3. **Review the migration** before applying
+   - Check for typos and syntax errors
+   - Verify foreign key references
+   - Ensure RLS policies are included
+
+4. **Apply the migration**
+   ```bash
+   # Option 1: Using Supabase CLI
+   npx supabase db push
+
+   # Option 2: Using MCP tool (only after file is created)
+   # Use mcp__supabase__apply_migration with the SQL from the file
+   ```
+
+5. **Verify the migration**
+   - Check tables were created correctly
+   - Test RLS policies
+   - Run security advisors
+
+### Best Practices
+- **One migration per logical change** - Don't bundle unrelated changes
+- **Include rollback steps** - Add comments showing how to revert
+- **Test migrations locally first** if possible
+- **Never hardcode IDs** in migrations - use relationships instead
+- **Always add RLS policies** for new tables to prevent security issues
+
+### Migration File Naming Convention
+Files are auto-generated with timestamps: `YYYYMMDDHHMMSS_descriptive_name.sql`
+
+Example:
+- `20251015033204_create_projects_table.sql`
+- `20251015033311_create_project_shares_table.sql`
+
 ## Additional Notes
 - Handling Cursor Messages in CURSOR_MESSAGES.md

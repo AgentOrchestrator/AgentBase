@@ -101,3 +101,42 @@ export function ClientWrapper({ data }) { ... }
 - `NEXT_PUBLIC_*` → Exposed to client (safe for public keys)
 - `SUPABASE_SERVICE_ROLE_KEY` → Server-only (NEVER use NEXT_PUBLIC_ prefix)
 - API routes → Can use any env var (always server-side)
+
+## Database Migrations (Supabase)
+
+### Critical Rule: Always Create Migration Files First
+**NEVER** apply migrations directly using MCP tools without creating local migration files first.
+
+### Migration Workflow
+1. **Generate migration file:**
+   ```bash
+   npx supabase migration new <descriptive_name>
+   ```
+
+2. **Write SQL in the file:**
+   - Add comments explaining changes
+   - Include RLS policies for new tables
+   - Verify foreign key references
+
+3. **Review before applying:**
+   - Check syntax and typos
+   - Ensure security policies are included
+   - Test locally when possible
+
+4. **Apply migration:**
+   ```bash
+   npx supabase db push
+   # OR use MCP tool only after file exists
+   ```
+
+5. **Verify:**
+   - Check tables created correctly
+   - Test RLS policies
+   - Run security advisors
+
+### Best Practices
+- One migration per logical change
+- Include rollback comments
+- Never hardcode IDs in migrations
+- Always add RLS policies for new tables
+- Migration files are timestamped: `YYYYMMDDHHMMSS_name.sql`
