@@ -28,6 +28,19 @@
 - Workspace links to global via `composer.composerData` → `composerId` (99.6% success)
 - Composer uses `conversation` array, Copilot uses `requests` array
 
+## Timestamp Limitations
+
+**Per-message timestamps are NOT reliably stored by Cursor:**
+
+- **Composer**: `bubble.createdAt` is `None` for 100% of conversation array bubbles. When present in legacy format, timestamps are batch-assigned (multiple messages share identical timestamps).
+- **Copilot**: Only `session.creationDate` exists. No per-message timestamps at all.
+
+**Implementation uses conversation/session-level timestamps only:**
+- Composer: `composerData.createdAt` and `lastUpdatedAt`
+- Copilot: `session.creationDate`
+
+This means all messages within a session show the same timestamp in the database - this is accurate to what Cursor stores, not a bug.
+
 ## Message Storage Details
 
 ### Composer Messages (Global DB)
