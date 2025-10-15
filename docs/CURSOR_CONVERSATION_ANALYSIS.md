@@ -68,19 +68,55 @@ f8fae93f-81d2-4018-81da-7b5e7cb5322
 
 1. **Two Storage Formats**: Cursor uses both modern (embedded) and legacy (separate bubble) storage formats
 2. **Complete Coverage**: The current `cursor-reader.ts` implementation correctly handles both formats
-3. **Lower Count**: 25 conversations is significantly lower than the 1,621+ mentioned in documentation, suggesting either:
-   - This is a newer Cursor installation
-   - Conversations were cleared/reset at some point
-   - Different user account or database location
+3. **⚠️ CRITICAL DISCOVERY: Workspace-Specific Conversations**:
+   - Testing on a second computer revealed only 18 conversations
+   - **These 18 conversations appear to be tied to a specific workspace**
+   - This suggests conversations are **NOT globally stored** but **workspace-specific**
+   - The global database likely only contains conversations for the currently active workspace
+   - **Implication**: There are likely many more conversations stored in workspace-specific locations
+
+## Workspace-Specific Storage Investigation
+
+### Hypothesis
+Cursor likely stores conversations in one of these ways:
+1. **Per-workspace databases**: Separate `.vscdb` files for each workspace
+2. **Workspace-keyed entries**: Conversations stored with workspace identifiers in keys (e.g., `composerData:{workspace-hash}:{conversation-id}`)
+3. **Workspace folders**: Different storage locations based on workspace paths
+4. **Tab-based storage**: Conversations tied to specific tabs/windows that are workspace-aware
+
+### Evidence
+- Computer 1: Found 25 conversations total
+- Computer 2: Found only 18 conversations
+- The 18 conversations appear to be tied to a specific workspace
+- This suggests the global database only shows conversations for currently active/recent workspaces
+
+### Next Steps for Investigation
+1. Check if `composerData` entries contain `workspaceFolder` or `tabId` fields
+2. Look for workspace-specific database files in Cursor's storage
+3. Examine if there are workspace hashes or identifiers in the key structure
+4. Check Cursor's workspaceStorage directory for per-workspace data
+5. Investigate if opening different workspaces changes the visible conversation count
 
 ## Recommendations
 
-1. **Update Analysis Script**: Modify `./scripts/analyze_cursor.sh` to count both storage formats
-2. **Verify Implementation**: Confirm `cursor-reader.ts` handles both `composerData` and `bubbleId` formats
-3. **Check Database History**: Investigate if there are backup databases or if conversations were migrated/cleared
+1. **URGENT: Investigate Workspace Storage**:
+   - Check `~/Library/Application Support/Cursor/User/workspaceStorage/` for per-workspace databases
+   - Examine composerData entries for workspace identifiers
+   - Test opening different workspaces and checking conversation count
+
+2. **Update Analysis Script**: Modify `./scripts/analyze_cursor.sh` to:
+   - Search all workspace-specific storage locations
+   - Aggregate conversations across all workspaces
+   - Report per-workspace conversation counts
+
+3. **Update cursor-reader.ts**:
+   - Add support for reading from multiple workspace storage locations
+   - Include workspace identification in extracted conversations
+   - Provide option to read from all workspaces or specific workspace
 
 ## Commands Used
 
+### Global Database Analysis
 ```bash
 # Count direct composerData entries
 sqlite3 "/Users/maxprokopp/Library/Application Support/Cursor/User/globalStorage/state.vscdb" \
@@ -93,6 +129,23 @@ sqlite3 "/Users/maxprokopp/Library/Application Support/Cursor/User/globalStorage
 # List all conversation IDs
 sqlite3 "/Users/maxprokopp/Library/Application Support/Cursor/User/globalStorage/state.vscdb" \
   "SELECT substr(key, 13) FROM cursorDiskKV WHERE key LIKE 'composerData:%' ORDER BY key;"
+```
+
+### Workspace Storage Investigation
+```bash
+# Find all workspace-specific databases
+find "$HOME/Library/Application Support/Cursor/User/workspaceStorage" -name "*.vscdb" -type f
+
+# Check if composerData has workspace info
+sqlite3 "$HOME/Library/Application Support/Cursor/User/globalStorage/state.vscdb" \
+  "SELECT key, json_extract(value, '$.workspaceFolder'), json_extract(value, '$.tabId') \
+   FROM cursorDiskKV WHERE key LIKE 'composerData:%' LIMIT 5;"
+
+# List all workspace storage directories
+ls -la "$HOME/Library/Application Support/Cursor/User/workspaceStorage/"
+
+# Search for state.vscdb files in workspace storage
+find "$HOME/Library/Application Support/Cursor/User/workspaceStorage" -name "state.vscdb" -exec echo "=== {} ===" \; -exec sqlite3 {} "SELECT COUNT(*) FROM cursorDiskKV WHERE key LIKE 'composerData:%';" \;
 ```
 
 ## Database Location

@@ -94,29 +94,67 @@ echo ""
 workspace_count=$(find "$WORKSPACE_DIR" -name "workspace.json" 2>/dev/null | wc -l | tr -d ' ')
 echo "Total workspaces: $workspace_count"
 
-# Sample a few workspaces to check their state
+# Check ALL workspaces for conversations
 echo ""
-echo "Workspace database contents (sample):"
-echo "--------------------------------------"
-sample_count=0
-find "$WORKSPACE_DIR" -name "state.vscdb" 2>/dev/null | head -3 | while read workspace_db; do
-    workspace_id=$(basename "$(dirname "$workspace_db")")
-    item_count=$(sqlite3 "$workspace_db" "SELECT COUNT(*) FROM ItemTable;" 2>/dev/null || echo "0")
-    cursor_count=$(sqlite3 "$workspace_db" "SELECT COUNT(*) FROM cursorDiskKV;" 2>/dev/null || echo "0")
+echo "Workspace database contents (checking for conversations):"
+echo "----------------------------------------------------------"
+total_workspace_conversations=0
+workspace_with_convos=0
 
-    echo "  Workspace: $workspace_id"
-    echo "    ItemTable entries:    $item_count (UI state)"
-    echo "    cursorDiskKV entries: $cursor_count (conversations)"
-    echo ""
+find "$WORKSPACE_DIR" -name "state.vscdb" 2>/dev/null | while read workspace_db; do
+    workspace_id=$(basename "$(dirname "$workspace_db")")
+
+    # Check for composerData entries in workspace database
+    composer_count=$(sqlite3 "$workspace_db" "SELECT COUNT(*) FROM cursorDiskKV WHERE key LIKE 'composerData:%';" 2>/dev/null || echo "0")
+    bubble_composers=$(sqlite3 "$workspace_db" "SELECT COUNT(DISTINCT substr(key, 10, 36)) FROM cursorDiskKV WHERE key LIKE 'bubbleId:%';" 2>/dev/null || echo "0")
+
+    if [ "$composer_count" -gt 0 ] || [ "$bubble_composers" -gt 0 ]; then
+        echo "  ⚠️  Workspace: $workspace_id"
+        echo "      composerData entries: $composer_count"
+        echo "      bubbleId composers:   $bubble_composers"
+        echo ""
+        workspace_with_convos=$((workspace_with_convos + 1))
+        total_workspace_conversations=$((total_workspace_conversations + composer_count))
+    fi
 done
+
+if [ "$workspace_with_convos" -eq 0 ]; then
+    echo "  ✓ No conversations found in workspace databases"
+    echo "  ✓ All conversations are in the global database"
+else
+    echo "  ⚠️  WARNING: Found $workspace_with_convos workspaces with conversations!"
+    echo "  ⚠️  Total workspace conversations: $total_workspace_conversations"
+    echo "  ⚠️  These are NOT included in the global database count!"
+fi
 
 echo ""
 echo "=== Summary ==="
 echo ""
-echo "✓ All $total_conversations conversations are in the global database"
-echo "✓ Workspace databases contain UI state only (no conversations)"
-echo "✓ To extract conversations, read only the global database"
+echo "Global database conversations:  $total_conversations"
+
+# Note: workspace_with_convos is calculated in a subshell, so we need to recalculate
+workspace_conv_count=$(find "$WORKSPACE_DIR" -name "state.vscdb" 2>/dev/null -exec sqlite3 {} "SELECT COUNT(*) FROM cursorDiskKV WHERE key LIKE 'composerData:%';" 2>/dev/null \; | awk '{sum+=$1} END {print sum}')
+if [ -z "$workspace_conv_count" ]; then
+    workspace_conv_count=0
+fi
+
+echo "Workspace conversations:        $workspace_conv_count"
+total_all=$((total_conversations + workspace_conv_count))
+echo "──────────────────────────────────────────"
+echo "TOTAL conversations:            $total_all"
 echo ""
-echo "See docs/CURSOR_MESSAGES.md for detailed documentation"
+
+if [ "$workspace_conv_count" -gt 0 ]; then
+    echo "⚠️  IMPORTANT: Conversations are stored in BOTH locations!"
+    echo "   To extract ALL conversations, you must read:"
+    echo "   1. Global database: $GLOBAL_DB"
+    echo "   2. All workspace databases in: $WORKSPACE_DIR"
+else
+    echo "✓ All conversations are in the global database"
+    echo "✓ To extract conversations, read only the global database"
+fi
+
+echo ""
+echo "See docs/CURSOR_MESSAGES.md and docs/CURSOR_CONVERSATION_ANALYSIS.md"
 echo ""
 echo "=== Analysis complete ==="
