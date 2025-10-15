@@ -19,6 +19,11 @@ type Service = {
 	message?: string;
 };
 
+type AuthPrompt = {
+	url: string;
+	timestamp: number;
+};
+
 const StartApp = () => {
 	const { exit } = useApp();
 	const [services, setServices] = useState<Service[]>([
@@ -28,6 +33,7 @@ const StartApp = () => {
 	]);
 	const [allRunning, setAllRunning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [authPrompt, setAuthPrompt] = useState<AuthPrompt | null>(null);
 	const processesRef = useRef<any[]>([]);
 
 	const updateService = (name: string, updates: Partial<Service>) => {
@@ -122,11 +128,39 @@ const StartApp = () => {
 
 			processesRef.current.push(daemonProcess);
 
-			// Pipe daemon logs to file
+			// Pipe daemon logs to file and monitor for auth messages
 			const daemonLog = fs.createWriteStream(path.join(process.cwd(), 'daemon.log'), {
 				flags: 'a',
 			});
-			daemonProcess.stdout?.pipe(daemonLog);
+
+			// Monitor stdout for auth messages
+			let stdoutBuffer = '';
+			daemonProcess.stdout?.on('data', (data) => {
+				const text = data.toString();
+				daemonLog.write(data);
+
+				// Buffer the output to detect auth URL
+				stdoutBuffer += text;
+
+				// Check for authentication URL pattern
+				const urlMatch = stdoutBuffer.match(/daemon-auth\?device_id=([a-f0-9-]+)/);
+				if (urlMatch) {
+					const webUrl = process.env.WEB_URL || 'http://localhost:3000';
+					const authUrl = `${webUrl}/daemon-auth?device_id=${urlMatch[1]}`;
+					setAuthPrompt({ url: authUrl, timestamp: Date.now() });
+				}
+
+				// Check for successful authentication
+				if (text.includes('Authentication successful') || text.includes('✓ Authentication successful')) {
+					setAuthPrompt(null);
+				}
+
+				// Keep buffer size reasonable
+				if (stdoutBuffer.length > 10000) {
+					stdoutBuffer = stdoutBuffer.slice(-5000);
+				}
+			});
+
 			daemonProcess.stderr?.pipe(daemonLog);
 
 			// Wait a bit for daemon to start
@@ -240,6 +274,21 @@ const StartApp = () => {
 			{error && (
 				<Box marginTop={1} borderStyle="round" borderColor="red" padding={1}>
 					<Text color="red">Error: {error}</Text>
+				</Box>
+			)}
+
+			{authPrompt && (
+				<Box marginTop={1} flexDirection="column" borderStyle="round" borderColor="cyan" padding={1}>
+					<Text bold color="cyan">🔐 Authentication Required</Text>
+					<Box marginTop={1} flexDirection="column">
+						<Text>Please click the link below to authenticate:</Text>
+						<Box marginTop={1}>
+							<Text color="cyan">{`\x1b]8;;${authPrompt.url}\x1b\\🔗 Open Authentication Page\x1b]8;;\x1b\\`}</Text>
+						</Box>
+						<Box marginTop={1}>
+							<Text dimColor>Or copy: <Text color="cyan">{authPrompt.url}</Text></Text>
+						</Box>
+					</Box>
 				</Box>
 			)}
 
