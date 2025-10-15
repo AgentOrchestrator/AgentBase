@@ -34,3 +34,49 @@
 - Ensure TypeScript types are properly defined
 - Run tests before merging branches
 - Update documentation when adding new features
+
+## Next.js App Router Guidelines (for web submodule)
+
+### Server vs Client Components
+- **NEVER** add `'use client'` to a file that exports an async component
+- Async components are Server Components and cannot be Client Components
+- If you need both server-side data fetching AND client-side interactivity:
+  1. Keep the page.tsx as a Server Component (no `'use client'`)
+  2. Create a separate client component file for interactivity
+  3. Server Component fetches data → passes props to Client Component
+
+### When to Use 'use client'
+- Only use `'use client'` when the component needs:
+  - React hooks (useState, useEffect, useRef, etc.)
+  - Browser APIs (IntersectionObserver, localStorage, etc.)
+  - Event handlers (onClick, onChange, etc.)
+- Prefer Server Components by default for better performance
+
+### Component Architecture Pattern
+```
+page.tsx (Server Component - async, fetches data)
+  ↓ passes data as props
+client-wrapper.tsx ('use client' - handles interactivity)
+  ↓ renders
+ui-component.tsx ('use client' if needed - displays UI)
+```
+
+### Common Error to Avoid
+❌ **WRONG:**
+```tsx
+'use client';  // ← Error: async component in client file
+export default async function Page() { ... }
+```
+
+✅ **CORRECT:**
+```tsx
+// page.tsx (no 'use client')
+export default async function Page() {
+  const data = await fetchData();
+  return <ClientWrapper data={data} />;
+}
+
+// client-wrapper.tsx
+'use client';
+export function ClientWrapper({ data }) { ... }
+```
