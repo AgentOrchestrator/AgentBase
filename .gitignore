@@ -29,6 +29,9 @@ Thumbs.db
 tmp/
 temp/
 
+# Supabase temp files
+supabase/.temp/
+
 # Lock files (keep package-lock.json if needed)
 # Uncomment if you want to ignore:
 # package-lock.json
