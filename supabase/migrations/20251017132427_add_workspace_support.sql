@@ -148,7 +148,7 @@ CREATE POLICY "Only owners can delete workspaces"
     USING (
         EXISTS (
             SELECT 1 FROM public.workspace_members wm
-            WHERE wm.workspace_id = id
+            WHERE wm.workspace_id = workspaces.id
             AND wm.user_id = auth.uid()
             AND wm.role = 'owner'
         )
