@@ -1218,3 +1218,84 @@ BEGIN
   RETURN COALESCE(is_admin_user, false);
 END;
 $function$;
+-- Create workspaces table
+-- Workspaces allow users to group projects and collaborate with team members
+CREATE TABLE IF NOT EXISTS public.workspaces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    created_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Create indexes for workspaces
+CREATE INDEX IF NOT EXISTS idx_workspaces_created_by ON public.workspaces(created_by_user_id);
+
+-- Enable RLS on workspaces
+ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
+
+-- Add comments
+COMMENT ON TABLE public.workspaces IS 'Workspaces for grouping projects and team collaboration';
+COMMENT ON COLUMN public.workspaces.created_by_user_id IS 'User who created the workspace';
+
+-- Create workspace_members table
+-- This table manages workspace memberships and invitations
+CREATE TABLE IF NOT EXISTS public.workspace_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+    invited_by_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL ON UPDATE CASCADE,
+    joined_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    invitation_status TEXT NOT NULL DEFAULT 'accepted' CHECK (invitation_status IN ('pending', 'accepted', 'declined')),
+    invited_at TIMESTAMPTZ DEFAULT now(),
+
+    -- Ensure unique workspace membership per user
+    UNIQUE(workspace_id, user_id)
+);
+
+-- Create indexes for workspace_members
+CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace_id ON public.workspace_members(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON public.workspace_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_invitation_status ON public.workspace_members(user_id, invitation_status);
+
+-- Enable RLS on workspace_members
+ALTER TABLE public.workspace_members ENABLE ROW LEVEL SECURITY;
+
+-- Add comments
+COMMENT ON TABLE public.workspace_members IS 'Manages workspace memberships and pending invitations';
+COMMENT ON COLUMN public.workspace_members.role IS 'Member role: owner, admin, or member';
+COMMENT ON COLUMN public.workspace_members.invitation_status IS 'Status: pending, accepted, or declined';
+COMMENT ON COLUMN public.workspace_members.invited_by_user_id IS 'User who sent the invitation';
+
+-- Create project_workspace_shares table
+-- Links projects to workspaces for team access
+CREATE TABLE IF NOT EXISTS public.project_workspace_shares (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    shared_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    permission_level TEXT NOT NULL DEFAULT 'view' CHECK (permission_level IN ('view', 'edit')),
+    created_at TIMESTAMPTZ DEFAULT now(),
+
+    -- Prevent duplicate workspace shares for same project
+    UNIQUE(project_id, workspace_id)
+);
+
+-- Create indexes for project_workspace_shares
+CREATE INDEX IF NOT EXISTS idx_project_workspace_shares_project_id ON public.project_workspace_shares(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_workspace_shares_workspace_id ON public.project_workspace_shares(workspace_id);
+
+-- Enable RLS on project_workspace_shares
+ALTER TABLE public.project_workspace_shares ENABLE ROW LEVEL SECURITY;
+
+-- Add comments
+COMMENT ON TABLE public.project_workspace_shares IS 'Links projects to workspaces for team collaboration';
+COMMENT ON COLUMN public.project_workspace_shares.permission_level IS 'Access level: view (read-only) or edit (read-write)';
+
+-- Rollback instructions:
+-- DROP TABLE IF EXISTS public.project_workspace_shares CASCADE;
+-- DROP TABLE IF EXISTS public.workspace_members CASCADE;
+-- DROP TABLE IF EXISTS public.workspaces CASCADE;
