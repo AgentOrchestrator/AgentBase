@@ -580,6 +580,27 @@ $$;
 COMMENT ON FUNCTION public.user_has_project_edit_permission(UUID, UUID) IS
   'Check if user has edit permission on a project';
 
+-- Function to check if current user is a system admin
+CREATE OR REPLACE FUNCTION public.is_system_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  is_admin_user BOOLEAN;
+BEGIN
+  SELECT is_admin INTO is_admin_user
+  FROM public.users
+  WHERE id = auth.uid();
+
+  RETURN COALESCE(is_admin_user, false);
+END;
+$$;
+
+COMMENT ON FUNCTION public.is_system_admin() IS
+  'Check if current user has system admin privileges';
+
 -- ============================================================================
 -- AUTH TRIGGER FUNCTIONS (handle user creation and synchronization)
 -- ============================================================================
@@ -771,42 +792,38 @@ CREATE POLICY "Users can delete own projects"
 -- Project Shares Policies
 CREATE POLICY "Project owners can view shares"
   ON public.project_shares FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.projects
-      WHERE projects.id = project_shares.project_id
-      AND projects.user_id = auth.uid()
-    )
-  );
+  USING (user_owns_project(project_id, auth.uid()));
 
 CREATE POLICY "Users can view their received shares"
   ON public.project_shares FOR SELECT
   USING (shared_with_user_id = auth.uid());
 
+CREATE POLICY "System admin can view all project shares"
+  ON public.project_shares FOR SELECT
+  USING (is_system_admin());
+
 CREATE POLICY "Project owners can create shares"
   ON public.project_shares FOR INSERT
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.projects
-      WHERE projects.id = project_shares.project_id
-      AND projects.user_id = auth.uid()
-    )
+    user_owns_project(project_id, auth.uid())
     AND shared_by_user_id = auth.uid()
   );
 
+CREATE POLICY "System admin can create any project share"
+  ON public.project_shares FOR INSERT
+  WITH CHECK (is_system_admin());
+
 CREATE POLICY "Project owners can delete shares"
   ON public.project_shares FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.projects
-      WHERE projects.id = project_shares.project_id
-      AND projects.user_id = auth.uid()
-    )
-  );
+  USING (user_owns_project(project_id, auth.uid()));
 
 CREATE POLICY "Users can remove their received shares"
   ON public.project_shares FOR DELETE
   USING (shared_with_user_id = auth.uid());
+
+CREATE POLICY "System admin can delete any project share"
+  ON public.project_shares FOR DELETE
+  USING (is_system_admin());
 
 -- Project Organization Shares Policies
 CREATE POLICY "Project owners can view org shares"
@@ -872,6 +889,72 @@ CREATE POLICY "Users can delete their own canvas layouts"
   ON public.user_canvas_layouts FOR DELETE
   USING (auth.uid() = user_id);
 
+-- Workspaces Policies
+CREATE POLICY "Users can view their workspaces"
+  ON public.workspaces FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.workspace_id = workspaces.id
+        AND wm.user_id = auth.uid()
+        AND wm.invitation_status = 'accepted'
+    )
+  );
+
+CREATE POLICY "System admin can view all workspaces"
+  ON public.workspaces FOR SELECT
+  USING (is_system_admin());
+
+CREATE POLICY "Users can create workspaces"
+  ON public.workspaces FOR INSERT
+  WITH CHECK (auth.uid() = created_by_user_id);
+
+CREATE POLICY "System admin can insert any workspace"
+  ON public.workspaces FOR INSERT
+  WITH CHECK (is_system_admin());
+
+CREATE POLICY "Owners and admins can update workspaces"
+  ON public.workspaces FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.workspace_id = workspaces.id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+        AND wm.invitation_status = 'accepted'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.workspace_id = workspaces.id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+        AND wm.invitation_status = 'accepted'
+    )
+  );
+
+CREATE POLICY "System admin can update any workspace"
+  ON public.workspaces FOR UPDATE
+  USING (is_system_admin())
+  WITH CHECK (is_system_admin());
+
+CREATE POLICY "Only owners can delete workspaces"
+  ON public.workspaces FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.workspace_id = workspaces.id
+        AND wm.user_id = auth.uid()
+        AND wm.role = 'owner'
+        AND wm.invitation_status = 'accepted'
+    )
+  );
+
+CREATE POLICY "System admin can delete any workspace"
+  ON public.workspaces FOR DELETE
+  USING (is_system_admin());
+
 -- Workspace Members Policies
 CREATE POLICY "Users can view workspace members non-recursive"
   ON public.workspace_members FOR SELECT
@@ -880,9 +963,17 @@ CREATE POLICY "Users can view workspace members non-recursive"
     OR is_workspace_member(workspace_id, auth.uid())
   );
 
+CREATE POLICY "System admin can view all workspace members"
+  ON public.workspace_members FOR SELECT
+  USING (is_system_admin());
+
 CREATE POLICY "Owners and admins can invite members non-recursive"
   ON public.workspace_members FOR INSERT
   WITH CHECK (is_workspace_admin(workspace_id, auth.uid()));
+
+CREATE POLICY "System admin can insert any workspace member"
+  ON public.workspace_members FOR INSERT
+  WITH CHECK (is_system_admin());
 
 CREATE POLICY "Owners and admins can update member roles non-recursive"
   ON public.workspace_members FOR UPDATE
@@ -893,12 +984,32 @@ CREATE POLICY "Owners and admins can update member roles non-recursive"
   )
   WITH CHECK (is_workspace_admin(workspace_id, auth.uid()));
 
+CREATE POLICY "Users can update their own invitation status"
+  ON public.workspace_members FOR UPDATE
+  USING (
+    user_id = auth.uid()
+    AND invitation_status = 'pending'
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    AND invitation_status IN ('accepted', 'declined')
+  );
+
+CREATE POLICY "System admin can update any workspace member"
+  ON public.workspace_members FOR UPDATE
+  USING (is_system_admin())
+  WITH CHECK (is_system_admin());
+
 CREATE POLICY "Members and invitations can be removed non-recursive"
   ON public.workspace_members FOR DELETE
   USING (
     user_id = auth.uid()
     OR is_workspace_admin(workspace_id, auth.uid())
   );
+
+CREATE POLICY "System admin can delete any workspace member"
+  ON public.workspace_members FOR DELETE
+  USING (is_system_admin());
 
 -- Project Workspace Shares Policies
 CREATE POLICY "Users can view workspace shares for accessible projects non-recursive"
