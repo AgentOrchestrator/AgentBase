@@ -828,34 +828,30 @@ CREATE POLICY "System admin can delete any project share"
 -- Project Organization Shares Policies
 CREATE POLICY "Project owners can view org shares"
   ON public.project_organization_shares FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.projects
-      WHERE projects.id = project_organization_shares.project_id
-      AND projects.user_id = auth.uid()
-    )
-  );
+  USING (user_owns_project(project_id, auth.uid()));
+
+CREATE POLICY "System admin can view all org shares"
+  ON public.project_organization_shares FOR SELECT
+  USING (is_system_admin());
 
 CREATE POLICY "Project owners can create org shares"
   ON public.project_organization_shares FOR INSERT
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.projects
-      WHERE projects.id = project_organization_shares.project_id
-      AND projects.user_id = auth.uid()
-    )
+    user_owns_project(project_id, auth.uid())
     AND shared_by_user_id = auth.uid()
   );
 
+CREATE POLICY "System admin can create any org share"
+  ON public.project_organization_shares FOR INSERT
+  WITH CHECK (is_system_admin());
+
 CREATE POLICY "Project owners can delete org shares"
   ON public.project_organization_shares FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.projects
-      WHERE projects.id = project_organization_shares.project_id
-      AND projects.user_id = auth.uid()
-    )
-  );
+  USING (user_owns_project(project_id, auth.uid()));
+
+CREATE POLICY "System admin can delete any org share"
+  ON public.project_organization_shares FOR DELETE
+  USING (is_system_admin());
 
 -- Active Sessions Policies
 CREATE POLICY "Users can view own active sessions"
