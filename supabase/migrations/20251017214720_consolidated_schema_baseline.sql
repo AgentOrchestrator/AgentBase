@@ -1223,21 +1223,26 @@ $function$;
 CREATE TABLE IF NOT EXISTS public.workspaces (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
     description TEXT,
     created_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    workspace_metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Create indexes for workspaces
 CREATE INDEX IF NOT EXISTS idx_workspaces_created_by ON public.workspaces(created_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON public.workspaces(slug);
 
 -- Enable RLS on workspaces
 ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 
 -- Add comments
 COMMENT ON TABLE public.workspaces IS 'Workspaces for grouping projects and team collaboration';
+COMMENT ON COLUMN public.workspaces.slug IS 'URL-friendly unique identifier for the workspace';
 COMMENT ON COLUMN public.workspaces.created_by_user_id IS 'User who created the workspace';
+COMMENT ON COLUMN public.workspaces.workspace_metadata IS 'Additional workspace metadata (settings, preferences, etc.)';
 
 -- Create workspace_members table
 -- This table manages workspace memberships and invitations
