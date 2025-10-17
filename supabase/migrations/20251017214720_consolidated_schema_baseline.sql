@@ -5,7 +5,7 @@
 -- ============================================================================
 
 -- ============================================================================
--- HELPER FUNCTIONS (must be created first for use in RLS policies)
+-- BASIC HELPER FUNCTIONS (no table dependencies)
 -- ============================================================================
 
 -- Function to update updated_at timestamp
@@ -16,139 +16,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
--- Function to check if user is a member of a workspace (bypasses RLS)
-CREATE OR REPLACE FUNCTION public.is_workspace_member(workspace_id_param UUID, user_id_param UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1
-    FROM workspace_members
-    WHERE workspace_id = workspace_id_param
-      AND user_id = user_id_param
-      AND invitation_status = 'accepted'
-  );
-END;
-$$;
-
-COMMENT ON FUNCTION public.is_workspace_member(UUID, UUID) IS
-  'SECURITY DEFINER function to check workspace membership without triggering RLS recursion';
-
--- Function to check if user is owner/admin of a workspace (bypasses RLS)
-CREATE OR REPLACE FUNCTION public.is_workspace_admin(workspace_id_param UUID, user_id_param UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1
-    FROM workspace_members
-    WHERE workspace_id = workspace_id_param
-      AND user_id = user_id_param
-      AND role IN ('owner', 'admin')
-      AND invitation_status = 'accepted'
-  );
-END;
-$$;
-
-COMMENT ON FUNCTION public.is_workspace_admin(UUID, UUID) IS
-  'SECURITY DEFINER function to check workspace admin/owner role without triggering RLS recursion';
-
--- Function to get all workspace IDs where user is an accepted member (bypasses RLS)
-CREATE OR REPLACE FUNCTION public.get_user_workspace_ids(user_id_param UUID)
-RETURNS TABLE(workspace_id UUID)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT wm.workspace_id
-  FROM workspace_members wm
-  WHERE wm.user_id = user_id_param
-    AND wm.invitation_status = 'accepted';
-END;
-$$;
-
-COMMENT ON FUNCTION public.get_user_workspace_ids(UUID) IS
-  'SECURITY DEFINER function to get user workspace IDs without triggering RLS recursion';
-
--- Function to check if user has workspace access to a project (bypasses RLS)
-CREATE OR REPLACE FUNCTION public.has_workspace_access_to_project(
-  project_id_param UUID,
-  user_id_param UUID,
-  required_permission TEXT DEFAULT NULL
-)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1
-    FROM project_workspace_shares pws
-    JOIN workspace_members wm ON wm.workspace_id = pws.workspace_id
-    WHERE pws.project_id = project_id_param
-      AND wm.user_id = user_id_param
-      AND wm.invitation_status = 'accepted'
-      AND (required_permission IS NULL OR pws.permission_level = required_permission)
-  );
-END;
-$$;
-
-COMMENT ON FUNCTION public.has_workspace_access_to_project(UUID, UUID, TEXT) IS
-  'SECURITY DEFINER function to check workspace access to projects without triggering RLS recursion';
-
--- Function to check if user can view a project (via ownership or shares)
-CREATE OR REPLACE FUNCTION public.user_can_view_project(
-  project_id_param UUID,
-  user_id_param UUID
-)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM projects p
-    WHERE p.id = project_id_param
-      AND p.user_id = user_id_param
-  )
-  OR EXISTS (
-    SELECT 1 FROM project_shares ps
-    WHERE ps.project_id = project_id_param
-      AND ps.shared_with_user_id = user_id_param
-  )
-  OR EXISTS (
-    SELECT 1 FROM project_organization_shares pos
-    WHERE pos.project_id = project_id_param
-  )
-  OR EXISTS (
-    SELECT 1
-    FROM project_workspace_shares pws
-    JOIN workspace_members wm ON wm.workspace_id = pws.workspace_id
-    WHERE pws.project_id = project_id_param
-      AND wm.user_id = user_id_param
-      AND wm.invitation_status = 'accepted'
-  );
-END;
-$$;
-
-COMMENT ON FUNCTION public.user_can_view_project(UUID, UUID) IS
-  'SECURITY DEFINER function to check if user can view a project without triggering RLS recursion';
 
 -- Cleanup function for consumed auth sessions
 CREATE OR REPLACE FUNCTION public.cleanup_consumed_auth_sessions()
@@ -163,6 +30,35 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 -- TABLES
 -- ============================================================================
+
+-- Projects Table (must be created before chat_histories references it)
+CREATE TABLE IF NOT EXISTS public.projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    name TEXT NOT NULL,
+    project_path TEXT NOT NULL,
+    description TEXT,
+    workspace_metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, project_path)
+);
+
+CREATE INDEX idx_projects_user_id ON public.projects(user_id);
+CREATE INDEX idx_projects_project_path ON public.projects(project_path);
+
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+
+CREATE TRIGGER update_projects_updated_at
+    BEFORE UPDATE ON public.projects
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_updated_at_column();
+
+COMMENT ON TABLE public.projects IS 'Stores project information for organizing chat histories';
+COMMENT ON COLUMN public.projects.user_id IS 'Owner of the project';
+COMMENT ON COLUMN public.projects.name IS 'Display name of the project (extracted from project_path)';
+COMMENT ON COLUMN public.projects.project_path IS 'Full filesystem path to the project';
+COMMENT ON COLUMN public.projects.workspace_metadata IS 'Additional metadata (e.g., Cursor workspace.json data)';
 
 -- Chat Histories Table
 CREATE TABLE IF NOT EXISTS public.chat_histories (
@@ -235,35 +131,6 @@ CREATE INDEX idx_daemon_auth_sessions_consumed ON public.daemon_auth_sessions(co
 ALTER TABLE public.daemon_auth_sessions ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.daemon_auth_sessions IS 'Handles daemon authentication sessions for desktop clients';
-
--- Projects Table
-CREATE TABLE IF NOT EXISTS public.projects (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    name TEXT NOT NULL,
-    project_path TEXT NOT NULL,
-    description TEXT,
-    workspace_metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(user_id, project_path)
-);
-
-CREATE INDEX idx_projects_user_id ON public.projects(user_id);
-CREATE INDEX idx_projects_project_path ON public.projects(project_path);
-
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
-
-CREATE TRIGGER update_projects_updated_at
-    BEFORE UPDATE ON public.projects
-    FOR EACH ROW
-    EXECUTE FUNCTION public.update_updated_at_column();
-
-COMMENT ON TABLE public.projects IS 'Stores project information for organizing chat histories';
-COMMENT ON COLUMN public.projects.user_id IS 'Owner of the project';
-COMMENT ON COLUMN public.projects.name IS 'Display name of the project (extracted from project_path)';
-COMMENT ON COLUMN public.projects.project_path IS 'Full filesystem path to the project';
-COMMENT ON COLUMN public.projects.workspace_metadata IS 'Additional metadata (e.g., Cursor workspace.json data)';
 
 -- Project Shares Table (Individual Users)
 CREATE TABLE IF NOT EXISTS public.project_shares (
@@ -429,6 +296,143 @@ ALTER TABLE public.project_workspace_shares ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.project_workspace_shares IS 'Links projects to workspaces for team collaboration';
 COMMENT ON COLUMN public.project_workspace_shares.permission_level IS 'Access level: view (read-only) or edit (read-write)';
+
+-- ============================================================================
+-- HELPER FUNCTIONS (depend on tables above)
+-- ============================================================================
+
+-- Function to check if user is a member of a workspace (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.is_workspace_member(workspace_id_param UUID, user_id_param UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM workspace_members
+    WHERE workspace_id = workspace_id_param
+      AND user_id = user_id_param
+      AND invitation_status = 'accepted'
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.is_workspace_member(UUID, UUID) IS
+  'SECURITY DEFINER function to check workspace membership without triggering RLS recursion';
+
+-- Function to check if user is owner/admin of a workspace (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.is_workspace_admin(workspace_id_param UUID, user_id_param UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM workspace_members
+    WHERE workspace_id = workspace_id_param
+      AND user_id = user_id_param
+      AND role IN ('owner', 'admin')
+      AND invitation_status = 'accepted'
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.is_workspace_admin(UUID, UUID) IS
+  'SECURITY DEFINER function to check workspace admin/owner role without triggering RLS recursion';
+
+-- Function to get all workspace IDs where user is an accepted member (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.get_user_workspace_ids(user_id_param UUID)
+RETURNS TABLE(workspace_id UUID)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT wm.workspace_id
+  FROM workspace_members wm
+  WHERE wm.user_id = user_id_param
+    AND wm.invitation_status = 'accepted';
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_user_workspace_ids(UUID) IS
+  'SECURITY DEFINER function to get user workspace IDs without triggering RLS recursion';
+
+-- Function to check if user has workspace access to a project (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.has_workspace_access_to_project(
+  project_id_param UUID,
+  user_id_param UUID,
+  required_permission TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM project_workspace_shares pws
+    JOIN workspace_members wm ON wm.workspace_id = pws.workspace_id
+    WHERE pws.project_id = project_id_param
+      AND wm.user_id = user_id_param
+      AND wm.invitation_status = 'accepted'
+      AND (required_permission IS NULL OR pws.permission_level = required_permission)
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.has_workspace_access_to_project(UUID, UUID, TEXT) IS
+  'SECURITY DEFINER function to check workspace access to projects without triggering RLS recursion';
+
+-- Function to check if user can view a project (via ownership or shares)
+CREATE OR REPLACE FUNCTION public.user_can_view_project(
+  project_id_param UUID,
+  user_id_param UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM projects p
+    WHERE p.id = project_id_param
+      AND p.user_id = user_id_param
+  )
+  OR EXISTS (
+    SELECT 1 FROM project_shares ps
+    WHERE ps.project_id = project_id_param
+      AND ps.shared_with_user_id = user_id_param
+  )
+  OR EXISTS (
+    SELECT 1 FROM project_organization_shares pos
+    WHERE pos.project_id = project_id_param
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM project_workspace_shares pws
+    JOIN workspace_members wm ON wm.workspace_id = pws.workspace_id
+    WHERE pws.project_id = project_id_param
+      AND wm.user_id = user_id_param
+      AND wm.invitation_status = 'accepted'
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.user_can_view_project(UUID, UUID) IS
+  'SECURITY DEFINER function to check if user can view a project without triggering RLS recursion';
 
 -- ============================================================================
 -- ROW LEVEL SECURITY POLICIES
