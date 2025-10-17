@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS public.chat_histories (
     ai_keywords_topic TEXT[],
     ai_keywords_generated_at TIMESTAMPTZ,
     ai_keywords_message_count INTEGER,
+    ai_title TEXT,
+    ai_title_generated_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT check_agent_type CHECK (agent_type IN ('claude_code', 'codex', 'cursor', 'windsurf', 'other'))
@@ -135,6 +137,8 @@ COMMENT ON COLUMN public.chat_histories.ai_keywords_type IS 'AI-extracted keywor
 COMMENT ON COLUMN public.chat_histories.ai_keywords_topic IS 'AI-extracted keywords about the topics discussed';
 COMMENT ON COLUMN public.chat_histories.ai_keywords_generated_at IS 'When the AI keywords were generated';
 COMMENT ON COLUMN public.chat_histories.ai_keywords_message_count IS 'Number of messages that were analyzed for keywords';
+COMMENT ON COLUMN public.chat_histories.ai_title IS 'AI-generated title for the conversation';
+COMMENT ON COLUMN public.chat_histories.ai_title_generated_at IS 'When the AI title was generated';
 COMMENT ON COLUMN public.chat_histories.project_id IS 'Foreign key to projects table - groups chat sessions by project';
 
 -- Daemon Auth Sessions Table
@@ -261,7 +265,7 @@ COMMENT ON TABLE public.user_canvas_layouts IS 'Stores user-specific canvas node
 CREATE TABLE IF NOT EXISTS public.workspaces (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
     description TEXT,
     created_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
     workspace_metadata JSONB DEFAULT '{}'::jsonb,
@@ -284,7 +288,7 @@ CREATE TABLE IF NOT EXISTS public.workspace_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member', 'viewer')),
     invited_by_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL ON UPDATE CASCADE,
     joined_at TIMESTAMPTZ DEFAULT now(),
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -322,6 +326,68 @@ ALTER TABLE public.project_workspace_shares ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.project_workspace_shares IS 'Links projects to workspaces for team collaboration';
 COMMENT ON COLUMN public.project_workspace_shares.permission_level IS 'Access level: view (read-only) or edit (read-write)';
+
+-- Pinned Conversations Table
+CREATE TABLE IF NOT EXISTS public.pinned_conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES public.chat_histories(id) ON DELETE CASCADE,
+    pinned_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, conversation_id)
+);
+
+CREATE INDEX idx_pinned_conversations_user_id ON public.pinned_conversations(user_id);
+CREATE INDEX idx_pinned_conversations_conversation_id ON public.pinned_conversations(conversation_id);
+
+ALTER TABLE public.pinned_conversations ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.pinned_conversations IS 'Tracks which conversations users have pinned on the canvas';
+
+-- LLM API Keys Table
+CREATE TABLE IF NOT EXISTS public.llm_api_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    provider TEXT NOT NULL,
+    api_key TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now())
+);
+
+CREATE INDEX idx_llm_api_keys_account_id ON public.llm_api_keys(account_id);
+CREATE INDEX idx_llm_api_keys_provider ON public.llm_api_keys(provider);
+CREATE INDEX idx_llm_api_keys_is_default ON public.llm_api_keys(is_default) WHERE is_default = true;
+
+ALTER TABLE public.llm_api_keys ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.llm_api_keys IS 'Stores user LLM API keys for various providers';
+
+-- User Preferences Table
+CREATE TABLE IF NOT EXISTS public.user_preferences (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    ai_summary_enabled BOOLEAN DEFAULT true,
+    ai_title_enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now())
+);
+
+CREATE INDEX idx_user_preferences_user_id ON public.user_preferences(user_id);
+
+ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
+
+CREATE TRIGGER update_user_preferences_updated_at
+    BEFORE UPDATE ON public.user_preferences
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_updated_at_column();
+
+COMMENT ON TABLE public.user_preferences IS 'Stores user preferences and settings';
+COMMENT ON COLUMN public.user_preferences.user_id IS 'Foreign key to auth.users - the user who owns these preferences';
+COMMENT ON COLUMN public.user_preferences.ai_summary_enabled IS 'Whether AI summaries should be generated for this user''s sessions';
+COMMENT ON COLUMN public.user_preferences.ai_title_enabled IS 'Whether AI titles should be generated for this user''s sessions';
 
 -- ============================================================================
 -- HELPER FUNCTIONS (depend on tables above)
@@ -678,10 +744,6 @@ CREATE POLICY "Users can view org-shared projects"
     )
   );
 
-CREATE POLICY "Users can view their projects and shared projects non-recursive"
-  ON public.projects FOR SELECT
-  USING (user_can_view_project(id, auth.uid()));
-
 CREATE POLICY "Users can create own projects"
   ON public.projects FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -849,3 +911,52 @@ CREATE POLICY "Users can view workspace shares for accessible projects non-recur
     )
     OR is_workspace_member(workspace_id, auth.uid())
   );
+
+-- Pinned Conversations Policies
+CREATE POLICY "Users can view own pinned conversations"
+  ON public.pinned_conversations FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own pinned conversations"
+  ON public.pinned_conversations FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own pinned conversations"
+  ON public.pinned_conversations FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- LLM API Keys Policies
+CREATE POLICY "Users can view own API keys"
+  ON public.llm_api_keys FOR SELECT
+  USING (auth.uid() = account_id);
+
+CREATE POLICY "Users can insert own API keys"
+  ON public.llm_api_keys FOR INSERT
+  WITH CHECK (auth.uid() = account_id);
+
+CREATE POLICY "Users can update own API keys"
+  ON public.llm_api_keys FOR UPDATE
+  USING (auth.uid() = account_id)
+  WITH CHECK (auth.uid() = account_id);
+
+CREATE POLICY "Users can delete own API keys"
+  ON public.llm_api_keys FOR DELETE
+  USING (auth.uid() = account_id);
+
+-- User Preferences Policies
+CREATE POLICY "Users can view own preferences"
+  ON public.user_preferences FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own preferences"
+  ON public.user_preferences FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own preferences"
+  ON public.user_preferences FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own preferences"
+  ON public.user_preferences FOR DELETE
+  USING (auth.uid() = user_id);
