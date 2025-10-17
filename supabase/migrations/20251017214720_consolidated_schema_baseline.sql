@@ -31,17 +31,42 @@ $$ LANGUAGE plpgsql;
 -- TABLES
 -- ============================================================================
 
+-- Users Table (mirrors auth.users with additional fields)
+CREATE TABLE IF NOT EXISTS public.users (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    display_name TEXT,
+    avatar_url TEXT,
+    is_admin BOOLEAN NOT NULL DEFAULT false,
+    github_username TEXT,
+    github_avatar_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_users_is_admin ON public.users(is_admin) WHERE is_admin = true;
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.users IS 'User profiles with additional metadata beyond auth.users';
+COMMENT ON COLUMN public.users.id IS 'References auth.users(id) - primary authentication ID';
+COMMENT ON COLUMN public.users.is_admin IS 'Whether user has admin privileges';
+COMMENT ON COLUMN public.users.github_username IS 'GitHub username if authenticated via GitHub';
+COMMENT ON COLUMN public.users.github_avatar_url IS 'GitHub avatar URL if authenticated via GitHub';
+
 -- Projects Table (must be created before chat_histories references it)
 CREATE TABLE IF NOT EXISTS public.projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
     name TEXT NOT NULL,
-    project_path TEXT NOT NULL,
+    project_path TEXT,
     description TEXT,
+    is_default BOOLEAN NOT NULL DEFAULT false,
     workspace_metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(user_id, project_path)
+    UNIQUE(user_id, name)
 );
 
 CREATE INDEX idx_projects_user_id ON public.projects(user_id);
@@ -57,7 +82,8 @@ CREATE TRIGGER update_projects_updated_at
 COMMENT ON TABLE public.projects IS 'Stores project information for organizing chat histories';
 COMMENT ON COLUMN public.projects.user_id IS 'Owner of the project';
 COMMENT ON COLUMN public.projects.name IS 'Display name of the project (extracted from project_path)';
-COMMENT ON COLUMN public.projects.project_path IS 'Full filesystem path to the project';
+COMMENT ON COLUMN public.projects.project_path IS 'Full filesystem path to the project (nullable for default projects)';
+COMMENT ON COLUMN public.projects.is_default IS 'Whether this is the default "Uncategorized" project for the user';
 COMMENT ON COLUMN public.projects.workspace_metadata IS 'Additional metadata (e.g., Cursor workspace.json data)';
 
 -- Chat Histories Table
@@ -434,9 +460,159 @@ $$;
 COMMENT ON FUNCTION public.user_can_view_project(UUID, UUID) IS
   'SECURITY DEFINER function to check if user can view a project without triggering RLS recursion';
 
+-- Additional helper functions for project permissions
+CREATE OR REPLACE FUNCTION public.user_owns_project(project_id_param UUID, user_id_param UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.projects
+    WHERE id = project_id_param AND user_id = user_id_param
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.user_owns_project(UUID, UUID) IS
+  'Check if user owns a specific project';
+
+CREATE OR REPLACE FUNCTION public.user_has_project_share(project_id_param UUID, user_id_param UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.project_shares
+    WHERE project_id = project_id_param AND shared_with_user_id = user_id_param
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.user_has_project_share(UUID, UUID) IS
+  'Check if user has any share access to a project';
+
+CREATE OR REPLACE FUNCTION public.user_has_project_edit_permission(project_id_param UUID, user_id_param UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.project_shares
+    WHERE project_id = project_id_param
+      AND shared_with_user_id = user_id_param
+      AND permission_level = 'edit'
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.user_has_project_edit_permission(UUID, UUID) IS
+  'Check if user has edit permission on a project';
+
+-- ============================================================================
+-- AUTH TRIGGER FUNCTIONS (handle user creation and synchronization)
+-- ============================================================================
+
+-- Function to handle new user creation/update from auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.users (id, email, display_name, avatar_url, github_username, github_avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(
+      NEW.raw_user_meta_data->>'display_name',
+      NEW.raw_user_meta_data->>'full_name',
+      NEW.raw_user_meta_data->>'name'
+    ),
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'x_github_name',
+    NEW.raw_user_meta_data->>'x_github_avatar_url'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = COALESCE(EXCLUDED.display_name, public.users.display_name),
+    avatar_url = COALESCE(EXCLUDED.avatar_url, public.users.avatar_url),
+    github_username = COALESCE(EXCLUDED.github_username, public.users.github_username),
+    github_avatar_url = COALESCE(EXCLUDED.github_avatar_url, public.users.github_avatar_url),
+    updated_at = now();
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.handle_new_user() IS
+  'Trigger function to sync auth.users to public.users table';
+
+-- Function to create default "Uncategorized" project for new users
+CREATE OR REPLACE FUNCTION public.create_default_project_for_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    INSERT INTO public.projects (user_id, name, project_path, description, is_default)
+    VALUES (
+        NEW.id,
+        'Uncategorized',
+        NULL,
+        'Default project for sessions without project information',
+        true
+    )
+    ON CONFLICT (user_id, name) DO NOTHING;
+
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.create_default_project_for_user() IS
+  'Trigger function to create default Uncategorized project for new users';
+
+-- ============================================================================
+-- AUTH TRIGGERS (on auth.users table)
+-- ============================================================================
+
+-- Trigger to sync auth.users to public.users on INSERT/UPDATE
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT OR UPDATE ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
+-- Trigger to create default project when user is created
+DROP TRIGGER IF EXISTS create_default_project_on_user_creation ON auth.users;
+CREATE TRIGGER create_default_project_on_user_creation
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.create_default_project_for_user();
+
 -- ============================================================================
 -- ROW LEVEL SECURITY POLICIES
 -- ============================================================================
+
+-- Users Table Policies
+CREATE POLICY "Users can view own profile"
+  ON public.users FOR SELECT
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can view other user profiles"
+  ON public.users FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can update own profile"
+  ON public.users FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- Chat Histories Policies
 CREATE POLICY "Enable all access for authenticated users"
