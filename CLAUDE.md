@@ -23,32 +23,34 @@ Only commit to the parent repository when:
 ### Branch Management
 - **Always create a new branch** for any code edits or features
 - Branch naming convention: Use descriptive names (e.g., `feature/add-auth`, `fix/install-env-vars`, `refactor/cleanup-types`)
-- **NEVER commit directly to main branch**
-- **NEVER push directly to main branch**
-- **Always create a Pull Request** for code review before merging
-- Delete feature branches after successful merge to keep the repository clean
 
 ### Workflow Steps
-1. Create a new branch: `git checkout -b <descriptive-branch-name>`
-2. Make your changes and commit them
-3. **Before pushing, merge main into your branch to resolve conflicts:**
+1. **Start from main branch:**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+2. Create a new branch: `git checkout -b <descriptive-branch-name>`
+3. Make your changes and commit them
+4. **Before pushing, merge main into your branch to resolve conflicts:**
    ```bash
    git fetch origin main
    git merge origin/main
    # Resolve any conflicts if they occur
    # Test your changes after merging to ensure everything still works
    ```
-4. Push your feature branch: `git push -u origin <your-branch-name>`
-5. Create a Pull Request (PR) to merge into main
-6. Wait for code review and approval (if working with a team)
-7. Merge the PR on GitHub (or via `gh` CLI)
-8. **After PR is merged, clean up locally:**
+5. Push your feature branch: `git push -u origin <your-branch-name>`
+6. Create a Pull Request (PR) to merge into main
+7. Wait for code review and approval (if working with a team)
+8. Merge the PR on GitHub (or via `gh` CLI)
+9. **After PR is merged, clean up locally and return to main:**
    ```bash
    git checkout main
    git pull origin main
    git branch -d <your-branch-name>
    ```
-9. **Important:** Always delete your local feature branch after the PR is merged to keep your workspace clean
+10. **Important:** Always delete your local feature branch after the PR is merged to keep your workspace clean
+11. **CRITICAL:** Always return to `main` branch after completing work on a feature - this ensures the next feature starts from a clean state
 
 ### Pull Request Guidelines
 - Write clear PR titles and descriptions explaining the changes
