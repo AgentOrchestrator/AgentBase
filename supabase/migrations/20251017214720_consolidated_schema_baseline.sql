@@ -632,14 +632,60 @@ ALTER TABLE public.project_organization_shares
     ON DELETE CASCADE
     ON UPDATE CASCADE;
 
--- 7. Update active_sessions.user_id foreign key
-ALTER TABLE public.active_sessions
-  DROP CONSTRAINT IF EXISTS active_sessions_user_id_fkey,
-  ADD CONSTRAINT active_sessions_user_id_fkey
-    FOREIGN KEY (user_id)
-    REFERENCES auth.users(id)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE;
+-- Create active_sessions table
+-- This table tracks the most recently active editor sessions and files per user
+-- Updated periodically by the daemon to show "currently working on" status
+CREATE TABLE IF NOT EXISTS public.active_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+    editor_type TEXT NOT NULL CHECK (editor_type IN ('cursor', 'windsurf', 'claude_code', 'vscode', 'other')),
+    last_activity_at TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    recent_files JSONB DEFAULT '[]'::jsonb,
+    workspace_path TEXT,
+    session_metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(user_id, editor_type)
+);
+
+-- Create indexes for active_sessions
+CREATE INDEX IF NOT EXISTS idx_active_sessions_user_id ON public.active_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_project_id ON public.active_sessions(project_id);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_is_active ON public.active_sessions(is_active);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_last_activity ON public.active_sessions(last_activity_at DESC);
+CREATE INDEX IF NOT EXISTS idx_active_sessions_recent_files ON public.active_sessions USING GIN(recent_files);
+
+-- Enable RLS
+ALTER TABLE public.active_sessions ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies for active_sessions
+CREATE POLICY "Users can view own active sessions"
+    ON public.active_sessions
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view active sessions of shared projects"
+    ON public.active_sessions
+    FOR SELECT
+    USING (
+        project_id IN (
+            SELECT project_id
+            FROM public.project_shares
+            WHERE shared_with_user_id = auth.uid()
+        )
+    );
+
+-- Add comments
+COMMENT ON TABLE public.active_sessions IS 'Tracks recently active editor sessions and files per user (updated periodically)';
+COMMENT ON COLUMN public.active_sessions.user_id IS 'User who owns this active session';
+COMMENT ON COLUMN public.active_sessions.editor_type IS 'Type of editor: cursor, windsurf, claude_code, vscode, other';
+COMMENT ON COLUMN public.active_sessions.last_activity_at IS 'Timestamp of last detected activity in this editor';
+COMMENT ON COLUMN public.active_sessions.is_active IS 'True if activity detected within past hour';
+COMMENT ON COLUMN public.active_sessions.recent_files IS 'Array of recently accessed files: [{path: string, lastAccessed: timestamp}]';
+COMMENT ON COLUMN public.active_sessions.workspace_path IS 'Current workspace/project path being worked on';
+COMMENT ON COLUMN public.active_sessions.session_metadata IS 'Additional session data (workspace info, etc.)';
 
 -- Rollback instructions:
 -- To rollback, recreate the constraints with ON UPDATE NO ACTION:
