@@ -399,7 +399,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -421,7 +421,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -444,7 +444,7 @@ RETURNS TABLE(workspace_id UUID)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN QUERY
@@ -468,7 +468,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -495,7 +495,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -531,7 +531,7 @@ CREATE OR REPLACE FUNCTION public.user_owns_project(project_id_param UUID, user_
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -548,7 +548,7 @@ CREATE OR REPLACE FUNCTION public.user_has_project_share(project_id_param UUID, 
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -565,7 +565,7 @@ CREATE OR REPLACE FUNCTION public.user_has_project_edit_permission(project_id_pa
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -585,7 +585,7 @@ CREATE OR REPLACE FUNCTION public.is_system_admin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 DECLARE
   is_admin_user BOOLEAN;
@@ -610,7 +610,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $$
 BEGIN
   INSERT INTO public.users (id, email, display_name, avatar_url, github_username, github_avatar_url)
@@ -750,9 +750,9 @@ CREATE POLICY "Users can view shared projects"
   ON public.projects FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM public.project_shares
-      WHERE project_shares.project_id = projects.id
-      AND project_shares.shared_with_user_id = auth.uid()
+      SELECT 1 FROM project_shares ps
+      WHERE ps.project_id = projects.id
+      AND ps.shared_with_user_id = auth.uid()
     )
   );
 
@@ -760,7 +760,7 @@ CREATE POLICY "Users can view org-shared projects"
   ON public.projects FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM public.project_organization_shares
+      SELECT 1 FROM project_organization_shares
       WHERE project_organization_shares.project_id = projects.id
     )
   );
@@ -778,10 +778,10 @@ CREATE POLICY "Users can update projects with edit permission"
   ON public.projects FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM public.project_shares
-      WHERE project_shares.project_id = projects.id
-      AND project_shares.shared_with_user_id = auth.uid()
-      AND project_shares.permission_level = 'edit'
+      SELECT 1 FROM project_shares ps
+      WHERE ps.project_id = projects.id
+      AND ps.shared_with_user_id = auth.uid()
+      AND ps.permission_level = 'edit'
     )
   );
 
