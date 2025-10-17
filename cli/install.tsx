@@ -33,7 +33,6 @@ const InstallApp = () => {
 	const [needsOpenaiInput, setNeedsOpenaiInput] = useState(false);
 	const [supabaseUrl, setSupabaseUrl] = useState('');
 	const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
-	const [supabaseServiceKey, setSupabaseServiceKey] = useState('');
 	const [completed, setCompleted] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [useRemoteSupabase, setUseRemoteSupabase] = useState<boolean | null>(null);
@@ -41,8 +40,7 @@ const InstallApp = () => {
 	const [needsRemoteCredentials, setNeedsRemoteCredentials] = useState(false);
 	const [remoteSupabaseUrl, setRemoteSupabaseUrl] = useState('');
 	const [remoteSupabaseAnonKey, setRemoteSupabaseAnonKey] = useState('');
-	const [remoteSupabaseServiceKey, setRemoteSupabaseServiceKey] = useState('');
-	const [currentCredentialInput, setCurrentCredentialInput] = useState<'url' | 'anon' | 'service'>('url');
+	const [currentCredentialInput, setCurrentCredentialInput] = useState<'url' | 'anon'>('url');
 	const [supabaseChoiceInput, setSupabaseChoiceInput] = useState('');
 
 	const updateStep = (index: number, status: Step['status'], message?: string) => {
@@ -135,8 +133,7 @@ const InstallApp = () => {
 	const continueInstall = async (
 		apiKey: string,
 		url: string,
-		anonKey: string,
-		serviceKey: string
+		anonKey: string
 	) => {
 		try {
 			// Step 5: Create/update .env files
@@ -157,7 +154,6 @@ const InstallApp = () => {
 			mergeEnvFile(rootEnvPath, {
 				SUPABASE_URL: url,
 				SUPABASE_ANON_KEY: anonKey,
-				SUPABASE_SERVICE_ROLE_KEY: serviceKey,
 			});
 
 			// Daemon .env
@@ -173,8 +169,7 @@ const InstallApp = () => {
 			}
 			mergeEnvFile(daemonEnvPath, {
 				SUPABASE_URL: url,
-				SUPABASE_KEY: anonKey,
-				SUPABASE_SERVICE_ROLE_KEY: serviceKey,
+				SUPABASE_ANON_KEY: anonKey,
 				OPENAI_API_KEY: apiKey,
 				CLAUDE_CODE_HOME: '',
 			});
@@ -193,7 +188,6 @@ const InstallApp = () => {
 			mergeEnvFile(webEnvPath, {
 				SUPABASE_URL: url,
 				SUPABASE_ANON_KEY: anonKey,
-				SUPABASE_SERVICE_ROLE_KEY: serviceKey,
 			});
 
 			// Web .env.local (client-side)
@@ -355,22 +349,20 @@ const InstallApp = () => {
 		// Match both old format (SUPABASE_URL=...) and new format (API_URL="...")
 		const urlMatch = envOutput.match(/API_URL="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_URL="?([^"\n]+)"?/);
 		const anonMatch = envOutput.match(/ANON_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_ANON_KEY="?([^"\n]+)"?/);
-		const serviceMatch = envOutput.match(/SERVICE_ROLE_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\n]+)"?/);
 
-		if (!urlMatch || !anonMatch || !serviceMatch) {
+		if (!urlMatch || !anonMatch) {
 			throw new Error('Failed to extract Supabase credentials');
 		}
 
 		setSupabaseUrl(urlMatch[1].trim());
 		setSupabaseAnonKey(anonMatch[1].trim());
-		setSupabaseServiceKey(serviceMatch[1].trim());
 		updateStep(3, 'success');
 
 		// Continue with OpenAI setup
-		await continueWithOpenAI(urlMatch[1].trim(), anonMatch[1].trim(), serviceMatch[1].trim());
+		await continueWithOpenAI(urlMatch[1].trim(), anonMatch[1].trim());
 	};
 
-	const continueWithOpenAI = async (url: string, anonKey: string, serviceKey: string) => {
+	const continueWithOpenAI = async (url: string, anonKey: string) => {
 		// Step 4: Get OpenAI key
 		setCurrentStep(4);
 		updateStep(4, 'running');
@@ -390,7 +382,7 @@ const InstallApp = () => {
 			setOpenaiKey(existingKey);
 			updateStep(4, 'success', 'Using existing key');
 			setCurrentStep(5);
-			await continueInstall(existingKey, url, anonKey, serviceKey);
+			await continueInstall(existingKey, url, anonKey);
 		} else {
 			setNeedsOpenaiInput(true);
 		}
@@ -402,17 +394,13 @@ const InstallApp = () => {
 			setCurrentCredentialInput('anon');
 		} else if (currentCredentialInput === 'anon') {
 			setRemoteSupabaseAnonKey(value);
-			setCurrentCredentialInput('service');
-		} else if (currentCredentialInput === 'service') {
-			setRemoteSupabaseServiceKey(value);
 			setNeedsRemoteCredentials(false);
 			updateStep(3, 'success', 'Remote credentials provided');
-			
+
 			// Set the credentials for use
 			setSupabaseUrl(remoteSupabaseUrl);
-			setSupabaseAnonKey(remoteSupabaseAnonKey);
-			setSupabaseServiceKey(value);
-			
+			setSupabaseAnonKey(value);
+
 			// Continue with OpenAI setup
 			setCurrentStep(4);
 			updateStep(4, 'running');
@@ -425,11 +413,11 @@ const InstallApp = () => {
 		setNeedsOpenaiInput(false);
 		updateStep(4, 'success');
 		setCurrentStep(5);
-		
+
 		if (useRemoteSupabase) {
-			continueInstall(value, remoteSupabaseUrl, remoteSupabaseAnonKey, remoteSupabaseServiceKey);
+			continueInstall(value, remoteSupabaseUrl, remoteSupabaseAnonKey);
 		} else {
-			continueInstall(value, supabaseUrl, supabaseAnonKey, supabaseServiceKey);
+			continueInstall(value, supabaseUrl, supabaseAnonKey);
 		}
 	};
 
@@ -504,12 +492,6 @@ const InstallApp = () => {
 						<>
 							<Text color="cyan">2. Supabase Anon Key:</Text>
 							<TextInput value={remoteSupabaseAnonKey} onChange={setRemoteSupabaseAnonKey} onSubmit={handleRemoteCredentialSubmit} />
-						</>
-					)}
-					{currentCredentialInput === 'service' && (
-						<>
-							<Text color="cyan">3. Supabase Service Role Key:</Text>
-							<TextInput value={remoteSupabaseServiceKey} onChange={setRemoteSupabaseServiceKey} onSubmit={handleRemoteCredentialSubmit} />
 						</>
 					)}
 				</Box>
