@@ -23,10 +23,6 @@ Only commit to the parent repository when:
 ### Branch Management
 - **Always create a new branch** for any code edits or features
 - Branch naming convention: Use descriptive names (e.g., `feature/add-auth`, `fix/install-env-vars`, `refactor/cleanup-types`)
-- **NEVER commit directly to main branch**
-- **NEVER push directly to main branch**
-- **Always create a Pull Request** for code review before merging
-- Delete feature branches after successful merge to keep the repository clean
 
 ### Workflow Steps
 1. Create a new branch: `git checkout -b <descriptive-branch-name>`
