@@ -6,7 +6,7 @@
 
 When you're deep in flow, vibe-coding with an AI assistant, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Orchestrator gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
 
-[Quick Start](#-quick-start) • [Preview](#-preview) • [Why We Built This](#-why-we-built-this) • [Features](#-features) • [Architecture](#-architecture)
+[Quick Start](#-quick-start) • [Preview](#-preview) • [Why We Built This](#-why-we-built-this) • [Features](#-features)
 
 </div>
 
@@ -55,6 +55,8 @@ Perfect for testing, personal use, or development. Runs entirely on your machine
    - **Web UI**: http://localhost:3000
    - **Supabase Studio**: http://localhost:54323
 
+   > **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
+
 ### 👥 Option 2: Team Collaboration (Hosted Supabase)
 For real team collaboration where multiple developers can see each other's AI conversations in real-time.
 
@@ -83,8 +85,7 @@ For real team collaboration where multiple developers can see each other's AI co
    **`agent-orchestrator-daemon/.env`**:
    ```env
    SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_KEY=<your_anon_key>
-   SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
+   SUPABASE_ANON_KEY=<your_anon_key>
    OPENAI_API_KEY=<your_openai_api_key>
    ```
 
@@ -256,78 +257,6 @@ npm run dev
 
 ---
 
-## 🔒 Security Architecture
-
-```
-┌─────────────┐                    ┌──────────────────┐
-│   Web App   │◄───Read Only───────┤    Supabase      │
-│ (Public)    │   (Anon Key)       │   (Database)     │
-└─────────────┘                    └──────────────────┘
-                                            ▲
-                                            │
-                                     Write + AI Process
-                                            │
-                                    ┌───────┴──────────┐
-                                    │  Backend Daemon  │
-                                    │  (Secrets Here)  │
-                                    │  - Service Key   │
-                                    │  - OpenAI Key    │
-                                    └──────────────────┘
-```
-
-- ✅ **Web app** has read-only access (anon key)
-- ✅ **Backend daemon** holds all secrets (service role key, OpenAI key)
-- ✅ **OpenAI API calls** only from backend, never exposed to client
-
----
-
-## 🛠️ Development
-
-### Working with Submodules
-
-Each submodule is an independent Git repository:
-
-```bash
-# Update all submodules to latest
-git submodule update --remote
-
-# Work in a submodule
-cd agent-orchestrator-daemon
-git checkout -b feature/new-feature
-# Make changes, commit, push
-git push origin feature/new-feature
-
-# Update parent repo to point to new submodule commit
-cd ..
-git add agent-orchestrator-daemon
-git commit -m "Update daemon to latest"
-```
-
-### Database Migrations
-
-Add new migrations in the `supabase/migrations/` directory:
-
-```bash
-cd supabase
-supabase migration new my_new_migration
-# Edit the generated SQL file
-supabase db reset  # Apply migrations locally
-```
-
-**Stop all services:** Press `Ctrl+C` in the terminal running `./start.sh`
-
-**Stop Supabase:** `supabase stop`
-
----
-
-## 📚 Documentation
-
-- [AI Summary Feature](./AI_SUMMARY_README.md) - Detailed docs on AI-powered summaries
-- [Daemon Repository](https://github.com/AgentOrchestrator/agent-orchestrator-daemon) - Backend service
-- [Web UI Repository](https://github.com/AgentOrchestrator/agent-orchestrator-web) - Frontend dashboard
-
----
-
 ## ⚠️ Early Stage Project
 
 **Note:** We recently started building this project and it's in active development. Expect things to move fast, break occasionally, and evolve rapidly. We welcome contributions, feedback, and ideas as we shape the future of team collaboration for AI-assisted coding!
@@ -337,7 +266,6 @@ supabase db reset  # Apply migrations locally
 ## 🤝 Contributing
 
 Contributions welcome! Please open an issue or PR in the appropriate repository:
-- **Architecture/Docs**: This repo
 - **Backend**: agent-orchestrator-daemon
 - **Frontend**: agent-orchestrator-web
 
