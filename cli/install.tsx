@@ -523,11 +523,12 @@ const InstallApp = () => {
 					<Newline />
 					<Text>Next steps:</Text>
 					<Text>  1. Run </Text>
-					<Text color="cyan">./start.sh</Text>
-					<Text> to start the web app and daemon</Text>
+					<Text color="cyan">npm start</Text>
+					<Text> to start all services</Text>
 					<Text>  2. Access the web app at </Text>
 					<Text color="cyan">http://localhost:3000</Text>
 					<Newline />
+					<Text dimColor>To stop services: Press Ctrl+C</Text>
 					<Text dimColor>To stop Supabase later: supabase stop</Text>
 				</Box>
 			)}

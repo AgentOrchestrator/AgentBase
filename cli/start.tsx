@@ -33,7 +33,7 @@ type LogLine = {
 const StartApp = () => {
 	const { exit } = useApp();
 	const [services, setServices] = useState<Service[]>([
-		{ name: 'Supabase', status: 'starting', url: 'http://localhost:54323' },
+		{ name: 'Supabase', status: 'starting' },
 		{ name: 'Web App', status: 'starting', url: 'http://localhost:3000' },
 		{ name: 'Daemon', status: 'starting' },
 	]);
@@ -69,27 +69,52 @@ const StartApp = () => {
 				throw new Error('Dependencies not installed. Please run ./install.sh first');
 			}
 
-			// Check if using remote Supabase
+			// Detect Supabase configuration
 			const rootEnvContent = fs.readFileSync(rootEnv, 'utf-8');
-			const isRemoteSupabase = rootEnvContent.includes('https://') && rootEnvContent.includes('.supabase.co');
-			
+			const urlMatch = rootEnvContent.match(/SUPABASE_URL=(.+)/);
+			const supabaseUrl = urlMatch ? urlMatch[1].trim() : '';
+
+			// Check if using remote Supabase (contains https:// and .supabase.co)
+			const isRemoteSupabase = supabaseUrl.includes('https://') && supabaseUrl.includes('.supabase.co');
+
 			if (isRemoteSupabase) {
-				// Using remote Supabase - skip local startup
-				updateService('Supabase', { 
-					status: 'running', 
-					message: 'Using remote Supabase',
-					url: 'Remote instance'
-				});
+				// Using remote Supabase - validate and skip local startup
+				updateService('Supabase', { status: 'starting', message: 'Verifying remote connection...' });
+
+				// Extract project reference from URL
+				const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || 'remote';
+
+				try {
+					// Simple connectivity check - try to reach the URL
+					const response = await fetch(supabaseUrl);
+					if (!response.ok && response.status !== 404) {
+						throw new Error(`Remote Supabase returned status ${response.status}`);
+					}
+
+					updateService('Supabase', {
+						status: 'running',
+						message: `Connected to ${projectRef}`,
+						url: supabaseUrl
+					});
+				} catch (err) {
+					const errorMsg = err instanceof Error ? err.message : 'Connection failed';
+					updateService('Supabase', {
+						status: 'error',
+						message: `Remote Supabase unreachable: ${errorMsg}`,
+						url: supabaseUrl
+					});
+					throw new Error(`Cannot connect to remote Supabase at ${supabaseUrl}: ${errorMsg}`);
+				}
 			} else {
 				// Start local Supabase
-				updateService('Supabase', { status: 'starting', message: 'Checking status...' });
+				updateService('Supabase', { status: 'starting', message: 'Checking status...', url: 'http://localhost:54323' });
 				try {
 					await execAsync('supabase status');
-					updateService('Supabase', { status: 'running', message: 'Already running' });
+					updateService('Supabase', { status: 'running', message: 'Already running', url: 'http://localhost:54323' });
 				} catch {
-					updateService('Supabase', { status: 'starting', message: 'Starting...' });
+					updateService('Supabase', { status: 'starting', message: 'Starting local instance...', url: 'http://localhost:54323' });
 					await execAsync('supabase start', { maxBuffer: 1024 * 1024 * 10 });
-					updateService('Supabase', { status: 'running', message: 'Started' });
+					updateService('Supabase', { status: 'running', message: 'Started', url: 'http://localhost:54323' });
 				}
 			}
 

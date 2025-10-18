@@ -16,6 +16,13 @@ When you're deep in flow, vibe-coding with an AI assistant, explaining what you'
 
 Choose your setup mode:
 
+### Using install script:
+ ```bash
+ npm install
+ npm run install-cli
+ npm run start-cli
+ ```
+
 ### 🏠 Option 1: Solo Development (Local Supabase)
 Perfect for testing, personal use, or development. Runs entirely on your machine.
 
@@ -26,7 +33,7 @@ Perfect for testing, personal use, or development. Runs entirely on your machine
    git submodule update --init --recursive
    ```
 
-   > **Note**: This repository uses private submodules. Make sure you have access to both `agent-orchestrator-daemon` and `agent-orchestrator-web` repositories. Your existing Git credentials (SSH keys or tokens) will be used automatically.
+   > **Note**: This repository uses private submodules. Make sure you have access to both `agent-orchestrator-daemon` and `web` repositories. Your existing Git credentials (SSH keys or tokens) will be used automatically.
 
 2. **Install Supabase CLI** (if not already installed):
 
