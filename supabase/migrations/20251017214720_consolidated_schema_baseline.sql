@@ -889,7 +889,10 @@ CREATE POLICY "Users can delete their own canvas layouts"
 CREATE POLICY "Users can view their workspaces"
   ON public.workspaces FOR SELECT
   USING (
-    EXISTS (
+    -- Allow users to view workspaces they created OR are members of
+    -- This allows .insert().select() to work after workspace creation
+    auth.uid() = created_by_user_id
+    OR EXISTS (
       SELECT 1 FROM workspace_members wm
       WHERE wm.workspace_id = workspaces.id
         AND wm.user_id = auth.uid()
@@ -903,7 +906,11 @@ CREATE POLICY "System admin can view all workspaces"
 
 CREATE POLICY "Users can create workspaces"
   ON public.workspaces FOR INSERT
-  WITH CHECK (auth.uid() = created_by_user_id);
+  WITH CHECK (
+    -- Allow authenticated users to create workspaces only for themselves
+    auth.uid() IS NOT NULL
+    AND auth.uid() = created_by_user_id
+  );
 
 CREATE POLICY "System admin can insert any workspace"
   ON public.workspaces FOR INSERT
@@ -1067,3 +1074,45 @@ CREATE POLICY "Users can update own preferences"
 CREATE POLICY "Users can delete own preferences"
   ON public.user_preferences FOR DELETE
   USING (auth.uid() = user_id);
+
+-- ============================================================================
+-- WORKSPACE TRIGGER FUNCTIONS
+-- ============================================================================
+
+-- Function to add workspace creator as owner when workspace is created
+CREATE OR REPLACE FUNCTION public.add_creator_as_workspace_owner()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Temporarily disable RLS for this operation
+    -- This allows the trigger to insert the workspace creator as owner
+    -- even though they're not yet a workspace admin (chicken-and-egg problem)
+    SET LOCAL row_security = off;
+
+    -- Add the creator as the workspace owner with accepted status (no invitation needed)
+    INSERT INTO public.workspace_members (workspace_id, user_id, role, invitation_status, joined_at, invited_at)
+    VALUES (NEW.id, NEW.created_by_user_id, 'owner', 'accepted', now(), now());
+
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.add_creator_as_workspace_owner() IS
+'Trigger function that automatically adds the workspace creator as an owner when a new workspace is created. Uses SECURITY DEFINER and disables RLS to bypass the workspace_members INSERT policy.';
+
+-- Trigger to add creator as workspace owner
+DROP TRIGGER IF EXISTS add_creator_as_owner_on_workspace_creation ON public.workspaces;
+CREATE TRIGGER add_creator_as_owner_on_workspace_creation
+  AFTER INSERT ON public.workspaces
+  FOR EACH ROW
+  EXECUTE FUNCTION public.add_creator_as_workspace_owner();
+
+-- Trigger to update workspaces.updated_at
+DROP TRIGGER IF EXISTS update_workspaces_updated_at ON public.workspaces;
+CREATE TRIGGER update_workspaces_updated_at
+  BEFORE UPDATE ON public.workspaces
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
