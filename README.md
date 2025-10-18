@@ -314,6 +314,6 @@ Contributions welcome! Please open an issue or PR in the appropriate repository:
 
 <div align="center">
 
-Made with ❤️ from Munich and San Francisco
+Made with ❤️ from Munich and Palo Alto
 
 </div>

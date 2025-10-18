@@ -581,6 +581,8 @@ COMMENT ON FUNCTION public.user_has_project_edit_permission(UUID, UUID) IS
   'Check if user has edit permission on a project';
 
 -- Function to check if current user is a system admin
+-- IMPORTANT: Uses SECURITY DEFINER to bypass RLS and prevent recursive policy checks
+-- This function is used in RLS policies, so it must not trigger RLS on tables it queries
 CREATE OR REPLACE FUNCTION public.is_system_admin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -590,16 +592,20 @@ AS $$
 DECLARE
   is_admin_user BOOLEAN;
 BEGIN
+  -- Query public.users with SECURITY DEFINER privileges
+  -- This bypasses RLS to prevent infinite recursion when this function
+  -- is called from RLS policies that themselves query users table
   SELECT is_admin INTO is_admin_user
   FROM public.users
-  WHERE id = auth.uid();
+  WHERE id = auth.uid()
+  LIMIT 1;
 
   RETURN COALESCE(is_admin_user, false);
 END;
 $$;
 
 COMMENT ON FUNCTION public.is_system_admin() IS
-  'Check if current user has system admin privileges';
+  'Check if current user has system admin privileges. Uses SECURITY DEFINER to bypass RLS and prevent recursive policy checks.';
 
 -- ============================================================================
 -- AUTH TRIGGER FUNCTIONS (handle user creation and synchronization)
@@ -700,6 +706,11 @@ CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Admins can update any profile"
+  ON public.users FOR UPDATE
+  USING (is_system_admin())
+  WITH CHECK (is_system_admin());
 
 -- Chat Histories Policies
 CREATE POLICY "Enable all access for authenticated users"
