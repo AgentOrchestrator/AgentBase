@@ -23,35 +23,69 @@ Perfect for testing, personal use, or development. Runs entirely on your machine
    ```bash
    git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
    cd agent-orchestrator
+   git submodule update --init --recursive
    ```
 
    > **Note**: This repository uses private submodules. Make sure you have access to both `agent-orchestrator-daemon` and `agent-orchestrator-web` repositories. Your existing Git credentials (SSH keys or tokens) will be used automatically.
 
-2. **Run the installation script**:
+2. **Install Supabase CLI** (if not already installed):
+
+   macOS:
    ```bash
-   ./install.sh
+   brew install supabase/tap/supabase
    ```
 
-   This will:
-   - Pull git submodules (daemon and web)
-   - Install Supabase CLI (if not already installed)
-   - Start Supabase locally
-   - Extract Supabase credentials
-   - Prompt for your OpenAI API key
-   - Create `.env` files automatically
-   - Install all dependencies
-
-3. **Start all services**:
+   Linux:
    ```bash
-   ./start.sh
+   curl -fsSL https://supabase.com/install.sh | sh
    ```
 
-   This will start:
-   - Supabase (if not already running)
-   - Backend daemon
-   - Web application
+3. **Start Supabase locally**:
+   ```bash
+   supabase start
+   ```
 
-4. **Access the application**:
+4. **Configure environment variables**:
+
+   Create `.env` files in the following locations with credentials from `supabase status`:
+
+   **Root `.env`**:
+   ```env
+   SUPABASE_URL=http://127.0.0.1:54321
+   SUPABASE_ANON_KEY=<from supabase status>
+   SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
+   ```
+
+   **`agent-orchestrator-daemon/.env`**:
+   ```env
+   SUPABASE_URL=http://127.0.0.1:54321
+   SUPABASE_ANON_KEY=<anon_key from supabase status>
+   OPENAI_API_KEY=<your_openai_api_key>
+   ```
+
+   **`web/.env.local`**:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key from supabase status>
+   ```
+
+5. **Install dependencies**:
+   ```bash
+   cd web && npm install && cd ..
+   cd agent-orchestrator-daemon && npm install && cd ..
+   ```
+
+6. **Start the services** (in separate terminals):
+
+   ```bash
+   # Terminal 1: Daemon
+   cd agent-orchestrator-daemon && npm run dev
+
+   # Terminal 2: Web
+   cd web && npm run dev
+   ```
+
+7. **Access the application**:
    - **Web UI**: http://localhost:3000
    - **Supabase Studio**: http://localhost:54323
 
