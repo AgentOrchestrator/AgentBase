@@ -2,9 +2,23 @@
 
 ## Git Workflow
 
+### Branch Protection
+All three repositories have branch protection enabled on the `main` branch:
+- **Direct pushes to main are blocked** - all changes must go through pull requests
+- **PR approval required** - at least 1 approving review is required before merging
+- **Force pushes blocked** - cannot force push to the main branch
+- **Branch deletion blocked** - the main branch cannot be deleted
+- **Enforced for admins** - administrators must also follow these rules
+
+Protected repositories:
+- `agent-orchestrator` (parent repo)
+- `agent-orchestrator-daemon` (submodule)
+- `agent-orchestrator-web` (submodule)
+
 ### Branch Management
 - **Always create a new branch** for any code edits or features
 - Branch naming convention: Use descriptive names (e.g., `feature/add-auth`, `fix/install-env-vars`, `refactor/cleanup-types`)
+- **You cannot push directly to main** - branch protection will reject direct pushes
 
 ### Workflow Steps
 1. **Start from main branch:**
