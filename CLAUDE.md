@@ -206,25 +206,27 @@ import { supabaseAdmin } from '@/lib/supabase-admin';  // ← Only imports serve
    - Include comments explaining the changes
    - Add rollback instructions if needed
    - Test queries locally when possible
+   - **Check for recursive RLS issues** - Avoid policies that query tables with their own RLS
 
 3. **Review the migration** before applying
    - Check for typos and syntax errors
    - Verify foreign key references
    - Ensure RLS policies are included
+   - **IMPORTANT**: Analyze for potential recursive RLS (policies querying RLS-enabled tables)
 
 4. **Apply the migration**
    ```bash
-   # Option 1: Using Supabase CLI
-   npx supabase db push
-
-   # Option 2: Using MCP tool (only after file is created)
+   # ALWAYS use Supabase MCP tools (preferred method)
    # Use mcp__supabase__apply_migration with the SQL from the file
+
+   # NEVER use: npx supabase db push
+   # The MCP tools provide better integration and error handling
    ```
 
 5. **Verify the migration**
    - Check tables were created correctly
-   - Test RLS policies
-   - Run security advisors
+   - Test RLS policies don't cause recursion or blocking
+   - Run security advisors with mcp__supabase__get_advisors
 
 ### Best Practices
 - **One migration per logical change** - Don't bundle unrelated changes
