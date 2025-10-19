@@ -1,37 +1,45 @@
 # Agent Orchestrator Project Instructions
 
-## Multi-Repo Structure
-This is a multi-repo setup. The {workspace} folder is the parent module and has multiple submodules.
+## Monorepo Structure
+This is a **monorepo** using **pnpm workspaces** and **Turborepo** for build orchestration.
 
-### Submodules
-- agent-orchestrator-daemon
-- web
+### Project Structure
+```
+agent-orchestrator/
+├── apps/
+│   ├── cli/           # Installation and startup CLI
+│   ├── daemon/        # Agent orchestrator daemon (formerly agent-orchestrator-daemon)
+│   └── web/           # Next.js web interface (formerly web submodule)
+├── packages/
+│   └── shared/        # Shared types and utilities
+├── supabase/          # Database migrations and config
+├── scripts/           # Utility scripts
+├── pnpm-workspace.yaml
+├── turbo.json
+└── package.json       # Root workspace configuration
+```
 
-### Working with Submodules
-**IMPORTANT**: When making changes to files within a submodule:
-- Navigate to the submodule directory (e.g., `cd agent-orchestrator-daemon` or `cd web`)
-- Create branches, commit, and push from within that submodule
-- **Do NOT commit submodule changes in the parent repository**
+### Package Management
+- **Use pnpm** for all package management operations
+- Each app/package has its own `package.json`
+- Dependencies are hoisted to the root `node_modules` when possible
+- Run `pnpm install` from the root to install all dependencies
 
-Only commit to the parent repository when:
-- Changing files directly in the parent (e.g., cli/, root config files)
-- Updating submodule references (after submodule has been pushed)
-- When making changes across submodules, ensure commits are properly coordinated
+### Working with the Monorepo
+All changes are made within the single repository. You can:
+- Edit files in any `apps/*` or `packages/*` directory
+- Create commits that span multiple packages
+- Use atomic commits for coordinated changes across apps
 
 ## Git Workflow
 
 ### Branch Protection
-All three repositories have branch protection enabled on the `main` branch:
+The repository has branch protection enabled on the `main` branch:
 - **Direct pushes to main are blocked** - all changes must go through pull requests
 - **PR approval required** - at least 1 approving review is required before merging
 - **Force pushes blocked** - cannot force push to the main branch
 - **Branch deletion blocked** - the main branch cannot be deleted
 - **Enforced for admins** - administrators must also follow these rules
-
-Protected repositories:
-- `agent-orchestrator` (parent repo)
-- `agent-orchestrator-daemon` (submodule)
-- `agent-orchestrator-web` (submodule)
 
 ### Branch Management
 - **Always create a new branch** for any code edits or features
@@ -80,7 +88,60 @@ Protected repositories:
 - Run tests before merging branches
 - Update documentation when adding new features
 
-## Next.js App Router Best Practices (Web Submodule)
+## Monorepo Commands
+
+### Development
+```bash
+# Install all dependencies
+pnpm install
+
+# Run all apps in dev mode (parallel)
+pnpm dev
+
+# Run specific app in dev mode
+pnpm dev:daemon
+pnpm dev:web
+
+# Build all apps
+pnpm build
+
+# Run CLI tools
+pnpm install-cli
+pnpm start-cli
+```
+
+### Package-Specific Commands
+```bash
+# Run command in specific package
+pnpm --filter <package-name> <command>
+
+# Examples:
+pnpm --filter agent-orchestrator-daemon run dev
+pnpm --filter web run build
+pnpm --filter @agent-orchestrator/shared run type-check
+```
+
+### Adding Dependencies
+```bash
+# Add to root (dev dependencies only)
+pnpm add -D <package> -w
+
+# Add to specific workspace package
+pnpm --filter <package-name> add <dependency>
+
+# Examples:
+pnpm --filter web add lucide-react
+pnpm --filter agent-orchestrator-daemon add uuid
+```
+
+### Shared Package Usage
+Apps can reference the shared package:
+```typescript
+// In apps/daemon or apps/web
+import { BaseConfig } from '@agent-orchestrator/shared';
+```
+
+## Next.js App Router Best Practices (apps/web)
 
 ### Critical Rule: Async Components Cannot Be Client Components
 **NEVER** add `'use client'` to a file containing an async component. This will cause a runtime error.

@@ -32,10 +32,12 @@ temp/
 # Supabase temp files
 supabase/.temp/
 
-# Lock files (keep package-lock.json if needed)
-# Uncomment if you want to ignore:
-# package-lock.json
-# bun.lockb
+# Lock files
+package-lock.json
+bun.lockb
+# Keep pnpm-lock.yaml for monorepo
+
 # Build outputs
 .next/
+.turbo/
 

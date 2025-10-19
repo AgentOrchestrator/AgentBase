@@ -1,23 +1,28 @@
 {
   "name": "agent-orchestrator",
   "version": "1.0.0",
-  "description": "Agent Orchestrator - Installation and startup scripts",
+  "description": "Agent Orchestrator - A multi-agent orchestration system",
   "license": "SEE LICENSE IN LICENSE",
+  "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.0.6",
   "scripts": {
-    "install-cli": "tsx cli/install.tsx",
-    "start-cli": "tsx cli/start.tsx"
-  },
-  "dependencies": {
-    "ink": "^5.2.0",
-    "ink-spinner": "^5.0.0",
-    "ink-text-input": "^6.0.0",
-    "react": "^18.3.1"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "type-check": "turbo run type-check",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
+    "install-cli": "pnpm --filter @agent-orchestrator/cli run install",
+    "install-cli:ci": "pnpm --filter @agent-orchestrator/cli run install:ci",
+    "start-cli": "pnpm --filter @agent-orchestrator/cli run start",
+    "dev:daemon": "pnpm --filter agent-orchestrator-daemon run dev",
+    "dev:web": "pnpm --filter web run dev"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/react": "^18.3.0",
-    "tsx": "^4.20.6",
+    "turbo": "^2.3.0",
     "typescript": "^5.9.3"
   }
 }

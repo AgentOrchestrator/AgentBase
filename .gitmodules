@@ -1,6 +1,0 @@
-[submodule "agent-orchestrator-daemon"]
-	path = agent-orchestrator-daemon
-	url = git@github.com:AgentOrchestrator/agent-orchestrator-daemon.git
-[submodule "web"]
-	path = web
-	url = git@github.com:AgentOrchestrator/agent-orchestrator-web.git

@@ -1,0 +1,67 @@
+# Agent Orchestrator License
+
+## Core - MIT License
+
+Most of the repository is licensed under the MIT License (permissive open source). This includes:
+- The main web application
+- The daemon application
+- The CLI tools
+- Shared packages
+- Everything outside the `ee/` directories
+
+### MIT License
+
+Copyright (c) 2025 Agent Orchestrator
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Enterprise Edition - Commercial License
+
+Code in these directories requires an Enterprise License:
+- `/ee/`
+- `/web/src/ee/`
+- `/agent-orchestrator-daemon/src/ee/`
+- `/cli/src/ee/`
+
+### Enterprise License Terms
+
+The Enterprise Edition code is available under a commercial license with the following terms:
+
+**Development and Testing**: Free to use for development, testing, and evaluation purposes.
+
+**Production Use**: Requires agreeing to Agent Orchestrator's Terms of Service and a valid enterprise subscription. Production use without a valid license is prohibited.
+
+**Restrictions**:
+- You may not use the Enterprise Edition code in production without a valid license
+- You may not remove or modify any license headers or notices
+- You may not redistribute the Enterprise Edition code as part of a competing product
+
+For enterprise licensing inquiries, please contact: [your-contact-email]
+
+---
+
+## Open Core Model
+
+This project follows an open-core model where:
+- **Core functionality** is free and open source under the MIT License
+- **Advanced enterprise features** are commercially licensed
+
+This approach allows individuals and small teams to use Agent Orchestrator freely while providing advanced features and support for larger organizations through the Enterprise Edition.
