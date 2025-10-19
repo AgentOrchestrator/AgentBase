@@ -205,6 +205,38 @@ This is the tool we wished we had: a way to stay connected with our team's work 
 
 ---
 
+## 🔌 Integrations
+
+Agent Orchestrator connects with your favorite AI coding assistants to provide real-time visibility into your team's development workflow.
+
+### Supported AI Coding Assistants:
+
+| Integration | Status | Description |
+| ----------- | ------ | ----------- |
+| [Claude Code](https://claude.ai/claude-code) | ✅ Supported | Anthropic's AI coding assistant - full integration with chat history tracking and real-time updates |
+| [Cursor](https://cursor.sh) | ✅ Supported | AI-first code editor - tracks conversations and project context |
+| [Windsurf](https://codeium.com/windsurf) | 🚧 Coming Soon | Codeium's AI coding assistant - integration in development |
+| [Codex](https://openai.com/blog/openai-codex) | 🚧 Coming Soon | OpenAI's code generation model - integration planned |
+
+### Integration Features:
+
+| Feature | Claude Code | Cursor | Windsurf | Codex |
+| ------- | ----------- | ------ | -------- | ----- |
+| Chat History Sync | ✅ | ✅ | 🚧 | 🚧 |
+| Real-time Updates | ✅ | ✅ | 🚧 | 🚧 |
+| AI Summaries | ✅ | ✅ | 🚧 | 🚧 |
+| Project Detection | ✅ | ✅ | 🚧 | 🚧 |
+| File Change Tracking | ✅ | ✅ | 🚧 | 🚧 |
+
+**Legend:**
+- ✅ Fully supported
+- 🚧 Coming soon
+- ⏸️ Planned
+
+Want to see your favorite AI assistant integrated? [Open an issue](https://github.com/AgentOrchestrator/agent-orchestrator/issues) or contribute via PR!
+
+---
+
 ## 🏗️ Architecture
 
 This is a multi-repo system with submodules:
