@@ -1,0 +1,19 @@
+{
+  "name": "@agent-orchestrator/shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities for Agent Orchestrator",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}

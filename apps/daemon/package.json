@@ -1,0 +1,36 @@
+{
+  "name": "agent-orchestrator-daemon",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/electron-main.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "dev:tray": "npm run build && electron .",
+    "start": "node dist/index.js",
+    "start:tray": "npm run build && electron .",
+    "status": "tsx src/cli-status.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
+    "better-sqlite3": "^12.4.1",
+    "dotenv": "^17.2.3",
+    "openai": "^6.3.0",
+    "supabase": "^2.51.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.7.2",
+    "@types/uuid": "^10.0.0",
+    "electron": "^38.3.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

@@ -20,13 +20,17 @@ When you're deep in flow, vibe-coding with an AI assistant, explaining what you'
 
 ## 🚀 Quick Start
 
+**Prerequisites:**
+- **Node.js 18+** and **pnpm** (install with `npm install -g pnpm`)
+- **Supabase CLI** for database management
+
 Choose your setup mode:
 
 ### Using install script:
  ```bash
- npm install
- npm run install-cli
- npm run start-cli
+ pnpm install
+ pnpm install-cli
+ pnpm start-cli
  ```
 
 ### 🏠 Option 1: Solo Development (Local Supabase)
@@ -36,10 +40,7 @@ Perfect for testing, personal use, or development. Runs entirely on your machine
    ```bash
    git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
    cd agent-orchestrator
-   git submodule update --init --recursive
    ```
-
-   > **Note**: This repository uses private submodules. Make sure you have access to both `agent-orchestrator-daemon` and `web` repositories. Your existing Git credentials (SSH keys or tokens) will be used automatically.
 
 2. **Install Supabase CLI** (if not already installed):
 
@@ -69,14 +70,14 @@ Perfect for testing, personal use, or development. Runs entirely on your machine
    SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
    ```
 
-   **`agent-orchestrator-daemon/.env`**:
+   **`apps/daemon/.env`**:
    ```env
    SUPABASE_URL=http://127.0.0.1:54321
    SUPABASE_ANON_KEY=<anon_key from supabase status>
    OPENAI_API_KEY=<your_openai_api_key>
    ```
 
-   **`web/.env.local`**:
+   **`apps/web/.env.local`**:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key from supabase status>
@@ -84,18 +85,18 @@ Perfect for testing, personal use, or development. Runs entirely on your machine
 
 5. **Install dependencies**:
    ```bash
-   cd web && npm install && cd ..
-   cd agent-orchestrator-daemon && npm install && cd ..
+   pnpm install
    ```
 
-6. **Start the services** (in separate terminals):
+6. **Start the services**:
 
    ```bash
-   # Terminal 1: Daemon
-   cd agent-orchestrator-daemon && npm run dev
+   # Option 1: Start all services (in separate terminals)
+   pnpm dev:daemon
+   pnpm dev:web
 
-   # Terminal 2: Web
-   cd web && npm run dev
+   # Option 2: Start everything in parallel with Turborepo
+   pnpm dev
    ```
 
 7. **Access the application**:
@@ -117,7 +118,6 @@ For real team collaboration where multiple developers can see each other's AI co
    ```bash
    git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
    cd agent-orchestrator
-   git submodule update --init --recursive
    ```
 
 3. **Configure environment variables** (each team member):
@@ -129,14 +129,14 @@ For real team collaboration where multiple developers can see each other's AI co
    SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
    ```
 
-   **`agent-orchestrator-daemon/.env`**:
+   **`apps/daemon/.env`**:
    ```env
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_ANON_KEY=<your_anon_key>
    OPENAI_API_KEY=<your_openai_api_key>
    ```
 
-   **`web/.env.local`**:
+   **`apps/web/.env.local`**:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_anon_key>
@@ -144,17 +144,17 @@ For real team collaboration where multiple developers can see each other's AI co
 
 4. **Install dependencies** (each team member):
    ```bash
-   cd web && npm install && cd ..
-   cd agent-orchestrator-daemon && npm install && cd ..
+   pnpm install
    ```
 
 5. **Start the services** (each team member):
    ```bash
-   # Terminal 1: Daemon
-   cd agent-orchestrator-daemon && npm run dev
+   # Option 1: Start services in separate terminals
+   pnpm dev:daemon
+   pnpm dev:web
 
-   # Terminal 2: Web
-   cd web && npm run dev
+   # Option 2: Start everything in parallel
+   pnpm dev
    ```
 
 6. **Access the shared dashboard**:
@@ -239,17 +239,23 @@ Want to see your favorite AI assistant integrated? [Open an issue](https://githu
 
 ## 🏗️ Architecture
 
-This is a multi-repo system with submodules:
+This is a **monorepo** using **pnpm workspaces** and **Turborepo**:
 
 ```
-agent-orchestrator/           # Parent orchestrator repo
-├── agent-orchestrator-daemon/  # Backend daemon (submodule)
-├── web/                        # Web UI (submodule)
-└── supabase/                   # Shared database migrations
+agent-orchestrator/
+├── apps/
+│   ├── cli/           # Installation and startup CLI
+│   ├── daemon/        # Backend daemon - watches for chat histories
+│   └── web/           # Next.js dashboard with real-time updates
+├── packages/
+│   └── shared/        # Shared types and utilities
+└── supabase/          # Database migrations and config
 ```
 
-- **[agent-orchestrator-daemon](./agent-orchestrator-daemon/)** - Watches for new chat histories and generates AI summaries
-- **[web](./web/)** - Next.js dashboard with real-time updates
+- **[apps/daemon](./apps/daemon/)** - Watches for new chat histories and generates AI summaries
+- **[apps/web](./apps/web/)** - Next.js dashboard with real-time updates via Supabase Realtime
+- **[apps/cli](./apps/cli/)** - Interactive CLI for installation and setup
+- **[packages/shared](./packages/shared/)** - Shared TypeScript types and utilities
 - **supabase/** - PostgreSQL database with real-time capabilities
 
 ---
@@ -259,10 +265,11 @@ agent-orchestrator/           # Parent orchestrator repo
 
 <br>
 
-#### 1. Pull Submodules
+#### 1. Clone Repository
 
 ```bash
-git submodule update --init --recursive
+git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
+cd agent-orchestrator
 ```
 
 #### 2. Install Supabase CLI
@@ -294,15 +301,14 @@ SUPABASE_ANON_KEY=<from supabase status>
 SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
 ```
 
-**`agent-orchestrator-daemon/.env`**:
+**`apps/daemon/.env`**:
 ```env
 SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_KEY=<anon_key from supabase status>
-SUPABASE_SERVICE_ROLE_KEY=<service_role_key from supabase status>
+SUPABASE_ANON_KEY=<anon_key from supabase status>
 OPENAI_API_KEY=<your_openai_api_key>
 ```
 
-**`web/.env.local`**:
+**`apps/web/.env.local`**:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key from supabase status>
@@ -311,25 +317,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key from supabase status>
 #### 5. Install Dependencies
 
 ```bash
-# Web dependencies
-cd web && npm install && cd ..
-
-# Daemon dependencies
-cd agent-orchestrator-daemon && npm install && cd ..
+pnpm install
 ```
 
 #### 6. Start Services
 
-In separate terminals:
-
 ```bash
-# Terminal 1: Daemon
-cd agent-orchestrator-daemon
-npm run dev
+# Start all services in parallel
+pnpm dev
 
-# Terminal 2: Web
-cd web
-npm run dev
+# Or start individually
+pnpm dev:daemon
+pnpm dev:web
 ```
 
 </details>
@@ -344,9 +343,13 @@ npm run dev
 
 ## 🤝 Contributing
 
-Contributions welcome! Please open an issue or PR in the appropriate repository:
-- **Backend**: agent-orchestrator-daemon
-- **Frontend**: agent-orchestrator-web
+Contributions welcome! This is a monorepo, so all code lives in one place:
+- **Backend (daemon)**: `apps/daemon/`
+- **Frontend (web)**: `apps/web/`
+- **CLI**: `apps/cli/`
+- **Shared code**: `packages/shared/`
+
+Please open an issue or PR in this repository!
 
 ---
 
