@@ -4,31 +4,14 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 /**
- * Get the Application Support directory path for the current platform
+ * Get the data directory path for the current platform
+ * Currently using ~/.agent-orchestrator for all platforms
  */
 export function getAppDataPath(): string {
-  const platform = process.platform;
-
-  if (platform === 'darwin') {
-    // macOS: ~/Library/Application Support/AgentOrchestrator
-    return path.join(os.homedir(), 'Library', 'Application Support', 'AgentOrchestrator');
-  } else if (platform === 'win32') {
-    // Windows: %APPDATA%\AgentOrchestrator
-    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    return path.join(appData, 'AgentOrchestrator');
-  } else {
-    // Linux: ~/.config/agent-orchestrator
-    const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-    return path.join(configHome, 'agent-orchestrator');
-  }
-}
-
-/**
- * Get the legacy config directory path (for migration)
- */
-export function getLegacyConfigPath(): string {
+  // Use ~/.agent-orchestrator for all platforms
   return path.join(os.homedir(), '.agent-orchestrator');
 }
+
 
 interface AuthData {
   id: number;
@@ -165,33 +148,35 @@ export class AppDatabase {
   }
 
   /**
-   * Migrate data from legacy ~/.agent-orchestrator location
+   * Migrate data from legacy file-based storage to SQLite database
+   * This runs once when the database is first initialized
    */
   private migrateLegacyData(): void {
-    const legacyPath = getLegacyConfigPath();
+    const appDataPath = getAppDataPath();
 
-    if (!fs.existsSync(legacyPath)) {
-      return; // No legacy data to migrate
-    }
-
-    console.log('[Database] Found legacy config directory, migrating...');
-
-    try {
-      // Migrate device_id
-      const deviceIdPath = path.join(legacyPath, 'device-id');
-      if (fs.existsSync(deviceIdPath)) {
+    // Migrate device_id from legacy file-based storage
+    const deviceIdPath = path.join(appDataPath, 'device-id');
+    if (fs.existsSync(deviceIdPath)) {
+      try {
         const deviceId = fs.readFileSync(deviceIdPath, 'utf-8').trim();
         const existing = this.getDeviceId();
 
         if (!existing && deviceId) {
           this.setDeviceId(deviceId);
-          console.log('[Database] Migrated device_id:', deviceId);
+          console.log('[Database] Migrated device_id from file-based storage:', deviceId);
+          // Remove the old file after successful migration
+          fs.unlinkSync(deviceIdPath);
+          console.log('[Database] Removed legacy device-id file');
         }
+      } catch (error) {
+        console.error('[Database] Error migrating device_id:', error);
       }
+    }
 
-      // Migrate auth.json
-      const authPath = path.join(legacyPath, 'auth.json');
-      if (fs.existsSync(authPath)) {
+    // Migrate auth.json from legacy file-based storage
+    const authPath = path.join(appDataPath, 'auth.json');
+    if (fs.existsSync(authPath)) {
+      try {
         const authData = JSON.parse(fs.readFileSync(authPath, 'utf-8'));
         const existing = this.getAuth();
 
@@ -202,19 +187,14 @@ export class AppDatabase {
             user_id: authData.userId,
             expires_at: authData.expiresAt,
           });
-          console.log('[Database] Migrated auth data for user:', authData.userId);
+          console.log('[Database] Migrated auth data from file-based storage for user:', authData.userId);
+          // Remove the old file after successful migration
+          fs.unlinkSync(authPath);
+          console.log('[Database] Removed legacy auth.json file');
         }
+      } catch (error) {
+        console.error('[Database] Error migrating auth data:', error);
       }
-
-      // After successful migration, rename the legacy directory
-      const backupPath = `${legacyPath}.backup`;
-      if (!fs.existsSync(backupPath)) {
-        fs.renameSync(legacyPath, backupPath);
-        console.log(`[Database] Legacy config backed up to: ${backupPath}`);
-      }
-    } catch (error) {
-      console.error('[Database] Error migrating legacy data:', error);
-      // Don't throw - allow the app to continue even if migration fails
     }
   }
 
