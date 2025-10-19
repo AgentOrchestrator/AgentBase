@@ -240,7 +240,7 @@ Agent Orchestrator connects with your favorite AI coding assistants to provide r
 | Real-time Updates | ✅ | ✅ | 🚧 | 🚧 |
 | AI Summaries | ✅ | ✅ | 🚧 | 🚧 |
 | Project Detection | ✅ | ✅ | 🚧 | 🚧 |
-| File Change Tracking | ✅ | ✅ | 🚧 | 🚧 |
+| File Change Tracking | ⏸️ | ⏸️ | 🚧 | 🚧 |
 
 **Legend:**
 - ✅ Fully supported
