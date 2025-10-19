@@ -15,6 +15,7 @@
     "type-check": "turbo run type-check",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
     "install-cli": "pnpm --filter @agent-orchestrator/cli run install",
+    "install-cli:ci": "pnpm --filter @agent-orchestrator/cli run install:ci",
     "start-cli": "pnpm --filter @agent-orchestrator/cli run start",
     "dev:daemon": "pnpm --filter agent-orchestrator-daemon run dev",
     "dev:web": "pnpm --filter web run dev"

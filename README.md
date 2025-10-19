@@ -26,11 +26,25 @@ When you're deep in flow, vibe-coding with an AI assistant, explaining what you'
 
 Choose your setup mode:
 
-### Using install script:
+### Using install script (Interactive):
  ```bash
  pnpm install
  pnpm install-cli
  pnpm start-cli
+ ```
+
+### Using install script (Non-Interactive/CI):
+For CI/CD pipelines or automated setups:
+ ```bash
+ pnpm install
+ # Using environment variables (recommended for secrets)
+ OPENAI_API_KEY=sk-xxx pnpm install-cli:ci -- --local --skip-openai
+
+ # Or with all environment variables
+ export SUPABASE_URL=https://xxx.supabase.co
+ export SUPABASE_ANON_KEY=eyJh...
+ export OPENAI_API_KEY=sk-xxx
+ pnpm install-cli:ci -- --remote
  ```
 
 ### 🏠 Option 1: Solo Development (Local Supabase)

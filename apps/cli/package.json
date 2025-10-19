@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "install": "tsx install.tsx",
+    "install:ci": "tsx install-non-interactive.ts",
     "start": "tsx start.tsx"
   },
   "dependencies": {
