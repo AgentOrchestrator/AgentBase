@@ -2,6 +2,7 @@
   "name": "agent-orchestrator",
   "version": "1.0.0",
   "description": "Agent Orchestrator - Installation and startup scripts",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
     "install-cli": "tsx cli/install.tsx",
