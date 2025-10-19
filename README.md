@@ -2,6 +2,12 @@
 
 # 🤖 Agent Orchestrator
 
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/AgentOrchestrator/agent-orchestrator?style=social)](https://github.com/AgentOrchestrator/agent-orchestrator)
+[![Last Commit](https://img.shields.io/github/last-commit/AgentOrchestrator/agent-orchestrator)](https://github.com/AgentOrchestrator/agent-orchestrator/commits/main)
+[![Commit Activity](https://img.shields.io/github/commit-activity/m/AgentOrchestrator/agent-orchestrator?labelColor=32b583&color=12b76a)](https://github.com/AgentOrchestrator/agent-orchestrator/graphs/commit-activity)
+[![Issues](https://img.shields.io/github/issues/AgentOrchestrator/agent-orchestrator?labelColor=7d89b0&color=5d6b98)](https://github.com/AgentOrchestrator/agent-orchestrator/issues)
+
 **Stay in sync with your team's AI coding sessions — see what they're building in real-time**
 
 When you're deep in flow, vibe-coding with an AI assistant, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Orchestrator gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
