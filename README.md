@@ -38,13 +38,13 @@ For CI/CD pipelines or automated setups:
  ```bash
  pnpm install
  # Using environment variables (recommended for secrets)
- OPENAI_API_KEY=sk-xxx pnpm install-cli:ci -- --local --skip-openai
+ OPENAI_API_KEY=sk-xxx pnpm install-cli:ci --local --skip-openai
 
  # Or with all environment variables
  export SUPABASE_URL=https://xxx.supabase.co
  export SUPABASE_ANON_KEY=eyJh...
  export OPENAI_API_KEY=sk-xxx
- pnpm install-cli:ci -- --remote
+ pnpm install-cli:ci --remote
  ```
 
 ### 🏠 Option 1: Solo Development (Local Supabase)

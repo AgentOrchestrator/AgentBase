@@ -8,6 +8,7 @@
   "scripts": {
     "install": "tsx install.tsx",
     "install:ci": "tsx install-non-interactive.ts",
+    "install:ci:local": "tsx install-non-interactive.ts --local --skip-openai",
     "start": "tsx start.tsx"
   },
   "dependencies": {
