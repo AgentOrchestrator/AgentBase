@@ -6,7 +6,7 @@
 /**
  * Agent/IDE type that created the session
  */
-export type AgentType = 'claude_code' | 'codex' | 'cursor' | 'windsurf' | 'other';
+export type AgentType = 'claude_code' | 'codex' | 'cursor' | 'vscode' | 'windsurf' | 'other';
 
 /**
  * Standard message format across all readers
@@ -51,7 +51,7 @@ export interface SessionMetadata {
   /**
    * Source of the session (for tracking)
    */
-  source?: 'claude_code' | 'cursor-composer' | 'cursor-copilot' | string;
+  source?: 'claude_code' | 'cursor-composer' | 'cursor-copilot' | 'vscode-chat' | 'vscode-inline-chat' | string;
 
   /**
    * AI-generated summary of the session
