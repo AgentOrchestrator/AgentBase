@@ -10,6 +10,7 @@ interface LLMProvider {
   name: string;
   icon: React.ReactNode;
   placeholder: string;
+  models: { id: string; name: string }[];
 }
 
 const LLM_PROVIDERS: LLMProvider[] = [
@@ -22,6 +23,13 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'sk-...',
+    models: [
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Fast & Affordable)' },
+      { id: 'gpt-4o', name: 'GPT-4o (Recommended)' },
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+      { id: 'gpt-4', name: 'GPT-4' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+    ],
   },
   {
     id: 'anthropic',
@@ -32,6 +40,11 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'sk-ant-...',
+    models: [
+      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)' },
+      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Fast & Affordable)' },
+      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+    ],
   },
   {
     id: 'google',
@@ -42,6 +55,11 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'AI...',
+    models: [
+      { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Fast & Affordable)' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    ],
   },
   {
     id: 'groq',
@@ -52,6 +70,10 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'gsk_...',
+    models: [
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Versatile)' },
+      { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B (Fast)' },
+    ],
   },
   {
     id: 'ollama',
@@ -62,6 +84,11 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'http://localhost:11434',
+    models: [
+      { id: 'llama3.2', name: 'Llama 3.2' },
+      { id: 'codellama', name: 'Code Llama' },
+      { id: 'mistral', name: 'Mistral' },
+    ],
   },
   {
     id: 'openrouter',
@@ -73,6 +100,9 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'sk-or-...',
+    models: [
+      { id: 'auto', name: 'Auto (Router Chooses Best Model)' },
+    ],
   },
 ];
 

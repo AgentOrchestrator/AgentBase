@@ -40,6 +40,9 @@ For CI/CD pipelines or automated setups:
  # Using environment variables (recommended for secrets)
  OPENAI_API_KEY=sk-xxx pnpm install-cli:ci --local --skip-openai
 
+ # Using an env file (recommended for CI/CD)
+ pnpm install-cli:ci --remote -e .env.production
+
  # Or with all environment variables
  export SUPABASE_URL=https://xxx.supabase.co
  export SUPABASE_ANON_KEY=eyJh...

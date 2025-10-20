@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { getUserLLMConfig, generateLLMText } from '@/lib/llm-client';
 
 interface MentionedUser {
   id: string;
@@ -49,27 +50,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch user's LLM API key (prefer OpenAI or Anthropic)
-    const { data: apiKeys, error: keysError } = await supabase
-      .from('llm_api_keys')
-      .select('provider, api_key')
-      .eq('account_id', user.id)
-      .eq('is_active', true)
-      .in('provider', ['openai', 'anthropic']);
+    // Get user's LLM configuration based on their preferences
+    const llmConfig = await getUserLLMConfig(user.id);
 
-    if (keysError || !apiKeys || apiKeys.length === 0) {
+    if (!llmConfig) {
       return NextResponse.json(
         {
           error:
-            'No LLM API key found. Please configure your OpenAI or Anthropic API key in settings.',
+            'No LLM API key found. Please configure an API key in settings.',
           type: 'error',
         },
         { status: 400 }
       );
     }
-
-    // Use the first available key
-    const apiKey = apiKeys[0];
 
     // Fetch context for each mentioned user
     const userContexts = await Promise.all(
@@ -173,21 +166,21 @@ ${userContextSummaries}
 
 Please provide a helpful response based on the above context.`;
 
-    // Call appropriate LLM API
-    let llmResponse: string;
+    // Call LLM using user's preferred model
+    const llmResponse = await generateLLMText(
+      llmConfig,
+      userPrompt,
+      systemPrompt,
+      {
+        temperature: 0.7,
+        maxTokens: 1000,
+      }
+    );
 
-    if (apiKey.provider === 'openai') {
-      llmResponse = await callOpenAI(apiKey.api_key, systemPrompt, userPrompt);
-    } else if (apiKey.provider === 'anthropic') {
-      llmResponse = await callAnthropic(
-        apiKey.api_key,
-        systemPrompt,
-        userPrompt
-      );
-    } else {
+    if (!llmResponse) {
       return NextResponse.json(
-        { error: 'Unsupported LLM provider' },
-        { status: 400 }
+        { error: 'Failed to generate response from LLM' },
+        { status: 500 }
       );
     }
 
@@ -206,66 +199,4 @@ Please provide a helpful response based on the above context.`;
       { status: 500 }
     );
   }
-}
-
-async function callOpenAI(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('OpenAI API error:', error);
-    throw new Error('Failed to get response from OpenAI');
-  }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content || 'No response generated';
-}
-
-async function callAnthropic(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Anthropic API error:', error);
-    throw new Error('Failed to get response from Anthropic');
-  }
-
-  const data = await response.json();
-  return data.content[0]?.text || 'No response generated';
 }

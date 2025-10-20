@@ -357,6 +357,9 @@ CREATE TABLE IF NOT EXISTS public.llm_api_keys (
     updated_at TIMESTAMPTZ DEFAULT timezone('utc', now())
 );
 
+-- Unique constraint: one API key per provider per user
+ALTER TABLE public.llm_api_keys ADD CONSTRAINT unique_account_provider UNIQUE (account_id, provider);
+
 CREATE INDEX idx_llm_api_keys_account_id ON public.llm_api_keys(account_id);
 CREATE INDEX idx_llm_api_keys_provider ON public.llm_api_keys(provider);
 CREATE INDEX idx_llm_api_keys_is_default ON public.llm_api_keys(is_default) WHERE is_default = true;
@@ -371,6 +374,8 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
     user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE ON UPDATE CASCADE,
     ai_summary_enabled BOOLEAN DEFAULT true,
     ai_title_enabled BOOLEAN DEFAULT true,
+    ai_model_provider TEXT DEFAULT 'openai',
+    ai_model_name TEXT DEFAULT 'gpt-4o-mini',
     created_at TIMESTAMPTZ DEFAULT timezone('utc', now()),
     updated_at TIMESTAMPTZ DEFAULT timezone('utc', now())
 );
@@ -388,6 +393,8 @@ COMMENT ON TABLE public.user_preferences IS 'Stores user preferences and setting
 COMMENT ON COLUMN public.user_preferences.user_id IS 'Foreign key to auth.users - the user who owns these preferences';
 COMMENT ON COLUMN public.user_preferences.ai_summary_enabled IS 'Whether AI summaries should be generated for this user''s sessions';
 COMMENT ON COLUMN public.user_preferences.ai_title_enabled IS 'Whether AI titles should be generated for this user''s sessions';
+COMMENT ON COLUMN public.user_preferences.ai_model_provider IS 'LLM provider to use for AI features (openai, anthropic, google, etc.)';
+COMMENT ON COLUMN public.user_preferences.ai_model_name IS 'Specific model to use (e.g., gpt-4o-mini, claude-3-5-sonnet)';
 
 -- ============================================================================
 -- HELPER FUNCTIONS (depend on tables above)
