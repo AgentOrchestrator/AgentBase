@@ -181,7 +181,7 @@ function ConversationNode({ data }: { data: { conversation: ChatHistory; userId:
 }
 
 // Custom node component for user circles
-function UserNode({ data }: { data: { label: string; userId: string; userEmail: string; avatarUrl: string | null; displayName: string | null; xGithubName: string | null; xGithubAvatarUrl: string | null; isLinked: boolean; onToggleLink: (userId: string) => void; onShowConversations: (userId: string) => void; onToggleConversations: (userId: string) => void; isConversationsOpen: boolean; sessionLimit: number; totalAvailable: number; onIncreaseLimit: (userId: string, maxAvailable: number) => void; onDecreaseLimit: (userId: string, maxAvailable: number) => void; animationState?: 'entering' | 'visible' | 'exiting' } }) {
+function UserNode({ data }: { data: { label: string; userId: string; userEmail: string; avatarUrl: string | null; displayName: string | null; xGithubName: string | null; xGithubAvatarUrl: string | null; isLinked: boolean; onToggleLink: (userId: string) => void; onShowConversations: (userId: string) => void; onToggleConversations: (userId: string) => void; isConversationsOpen: boolean; sessionLimit: number; totalAvailable: number; onIncreaseLimit: (userId: string, maxAvailable: number) => void; onDecreaseLimit: (userId: string, maxAvailable: number) => void; animationState?: 'entering' | 'visible' | 'exiting'; hasRecentMessages?: boolean } }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(data.animationState !== 'entering');
   
@@ -205,6 +205,7 @@ function UserNode({ data }: { data: { label: string; userId: string; userEmail: 
   const displayText = data.xGithubName || data.displayName || data.userEmail;
   const avatarToUse = data.xGithubAvatarUrl || data.avatarUrl;
   const fallbackInitial = (data.xGithubName || data.displayName || data.userEmail).charAt(0);
+  const hasRecentMessages = data.hasRecentMessages ?? true;
 
   const handleToggleLink = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -215,7 +216,7 @@ function UserNode({ data }: { data: { label: string; userId: string; userEmail: 
     e.stopPropagation();
     data.onToggleConversations(data.userId);
   };
-  
+
   return (
     <div
       className={`flex flex-col items-center relative ${
@@ -225,6 +226,7 @@ function UserNode({ data }: { data: { label: string; userId: string; userEmail: 
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      title={!hasRecentMessages ? 'No new messages in the last 24 hours' : undefined}
     >
       <Handle
         type="source"
@@ -303,61 +305,73 @@ function UserNode({ data }: { data: { label: string; userId: string; userEmail: 
         <img
           src={avatarToUse}
           alt={displayText}
-          className="w-20 h-20 rounded-full border-2 border-border object-cover"
+          className={`w-20 h-20 rounded-full border-2 border-border object-cover transition-all duration-300 ${
+            !hasRecentMessages ? 'opacity-40 grayscale' : ''
+          }`}
         />
       ) : (
-        <div className="w-20 h-20 rounded-full border-2 border-border bg-muted flex items-center justify-center text-muted-foreground font-semibold text-sm">
+        <div className={`w-20 h-20 rounded-full border-2 border-border bg-muted flex items-center justify-center text-muted-foreground font-semibold text-sm transition-all duration-300 ${
+          !hasRecentMessages ? 'opacity-40 grayscale' : ''
+        }`}>
           {fallbackInitial.toUpperCase()}
         </div>
       )}
-      <div className="mt-2 text-xs text-center font-medium text-muted-foreground max-w-24 truncate">
+      <div className={`mt-2 text-xs text-center font-medium text-muted-foreground max-w-24 truncate transition-all duration-300 ${
+        !hasRecentMessages ? 'opacity-40' : ''
+      }`}>
         {displayText}
       </div>
 
-      {/* Session limit controls */}
-      <div className="mt-2 flex items-center gap-2">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            data.onDecreaseLimit(data.userId, data.totalAvailable);
-          }}
-          className="w-5 h-5 flex items-center justify-center bg-background border border-border rounded hover:bg-border hover:border-background transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Show fewer sessions"
-          disabled={data.sessionLimit <= 1}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="w-3 h-3 text-border hover:text-background"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+      {/* Session limit controls or no messages indicator */}
+      {!hasRecentMessages ? (
+        <div className="mt-2 text-xs text-muted-foreground font-medium opacity-40">
+          No messages in last 24h
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onDecreaseLimit(data.userId, data.totalAvailable);
+            }}
+            className="w-5 h-5 flex items-center justify-center bg-background border border-border rounded hover:bg-border hover:border-background transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Show fewer sessions"
+            disabled={data.sessionLimit <= 1}
           >
-            <path d="M5 12h14"/>
-          </svg>
-        </button>
-        <span className="text-xs text-muted-foreground font-medium min-w-[4ch] text-center">
-          {data.sessionLimit}/{data.totalAvailable}
-        </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            data.onIncreaseLimit(data.userId, data.totalAvailable);
-          }}
-          className="w-5 h-5 flex items-center justify-center bg-background border border-border rounded hover:bg-border hover:border-background transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Show more sessions"
-          disabled={data.sessionLimit >= data.totalAvailable}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="w-3 h-3 text-border hover:text-background"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+            <svg
+              viewBox="0 0 24 24"
+              className="w-3 h-3 text-border hover:text-background"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M5 12h14"/>
+            </svg>
+          </button>
+          <span className="text-xs text-muted-foreground font-medium min-w-[4ch] text-center">
+            {data.sessionLimit}/{data.totalAvailable}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onIncreaseLimit(data.userId, data.totalAvailable);
+            }}
+            className="w-5 h-5 flex items-center justify-center bg-background border border-border rounded hover:bg-border hover:border-background transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Show more sessions"
+            disabled={data.sessionLimit >= data.totalAvailable}
           >
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-        </button>
-      </div>
+            <svg
+              viewBox="0 0 24 24"
+              className="w-3 h-3 text-border hover:text-background"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1363,6 +1377,7 @@ function CanvasFlowInner({ usersWithMessages, initialData }: CanvasFlowProps) {
     usersData.forEach((user, userIndex) => {
       const position = userPositions[userIndex];
       const totalAvailable = getTotalAvailableSessions(user);
+      const hasRecentMessages = user.recentMessages && user.recentMessages.length > 0;
 
       const userNode: Node = {
         id: `user-${user.id}`,
@@ -1385,14 +1400,15 @@ function CanvasFlowInner({ usersWithMessages, initialData }: CanvasFlowProps) {
           totalAvailable: totalAvailable,
           onIncreaseLimit: handleIncreaseSessionLimit,
           onDecreaseLimit: handleDecreaseSessionLimit,
-          animationState: nodeAnimationStates.get(`user-${user.id}`) || 'visible'
+          animationState: nodeAnimationStates.get(`user-${user.id}`) || 'visible',
+          hasRecentMessages: hasRecentMessages
         },
         style: {
           background: 'transparent',
           border: 'none',
         },
       };
-      
+
       nodes.push(userNode);
     });
     
