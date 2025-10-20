@@ -1,5 +1,6 @@
 import type { ProjectInfo as CursorProjectInfo } from './cursor-reader.js';
 import type { ProjectInfo as ClaudeCodeProjectInfo } from './claude-code-reader.js';
+import type { ProjectInfo as VSCodeProjectInfo } from './vscode-reader.js';
 
 /**
  * Unified project information combining data from all sources
@@ -11,16 +12,19 @@ export interface UnifiedProjectInfo {
   composerCount: number;
   copilotSessionCount: number;
   claudeCodeSessionCount: number;
+  vscodeChatCount: number;
+  vscodeInlineChatCount: number;
   lastActivity: string;
 }
 
 /**
- * Merge projects from Cursor and Claude Code into a unified list
+ * Merge projects from Cursor, Claude Code, and VSCode into a unified list
  * Projects with the same path are merged together
  */
 export function mergeProjects(
   cursorProjects: CursorProjectInfo[],
-  claudeCodeProjects: ClaudeCodeProjectInfo[]
+  claudeCodeProjects: ClaudeCodeProjectInfo[],
+  vscodeProjects: VSCodeProjectInfo[] = []
 ): UnifiedProjectInfo[] {
   const projectsMap = new Map<string, UnifiedProjectInfo>();
 
@@ -33,6 +37,8 @@ export function mergeProjects(
       composerCount: project.composerCount,
       copilotSessionCount: project.copilotSessionCount,
       claudeCodeSessionCount: 0,
+      vscodeChatCount: 0,
+      vscodeInlineChatCount: 0,
       lastActivity: project.lastActivity
     });
   }
@@ -58,6 +64,44 @@ export function mergeProjects(
         composerCount: 0,
         copilotSessionCount: 0,
         claudeCodeSessionCount: project.claudeCodeSessionCount,
+        vscodeChatCount: 0,
+        vscodeInlineChatCount: 0,
+        lastActivity: project.lastActivity
+      });
+    }
+  }
+
+  // Merge or add VSCode projects
+  for (const project of vscodeProjects) {
+    const existing = projectsMap.get(project.path);
+
+    if (existing) {
+      // Merge with existing project
+      existing.vscodeChatCount = project.chatCount;
+      existing.vscodeInlineChatCount = project.inlineChatCount;
+
+      // Merge workspace IDs
+      for (const workspaceId of project.workspaceIds) {
+        if (!existing.workspaceIds.includes(workspaceId)) {
+          existing.workspaceIds.push(workspaceId);
+        }
+      }
+
+      // Update last activity if VSCode activity is more recent
+      if (project.lastActivity > existing.lastActivity) {
+        existing.lastActivity = project.lastActivity;
+      }
+    } else {
+      // Add new project from VSCode
+      projectsMap.set(project.path, {
+        name: project.name,
+        path: project.path,
+        workspaceIds: project.workspaceIds,
+        composerCount: 0,
+        copilotSessionCount: 0,
+        claudeCodeSessionCount: 0,
+        vscodeChatCount: project.chatCount,
+        vscodeInlineChatCount: project.inlineChatCount,
         lastActivity: project.lastActivity
       });
     }

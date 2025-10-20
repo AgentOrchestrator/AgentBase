@@ -1,5 +1,6 @@
 import { readChatHistories, extractProjectsFromClaudeCodeHistories } from './claude-code-reader.js';
 import { readCursorHistories, convertCursorToStandardFormat, extractProjectsFromConversations } from './cursor-reader.js';
+import { readVSCodeHistories, convertVSCodeToStandardFormat, extractProjectsFromConversations as extractVSCodeProjects } from './vscode-reader.js';
 import { uploadAllHistories, syncProjects } from './uploader.js';
 import { runPeriodicSummaryUpdate, runPeriodicKeywordUpdate, runPeriodicTitleUpdate } from './summarizer.js';
 import { AuthManager } from './auth-manager.js';
@@ -74,23 +75,29 @@ async function processHistories() {
     const cursorHistories = convertCursorToStandardFormat(cursorConversations);
     console.log(`Found ${cursorHistories.length} Cursor chat histories.`);
 
+    // Read VSCode histories (with timestamp filtering)
+    const vscodeConversations = await readVSCodeHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined);
+    const vscodeHistories = convertVSCodeToStandardFormat(vscodeConversations);
+    console.log(`Found ${vscodeHistories.length} VSCode chat histories.`);
+
     // Retry any previously failed syncs
     const failedSyncs = db.getFailedSyncsForRetry();
     if (failedSyncs.length > 0) {
       console.log(`Retrying ${failedSyncs.length} previously failed syncs...`);
     }
 
-    // Extract and merge projects from both Claude Code and Cursor
+    // Extract and merge projects from Claude Code, Cursor, and VSCode
     const claudeCodeProjects = extractProjectsFromClaudeCodeHistories(claudeHistories);
     const cursorProjects = extractProjectsFromConversations(cursorConversations);
-    const allProjects = mergeProjects(cursorProjects, claudeCodeProjects);
+    const vscodeProjects = extractVSCodeProjects(vscodeConversations);
+    const allProjects = mergeProjects(cursorProjects, claudeCodeProjects, vscodeProjects);
 
     if (allProjects.length > 0) {
       await syncProjects(allProjects, accountId, accessToken, refreshToken);
     }
 
     // Combine all histories
-    const allHistories = [...claudeHistories, ...cursorHistories];
+    const allHistories = [...claudeHistories, ...cursorHistories, ...vscodeHistories];
 
     if (allHistories.length === 0 && failedSyncs.length === 0) {
       console.log('No new chat histories found and no failed syncs to retry.');

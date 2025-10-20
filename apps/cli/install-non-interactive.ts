@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { exec, execSync } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
@@ -13,6 +13,7 @@ interface InstallOptions {
 	supabaseAnonKey?: string;
 	openaiApiKey?: string;
 	skipOpenai?: boolean; // Skip OpenAI setup entirely
+	envFile?: string; // Path to custom env file
 }
 
 async function log(message: string, level: 'info' | 'success' | 'error' | 'running' = 'info') {
@@ -64,6 +65,11 @@ async function mergeEnvFile(filePath: string, newEntries: Record<string, string>
 
 async function install(options: InstallOptions = {}) {
 	console.log('\n🚀 Agent Orchestrator Installation (Non-Interactive Mode)\n');
+
+	// Show env file usage if specified
+	if (options.envFile) {
+		log(`Loading environment variables from: ${options.envFile}`, 'info');
+	}
 
 	try {
 		// Step 0: Check Supabase CLI (if using local)
@@ -264,20 +270,85 @@ async function install(options: InstallOptions = {}) {
 	}
 }
 
+// Helper function to load env file
+function loadEnvFile(filePath: string): Record<string, string> {
+	const envVars: Record<string, string> = {};
+
+	// Try the path as-is first, then try relative to root
+	let resolvedPath = filePath;
+	if (!fs.existsSync(resolvedPath)) {
+		// Try relative to monorepo root (../../ from apps/cli/)
+		const rootPath = path.join(process.cwd(), '..', '..', filePath);
+		if (fs.existsSync(rootPath)) {
+			resolvedPath = rootPath;
+		} else {
+			throw new Error(`Env file not found: ${filePath} (tried ${resolvedPath} and ${rootPath})`);
+		}
+	}
+
+	const content = fs.readFileSync(resolvedPath, 'utf-8');
+	const lines = content.split('\n');
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		// Skip comments and empty lines
+		if (trimmed.startsWith('#') || trimmed === '') {
+			continue;
+		}
+
+		const match = trimmed.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+		if (match) {
+			const key = match[1];
+			let value = match[2];
+
+			// Remove surrounding quotes if present
+			if ((value.startsWith('"') && value.endsWith('"')) ||
+			    (value.startsWith("'") && value.endsWith("'"))) {
+				value = value.slice(1, -1);
+			}
+
+			envVars[key] = value;
+		}
+	}
+
+	return envVars;
+}
+
 // Parse command-line arguments and environment variables
 const args = process.argv.slice(2);
 const options: InstallOptions = {};
 
+// Check for --env-file option first
+let envFileVars: Record<string, string> = {};
+for (let i = 0; i < args.length; i++) {
+	if (args[i] === '-e' || args[i] === '--env-file') {
+		const envFilePath = args[i + 1];
+		if (!envFilePath) {
+			console.error('Error: --env-file requires a path argument');
+			process.exit(1);
+		}
+		try {
+			envFileVars = loadEnvFile(envFilePath);
+			options.envFile = envFilePath;
+		} catch (error) {
+			console.error(`Error loading env file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			process.exit(1);
+		}
+		break;
+	}
+}
+
 // First, check environment variables for secrets (more secure than CLI args)
+// Priority: CLI args > process.env > env file
 // This allows using: SUPABASE_URL=xxx OPENAI_API_KEY=yyy tsx install-non-interactive.ts
-if (process.env.SUPABASE_URL) {
-	options.supabaseUrl = process.env.SUPABASE_URL;
+if (envFileVars.SUPABASE_URL || process.env.SUPABASE_URL) {
+	options.supabaseUrl = process.env.SUPABASE_URL || envFileVars.SUPABASE_URL;
 }
-if (process.env.SUPABASE_ANON_KEY) {
-	options.supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+if (envFileVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY) {
+	options.supabaseAnonKey = process.env.SUPABASE_ANON_KEY || envFileVars.SUPABASE_ANON_KEY;
 }
-if (process.env.OPENAI_API_KEY) {
-	options.openaiApiKey = process.env.OPENAI_API_KEY;
+if (envFileVars.OPENAI_API_KEY || process.env.OPENAI_API_KEY) {
+	options.openaiApiKey = process.env.OPENAI_API_KEY || envFileVars.OPENAI_API_KEY;
 }
 
 for (let i = 0; i < args.length; i++) {
@@ -288,6 +359,11 @@ for (let i = 0; i < args.length; i++) {
 			break;
 		case '--remote':
 			options.useLocal = false;
+			break;
+		case '-e':
+		case '--env-file':
+			// Already processed above, skip the path argument
+			i++;
 			break;
 		case '--supabase-url':
 			options.supabaseUrl = args[++i];
@@ -311,6 +387,7 @@ Usage: tsx install-non-interactive.ts [options]
 Options:
   --local                     Use local Supabase (default)
   --remote                    Use remote Supabase
+  -e, --env-file <path>       Load environment variables from file
   --supabase-url <url>        Supabase URL (required for remote)
   --supabase-anon-key <key>   Supabase anon key (required for remote)
   --openai-key <key>          OpenAI API key (optional)
@@ -322,12 +399,20 @@ Environment Variables (preferred for secrets):
   SUPABASE_ANON_KEY           Supabase anon key (overridden by --supabase-anon-key)
   OPENAI_API_KEY              OpenAI API key (overridden by --openai-key)
 
+Priority Order (highest to lowest):
+  1. CLI arguments (--supabase-url, --openai-key, etc.)
+  2. Environment variables (SUPABASE_URL, OPENAI_API_KEY, etc.)
+  3. Env file specified with -e/--env-file
+
 Examples:
   # Local Supabase with OpenAI (using env vars - RECOMMENDED)
   OPENAI_API_KEY=sk-xxx tsx install-non-interactive.ts --local
 
   # Local Supabase without OpenAI (development mode)
   tsx install-non-interactive.ts --local --skip-openai
+
+  # Remote Supabase (using env file - RECOMMENDED for CI/CD)
+  tsx install-non-interactive.ts --remote -e .env.production
 
   # Remote Supabase (using env vars - RECOMMENDED)
   SUPABASE_URL=https://xxx.supabase.co \\
@@ -341,8 +426,8 @@ Examples:
     --supabase-anon-key eyJh... \\
     --openai-key sk-xxx
 
-  # CI/CD usage (read from .env file)
-  export $(cat .env | xargs) && tsx install-non-interactive.ts --local
+  # CI/CD usage (using env file)
+  tsx install-non-interactive.ts --remote --env-file .env.ci
 `);
 			process.exit(0);
 		default:

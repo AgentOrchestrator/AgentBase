@@ -1,19 +1,9 @@
-import OpenAI from 'openai';
 import { generateMockSummary, generateMockKeywords } from './mock-summarizer.js';
 import { createAuthenticatedClient } from './supabase.js';
+import { getUserLLMConfig, generateLLMText, type LLMConfig, type UserPreferences, getUserPreferences } from './llm-client.js';
 
-// Check if we're in development mode or if OpenAI API key is not set
+// Check if we're in development mode
 const isDevelopment = process.env.DEVELOPMENT === 'true';
-const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-
-// Use fallback (mock) mode if:
-// 1. DEVELOPMENT=true is set, OR
-// 2. OPENAI_API_KEY is not configured
-const useFallback = isDevelopment || !hasOpenAIKey;
-
-const openai = useFallback ? null : new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 interface Message {
   display: string;
@@ -42,57 +32,16 @@ interface ChatHistory {
   updated_at: string;
 }
 
-interface UserPreferences {
-  user_id: string;
-  ai_summary_enabled: boolean;
-  ai_title_enabled: boolean;
-}
-
 interface KeywordClassification {
   type: string[];
   topic: string[];
 }
 
-/**
- * Fetch user preferences from the database
- * Returns default preferences if not found
- */
-async function getUserPreferences(userId: string, accessToken: string, refreshToken: string): Promise<UserPreferences> {
-  try {
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-    const { data, error } = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !data) {
-      // Return default preferences if not found
-      console.log(`[Preferences] No preferences found for user ${userId}, using defaults`);
-      return {
-        user_id: userId,
-        ai_summary_enabled: true,
-        ai_title_enabled: true,
-      };
-    }
-
-    return {
-      user_id: data.user_id,
-      ai_summary_enabled: data.ai_summary_enabled ?? true,
-      ai_title_enabled: data.ai_title_enabled ?? true,
-    };
-  } catch (error) {
-    console.error('[Preferences] Error fetching user preferences:', error);
-    // Return defaults on error
-    return {
-      user_id: userId,
-      ai_summary_enabled: true,
-      ai_title_enabled: true,
-    };
-  }
-}
-
-async function generateSessionSummary(messages: Message[], retries = 3): Promise<string> {
+async function generateSessionSummary(
+  messages: Message[],
+  llmConfig: LLMConfig,
+  retries = 3
+): Promise<string> {
   if (messages.length === 0) {
     return JSON.stringify({
       summary: 'No messages yet',
@@ -101,19 +50,10 @@ async function generateSessionSummary(messages: Message[], retries = 3): Promise
     });
   }
 
-  // Use fallback summarizer if in development mode or OpenAI key not configured
-  if (useFallback) {
-    if (isDevelopment) {
-      console.log('[Summary] Using fallback summarizer (DEVELOPMENT mode)');
-    } else {
-      console.log('[Summary] Using fallback summarizer (OPENAI_API_KEY not set)');
-    }
+  // Use fallback summarizer if in development mode
+  if (isDevelopment) {
+    console.log('[Summary] Using fallback summarizer (DEVELOPMENT mode)');
     return generateMockSummary(messages);
-  }
-
-  // Ensure openai is available
-  if (!openai) {
-    throw new Error('OpenAI client not initialized');
   }
 
   // Construct conversation context for the AI
@@ -149,25 +89,25 @@ Example:
 }
 \`\`\``;
 
+  const systemPrompt = 'You are an expert at analyzing software development conversations. Always respond with valid JSON only, wrapped in ```json ``` code blocks.';
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at analyzing software development conversations. Always respond with valid JSON only, wrapped in ```json ``` code blocks.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 200,
-      });
+      const content = await generateLLMText(
+        llmConfig,
+        prompt,
+        systemPrompt,
+        {
+          temperature: 0.3,
+          maxTokens: 200,
+        }
+      );
 
-      const content = response.choices[0]?.message?.content || '';
+      if (!content) {
+        // No LLM available, use fallback
+        console.log('[Summary] No LLM available, using fallback summarizer');
+        return generateMockSummary(messages);
+      }
 
       // Extract JSON from markdown code block
       const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
@@ -231,24 +171,19 @@ Example:
   throw new Error('Failed to generate summary after retries');
 }
 
-async function generateKeywordClassification(messages: Message[], retries = 3): Promise<KeywordClassification> {
+async function generateKeywordClassification(
+  messages: Message[],
+  llmConfig: LLMConfig,
+  retries = 3
+): Promise<KeywordClassification> {
   if (messages.length === 0) {
     return { type: [], topic: [] };
   }
 
-  // Use fallback keyword extraction if in development mode or OpenAI key not configured
-  if (useFallback) {
-    if (isDevelopment) {
-      console.log('[Keywords] Using fallback keyword extraction (DEVELOPMENT mode)');
-    } else {
-      console.log('[Keywords] Using fallback keyword extraction (OPENAI_API_KEY not set)');
-    }
+  // Use fallback keyword extraction if in development mode
+  if (isDevelopment) {
+    console.log('[Keywords] Using fallback keyword extraction (DEVELOPMENT mode)');
     return generateMockKeywords(messages);
-  }
-
-  // Ensure openai is available
-  if (!openai) {
-    return { type: [], topic: [] };
   }
 
   // Construct conversation context for the AI
@@ -268,26 +203,26 @@ Provide a JSON response with two arrays:
 Respond ONLY with valid JSON in this exact format:
 {"type": ["feature", "refactor"], "topic": ["gmail integration", "email parser"]}`;
 
+  const systemPrompt = 'You are an expert at analyzing software development conversations and extracting structured keyword classifications. Always respond with valid JSON only.';
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at analyzing software development conversations and extracting structured keyword classifications. Always respond with valid JSON only.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 150,
-        response_format: { type: 'json_object' },
-      });
+      const content = await generateLLMText(
+        llmConfig,
+        prompt,
+        systemPrompt,
+        {
+          temperature: 0.3,
+          maxTokens: 150,
+        }
+      );
 
-      const content = response.choices[0]?.message?.content || '{"type": [], "topic": []}';
+      if (!content) {
+        // No LLM available, use fallback
+        console.log('[Keywords] No LLM available, using fallback keyword extraction');
+        return generateMockKeywords(messages);
+      }
+
       const parsed = JSON.parse(content);
 
       // Validate and sanitize the response
@@ -315,26 +250,21 @@ Respond ONLY with valid JSON in this exact format:
   return { type: [], topic: [] };
 }
 
-async function generateSessionTitle(messages: Message[], retries = 3): Promise<string> {
+async function generateSessionTitle(
+  messages: Message[],
+  llmConfig: LLMConfig,
+  retries = 3
+): Promise<string> {
   if (messages.length === 0) {
     return 'Empty Session';
   }
 
-  // Use fallback title generation if in development mode or OpenAI key not configured
-  if (useFallback) {
-    if (isDevelopment) {
-      console.log('[Title] Using fallback title generation (DEVELOPMENT mode)');
-    } else {
-      console.log('[Title] Using fallback title generation (OPENAI_API_KEY not set)');
-    }
+  // Use fallback title generation if in development mode
+  if (isDevelopment) {
+    console.log('[Title] Using fallback title generation (DEVELOPMENT mode)');
     // Generate a simple title from first few messages
     const firstMessage = messages[0]?.display || '';
     return firstMessage.slice(0, 50).trim() + (firstMessage.length > 50 ? '...' : '');
-  }
-
-  // Ensure openai is available
-  if (!openai) {
-    throw new Error('OpenAI client not initialized');
   }
 
   // Construct conversation context for the AI
@@ -350,25 +280,28 @@ ${conversationText}
 
 Provide ONLY the title, nothing else:`;
 
+  const systemPrompt = 'You are an expert at creating concise, descriptive titles for software development sessions. Respond with only the title.';
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at creating concise, descriptive titles for software development sessions. Respond with only the title.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 50,
-      });
+      const content = await generateLLMText(
+        llmConfig,
+        prompt,
+        systemPrompt,
+        {
+          temperature: 0.7,
+          maxTokens: 50,
+        }
+      );
 
-      return response.choices[0]?.message?.content?.trim() || 'Coding Session';
+      if (!content) {
+        // No LLM available, use fallback
+        console.log('[Title] No LLM available, using fallback title generation');
+        const firstMessage = messages[0]?.display || '';
+        return firstMessage.slice(0, 50).trim() + (firstMessage.length > 50 ? '...' : '');
+      }
+
+      return content.trim() || 'Coding Session';
     } catch (error: any) {
       // Handle rate limit errors with exponential backoff
       if (error?.code === 'rate_limit_exceeded' && attempt < retries) {
@@ -711,8 +644,16 @@ export async function updateSessionSummary(
       return { success: false, error: 'No messages to summarize' };
     }
 
+    // Get user's LLM configuration
+    const accountId = session.account_id;
+    if (!accountId) {
+      return { success: false, error: 'No account ID found for session' };
+    }
+
+    const llmConfig = await getUserLLMConfig(accountId, accessToken, refreshToken);
+
     // Generate summary
-    const summary = await generateSessionSummary(messages);
+    const summary = await generateSessionSummary(messages, llmConfig);
 
     // Update database
     const { error: updateError } = await supabase
@@ -764,8 +705,16 @@ export async function updateSessionKeywords(
       return { success: false, error: 'No messages to classify' };
     }
 
+    // Get user's LLM configuration
+    const accountId = session.account_id;
+    if (!accountId) {
+      return { success: false, error: 'No account ID found for session' };
+    }
+
+    const llmConfig = await getUserLLMConfig(accountId, accessToken, refreshToken);
+
     // Generate keywords
-    const keywords = await generateKeywordClassification(messages);
+    const keywords = await generateKeywordClassification(messages, llmConfig);
 
     // Update database
     const { error: updateError } = await supabase
@@ -827,8 +776,16 @@ export async function updateSessionTitle(
       // Use conversation name from metadata as the title
       title = conversationName;
     } else {
+      // Get user's LLM configuration
+      const accountId = session.account_id;
+      if (!accountId) {
+        return { success: false, error: 'No account ID found for session' };
+      }
+
+      const llmConfig = await getUserLLMConfig(accountId, accessToken, refreshToken);
+
       // Generate title from messages
-      title = await generateSessionTitle(messages);
+      title = await generateSessionTitle(messages, llmConfig);
     }
 
     // Update database

@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Star, StarOff, CheckCircle2 } from 'lucide-react';
 
 interface LLMProvider {
@@ -10,6 +17,7 @@ interface LLMProvider {
   name: string;
   icon: React.ReactNode;
   placeholder: string;
+  models: { id: string; name: string }[];
 }
 
 const LLM_PROVIDERS: LLMProvider[] = [
@@ -22,6 +30,13 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'sk-...',
+    models: [
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Fast & Affordable)' },
+      { id: 'gpt-4o', name: 'GPT-4o (Recommended)' },
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+      { id: 'gpt-4', name: 'GPT-4' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+    ],
   },
   {
     id: 'anthropic',
@@ -32,6 +47,11 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'sk-ant-...',
+    models: [
+      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)' },
+      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Fast & Affordable)' },
+      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+    ],
   },
   {
     id: 'google',
@@ -42,6 +62,11 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'AI...',
+    models: [
+      { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Fast & Affordable)' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    ],
   },
   {
     id: 'groq',
@@ -52,6 +77,10 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'gsk_...',
+    models: [
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Versatile)' },
+      { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B (Fast)' },
+    ],
   },
   {
     id: 'ollama',
@@ -62,6 +91,11 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'http://localhost:11434',
+    models: [
+      { id: 'llama3.2', name: 'Llama 3.2' },
+      { id: 'codellama', name: 'Code Llama' },
+      { id: 'mistral', name: 'Mistral' },
+    ],
   },
   {
     id: 'openrouter',
@@ -73,6 +107,9 @@ const LLM_PROVIDERS: LLMProvider[] = [
       </svg>
     ),
     placeholder: 'sk-or-...',
+    models: [
+      { id: 'auto', name: 'Auto (Router Chooses Best Model)' },
+    ],
   },
 ];
 
@@ -83,14 +120,24 @@ interface SavedKey {
   is_default: boolean;
 }
 
+interface UserPreferences {
+  ai_summary_enabled: boolean;
+  ai_title_enabled: boolean;
+  ai_model_provider?: string;
+  ai_model_name?: string;
+}
+
 export function LLMProviderSettings() {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [savedKeys, setSavedKeys] = useState<SavedKey[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchSavedKeys();
+    fetchPreferences();
   }, []);
 
   const fetchSavedKeys = async () => {
@@ -102,6 +149,24 @@ export function LLMProviderSettings() {
       }
     } catch (error) {
       console.error('Error fetching saved keys:', error);
+    }
+  };
+
+  const fetchPreferences = async () => {
+    try {
+      const response = await fetch('/api/preferences');
+      if (response.ok) {
+        const data = await response.json();
+        setPreferences(data.preferences);
+        // Initialize selected models from preferences
+        if (data.preferences?.ai_model_provider && data.preferences?.ai_model_name) {
+          setSelectedModels({
+            [data.preferences.ai_model_provider]: data.preferences.ai_model_name,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching preferences:', error);
     }
   };
 
@@ -186,6 +251,31 @@ export function LLMProviderSettings() {
 
   const isDefault = (provider: string) => {
     return savedKeys.some(key => key.provider === provider && key.is_default);
+  };
+
+  const handleModelChange = async (provider: string, modelId: string) => {
+    setSelectedModels(prev => ({ ...prev, [provider]: modelId }));
+
+    // Update preferences in database
+    try {
+      const response = await fetch('/api/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ai_model_provider: provider,
+          ai_model_name: modelId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Failed to update model preference:', error);
+        alert(`Failed to update model preference: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating model preference:', error);
+      alert('Failed to update model preference');
+    }
   };
 
   return (
@@ -289,6 +379,29 @@ export function LLMProviderSettings() {
                       </button>
                     )}
                   </div>
+
+                  {configured && provider.models.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Model
+                      </label>
+                      <Select
+                        value={selectedModels[provider.id] || provider.models[0].id}
+                        onValueChange={(value) => handleModelChange(provider.id, value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {provider.models.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              {model.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>

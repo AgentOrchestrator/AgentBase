@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { generateText } from 'ai';
+import { getUserLLMConfig, generateLLMText } from '@/lib/llm-client';
 
 export async function POST(request: Request) {
   try {
@@ -61,45 +61,36 @@ export async function POST(request: Request) {
       .map((msg: any) => `${msg.role}: ${msg.display || msg.content || ''}`)
       .join('\n\n');
 
-    // Fetch the user's OpenAI API key from llm_api_keys table
-    const { data: apiKeyRecord, error: apiKeyError } = await supabase
-      .from('llm_api_keys')
-      .select('api_key, provider')
-      .eq('account_id', user.id)
-      .eq('provider', 'openai')
-      .eq('is_active', true)
-      .order('is_default', { ascending: false })
-      .limit(1)
-      .single();
+    // Get user's LLM configuration based on their preferences
+    const llmConfig = await getUserLLMConfig(user.id);
 
-    let apiKey: string;
-    if (apiKeyError || !apiKeyRecord) {
-      // Fallback to environment variable if no user key found
-      const envApiKey = process.env.OPENAI_API_KEY;
-      if (!envApiKey) {
-        return NextResponse.json(
-          { success: false, error: 'No OpenAI API key found. Please add one in Settings.' },
-          { status: 400 }
-        );
-      }
-      apiKey = envApiKey;
-    } else {
-      apiKey = apiKeyRecord.api_key;
+    if (!llmConfig) {
+      return NextResponse.json(
+        { success: false, error: 'No LLM API key found. Please configure an API key in Settings.' },
+        { status: 400 }
+      );
     }
 
-    // Create OpenAI provider with the API key
-    const { createOpenAI } = await import('@ai-sdk/openai');
-    const openaiProvider = createOpenAI({
-      apiKey,
-    });
-
-    const { text } = await generateText({
-      model: openaiProvider('gpt-4o-mini'),
-      prompt: `Based on the following conversation, generate a short, descriptive title (max 5-7 words). Only respond with the title, nothing else.
+    // Generate title using user's preferred model
+    const text = await generateLLMText(
+      llmConfig,
+      `Based on the following conversation, generate a short, descriptive title (max 5-7 words). Only respond with the title, nothing else.
 
 Conversation:
 ${conversationPreview}`,
-    });
+      undefined,
+      {
+        temperature: 0.7,
+        maxTokens: 50,
+      }
+    );
+
+    if (!text) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to generate title' },
+        { status: 500 }
+      );
+    }
 
     const generatedTitle = text.trim() || 'Untitled Conversation';
 
