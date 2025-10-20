@@ -61,7 +61,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { ai_summary_enabled, ai_title_enabled } = body;
+    const { ai_summary_enabled, ai_title_enabled, ai_model_provider, ai_model_name } = body;
 
     // Build update object with only provided fields
     const updateData: any = { user_id: user.id };
@@ -74,8 +74,16 @@ export async function PUT(request: NextRequest) {
       updateData.ai_title_enabled = ai_title_enabled;
     }
 
+    if (typeof ai_model_provider === 'string') {
+      updateData.ai_model_provider = ai_model_provider;
+    }
+
+    if (typeof ai_model_name === 'string') {
+      updateData.ai_model_name = ai_model_name;
+    }
+
     // Validate at least one field is provided
-    if (!('ai_summary_enabled' in updateData) && !('ai_title_enabled' in updateData)) {
+    if (Object.keys(updateData).length === 1) { // Only user_id
       return NextResponse.json({ error: 'At least one preference field must be provided' }, { status: 400 });
     }
 

@@ -1,8 +1,11 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText, LanguageModel } from 'ai';
+import { generateText } from 'ai';
 import { createClient } from '@/lib/supabase-server';
+
+// Type for language model returned by AI SDK providers
+type LanguageModel = ReturnType<ReturnType<typeof createOpenAI>>;
 
 export interface LLMConfig {
   provider: string;
@@ -176,9 +179,9 @@ export async function generateLLMText(
     const result = await generateText({
       model,
       prompt,
-      system: systemPrompt,
+      ...(systemPrompt && { system: systemPrompt }),
       temperature: options?.temperature ?? 0.7,
-      maxTokens: options?.maxTokens ?? 500,
+      maxRetries: 2,
     });
 
     return result.text;
