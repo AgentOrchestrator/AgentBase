@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.chat_histories (
     ai_title_generated_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT check_agent_type CHECK (agent_type IN ('claude_code', 'codex', 'cursor', 'windsurf', 'other'))
+    CONSTRAINT check_agent_type CHECK (agent_type IN ('claude_code', 'codex', 'cursor', 'vscode', 'windsurf', 'other'))
 );
 
 CREATE INDEX idx_chat_histories_timestamp ON public.chat_histories(timestamp DESC);

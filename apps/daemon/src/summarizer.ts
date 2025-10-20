@@ -223,7 +223,11 @@ Respond ONLY with valid JSON in this exact format:
         return generateMockKeywords(messages);
       }
 
-      const parsed = JSON.parse(content);
+      // Extract JSON from markdown code block (same as summary generation)
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+      const jsonString = jsonMatch?.[1] ?? content;
+
+      const parsed = JSON.parse(jsonString);
 
       // Validate and sanitize the response
       return {
