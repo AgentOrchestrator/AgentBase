@@ -174,7 +174,7 @@ For real team collaboration where multiple developers can see each other's AI co
    pnpm dev
    ```
 
-6. **Access the shared dashboard**:
+6. **Access the canvas**:
    - **Web UI**: http://localhost:3000
    - All team members will see each other's AI conversations in real-time!
 
@@ -186,7 +186,7 @@ For real team collaboration where multiple developers can see each other's AI co
 
 When you're in the zone with Claude Code or Cursor, articulating your current task in Slack feels like context-switching hell. "What are you working on?" becomes a difficult question to answer when you're mid-conversation with an AI, exploring multiple approaches, hitting roadblocks, and iterating rapidly.
 
-**The Solution:** We built Agent Orchestrator to create transparency without the overhead. Instead of asking teammates to explain what they're doing, we can simply check the dashboard:
+**The Solution:** We built Agent Orchestrator to create transparency without the overhead. Instead of asking teammates to explain what they're doing, we can simply check the canvas:
 
 - **Real-time visibility** - See who's working on what, right now
 - **AI-powered summaries** - Instantly understand the context of each conversation without reading entire chat logs
@@ -199,11 +199,26 @@ This is the tool we wished we had: a way to stay connected with our team's work 
 
 ## 📸 Preview
 
-> _Coming soon: Screenshots and demo of the web dashboard_
+<div align="center">
+
+### The Canvas
+
+<table>
+  <tr>
+    <td><img src="./assets/screenshot_0.jpeg" alt="Dashboard Overview" width="400"/></td>
+    <td><img src="./assets/screenshot_1.jpeg" alt="Chat History View" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="./assets/screenshot_2.jpeg" alt="Project Organization" width="400"/></td>
+    <td><img src="./assets/screenshot_3.jpeg" alt="Real-time Updates" width="400"/></td>
+  </tr>
+</table>
+
+</div>
 
 **What you'll see:**
 - 👥 Team member activities across Claude Code, Cursor, and more
-- 📊 Real-time chat history dashboard for all teammates
+- 📊 Real-time chat history synced across your team
 - 🔍 AI-generated summaries for each conversation
 - 📁 Project-based organization for easy navigation
 - ⚡ Live updates as your team codes with AI assistants
@@ -243,7 +258,7 @@ Agent Orchestrator connects with your favorite AI coding assistants to provide r
 | Real-time Updates | ✅ | ✅ | 🚧 | 🚧 |
 | AI Summaries | ✅ | ✅ | 🚧 | 🚧 |
 | Project Detection | ✅ | ✅ | 🚧 | 🚧 |
-| File Change Tracking | ✅ | ✅ | 🚧 | 🚧 |
+| File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 |
 
 **Legend:**
 - ✅ Fully supported
@@ -270,7 +285,7 @@ agent-orchestrator/
 ```
 
 - **[apps/daemon](./apps/daemon/)** - Watches for new chat histories and generates AI summaries
-- **[apps/web](./apps/web/)** - Next.js dashboard with real-time updates via Supabase Realtime
+- **[apps/web](./apps/web/)** - Next.js canvas with real-time updates via Supabase Realtime
 - **[apps/cli](./apps/cli/)** - Interactive CLI for installation and setup
 - **[packages/shared](./packages/shared/)** - Shared TypeScript types and utilities
 - **supabase/** - PostgreSQL database with real-time capabilities
