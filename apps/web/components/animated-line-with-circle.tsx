@@ -14,7 +14,7 @@ export function AnimatedPin({ className = '', size = 16, onClick, title, isPinne
       <button
         onClick={onClick}
         disabled={disabled}
-        className={`flex items-center justify-center transition-all duration-200 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${className}`}
+        className={`flex items-center justify-center transition-all duration-200 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
         title={title}
       >
       <svg 
@@ -23,11 +23,21 @@ export function AnimatedPin({ className = '', size = 16, onClick, title, isPinne
         viewBox="0 0 24 24" 
         fill="none" 
         xmlns="http://www.w3.org/2000/svg"
-        className={`transition-colors duration-50 ${
-          isPinned 
-            ? 'text-primary hover:text-primary/80' 
-            : 'text-muted-foreground hover:text-foreground'
-        }`}
+        className="transition-colors duration-100"
+        style={{ 
+          color: isPinned ? 'var(--primary)' : 'var(--border)',
+          transition: 'color 100ms ease-in-out'
+        }}
+        onMouseEnter={(e) => {
+          if (!isPinned) {
+            e.currentTarget.style.color = 'var(--primary)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isPinned) {
+            e.currentTarget.style.color = 'var(--border)';
+          }
+        }}
       >
         <defs>
           <style>
