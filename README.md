@@ -7,14 +7,12 @@
 When you're deep in flow working with AI agnts, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Base gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
 
 <div align="center">
-<img src="./assets/agent_base_1.png" alt="Agent Base" width="635"/>
+<img src="./assets/agent_base_1.png" alt="Agent Base" width="618"/>
 
-<table border="0">
-  <tr>
-    <td><img src="./assets/agent_base_2.png" alt="Agent Base" width="364"/></td>
-    <td><img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="./assets/agent_base_2.png" alt="Agent Base" width="364"/>
+  <img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/>
+</p>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-555555.svg?labelColor=333333&color=666666)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator)
