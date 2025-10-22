@@ -1,4 +1,4 @@
-import { createAuthenticatedClient } from './supabase.js';
+import { type AuthenticatedContext } from './supabase.js';
 
 interface LLMApiKey {
   id: string;
@@ -13,25 +13,19 @@ interface LLMApiKey {
 
 /**
  * Fetch API key from the database for a specific user and provider
- * @param accountId - The user's account ID
+ * @param auth - Authenticated context
  * @param provider - The LLM provider (openai, anthropic, google, etc.)
- * @param accessToken - User's access token
- * @param refreshToken - User's refresh token
  * @returns The API key string if found and active, null otherwise
  */
 export async function getApiKeyFromDatabase(
-  accountId: string,
-  provider: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  provider: string
 ): Promise<string | null> {
   try {
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('llm_api_keys')
       .select('*')
-      .eq('account_id', accountId)
+      .eq('account_id', auth.accountId)
       .eq('provider', provider)
       .eq('is_active', true)
       .single();
@@ -50,7 +44,7 @@ export async function getApiKeyFromDatabase(
       return null;
     }
 
-    console.log(`[API Key Manager] Found ${provider} API key in database for user ${accountId}`);
+    console.log(`[API Key Manager] Found ${provider} API key in database for user ${auth.accountId}`);
     return data.api_key;
   } catch (error) {
     console.error('[API Key Manager] Unexpected error fetching API key:', error);
@@ -65,16 +59,12 @@ export async function getApiKeyFromDatabase(
  * 3. null (will use mock/fallback generation)
  *
  * @param provider - The LLM provider (openai, anthropic, google, groq, etc.)
- * @param accountId - The user's account ID (optional, required for database lookup)
- * @param accessToken - User's access token (optional, required for database lookup)
- * @param refreshToken - User's refresh token (optional, required for database lookup)
+ * @param auth - Authenticated context (optional, required for database lookup)
  * @returns The API key string if found, null otherwise
  */
 export async function getApiKey(
   provider: string,
-  accountId?: string | null,
-  accessToken?: string | null,
-  refreshToken?: string | null
+  auth?: AuthenticatedContext | null
 ): Promise<string | null> {
   // Map provider names to environment variable names
   const envVarMap: Record<string, string> = {
@@ -94,9 +84,9 @@ export async function getApiKey(
     return process.env[envVarName] || null;
   }
 
-  // Priority 2: Check database (if user credentials provided)
-  if (accountId && accessToken && refreshToken) {
-    const dbApiKey = await getApiKeyFromDatabase(accountId, provider.toLowerCase(), accessToken, refreshToken);
+  // Priority 2: Check database (if authenticated context provided)
+  if (auth) {
+    const dbApiKey = await getApiKeyFromDatabase(auth, provider.toLowerCase());
     if (dbApiKey) {
       return dbApiKey;
     }
@@ -109,23 +99,17 @@ export async function getApiKey(
 
 /**
  * Get the default LLM provider for a user from their preferences
- * @param accountId - The user's account ID
- * @param accessToken - User's access token
- * @param refreshToken - User's refresh token
+ * @param auth - Authenticated context
  * @returns The default provider name or null if not set
  */
 export async function getDefaultProvider(
-  accountId: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext
 ): Promise<string | null> {
   try {
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('llm_api_keys')
       .select('provider')
-      .eq('account_id', accountId)
+      .eq('account_id', auth.accountId)
       .eq('is_default', true)
       .eq('is_active', true)
       .single();

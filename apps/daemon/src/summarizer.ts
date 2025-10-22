@@ -1,6 +1,6 @@
 import { generateMockSummary, generateMockKeywords } from './mock-summarizer.js';
-import { createAuthenticatedClient } from './supabase.js';
-import { getUserLLMConfig, generateLLMText, type LLMConfig, type UserPreferences, getUserPreferences } from './llm-client.js';
+import { type AuthenticatedContext, createAuthenticatedClient } from './supabase.js';
+import { getUserLLMConfig, generateLLMText, type LLMConfig, getUserPreferences } from './llm-client.js';
 
 // Check if we're in development mode
 const isDevelopment = process.env.DEVELOPMENT === 'true';
@@ -19,6 +19,7 @@ interface StructuredSummary {
 interface ChatHistory {
   id: string;
   messages: Message[];
+  metadata?: any;
   account_id?: string | null;
   ai_summary?: string | null;
   ai_summary_generated_at?: string | null;
@@ -335,9 +336,8 @@ Provide ONLY the title, nothing else:`;
  * 3. User has AI summaries enabled in preferences
  */
 export async function getSessionsNeedingSummaryUpdate(
-  withinHours: number = 24,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  withinHours: number = 24
 ): Promise<ChatHistory[]> {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - withinHours);
@@ -350,11 +350,10 @@ export async function getSessionsNeedingSummaryUpdate(
   console.log(`[Summary Updater] Cutoff time: ${cutoffTime.toISOString()}`);
   console.log(`[Summary Updater] Thresholds: ${MESSAGE_THRESHOLD} messages, ${TIME_THROTTLE_MINUTES} minutes`);
 
-  // Fetch recent sessions
-  const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-  const { data, error } = await supabase
+  const { data, error } = await auth.client
     .from('chat_histories')
     .select('*')
+    .eq('account_id', auth.accountId)
     .gte('latest_message_timestamp', cutoffTime.toISOString())
     .order('latest_message_timestamp', { ascending: false });
 
@@ -367,22 +366,15 @@ export async function getSessionsNeedingSummaryUpdate(
     return [];
   }
 
-  // Get unique account IDs and batch fetch all preferences at once
-  const uniqueAccountIds = [...new Set(data.map(s => s.account_id).filter(Boolean))];
-  const preferencesMap = new Map<string, UserPreferences>();
-
-  // Fetch all preferences in parallel
-  await Promise.all(
-    uniqueAccountIds.map(async (accountId: string) => {
-      const prefs = await getUserPreferences(accountId, accessToken, refreshToken);
-      preferencesMap.set(accountId, prefs);
-    })
-  );
+  const preferences = await getUserPreferences(auth);
 
   // Filter sessions based on user preferences and update needs
   const needsUpdate: ChatHistory[] = [];
 
-  for (const session of data) {
+  // Cast database rows to ChatHistory type
+  const sessions = data as unknown as ChatHistory[];
+
+  for (const session of sessions) {
     const currentMessageCount = Array.isArray(session.messages)
       ? session.messages.length
       : 0;
@@ -392,13 +384,7 @@ export async function getSessionsNeedingSummaryUpdate(
       continue;
     }
 
-    // Skip if no account_id (can't check preferences)
-    if (!session.account_id) {
-      continue;
-    }
-
     // Check user preferences from cache
-    const preferences = preferencesMap.get(session.account_id);
     if (!preferences || !preferences.ai_summary_enabled) {
       continue;
     }
@@ -438,9 +424,8 @@ export async function getSessionsNeedingSummaryUpdate(
  * 3. User has AI summaries enabled in preferences
  */
 export async function getSessionsNeedingKeywordUpdate(
-  withinHours: number = 24,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  withinHours: number = 24
 ): Promise<ChatHistory[]> {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - withinHours);
@@ -453,11 +438,10 @@ export async function getSessionsNeedingKeywordUpdate(
   console.log(`[Keyword Updater] Cutoff time: ${cutoffTime.toISOString()}`);
   console.log(`[Keyword Updater] Thresholds: ${MESSAGE_THRESHOLD} messages, ${TIME_THROTTLE_MINUTES} minutes`);
 
-  // Fetch recent sessions
-  const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-  const { data, error } = await supabase
+  const { data, error } = await auth.client
     .from('chat_histories')
     .select('*')
+    .eq('account_id', auth.accountId)
     .gte('latest_message_timestamp', cutoffTime.toISOString())
     .order('latest_message_timestamp', { ascending: false });
 
@@ -470,22 +454,15 @@ export async function getSessionsNeedingKeywordUpdate(
     return [];
   }
 
-  // Get unique account IDs and batch fetch all preferences at once
-  const uniqueAccountIds = [...new Set(data.map(s => s.account_id).filter(Boolean))];
-  const preferencesMap = new Map<string, UserPreferences>();
-
-  // Fetch all preferences in parallel
-  await Promise.all(
-    uniqueAccountIds.map(async (accountId: string) => {
-      const prefs = await getUserPreferences(accountId, accessToken, refreshToken);
-      preferencesMap.set(accountId, prefs);
-    })
-  );
+  const preferences = await getUserPreferences(auth);
 
   // Filter sessions based on user preferences and update needs
   const needsUpdate: ChatHistory[] = [];
 
-  for (const session of data) {
+  // Cast database rows to ChatHistory type
+  const sessions = data as unknown as ChatHistory[];
+
+  for (const session of sessions) {
     const currentMessageCount = Array.isArray(session.messages)
       ? session.messages.length
       : 0;
@@ -495,13 +472,7 @@ export async function getSessionsNeedingKeywordUpdate(
       continue;
     }
 
-    // Skip if no account_id (can't check preferences)
-    if (!session.account_id) {
-      continue;
-    }
-
-    // Check user preferences from cache
-    const preferences = preferencesMap.get(session.account_id);
+    // Check user preferences
     if (!preferences || !preferences.ai_summary_enabled) {
       continue;
     }
@@ -540,18 +511,16 @@ export async function getSessionsNeedingKeywordUpdate(
  * 4. User has AI titles enabled in preferences
  */
 export async function getSessionsNeedingTitleUpdate(
-  withinHours: number = 24,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  withinHours: number = 24
 ): Promise<ChatHistory[]> {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - withinHours);
 
-  // Fetch recent sessions
-  const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-  const { data, error } = await supabase
+  const { data, error } = await auth.client
     .from('chat_histories')
     .select('*')
+    .eq('account_id', auth.accountId)
     .gte('latest_message_timestamp', cutoffTime.toISOString())
     .order('latest_message_timestamp', { ascending: false });
 
@@ -564,22 +533,15 @@ export async function getSessionsNeedingTitleUpdate(
     return [];
   }
 
-  // Get unique account IDs and batch fetch all preferences at once
-  const uniqueAccountIds = [...new Set(data.map(s => s.account_id).filter(Boolean))];
-  const preferencesMap = new Map<string, UserPreferences>();
-
-  // Fetch all preferences in parallel
-  await Promise.all(
-    uniqueAccountIds.map(async (accountId: string) => {
-      const prefs = await getUserPreferences(accountId, accessToken, refreshToken);
-      preferencesMap.set(accountId, prefs);
-    })
-  );
+  const preferences = await getUserPreferences(auth);
 
   // Filter sessions that need title generation
   const needsUpdate: ChatHistory[] = [];
 
-  for (const session of data) {
+  // Cast database rows to ChatHistory type
+  const sessions = data as unknown as ChatHistory[];
+
+  for (const session of sessions) {
     const currentMessageCount = Array.isArray(session.messages)
       ? session.messages.length
       : 0;
@@ -589,13 +551,7 @@ export async function getSessionsNeedingTitleUpdate(
       continue;
     }
 
-    // Skip if no account_id (can't check preferences)
-    if (!session.account_id) {
-      continue;
-    }
-
-    // Check user preferences from cache
-    const preferences = preferencesMap.get(session.account_id);
+    // Check user preferences
     if (!preferences || !preferences.ai_title_enabled) {
       continue;
     }
@@ -624,17 +580,16 @@ export async function getSessionsNeedingTitleUpdate(
  * Generate and save summary for a single session
  */
 export async function updateSessionSummary(
-  sessionId: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  sessionId: string
 ): Promise<{ success: boolean; summary?: string; error?: string }> {
   try {
     // Fetch the session
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-    const { data: session, error: fetchError } = await supabase
+    const { data: session, error: fetchError } = await auth.client
       .from('chat_histories')
       .select('*')
       .eq('id', sessionId)
+      .eq('account_id', auth.accountId)
       .single();
 
     if (fetchError || !session) {
@@ -648,19 +603,13 @@ export async function updateSessionSummary(
       return { success: false, error: 'No messages to summarize' };
     }
 
-    // Get user's LLM configuration
-    const accountId = session.account_id;
-    if (!accountId) {
-      return { success: false, error: 'No account ID found for session' };
-    }
-
-    const llmConfig = await getUserLLMConfig(accountId, accessToken, refreshToken);
+    const llmConfig = await getUserLLMConfig(auth);
 
     // Generate summary
-    const summary = await generateSessionSummary(messages, llmConfig);
+    const summary = await generateSessionSummary(messages as unknown as Message[], llmConfig);
 
     // Update database
-    const { error: updateError } = await supabase
+    const { error: updateError } = await auth.client
       .from('chat_histories')
       .update({
         ai_summary: summary,
@@ -685,17 +634,16 @@ export async function updateSessionSummary(
  * Generate and save keywords for a single session
  */
 export async function updateSessionKeywords(
-  sessionId: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  sessionId: string
 ): Promise<{ success: boolean; keywords?: KeywordClassification; error?: string }> {
   try {
     // Fetch the session
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-    const { data: session, error: fetchError } = await supabase
+    const { data: session, error: fetchError } = await auth.client
       .from('chat_histories')
       .select('*')
       .eq('id', sessionId)
+      .eq('account_id', auth.accountId)
       .single();
 
     if (fetchError || !session) {
@@ -709,19 +657,13 @@ export async function updateSessionKeywords(
       return { success: false, error: 'No messages to classify' };
     }
 
-    // Get user's LLM configuration
-    const accountId = session.account_id;
-    if (!accountId) {
-      return { success: false, error: 'No account ID found for session' };
-    }
-
-    const llmConfig = await getUserLLMConfig(accountId, accessToken, refreshToken);
+    const llmConfig = await getUserLLMConfig(auth);
 
     // Generate keywords
-    const keywords = await generateKeywordClassification(messages, llmConfig);
+    const keywords = await generateKeywordClassification(messages as unknown as Message[], llmConfig);
 
     // Update database
-    const { error: updateError } = await supabase
+    const { error: updateError } = await auth.client
       .from('chat_histories')
       .update({
         ai_keywords_type: keywords.type,
@@ -747,17 +689,16 @@ export async function updateSessionKeywords(
  * Generate and save title for a single session
  */
 export async function updateSessionTitle(
-  sessionId: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext,
+  sessionId: string
 ): Promise<{ success: boolean; title?: string; error?: string }> {
   try {
     // Fetch the session
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-    const { data: session, error: fetchError } = await supabase
+    const { data: session, error: fetchError } = await auth.client
       .from('chat_histories')
       .select('*')
       .eq('id', sessionId)
+      .eq('account_id', auth.accountId)
       .single();
 
     if (fetchError || !session) {
@@ -781,19 +722,14 @@ export async function updateSessionTitle(
       title = conversationName;
     } else {
       // Get user's LLM configuration
-      const accountId = session.account_id;
-      if (!accountId) {
-        return { success: false, error: 'No account ID found for session' };
-      }
-
-      const llmConfig = await getUserLLMConfig(accountId, accessToken, refreshToken);
+      const llmConfig = await getUserLLMConfig(auth);
 
       // Generate title from messages
-      title = await generateSessionTitle(messages, llmConfig);
+      title = await generateSessionTitle(messages as unknown as Message[], llmConfig);
     }
 
     // Update database
-    const { error: updateError } = await supabase
+    const { error: updateError } = await auth.client
       .from('chat_histories')
       .update({
         ai_title: title,
@@ -818,9 +754,8 @@ export async function updateSessionTitle(
  * Processes sessions sequentially with delays to avoid rate limits
  */
 export async function batchUpdateSessionSummaries(
+  auth: AuthenticatedContext,
   sessionIds: string[],
-  accessToken: string,
-  refreshToken: string,
   delayBetweenRequests: number = 100
 ): Promise<{
   updated: number;
@@ -837,7 +772,7 @@ export async function batchUpdateSessionSummaries(
     if (!sessionId) continue;
 
     try {
-      const result = await updateSessionSummary(sessionId, accessToken, refreshToken);
+      const result = await updateSessionSummary(auth, sessionId);
       results.push({ sessionId, ...result });
 
       // Add delay between requests (except for last one)
@@ -866,9 +801,8 @@ export async function batchUpdateSessionSummaries(
  * Processes sessions sequentially with delays to avoid rate limits
  */
 export async function batchUpdateSessionKeywords(
+  auth: AuthenticatedContext,
   sessionIds: string[],
-  accessToken: string,
-  refreshToken: string,
   delayBetweenRequests: number = 100
 ): Promise<{
   updated: number;
@@ -885,7 +819,7 @@ export async function batchUpdateSessionKeywords(
     if (!sessionId) continue;
 
     try {
-      const result = await updateSessionKeywords(sessionId, accessToken, refreshToken);
+      const result = await updateSessionKeywords(auth, sessionId);
       results.push({ sessionId, ...result });
 
       // Add delay between requests (except for last one)
@@ -918,8 +852,11 @@ export async function runPeriodicSummaryUpdate(accessToken: string, refreshToken
   console.log('[Summary Updater] Starting periodic summary update...');
 
   try {
+    // Create authenticated context
+    const auth = await createAuthenticatedClient(accessToken, refreshToken);
+
     // Get sessions from the last 24 hours that need updates
-    const sessions = await getSessionsNeedingSummaryUpdate(24, accessToken, refreshToken);
+    const sessions = await getSessionsNeedingSummaryUpdate(auth);
 
     if (sessions.length === 0) {
       console.log('[Summary Updater] No sessions need updating');
@@ -930,7 +867,7 @@ export async function runPeriodicSummaryUpdate(accessToken: string, refreshToken
 
     // Batch update all sessions
     const sessionIds = sessions.map((s) => s.id);
-    const result = await batchUpdateSessionSummaries(sessionIds, accessToken, refreshToken);
+    const result = await batchUpdateSessionSummaries(auth, sessionIds);
 
     console.log('[Summary Updater] Update complete:', {
       total: sessionIds.length,
@@ -951,8 +888,11 @@ export async function runPeriodicKeywordUpdate(accessToken: string, refreshToken
   console.log('[Keyword Updater] Starting periodic keyword update...');
 
   try {
+    // Create authenticated context
+    const auth = await createAuthenticatedClient(accessToken, refreshToken);
+
     // Get sessions from the last 24 hours that need keyword updates
-    const sessions = await getSessionsNeedingKeywordUpdate(24, accessToken, refreshToken);
+    const sessions = await getSessionsNeedingKeywordUpdate(auth);
 
     if (sessions.length === 0) {
       console.log('[Keyword Updater] No sessions need updating');
@@ -963,7 +903,7 @@ export async function runPeriodicKeywordUpdate(accessToken: string, refreshToken
 
     // Batch update all sessions
     const sessionIds = sessions.map((s) => s.id);
-    const result = await batchUpdateSessionKeywords(sessionIds, accessToken, refreshToken);
+    const result = await batchUpdateSessionKeywords(auth, sessionIds);
 
     console.log('[Keyword Updater] Update complete:', {
       total: sessionIds.length,
@@ -980,9 +920,8 @@ export async function runPeriodicKeywordUpdate(accessToken: string, refreshToken
  * Processes sessions sequentially with delays to avoid rate limits
  */
 export async function batchUpdateSessionTitles(
+  auth: AuthenticatedContext,
   sessionIds: string[],
-  accessToken: string,
-  refreshToken: string,
   delayBetweenRequests: number = 100
 ): Promise<{
   updated: number;
@@ -999,7 +938,7 @@ export async function batchUpdateSessionTitles(
     if (!sessionId) continue;
 
     try {
-      const result = await updateSessionTitle(sessionId, accessToken, refreshToken);
+      const result = await updateSessionTitle(auth, sessionId);
       results.push({ sessionId, ...result });
 
       // Add delay between requests (except for last one)
@@ -1032,8 +971,11 @@ export async function runPeriodicTitleUpdate(accessToken: string, refreshToken: 
   console.log('[Title Updater] Starting periodic title update...');
 
   try {
+    // Create authenticated context
+    const auth = await createAuthenticatedClient(accessToken, refreshToken);
+
     // Get sessions from the last 24 hours that need title updates
-    const sessions = await getSessionsNeedingTitleUpdate(24, accessToken, refreshToken);
+    const sessions = await getSessionsNeedingTitleUpdate(auth);
 
     if (sessions.length === 0) {
       console.log('[Title Updater] No sessions need updating');
@@ -1044,7 +986,7 @@ export async function runPeriodicTitleUpdate(accessToken: string, refreshToken: 
 
     // Batch update all sessions
     const sessionIds = sessions.map((s) => s.id);
-    const result = await batchUpdateSessionTitles(sessionIds, accessToken, refreshToken);
+    const result = await batchUpdateSessionTitles(auth, sessionIds);
 
     console.log('[Title Updater] Update complete:', {
       total: sessionIds.length,

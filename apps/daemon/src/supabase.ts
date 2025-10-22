@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
+import type { Database } from './database.types.js';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Base unauthenticated client (for auth operations and public data)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -19,25 +20,33 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
+ * Authenticated context containing the Supabase client and user account ID
+ * Use this for dependency injection instead of passing tokens everywhere
+ */
+export interface AuthenticatedContext {
+  client: ReturnType<typeof createClient<Database>>;
+  accountId: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+/**
  * Create an authenticated Supabase client with a user's access token
  * This client will respect RLS policies as the authenticated user
  *
  * We use both global.headers (for database requests) and setSession (for auth state)
+ *
+ * @returns AuthenticatedContext containing client, accountId, and tokens
  */
-export async function createAuthenticatedClient(accessToken: string, refreshToken: string) {
+export async function createAuthenticatedClient(accessToken: string, refreshToken: string): Promise<AuthenticatedContext> {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables');
   }
 
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
+  const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
     }
   });
 
@@ -52,5 +61,13 @@ export async function createAuthenticatedClient(accessToken: string, refreshToke
     throw error;
   }
 
-  return client;
+  // Extract account ID from the session
+  const authSession = await client.auth.getSession();
+  const accountId = authSession.data.session?.user.id;
+
+  if (!accountId) {
+    throw new Error('No account ID found in authenticated session');
+  }
+
+  return { client, accountId, accessToken, refreshToken };
 }

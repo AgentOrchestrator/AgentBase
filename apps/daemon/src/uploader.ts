@@ -10,13 +10,9 @@ import type { FailedSyncData } from './database.js';
  */
 async function findOrCreateProject(
   history: ChatHistory,
-  accountId: string | null,
-  client: Awaited<ReturnType<typeof createAuthenticatedClient>>
+  accountId: string,
+  client: Awaited<ReturnType<typeof createAuthenticatedClient>>['client']
 ): Promise<string | null> {
-  if (!accountId) {
-    return null;
-  }
-
   const projectName = history.metadata?.projectName;
 
   // If no project name in metadata, link to default "Uncategorized" project
@@ -100,7 +96,10 @@ export async function uploadChatHistory(
     return false;
   }
 
-  const client = await createAuthenticatedClient(accessToken, refreshToken);
+  const { client, accountId: authAccountId } = await createAuthenticatedClient(accessToken, refreshToken);
+
+  // Use the authenticated account ID instead of the passed one
+  const validAccountId = accountId || authAccountId;
 
   try {
     // Calculate the latest message timestamp from the messages array
@@ -117,7 +116,7 @@ export async function uploadChatHistory(
     }
 
     // Find or create project for this session
-    const projectId = await findOrCreateProject(history, accountId, client);
+    const projectId = await findOrCreateProject(history, validAccountId, client);
 
     // Upsert based on session ID
     // This allows us to update existing records when re-running the uploader
@@ -127,10 +126,10 @@ export async function uploadChatHistory(
         {
           id: history.id,
           timestamp: history.timestamp,
-          messages: history.messages,
-          metadata: history.metadata,
+          messages: history.messages as any,
+          metadata: history.metadata as any,
           agent_type: history.agent_type,
-          account_id: accountId,
+          account_id: authAccountId,
           project_id: projectId,
           latest_message_timestamp: latestMessageTimestamp,
           updated_at: new Date().toISOString()
@@ -195,12 +194,15 @@ export async function upsertProject(
   accessToken: string | null,
   refreshToken: string | null
 ): Promise<string | null> {
-  if (!accountId || !accessToken || !refreshToken) {
+  if (!accessToken || !refreshToken) {
     console.log(`Skipping project ${project.name} (not authenticated)`);
     return null;
   }
 
-  const client = await createAuthenticatedClient(accessToken, refreshToken);
+  const { client, accountId: authAccountId } = await createAuthenticatedClient(accessToken, refreshToken);
+
+  // Use the authenticated account ID instead of the passed one
+  const validAccountId = accountId || authAccountId;
 
   try {
     // Build workspace metadata from project info
@@ -216,7 +218,7 @@ export async function upsertProject(
       .from('projects')
       .upsert(
         {
-          user_id: accountId,
+          user_id: validAccountId,
           name: project.name,
           project_path: project.path,
           workspace_metadata: workspaceMetadata,

@@ -105,7 +105,8 @@ function getCursorStatePath(): string {
 
 // Authenticated Supabase client for database lookups
 // Initialized with user session when readCursorHistories is called
-let authenticatedClient: Awaited<ReturnType<typeof createAuthenticatedClient>> | null = null;
+let authenticatedClient: Awaited<ReturnType<typeof createAuthenticatedClient>>['client'] | null = null;
+let authenticatedAccountId: string | null = null;
 
 /**
  * Initialize authenticated Supabase client
@@ -113,10 +114,13 @@ let authenticatedClient: Awaited<ReturnType<typeof createAuthenticatedClient>> |
  */
 async function initializeAuthenticatedClient(accessToken: string, refreshToken: string): Promise<void> {
   try {
-    authenticatedClient = await createAuthenticatedClient(accessToken, refreshToken);
+    const { client, accountId } = await createAuthenticatedClient(accessToken, refreshToken);
+    authenticatedClient = client;
+    authenticatedAccountId = accountId;
   } catch (error) {
     console.warn('[Cursor Reader] Could not initialize authenticated Supabase client:', error);
     authenticatedClient = null;
+    authenticatedAccountId = null;
   }
 }
 
@@ -155,7 +159,7 @@ async function fetchExistingSession(sessionId: string): Promise<{ id: string; me
       return null;
     }
 
-    return data;
+    return data as any;
   } catch (error) {
     console.warn(`[Cursor Reader] Error fetching session ${sessionId}:`, error);
     return null;

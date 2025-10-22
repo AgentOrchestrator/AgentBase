@@ -3,7 +3,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { getApiKey } from './api-key-manager.js';
-import { createAuthenticatedClient } from './supabase.js';
+import { type AuthenticatedContext } from './supabase.js';
 
 // Type for language model returned by AI SDK providers
 type LanguageModel = ReturnType<ReturnType<typeof createOpenAI>>;
@@ -29,23 +29,32 @@ export interface UserPreferences {
  * Returns default preferences if not found
  */
 export async function getUserPreferences(
-  userId: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext
 ): Promise<UserPreferences> {
   try {
-    const supabase = await createAuthenticatedClient(accessToken, refreshToken);
-    const { data, error } = await supabase
+    const { data, error } = await auth.client
       .from('user_preferences')
       .select('*')
-      .eq('user_id', userId)
-      .single();
+      .eq('user_id', auth.accountId)
+      .maybeSingle();
 
-    if (error || !data) {
-      // Return default preferences if not found
-      console.log(`[LLM Client] No preferences found for user ${userId}, using defaults`);
+    if (error) {
+      console.error(`[LLM Client] Error fetching preferences for user ${auth.accountId}:`, error);
+      // Return defaults on error
       return {
-        user_id: userId,
+        user_id: auth.accountId,
+        ai_summary_enabled: true,
+        ai_title_enabled: true,
+        ai_model_provider: 'openai',
+        ai_model_name: 'gpt-4o-mini',
+      };
+    }
+
+    if (!data) {
+      // Return default preferences if not found
+      console.log(`[LLM Client] No preferences found for user ${auth.accountId}, using defaults`);
+      return {
+        user_id: auth.accountId,
         ai_summary_enabled: true,
         ai_title_enabled: true,
         ai_model_provider: 'openai',
@@ -61,10 +70,10 @@ export async function getUserPreferences(
       ai_model_name: data.ai_model_name ?? 'gpt-4o-mini',
     };
   } catch (error) {
-    console.error('[LLM Client] Error fetching user preferences:', error);
+    console.error(`[LLM Client] Error fetching preferences for user ${auth.accountId}:`, error);
     // Return defaults on error
     return {
-      user_id: userId,
+      user_id: auth.accountId,
       ai_summary_enabled: true,
       ai_title_enabled: true,
       ai_model_provider: 'openai',
@@ -81,7 +90,18 @@ export async function createLLMClient(config: LLMConfig): Promise<LanguageModel 
   const { provider, model, accountId, accessToken, refreshToken } = config;
 
   // Get API key with fallback priority: env var -> database -> null
-  const apiKey = await getApiKey(provider, accountId, accessToken, refreshToken);
+  // If we have full auth context, create the authenticated client for DB lookup
+  let auth: AuthenticatedContext | null = null;
+  if (accountId && accessToken && refreshToken) {
+    try {
+      const { createAuthenticatedClient } = await import('./supabase.js');
+      auth = await createAuthenticatedClient(accessToken, refreshToken);
+    } catch (error) {
+      console.error('[LLM Client] Failed to create authenticated client for API key lookup:', error);
+    }
+  }
+
+  const apiKey = await getApiKey(provider, auth);
 
   if (!apiKey) {
     console.log(`[LLM Client] No API key found for provider: ${provider}`);
@@ -159,17 +179,15 @@ export async function generateLLMText(
  * Falls back to defaults if preferences not found
  */
 export async function getUserLLMConfig(
-  accountId: string,
-  accessToken: string,
-  refreshToken: string
+  auth: AuthenticatedContext
 ): Promise<LLMConfig> {
-  const preferences = await getUserPreferences(accountId, accessToken, refreshToken);
+  const preferences = await getUserPreferences(auth);
 
   return {
     provider: preferences.ai_model_provider || 'openai',
     model: preferences.ai_model_name || 'gpt-4o-mini',
-    accountId,
-    accessToken,
-    refreshToken,
+    accountId: auth.accountId,
+    accessToken: auth.accessToken,
+    refreshToken: auth.refreshToken,
   };
 }
