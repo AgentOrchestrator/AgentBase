@@ -28,19 +28,19 @@ When you're deep in flow, vibe-coding with an AI assistant, explaining what you'
 git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
 cd agent-orchestrator
 pnpm install
-pnpm setup  # Interactive setup wizard
-pnpm dev    # Start the application
+pnpm configure  # Interactive configuration wizard
+pnpm dev        # Start the application
 ```
 
 Then open **http://localhost:3000** in your browser!
 
-### What the setup wizard does:
+### What the configuration wizard does:
 
-The `pnpm setup` command will ask you to choose between:
+The `pnpm configure` command will ask you to choose between:
 - **🏠 Local Supabase** - Solo development, testing, or personal use. Runs entirely on your machine.
 - **👥 Remote Supabase** - Team collaboration where you can see each other's AI conversations in real-time.
 
-The setup script automatically:
+The configuration script automatically:
 - Installs Supabase CLI (if using local)
 - Starts local Supabase or prompts for remote credentials
 - Configures environment variables
@@ -74,7 +74,7 @@ One team member should:
 
 Each team member then:
 1. Clone the repository
-2. Run `pnpm install && pnpm setup`
+2. Run `pnpm install && pnpm configure`
 3. Choose "Remote Supabase" and enter the shared credentials
 
 ---
@@ -85,13 +85,13 @@ For automated setups where you can't use the interactive wizard, use the `--non-
 
 ```bash
 # Using an env file (recommended)
-pnpm setup --non-interactive --remote -e .env.production
+pnpm configure --non-interactive --remote -e .env.production
 
 # Or with all environment variables
 export SUPABASE_URL=https://xxx.supabase.co
 export SUPABASE_ANON_KEY=eyJh...
 export OPENAI_API_KEY=sk-xxx
-pnpm setup --non-interactive --remote
+pnpm configure --non-interactive --remote
 ```
 
 ---
@@ -101,31 +101,31 @@ pnpm setup --non-interactive --remote
 | Command | Description |
 |---------|-------------|
 | `pnpm install` | Install all dependencies for the monorepo |
-| `pnpm setup` | Interactive setup wizard - configures environment and Supabase |
+| `pnpm configure` | Interactive configuration wizard - configures environment and Supabase |
 | `pnpm dev` | Start all services in development mode (daemon + web with hot reload) |
 | `pnpm dev:daemon` | Start only the daemon service in development mode |
 | `pnpm dev:web` | Start only the web interface in development mode |
 | `pnpm build` | Build all apps for production |
 | `pnpm start` | Start all services in production mode (requires build first) |
 
-### Setup Command Flags
+### Configuration Flags
 
 | Flag | Description |
 |------|-------------|
-| `--non-interactive` | Run setup without prompts (for CI/CD or coding assistants) |
+| `--non-interactive` | Run configuration without prompts (for CI/CD or coding assistants) |
 | `--local` | Use local Supabase (default if not specified) |
 | `--remote` | Use remote hosted Supabase |
 | `-e, --env-file <path>` | Load environment variables from a file |
-| `--skip-openai` | Skip OpenAI API key setup (development mode) |
-| `--help` | Show detailed help for the setup command |
+| `--skip-openai` | Skip OpenAI API key configuration (development mode) |
+| `--help` | Show detailed help for the configure command |
 
 **Example:**
 ```bash
-# Setup with local Supabase, no OpenAI key
-pnpm setup --non-interactive --local --skip-openai
+# Configure with local Supabase, no OpenAI key
+pnpm configure --non-interactive --local --skip-openai
 
-# Setup with remote Supabase using env file
-pnpm setup --non-interactive --remote -e .env.production
+# Configure with remote Supabase using env file
+pnpm configure --non-interactive --remote -e .env.production
 ```
 
 ---

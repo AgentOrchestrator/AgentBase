@@ -6,7 +6,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "setup": "tsx setup.ts",
+    "configure": "tsx configure.ts",
     "start": "tsx start.tsx"
   },
   "dependencies": {

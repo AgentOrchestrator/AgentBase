@@ -105,11 +105,11 @@ pnpm dev:web
 # Build all apps
 pnpm build
 
-# Setup (interactive)
-pnpm setup
+# Configure (interactive)
+pnpm configure
 
-# Setup (non-interactive for CI/CD)
-pnpm setup --non-interactive --remote -e .env.production
+# Configure (non-interactive for CI/CD)
+pnpm configure --non-interactive --remote -e .env.production
 
 # Start all services (production)
 pnpm start
