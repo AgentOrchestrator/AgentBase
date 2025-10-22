@@ -188,13 +188,10 @@ For REMOTE Supabase:
 		// Completion message
 		console.log('\n✨ Installation Complete!\n');
 		console.log('Next steps:');
-		console.log('  1. Run pnpm dev to start all services');
-		console.log('     Or use pnpm dev:daemon and pnpm dev:web separately');
+		console.log('  1. Run pnpm run dev to start all services');
+		console.log('     Or use pnpm run dev:daemon and pnpm run dev:web separately');
 		console.log('  2. Access the web app at http://localhost:3000\n');
 		console.log('To stop services: Press Ctrl+C');
-		if (useLocalSupabase) {
-			console.log('To stop Supabase later: supabase stop\n');
-		}
 
 		process.exit(0);
 	} catch (error) {
@@ -310,7 +307,7 @@ for (let i = 0; i < args.length; i++) {
 Agent Orchestrator Non-Interactive Setup
 
 Usage: npm run setup -- --non-interactive [options]
-   or: pnpm setup --non-interactive [options]
+   or: pnpm run setup --non-interactive [options]
 
 Required: Supabase credentials (via env vars, env file, or CLI args)
 
@@ -346,16 +343,16 @@ Setup Instructions:
 
 Examples:
   # Using env file (recommended for CI/CD)
-  pnpm setup --non-interactive -e .env.production
+  pnpm run setup --non-interactive -e .env.production
 
   # Using environment variables (recommended)
   SUPABASE_URL=https://xxx.supabase.co \\
   SUPABASE_ANON_KEY=eyJh... \\
   OPENAI_API_KEY=sk-xxx \\
-  pnpm setup --non-interactive
+  pnpm run setup --non-interactive
 
   # Using CLI args (less secure - visible in process list)
-  pnpm setup --non-interactive \\
+  pnpm run setup --non-interactive \\
     --supabase-url https://xxx.supabase.co \\
     --supabase-anon-key eyJh... \\
     --openai-key sk-xxx

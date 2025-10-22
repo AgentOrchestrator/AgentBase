@@ -106,12 +106,12 @@ pnpm dev:web
 pnpm build
 
 # Setup (interactive) - works with both npm and pnpm
-pnpm setup  # or: npm run setup
+pnpm run setup  # or: npm run setup
 
 # Setup (non-interactive for CI/CD) - requires Supabase credentials
 export SUPABASE_URL=https://xxx.supabase.co
 export SUPABASE_ANON_KEY=eyJh...
-pnpm setup --non-interactive
+pnpm run setup --non-interactive
 
 # Start all services (production)
 pnpm start

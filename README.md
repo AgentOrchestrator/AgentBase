@@ -30,8 +30,8 @@ cd agent-orchestrator
 
 # Using pnpm (recommended - faster and more efficient)
 pnpm install
-pnpm setup
-pnpm dev
+pnpm run setup
+pnpm run dev
 
 # OR using npm
 npm install
@@ -43,7 +43,7 @@ Then open **http://localhost:3000** in your browser!
 
 ### What the setup wizard does:
 
-The setup wizard (`npm run setup` or `pnpm setup`) will ask you to choose between:
+The setup wizard (`npm run setup` or `pnpm run setup`) will ask you to choose between:
 - **🏠 Local Supabase** - Solo development, testing, or personal use. Runs entirely on your machine.
 - **👥 Remote Supabase** - Team collaboration where you can see each other's AI conversations in real-time.
 
@@ -81,7 +81,7 @@ One team member should:
 
 Each team member then:
 1. Clone the repository
-2. Run `pnpm install && pnpm setup` (or `npm install && npm run setup`)
+2. Run `pnpm install && pnpm run setup` (or `npm install && npm run setup`)
 3. Choose "Remote Supabase" and enter the shared credentials
 
 ---
@@ -111,13 +111,13 @@ For remote Supabase:
 export SUPABASE_URL=http://127.0.0.1:54321  # or your remote URL
 export SUPABASE_ANON_KEY=eyJh...
 export OPENAI_API_KEY=sk-xxx  # optional
-pnpm setup --non-interactive
+pnpm run setup --non-interactive
 
 # Using env file (recommended for CI/CD)
-pnpm setup --non-interactive -e .env.production
+pnpm run setup --non-interactive -e .env.production
 
 # Using CLI args (less secure - visible in process list)
-pnpm setup --non-interactive \
+pnpm run setup --non-interactive \
   --supabase-url https://xxx.supabase.co \
   --supabase-anon-key eyJh... \
   --openai-key sk-xxx
@@ -132,7 +132,7 @@ All commands work with both **pnpm** (recommended) and **npm**. For npm, use `np
 | pnpm command | npm equivalent | Description |
 |--------------|----------------|-------------|
 | `pnpm install` | `npm install` | Install all dependencies for the monorepo |
-| `pnpm setup` | `npm run setup` | Interactive setup wizard - configures environment and Supabase |
+| `pnpm run setup` | `npm run setup` | Interactive setup wizard - configures environment and Supabase |
 | `pnpm dev` | `npm run dev` | Start all services in development mode (daemon + web with hot reload) |
 | `pnpm dev:daemon` | `npm run dev:daemon` | Start only the daemon service in development mode |
 | `pnpm dev:web` | `npm run dev:web` | Start only the web interface in development mode |
@@ -154,10 +154,10 @@ All commands work with both **pnpm** (recommended) and **npm**. For npm, use `np
 **Example:**
 ```bash
 # Using env file
-pnpm setup --non-interactive -e .env.production
+pnpm run setup --non-interactive -e .env.production
 
 # Using CLI args
-pnpm setup --non-interactive \
+pnpm run setup --non-interactive \
   --supabase-url http://127.0.0.1:54321 \
   --supabase-anon-key eyJh... \
   --skip-openai
