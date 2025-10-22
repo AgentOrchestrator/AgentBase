@@ -55,6 +55,9 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   const [isPillExpanded, setIsPillExpanded] = useState(false);
   const [isPillSquare, setIsPillSquare] = useState(false);
   const [showChatContent, setShowChatContent] = useState(false);
+  const [isInputVisible, setIsInputVisible] = useState(false);
+  const [isMessagesVisible, setIsMessagesVisible] = useState(false);
+  const [isTextVisible, setIsTextVisible] = useState(true);
   
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -87,29 +90,53 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
 
   const togglePill = () => {
     if (!isPillExpanded) {
+      // Hide text immediately when expanding
+      setIsTextVisible(false);
       // Both phases start simultaneously
       setIsPillExpanded(true);
       setIsPillSquare(true);
       // Show chat content after expansion completes (300ms) + 50ms delay
       setTimeout(() => {
         setShowChatContent(true);
+        // Start messages animation after chat content is shown
+        setTimeout(() => {
+          setIsMessagesVisible(true);
+        }, 100);
+        // Start input animation after messages animation
+        setTimeout(() => {
+          setIsInputVisible(true);
+        }, 50);
       }, 350);
     } else {
+      // Hide animations immediately when collapsing
+      setIsInputVisible(false);
+      setIsMessagesVisible(false);
       // Hide chat content immediately when collapsing
       setShowChatContent(false);
       // Both phases collapse simultaneously
       setIsPillSquare(false);
       setIsPillExpanded(false);
+      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
+      setTimeout(() => {
+        setIsTextVisible(true);
+      }, 350);
     }
   };
 
   const collapsePill = () => {
+    // First hide animations immediately
+    setIsInputVisible(false);
+    setIsMessagesVisible(false);
     // First hide content with 50ms delay
     setShowChatContent(false);
     setTimeout(() => {
       // Then collapse the pill
       setIsPillSquare(false);
       setIsPillExpanded(false);
+      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
+      setTimeout(() => {
+        setIsTextVisible(true);
+      }, 350);
     }, 50);
   };
 
@@ -154,6 +181,17 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       clearInactivityTimer();
     };
   }, []);
+
+  // Auto-focus input when animation completes
+  useEffect(() => {
+    if (isInputVisible && inputRef.current) {
+      // Small delay to ensure the animation has started
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isInputVisible]);
 
   // Detect @ symbol and show mention autocomplete
   const handleInputChange = (value: string) => {
@@ -300,10 +338,10 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
           display: none;
         }
         .fade-gradient-top {
-          background: linear-gradient(to bottom, hsl(var(--background)) 0%, transparent 100%);
+          background: linear-gradient(to bottom, var(--background) 0%, transparent 100%);
         }
         .fade-gradient-bottom {
-          background: linear-gradient(to top, hsl(var(--background)) 0%, transparent 100%);
+          background: linear-gradient(to top, var(--background) 0%, transparent 100%);
         }
       `}</style>
       <div className="flex h-screen">
@@ -333,7 +371,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
             className={`fixed bottom-4 z-30 bg-background border border-border transition-all duration-300 ease-in-out ${
               !isPillSquare ? 'cursor-pointer' : 'cursor-default'
             } ${
-              isPillExpanded ? 'w-96' : 'w-32'
+              isPillExpanded ? 'w-96' : 'w-40'
             } ${
               isPillSquare ? 'h-96' : 'h-10'
             } ${
@@ -346,8 +384,12 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
             }}
           >
             {!isPillSquare ? (
-              <div className="text-sm text-foreground text-center flex items-center justify-center h-full">
-                Thinking...
+              <div className={`text-sm text-foreground text-center flex items-center justify-center h-full transition-all duration-[1000ms] ease-out ${
+                isTextVisible 
+                  ? 'opacity-100 blur-0' 
+                  : 'opacity-0 blur-sm'
+              }`}>
+                Think with me...
               </div>
             ) : showChatContent ? (
               <div
@@ -359,7 +401,11 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
                 onScroll={resetInactivityTimer}
               >
                 {/* Messages area - fills entire box */}
-                <div className="absolute inset-0 overflow-y-auto p-4 space-y-3 scrollbar-hide">
+                <div className={`absolute inset-0 overflow-y-auto p-4 space-y-3 scrollbar-hide ${
+                  isMessagesVisible 
+                    ? 'opacity-100 blur-0 transition-all duration-[1000ms] ease-out' 
+                    : 'opacity-0 blur-sm transition-all duration-[500ms] ease-out'
+                }`}>
                   {messages.map((msg, index) => (
                     <div
                       key={index}
@@ -370,7 +416,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
                       <div
                         className={`max-w-[80%] rounded-lg px-3 py-2 ${
                           msg.role === 'user'
-                            ? 'bg-muted/50 text-foreground'
+                            ? 'bg-muted/50 text-foreground dark:bg-sidebar-accent dark:text-foreground'
                             : 'bg-transparent text-foreground'
                         }`}
                       >
@@ -415,7 +461,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
                   <div className="h-20" />
                 </div>
 
-                {/* Fade gradient at top */}
+                {/* Theme-aware fade gradient at top */}
                 <div
                   className="absolute top-0 left-0 right-0 h-10 pointer-events-none fade-gradient-top"
                   style={{
@@ -426,12 +472,16 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
 
                 {/* Collapse nozzle at top */}
                 <div
-                  className="absolute top-2 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-muted-foreground/40 rounded-full cursor-pointer hover:bg-muted-foreground/60 transition-colors"
+                  className={`absolute top-2 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-muted-foreground/40 rounded-full cursor-pointer hover:bg-muted-foreground/60 transition-all duration-[1000ms] ease-out ${
+                    isInputVisible 
+                      ? 'opacity-100 blur-0' 
+                      : 'opacity-0 blur-sm'
+                  }`}
                   onClick={collapsePill}
                   title="Collapse chat"
                 />
 
-                {/* Fade gradient at bottom */}
+                {/* Theme-aware fade gradient at bottom */}
                 <div
                   className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none fade-gradient-bottom"
                   style={{
@@ -441,7 +491,11 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
                 />
 
                 {/* Input area - floating at bottom */}
-                <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+                <div className={`absolute bottom-4 left-4 right-4 flex gap-2 ${
+                  isInputVisible 
+                    ? 'opacity-100 blur-0 transition-all duration-[1000ms] ease-out' 
+                    : 'opacity-0 blur-sm transition-all duration-[500ms] ease-out'
+                }`}>
                   <div className="flex-1 relative">
                     <Input
                       ref={inputRef}
@@ -449,8 +503,12 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
                       onChange={(e) => handleInputChange(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="What is @Max working on..."
-                      className="pr-10 bg-background border-0 rounded-full focus:ring-0 focus:outline-none shadow-lg"
+                      className="pr-10 bg-background border-0 rounded-full focus:ring-0 focus:outline-none shadow-lg dark:border"
                       disabled={sending}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
                     />
                     {showMentions && (
                       <MentionAutocomplete
@@ -476,7 +534,11 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
                   <Button
                     onClick={handleSendMessage}
                     disabled={!message.trim() || sending}
-                    className="w-10 h-10 rounded-full shadow-lg p-0 bg-background border-0 hover:bg-muted/50"
+                    className={`w-10 h-10 rounded-full shadow-lg p-0 bg-background border-0 hover:bg-muted/50 dark:border ${
+                      isInputVisible 
+                        ? 'opacity-100 blur-0 transition-all duration-[1000ms] ease-out' 
+                        : 'opacity-0 blur-sm transition-all duration-[500ms] ease-out'
+                    }`}
                   >
                     {sending ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

@@ -20,7 +20,17 @@ export function AnimatedXMark({ className = '', size = 16, onClick, title }: Ani
         viewBox="0 0 24 24" 
         fill="none" 
         xmlns="http://www.w3.org/2000/svg"
-        className="text-muted-foreground hover:text-foreground transition-colors duration-50"
+        className="transition-colors duration-100"
+        style={{ 
+          color: 'var(--border)',
+          transition: 'color 100ms ease-in-out'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--primary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--border)';
+        }}
       >
         <defs>
           <style>

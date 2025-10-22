@@ -176,7 +176,7 @@ export function MentionAutocomplete({
             key={user.id}
             className={`w-full flex items-center gap-2 p-2 text-left hover:bg-accent transition-colors ${
               index === selectedIndex
-                ? 'bg-accent'
+                ? 'bg-accent dark:bg-sidebar-accent'
                 : ''
             }`}
             onClick={() => onSelect(user)}

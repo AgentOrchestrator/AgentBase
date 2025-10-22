@@ -1608,7 +1608,7 @@ function CanvasFlowInner({ usersWithMessages, initialData }: CanvasFlowProps) {
             style: { 
               stroke: linkedUsers.has(user.id) 
                 ? (theme === 'dark' ? '#ffffff' : '#000000')
-                : (theme === 'dark' ? '#2A2C36' : '#E5E5E5'), 
+                : (theme === 'dark' ? '#2A2C36' : '#d1d5db'), 
               strokeWidth: 2,
               strokeDasharray: '5,5'
             },
