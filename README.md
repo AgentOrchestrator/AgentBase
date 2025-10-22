@@ -1,5 +1,8 @@
 <div align="center">
-<img src="./assets/logo-images/agent_base_serif.png" alt="Agent Base" width="500" style="margin-bottom: 50px;"/>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-images/agent_base_serif_white.png">
+  <img src="./assets/logo-images/agent_base_serif.png" alt="Agent Base" width="500" style="margin-bottom: 50px;"/>
+</picture>
 </div>
 
 **Stay in sync with your team's AI coding sessions — see what they're building in real-time**
