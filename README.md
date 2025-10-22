@@ -9,7 +9,7 @@ When you're deep in flow working with AI agnts, explaining what you're working o
 <div align="center">
 <img src="./assets/agent_base_1.png" alt="Agent Base" width="635"/>
 
-<table>
+<table border="0">
   <tr>
     <td><img src="./assets/agent_base_2.png" alt="Agent Base" width="364"/></td>
     <td><img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/></td>
