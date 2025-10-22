@@ -12,171 +12,121 @@
 
 When you're deep in flow, vibe-coding with an AI assistant, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Orchestrator gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
 
-[Quick Start](#-quick-start) • [Preview](#-preview) • [Why We Built This](#-why-we-built-this) • [Features](#-features)
+[Installation](#-installation) • [Commands](#-available-commands) • [Preview](#-preview) • [Features](#-features) • [Integrations](#-integrations)
 
 </div>
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation
 
-**Prerequisites:**
-- **Node.js 18+** and **pnpm** (install with `npm install -g pnpm`)
-- **Supabase CLI** for database management
+**Prerequisites:** Node.js 18+ and pnpm (`npm install -g pnpm`)
 
-Choose your setup mode:
+### Get Started
 
-### Using install script (Interactive):
- ```bash
- pnpm install
- pnpm install-cli
- pnpm start-cli
- ```
+```bash
+git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
+cd agent-orchestrator
+pnpm install
+pnpm setup  # Interactive setup wizard
+pnpm dev    # Start the application
+```
 
-### Using install script (Non-Interactive/CI):
-For CI/CD pipelines or automated setups:
- ```bash
- pnpm install
- # Using environment variables (recommended for secrets)
- OPENAI_API_KEY=sk-xxx pnpm install-cli:ci --local --skip-openai
+Then open **http://localhost:3000** in your browser!
 
- # Using an env file (recommended for CI/CD)
- pnpm install-cli:ci --remote -e .env.production
+### What the setup wizard does:
 
- # Or with all environment variables
- export SUPABASE_URL=https://xxx.supabase.co
- export SUPABASE_ANON_KEY=eyJh...
- export OPENAI_API_KEY=sk-xxx
- pnpm install-cli:ci --remote
- ```
+The `pnpm setup` command will ask you to choose between:
+- **🏠 Local Supabase** - Solo development, testing, or personal use. Runs entirely on your machine.
+- **👥 Remote Supabase** - Team collaboration where you can see each other's AI conversations in real-time.
 
-### 🏠 Option 1: Solo Development (Local Supabase)
-Perfect for testing, personal use, or development. Runs entirely on your machine.
+The setup script automatically:
+- Installs Supabase CLI (if using local)
+- Starts local Supabase or prompts for remote credentials
+- Configures environment variables
+- Sets up OpenAI API key for AI summaries
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
-   cd agent-orchestrator
-   ```
+### Access points:
+- **Web UI**: http://localhost:3000
+- **Supabase Studio** (local only): http://localhost:54323
 
-2. **Install Supabase CLI** (if not already installed):
+> **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
 
-   macOS:
-   ```bash
-   brew install supabase/tap/supabase
-   ```
+---
 
-   Linux:
-   ```bash
-   curl -fsSL https://supabase.com/install.sh | sh
-   ```
+### Local vs Remote Supabase
 
-3. **Start Supabase locally**:
-   ```bash
-   supabase start
-   ```
+| Feature | 🏠 Local Supabase | 👥 Remote Supabase |
+|---------|------------------|-------------------|
+| **Use Case** | Solo development, testing | Team collaboration |
+| **Setup** | Automatic (via setup script) | Requires [supabase.com](https://supabase.com) project |
+| **Data Sharing** | Only on your machine | Shared across team in real-time |
+| **Internet Required** | No | Yes |
+| **Cost** | Free | Free tier available, paid plans for production |
+| **Supabase Studio** | http://localhost:54323 | Via Supabase dashboard |
 
-4. **Configure environment variables**:
+**For Remote Supabase (Team Setup):**
 
-   Create `.env` files in the following locations with credentials from `supabase status`:
+One team member should:
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to Project Settings → Database and run migrations from `supabase/migrations/`
+3. Share the project URL and anon key with the team
 
-   **Root `.env`**:
-   ```env
-   SUPABASE_URL=http://127.0.0.1:54321
-   SUPABASE_ANON_KEY=<from supabase status>
-   SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
-   ```
+Each team member then:
+1. Clone the repository
+2. Run `pnpm install && pnpm setup`
+3. Choose "Remote Supabase" and enter the shared credentials
 
-   **`apps/daemon/.env`**:
-   ```env
-   SUPABASE_URL=http://127.0.0.1:54321
-   SUPABASE_ANON_KEY=<anon_key from supabase status>
-   OPENAI_API_KEY=<your_openai_api_key>
-   ```
+---
 
-   **`apps/web/.env.local`**:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key from supabase status>
-   ```
+### Non-Interactive Setup (for coding assistants or CI/CD)
 
-5. **Install dependencies**:
-   ```bash
-   pnpm install
-   ```
+For automated setups where you can't use the interactive wizard, use the `--non-interactive` flag:
 
-6. **Start the services**:
+```bash
+# Using an env file (recommended)
+pnpm setup --non-interactive --remote -e .env.production
 
-   ```bash
-   # Option 1: Start all services (in separate terminals)
-   pnpm dev:daemon
-   pnpm dev:web
+# Or with all environment variables
+export SUPABASE_URL=https://xxx.supabase.co
+export SUPABASE_ANON_KEY=eyJh...
+export OPENAI_API_KEY=sk-xxx
+pnpm setup --non-interactive --remote
+```
 
-   # Option 2: Start everything in parallel with Turborepo
-   pnpm dev
-   ```
+---
 
-7. **Access the application**:
-   - **Web UI**: http://localhost:3000
-   - **Supabase Studio**: http://localhost:54323
+## 📋 Available Commands
 
-   > **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
+| Command | Description |
+|---------|-------------|
+| `pnpm install` | Install all dependencies for the monorepo |
+| `pnpm setup` | Interactive setup wizard - configures environment and Supabase |
+| `pnpm dev` | Start all services in development mode (daemon + web with hot reload) |
+| `pnpm dev:daemon` | Start only the daemon service in development mode |
+| `pnpm dev:web` | Start only the web interface in development mode |
+| `pnpm build` | Build all apps for production |
+| `pnpm start` | Start all services in production mode (requires build first) |
 
-### 👥 Option 2: Team Collaboration (Hosted Supabase)
-For real team collaboration where multiple developers can see each other's AI conversations in real-time.
+### Setup Command Flags
 
-1. **Set up Supabase project** (one person does this):
-   - Create a project at [supabase.com](https://supabase.com)
-   - Go to Project Settings → API
-   - Note your `Project URL`, `anon/public key`, and `service_role key`
-   - Go to Project Settings → Database and run the migrations from `supabase/migrations/`
+| Flag | Description |
+|------|-------------|
+| `--non-interactive` | Run setup without prompts (for CI/CD or coding assistants) |
+| `--local` | Use local Supabase (default if not specified) |
+| `--remote` | Use remote hosted Supabase |
+| `-e, --env-file <path>` | Load environment variables from a file |
+| `--skip-openai` | Skip OpenAI API key setup (development mode) |
+| `--help` | Show detailed help for the setup command |
 
-2. **Clone the repository** (each team member):
-   ```bash
-   git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
-   cd agent-orchestrator
-   ```
+**Example:**
+```bash
+# Setup with local Supabase, no OpenAI key
+pnpm setup --non-interactive --local --skip-openai
 
-3. **Configure environment variables** (each team member):
-
-   **Root `.env`**:
-   ```env
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_ANON_KEY=<your_anon_key>
-   SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
-   ```
-
-   **`apps/daemon/.env`**:
-   ```env
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_ANON_KEY=<your_anon_key>
-   OPENAI_API_KEY=<your_openai_api_key>
-   ```
-
-   **`apps/web/.env.local`**:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<your_anon_key>
-   ```
-
-4. **Install dependencies** (each team member):
-   ```bash
-   pnpm install
-   ```
-
-5. **Start the services** (each team member):
-   ```bash
-   # Option 1: Start services in separate terminals
-   pnpm dev:daemon
-   pnpm dev:web
-
-   # Option 2: Start everything in parallel
-   pnpm dev
-   ```
-
-6. **Access the canvas**:
-   - **Web UI**: http://localhost:3000
-   - All team members will see each other's AI conversations in real-time!
+# Setup with remote Supabase using env file
+pnpm setup --non-interactive --remote -e .env.production
+```
 
 ---
 
@@ -266,104 +216,6 @@ Agent Orchestrator connects with your favorite AI coding assistants to provide r
 - ⏸️ Planned
 
 Want to see your favorite AI assistant integrated? [Open an issue](https://github.com/AgentOrchestrator/agent-orchestrator/issues) or contribute via PR!
-
----
-
-## 🏗️ Architecture
-
-This is a **monorepo** using **pnpm workspaces** and **Turborepo**:
-
-```
-agent-orchestrator/
-├── apps/
-│   ├── cli/           # Installation and startup CLI
-│   ├── daemon/        # Backend daemon - watches for chat histories
-│   └── web/           # Next.js dashboard with real-time updates
-├── packages/
-│   └── shared/        # Shared types and utilities
-└── supabase/          # Database migrations and config
-```
-
-- **[apps/daemon](./apps/daemon/)** - Watches for new chat histories and generates AI summaries
-- **[apps/web](./apps/web/)** - Next.js canvas with real-time updates via Supabase Realtime
-- **[apps/cli](./apps/cli/)** - Interactive CLI for installation and setup
-- **[packages/shared](./packages/shared/)** - Shared TypeScript types and utilities
-- **supabase/** - PostgreSQL database with real-time capabilities
-
----
-
-<details>
-<summary><b>📚 Manual Setup (Advanced)</b></summary>
-
-<br>
-
-#### 1. Clone Repository
-
-```bash
-git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
-cd agent-orchestrator
-```
-
-#### 2. Install Supabase CLI
-
-macOS:
-```bash
-brew install supabase/tap/supabase
-```
-
-Linux:
-```bash
-curl -fsSL https://supabase.com/install.sh | sh
-```
-
-#### 3. Start Supabase
-
-```bash
-supabase start
-```
-
-#### 4. Configure Environment Variables
-
-Create `.env` files in the following locations:
-
-**Root `.env`**:
-```env
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_ANON_KEY=<from supabase status>
-SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
-```
-
-**`apps/daemon/.env`**:
-```env
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_ANON_KEY=<anon_key from supabase status>
-OPENAI_API_KEY=<your_openai_api_key>
-```
-
-**`apps/web/.env.local`**:
-```env
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key from supabase status>
-```
-
-#### 5. Install Dependencies
-
-```bash
-pnpm install
-```
-
-#### 6. Start Services
-
-```bash
-# Start all services in parallel
-pnpm dev
-
-# Or start individually
-pnpm dev:daemon
-pnpm dev:web
-```
-
-</details>
 
 ---
 

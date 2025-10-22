@@ -105,9 +105,14 @@ pnpm dev:web
 # Build all apps
 pnpm build
 
-# Run CLI tools
-pnpm install-cli
-pnpm start-cli
+# Setup (interactive)
+pnpm setup
+
+# Setup (non-interactive for CI/CD)
+pnpm setup --non-interactive --remote -e .env.production
+
+# Start all services (production)
+pnpm start
 ```
 
 ### Package-Specific Commands

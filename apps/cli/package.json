@@ -6,9 +6,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "install": "tsx install.tsx",
-    "install:ci": "tsx install-non-interactive.ts",
-    "install:ci:local": "tsx install-non-interactive.ts --local --skip-openai",
+    "setup": "tsx setup.ts",
     "start": "tsx start.tsx"
   },
   "dependencies": {

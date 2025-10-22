@@ -52,26 +52,21 @@ const StartApp = () => {
 
 	const startServices = async () => {
 		try {
-			// Check if .env files exist
-			const rootEnv = path.join(process.cwd(), '.env');
-			const daemonEnv = path.join(process.cwd(), 'agent-orchestrator-daemon', '.env');
-			const webEnv = path.join(process.cwd(), 'web', '.env.local');
-
-			if (!fs.existsSync(rootEnv) || !fs.existsSync(daemonEnv) || !fs.existsSync(webEnv)) {
-				throw new Error('Environment files not found. Please run ./install.sh first');
-			}
+			// Get monorepo root (../../ from CLI app)
+			const monorepoRoot = path.resolve(__dirname, '..', '..');
 
 			// Check if node_modules exist
-			const webModules = path.join(process.cwd(), 'web', 'node_modules');
-			const daemonModules = path.join(process.cwd(), 'agent-orchestrator-daemon', 'node_modules');
+			const webModules = path.join(monorepoRoot, 'apps', 'web', 'node_modules');
+			const daemonModules = path.join(monorepoRoot, 'apps', 'daemon', 'node_modules');
 
 			if (!fs.existsSync(webModules) || !fs.existsSync(daemonModules)) {
 				throw new Error('Dependencies not installed. Please run ./install.sh first');
 			}
 
-			// Detect Supabase configuration
-			const rootEnvContent = fs.readFileSync(rootEnv, 'utf-8');
-			const urlMatch = rootEnvContent.match(/SUPABASE_URL=(.+)/);
+			// Detect Supabase configuration from daemon's .env
+			const daemonEnv = path.join(monorepoRoot, 'apps', 'daemon', '.env');
+			const envContent = fs.readFileSync(daemonEnv, 'utf-8');
+			const urlMatch = envContent.match(/SUPABASE_URL=(.+)/);
 			const supabaseUrl = urlMatch ? urlMatch[1].trim() : '';
 
 			// Check if using remote Supabase (contains https:// and .supabase.co)
@@ -121,7 +116,7 @@ const StartApp = () => {
 			// Start Web App FIRST (daemon needs web to be ready for auth)
 			updateService('Web App', { status: 'starting', message: 'Launching...' });
 			const webProcess = spawn('npm', ['run', 'dev'], {
-				cwd: path.join(process.cwd(), 'web'),
+				cwd: path.join(monorepoRoot, 'apps', 'web'),
 				stdio: ['ignore', 'pipe', 'pipe'],
 				detached: false,
 			});
@@ -129,7 +124,7 @@ const StartApp = () => {
 			processesRef.current.push(webProcess);
 
 			// Pipe web logs to file
-			const webLog = fs.createWriteStream(path.join(process.cwd(), 'web.log'), { flags: 'a' });
+			const webLog = fs.createWriteStream(path.join(monorepoRoot, 'web.log'), { flags: 'a' });
 			webProcess.stdout?.pipe(webLog);
 			webProcess.stderr?.pipe(webLog);
 
@@ -154,7 +149,7 @@ const StartApp = () => {
 			// Now start Daemon (web is ready for auth redirects)
 			updateService('Daemon', { status: 'starting', message: 'Launching...' });
 			const daemonProcess = spawn('npm', ['run', 'dev'], {
-				cwd: path.join(process.cwd(), 'agent-orchestrator-daemon'),
+				cwd: path.join(monorepoRoot, 'apps', 'daemon'),
 				stdio: ['ignore', 'pipe', 'pipe'], // Capture logs for display
 				detached: false,
 			});
