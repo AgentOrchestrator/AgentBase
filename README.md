@@ -88,20 +88,39 @@ Each team member then:
 
 ### Non-Interactive Setup (for coding assistants or CI/CD)
 
-For automated setups where you can't use the interactive wizard, use the `--non-interactive` flag:
+For automated setups where you can't use the interactive wizard, you must provide Supabase credentials:
+
+**First, get your credentials:**
+
+For local Supabase:
+```bash
+# Install and start Supabase CLI first
+brew install supabase/tap/supabase  # macOS
+supabase start
+supabase status  # Get URL and anon key
+```
+
+For remote Supabase:
+- Create project at [supabase.com](https://supabase.com)
+- Get credentials from Project Settings → API
+
+**Then run setup:**
 
 ```bash
-# Using pnpm (recommended)
-pnpm setup --non-interactive --remote -e .env.production
-
-# Using npm
-npm run setup -- --non-interactive --remote -e .env.production
-
-# Or with environment variables
-export SUPABASE_URL=https://xxx.supabase.co
+# Using environment variables (recommended)
+export SUPABASE_URL=http://127.0.0.1:54321  # or your remote URL
 export SUPABASE_ANON_KEY=eyJh...
-export OPENAI_API_KEY=sk-xxx
-pnpm setup --non-interactive --remote  # or: npm run setup -- --non-interactive --remote
+export OPENAI_API_KEY=sk-xxx  # optional
+pnpm setup --non-interactive
+
+# Using env file (recommended for CI/CD)
+pnpm setup --non-interactive -e .env.production
+
+# Using CLI args (less secure - visible in process list)
+pnpm setup --non-interactive \
+  --supabase-url https://xxx.supabase.co \
+  --supabase-anon-key eyJh... \
+  --openai-key sk-xxx
 ```
 
 ---
@@ -125,19 +144,23 @@ All commands work with both **pnpm** (recommended) and **npm**. For npm, use `np
 | Flag | Description |
 |------|-------------|
 | `--non-interactive` | Run setup without prompts (for CI/CD or coding assistants) |
-| `--local` | Use local Supabase (default if not specified) |
-| `--remote` | Use remote hosted Supabase |
+| `--supabase-url <url>` | Supabase URL (required for non-interactive) |
+| `--supabase-anon-key <key>` | Supabase anon key (required for non-interactive) |
 | `-e, --env-file <path>` | Load environment variables from a file |
+| `--openai-key <key>` | OpenAI API key (optional) |
 | `--skip-openai` | Skip OpenAI API key setup (development mode) |
 | `--help` | Show detailed help for the setup command |
 
 **Example:**
 ```bash
-# Setup with local Supabase, no OpenAI key
-pnpm setup --non-interactive --local --skip-openai
+# Using env file
+pnpm setup --non-interactive -e .env.production
 
-# Setup with remote Supabase using env file
-pnpm setup --non-interactive --remote -e .env.production
+# Using CLI args
+pnpm setup --non-interactive \
+  --supabase-url http://127.0.0.1:54321 \
+  --supabase-anon-key eyJh... \
+  --skip-openai
 ```
 
 ---
