@@ -1,18 +1,30 @@
 <div align="center">
-
-# 🤖 Agent Orchestrator
-
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/AgentOrchestrator/agent-orchestrator?style=social)](https://github.com/AgentOrchestrator/agent-orchestrator)
-[![Last Commit](https://img.shields.io/github/last-commit/AgentOrchestrator/agent-orchestrator)](https://github.com/AgentOrchestrator/agent-orchestrator/commits/main)
-[![Commit Activity](https://img.shields.io/github/commit-activity/m/AgentOrchestrator/agent-orchestrator?labelColor=32b583&color=12b76a)](https://github.com/AgentOrchestrator/agent-orchestrator/graphs/commit-activity)
-[![Issues](https://img.shields.io/github/issues/AgentOrchestrator/agent-orchestrator?labelColor=7d89b0&color=5d6b98)](https://github.com/AgentOrchestrator/agent-orchestrator/issues)
+<img src="./assets/logo-images/agent_base_serif.png" alt="Agent Base" width="500" style="margin-bottom: 50px;"/>
+</div>
 
 **Stay in sync with your team's AI coding sessions — see what they're building in real-time**
 
-When you're deep in flow, vibe-coding with an AI assistant, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Orchestrator gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
+When you're deep in flow working with AI agnts, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Base gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
+
+<div align="center">
+<img src="./assets/agent_base_1.png" alt="Agent Base" width="635"/>
+
+<table>
+  <tr>
+    <td><img src="./assets/agent_base_2.png" alt="Agent Base" width="364"/></td>
+    <td><img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/></td>
+  </tr>
+</table>
+
+[![MIT License](https://img.shields.io/badge/License-MIT-555555.svg?labelColor=333333&color=666666)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator)
+[![Last Commit](https://img.shields.io/github/last-commit/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/commits/main)
+[![Commit Activity](https://img.shields.io/github/commit-activity/m/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/graphs/commit-activity)
+[![Issues](https://img.shields.io/github/issues/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/issues)
 
 [Installation](#-installation) • [Commands](#-available-commands) • [Preview](#-preview) • [Features](#-features) • [Integrations](#-integrations)
+</div>
+
 
 </div>
 
@@ -171,7 +183,7 @@ pnpm run setup --non-interactive \
 
 When you're in the zone with Claude Code or Cursor, articulating your current task in Slack feels like context-switching hell. "What are you working on?" becomes a difficult question to answer when you're mid-conversation with an AI, exploring multiple approaches, hitting roadblocks, and iterating rapidly.
 
-**The Solution:** We built Agent Orchestrator to create transparency without the overhead. Instead of asking teammates to explain what they're doing, we can simply check the canvas:
+**The Solution:** We built Agent Base to create transparency without the overhead. Instead of asking teammates to explain what they're doing, we can simply check the canvas:
 
 - **Real-time visibility** - See who's working on what, right now
 - **AI-powered summaries** - Instantly understand the context of each conversation without reading entire chat logs
@@ -224,7 +236,7 @@ This is the tool we wished we had: a way to stay connected with our team's work 
 
 ## 🔌 Integrations
 
-Agent Orchestrator connects with your favorite AI coding assistants to provide real-time visibility into your team's development workflow.
+Agent Base connects with your favorite AI coding assistants to provide real-time visibility into your team's development workflow.
 
 ### Supported AI Coding Assistants:
 
