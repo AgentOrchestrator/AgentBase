@@ -5,7 +5,7 @@
 </picture>
 </div>
 
-**Stay in sync with your team's AI coding sessions — see what they're building in real-time**
+**Stay in sync with your team's coding sessions — see what they're building in real-time**
 
 When you're deep in flow working with AI agnts, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Base gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
 
@@ -16,6 +16,11 @@ When you're deep in flow working with AI agnts, explaining what you're working o
   <img src="./assets/agent_base_2.png" alt="Agent Base" width="364"/>
   <img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/>
 </p>
+<div align="left">
+We built Agent Base to provide a quick overview of what all your and your teammates' agents are working on. You get real-time visibility, summaries that let you instantly understand the context of each conversation, and shared context that lets you jump into conversations with full context when pair programming or code reviews.
+
+You can run Agent Base locally on your machine for personal development and testing, or connect to a shared Supabase instance for real-time team collaboration. The local setup keeps everything on your device, while the remote option lets your entire team see each other's agent conversations in real-time.
+</div>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-555555.svg?labelColor=333333&color=666666)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator)
@@ -195,33 +200,6 @@ This is the tool we wished we had: a way to stay connected with our team's work 
 
 ---
 
-## 📸 Preview
-
-<div align="center">
-
-### The Canvas
-
-<table>
-  <tr>
-    <td><img src="./assets/screenshot_0.jpeg" alt="Dashboard Overview" width="400"/></td>
-    <td><img src="./assets/screenshot_1.jpeg" alt="Chat History View" width="400"/></td>
-  </tr>
-  <tr>
-    <td><img src="./assets/screenshot_2.jpeg" alt="Project Organization" width="400"/></td>
-    <td><img src="./assets/screenshot_3.jpeg" alt="Real-time Updates" width="400"/></td>
-  </tr>
-</table>
-
-</div>
-
-**What you'll see:**
-- 👥 Team member activities across Claude Code, Cursor, and more
-- 📊 Real-time chat history synced across your team
-- 🔍 AI-generated summaries for each conversation
-- 📁 Project-based organization for easy navigation
-- ⚡ Live updates as your team codes with AI assistants
-
----
 
 ## ✨ Features
 
@@ -286,6 +264,14 @@ Please open an issue or PR in this repository!
 ---
 
 <div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/HaiandMax_white.png">
+  <img src="./assets/HaiandMax.png" alt="Hai Dang & Max Prokopp" style="max-width: 400px; margin: 20px 0;"/>
+</picture>
+</div>
+
+<div align="center">
+We want to build tools that enhance the experience of ai working alongside humans.
 
 Made with ❤️ from Munich and Palo Alto
 
