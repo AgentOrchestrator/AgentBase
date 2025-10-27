@@ -12,6 +12,70 @@ import type { RuleFilters, RuleWithApproval, RulesStats } from './types';
 export async function getRules(filters: RuleFilters = {}) {
   const supabase = await createClient();
 
+  // If filtering by status, we need to use !inner to do an inner join
+  if (filters.status) {
+    // Use extracted_rules as base, but filter on rule_approvals using !inner
+    let query = supabase
+      .from('extracted_rules')
+      .select(
+        `
+        *,
+        rule_approvals!inner (
+          rule_id,
+          status,
+          reviewed_by,
+          reviewed_at,
+          rejection_reason,
+          revision_notes
+        )
+      `,
+        { count: 'exact' }
+      )
+      .eq('rule_approvals.status', filters.status);
+
+    // Apply other filters
+    if (filters.category) {
+      query = query.eq('rule_category', filters.category);
+    }
+
+    if (filters.workspace_id) {
+      query = query.eq('workspace_id', filters.workspace_id);
+    }
+
+    if (filters.project_id) {
+      query = query.eq('project_id', filters.project_id);
+    }
+
+    // Sorting
+    query = query.order('confidence_score', { ascending: false }).order('created_at', { ascending: false });
+
+    // Pagination
+    const limit = filters.limit || 50;
+    const offset = filters.offset || 0;
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('Error fetching rules with status filter:', error);
+      throw new Error(`Failed to fetch rules: ${error.message}`);
+    }
+
+    // Transform data to include approval as nested object
+    const rules: RuleWithApproval[] =
+      data?.map((rule: any) => ({
+        ...rule,
+        approval: Array.isArray(rule.rule_approvals) ? rule.rule_approvals[0] : rule.rule_approvals,
+      })) || [];
+
+    return {
+      rules,
+      total: count || 0,
+      page: Math.floor(offset / limit),
+    };
+  }
+
+  // No status filter - use original query
   let query = supabase
     .from('extracted_rules')
     .select(
@@ -23,16 +87,13 @@ export async function getRules(filters: RuleFilters = {}) {
         reviewed_by,
         reviewed_at,
         rejection_reason,
-        notes
+        revision_notes
       )
     `,
       { count: 'exact' }
     );
 
   // Apply filters
-  if (filters.status) {
-    query = query.eq('rule_approvals.status', filters.status);
-  }
 
   if (filters.category) {
     query = query.eq('rule_category', filters.category);
@@ -91,7 +152,7 @@ export async function getRuleById(ruleId: string) {
         reviewed_by,
         reviewed_at,
         rejection_reason,
-        notes
+        revision_notes
       )
     `
     )
@@ -234,21 +295,20 @@ export async function getApprovedRules(workspaceId?: string, projectId?: string)
 export async function getRulesStats(): Promise<RulesStats> {
   const supabase = await createClient();
 
-  // Get counts by status
-  const { data: statusCounts, error: statusError } = await supabase
+  // Get counts by status using count queries
+  const { count: pendingCount, error: pendingError } = await supabase
     .from('rule_approvals')
-    .select('status, count')
-    .eq('status', 'pending')
-    .single();
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending');
 
-  const { data: approvedCount, error: approvedError } = await supabase
+  const { count: approvedCount, error: approvedError } = await supabase
     .from('rule_approvals')
-    .select('status', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'approved');
 
-  const { data: rejectedCount, error: rejectedError } = await supabase
+  const { count: rejectedCount, error: rejectedError } = await supabase
     .from('rule_approvals')
-    .select('status', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'rejected');
 
   // Get recent extractions (last 10)
@@ -284,9 +344,9 @@ export async function getRulesStats(): Promise<RulesStats> {
     .slice(0, 10);
 
   return {
-    pending: statusCounts?.count || 0,
-    approved: approvedCount?.length || 0,
-    rejected: rejectedCount?.length || 0,
+    pending: pendingCount || 0,
+    approved: approvedCount || 0,
+    rejected: rejectedCount || 0,
     recent_extractions,
   };
 }

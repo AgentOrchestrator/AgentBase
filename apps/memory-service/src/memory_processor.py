@@ -96,7 +96,9 @@ class SharedMemoryProcessor:
         similar_memories = {"results": []}
 
         if self.memory is not None:
-            self.memory.add(messages, user_id=chat_history_id)
+            # Transform messages to mem0 format (role + content)
+            mem0_messages = self._transform_messages_for_mem0(messages)
+            self.memory.add(mem0_messages, user_id=chat_history_id)
 
             # 2. Search for similar patterns across other conversations
             # This provides context from previous sessions
@@ -192,7 +194,7 @@ class SharedMemoryProcessor:
 
         # Call Claude
         response = self.anthropic.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-haiku-4-5",
             max_tokens=4096,
             temperature=0.2,  # Lower temperature for more consistent extraction
             messages=[{"role": "user", "content": full_prompt}],
@@ -201,6 +203,18 @@ class SharedMemoryProcessor:
         # Parse JSON response
         content = response.content[0].text if response.content else "[]"
 
+        # Strip markdown code blocks if present
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]  # Remove ```json
+        elif content.startswith("```"):
+            content = content[3:]  # Remove ```
+
+        if content.endswith("```"):
+            content = content[:-3]  # Remove trailing ```
+
+        content = content.strip()
+
         try:
             rules = json.loads(content)
             if not isinstance(rules, list):
@@ -208,8 +222,29 @@ class SharedMemoryProcessor:
                 return []
             return rules
         except json.JSONDecodeError as e:
-            logger.error("Failed to parse LLM response as JSON", error=str(e), response=content)
+            logger.error("Failed to parse LLM response as JSON", error=str(e), response=content[:500])
             return []
+
+    def _transform_messages_for_mem0(self, messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """
+        Transform our message format to mem0's expected format.
+
+        Our format: {role, display, timestamp, ...}
+        mem0 format: {role, content}
+        """
+        transformed = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            # Use 'content' if present, otherwise fall back to 'display'
+            content = msg.get("content") or msg.get("display", "")
+
+            if content:  # Only include messages with actual content
+                transformed.append({
+                    "role": role,
+                    "content": content
+                })
+
+        return transformed
 
     def _format_conversation(self, messages: list[dict[str, Any]]) -> str:
         """Format messages into readable conversation text."""

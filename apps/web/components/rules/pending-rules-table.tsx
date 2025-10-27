@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow } from '@/components/ui/table';
 import { RuleRow } from './rule-row';
 import { RuleDetailModal } from './rule-detail-modal';

@@ -31,11 +31,12 @@ export async function POST(request: NextRequest) {
     // Verify user has access to the chat histories
     const { data: chatHistories, error: chatError } = await supabase
       .from('chat_histories')
-      .select('id, session_data')
+      .select('id, messages')
       .in('id', chat_history_ids);
 
     if (chatError) {
-      return NextResponse.json({ error: 'Failed to fetch chat histories' }, { status: 500 });
+      console.error('Database error fetching chat histories:', chatError);
+      return NextResponse.json({ error: `Failed to fetch chat histories: ${chatError.message}` }, { status: 500 });
     }
 
     if (!chatHistories || chatHistories.length === 0) {
@@ -58,24 +59,36 @@ export async function POST(request: NextRequest) {
 
     // Call Python memory service
     const memoryServiceUrl = process.env.MEMORY_SERVICE_URL || 'http://localhost:8000';
+    console.log(`Calling memory service at ${memoryServiceUrl}/extract-rules`);
+    console.log(`Extracting rules from ${chat_history_ids.length} chat histories for user ${user.id}`);
+
     const response = await fetch(`${memoryServiceUrl}/extract-rules`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_histories: chatHistories.map((ch) => ({
-          id: ch.id,
-          session_data: ch.session_data,
-        })),
-        workspace_id: workspace_id || null,
-        prompt_text: promptText,
+        chat_history_ids: chat_history_ids,  // Memory service fetches from DB
         user_id: user.id,
+        prompt_id: prompt_id || null,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      const errorText = await response.text();
+      console.error('Memory service error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
+
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || 'Unknown error' };
+      }
+
       return NextResponse.json(
-        { error: `Memory service error: ${errorData.error || response.statusText}` },
+        { error: `Memory service error: ${errorData.error || errorData.detail || response.statusText}` },
         { status: 500 }
       );
     }
@@ -84,8 +97,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      rules_extracted: result.rules_extracted || 0,
-      pending_review: result.pending_review || 0,
+      rules_extracted: result.rules_count || 0,
+      pending_review: result.rules_count || 0, // All extracted rules go to pending
       job_id: result.job_id || null,
     });
   } catch (error) {

@@ -47,9 +47,11 @@ class APIKeyManager:
         Returns:
             API key string or None if not found
         """
+        logger.info("Getting api key for %s", provider)
         # Check cache first
         cache_key = f"{provider}:{env_var_name}"
         if cache_key in self._cache:
+            logger.debug("Found api key in cache")
             return self._cache[cache_key]
 
         # 1. Check environment variable if provided
