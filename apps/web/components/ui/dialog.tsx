@@ -95,6 +95,14 @@ export function DialogDescription({ children, className = "" }: DialogDescriptio
   );
 }
 
+export function DialogFooter({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 export function DialogClose({ onClose }: { onClose: () => void }) {
   return (
     <button
