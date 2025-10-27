@@ -5,55 +5,100 @@ interface AgentDisplayProps {
   agentType: string | null;
 }
 
-// Agent logos using actual PNG images from assets
+// Agent logos using actual PNG images from assets with dark mode support
 const ClaudeCodeLogo = () => (
-  <Image
-    src="/assets/claude_code_logo.png"
-    alt="Claude Code"
-    width={16}
-    height={16}
-    className="rounded-sm"
-  />
+  <>
+    <Image
+      src="/assets/claude_code_logo.png"
+      alt="Claude Code"
+      width={16}
+      height={16}
+      className="rounded-sm dark:hidden"
+    />
+    <Image
+      src="/assets/claude_code_logo.png"
+      alt="Claude Code"
+      width={16}
+      height={16}
+      className="rounded-sm hidden dark:block"
+    />
+  </>
 );
 
 const CodexLogo = () => (
-  <Image
-    src="/assets/codex_logo.png"
-    alt="Codex"
-    width={16}
-    height={16}
-    className="rounded-sm"
-  />
+  <>
+    <Image
+      src="/assets/codex_logo.png"
+      alt="Codex"
+      width={16}
+      height={16}
+      className="rounded-sm dark:hidden"
+    />
+    <Image
+      src="/assets/codex_logo_white.png"
+      alt="Codex"
+      width={16}
+      height={16}
+      className="rounded-sm hidden dark:block"
+    />
+  </>
 );
 
 const CursorLogo = () => (
-  <Image
-    src="/assets/cursor_logo.png"
-    alt="Cursor"
-    width={16}
-    height={16}
-    className="rounded-sm"
-  />
+  <>
+    <Image
+      src="/assets/cursor_logo.png"
+      alt="Cursor"
+      width={16}
+      height={16}
+      className="rounded-sm dark:hidden"
+    />
+    <Image
+      src="/assets/cursor_logo_white.png"
+      alt="Cursor"
+      width={16}
+      height={16}
+      className="rounded-sm hidden dark:block"
+    />
+  </>
 );
 
 const WindsurfLogo = () => (
-  <Image
-    src="/assets/windsurf_logo.png"
-    alt="Windsurf"
-    width={16}
-    height={16}
-    className="rounded-sm"
-  />
+  <>
+    <Image
+      src="/assets/windsurf_logo.png"
+      alt="Windsurf"
+      width={16}
+      height={16}
+      className="rounded-sm dark:hidden"
+    />
+    <Image
+      src="/assets/windsurf_logo_white.png"
+      alt="Windsurf"
+      width={16}
+      height={16}
+      className="rounded-sm hidden dark:block"
+    />
+  </>
 );
 
 const FactoryLogo = () => (
-  <Image
-    src="/assets/factory_droid_logo.png"
-    alt="Droid"
-    width={16}
-    height={16}
-    className="rounded-sm"
-  />
+  <>
+    <Image
+      src="/assets/factory_droid_logo.png"
+      alt="Droid"
+      width={16}
+      height={16}
+      className="rounded-sm dark:hidden"
+    />
+    <Image
+      src="/assets/factory_droid_logo_white.png"
+      alt="Droid"
+      width={16}
+      height={16}
+      className="rounded-sm hidden dark:block"
+    />
+  </>
 );
 
 const OtherLogo = () => (
@@ -143,7 +188,7 @@ export function AgentDisplay({ agentType }: AgentDisplayProps) {
   return (
     <div className="flex items-center gap-2 mt-2">
       {agentInfo.logo}
-      <span className="text-sm font-bold text-black">
+      <span className="text-sm font-bold text-foreground">
         {agentInfo.name}
       </span>
     </div>
