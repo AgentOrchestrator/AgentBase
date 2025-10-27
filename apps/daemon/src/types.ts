@@ -6,7 +6,7 @@
 /**
  * Agent/IDE type that created the session
  */
-export type AgentType = 'claude_code' | 'codex' | 'cursor' | 'vscode' | 'windsurf' | 'other';
+export type AgentType = 'claude_code' | 'codex' | 'cursor' | 'vscode' | 'windsurf' | 'factory' | 'other';
 
 /**
  * Standard message format across all readers

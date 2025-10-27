@@ -46,6 +46,16 @@ const WindsurfLogo = () => (
   />
 );
 
+const FactoryLogo = () => (
+  <Image
+    src="/assets/factory_droid_logo.png"
+    alt="Droid"
+    width={16}
+    height={16}
+    className="rounded-sm"
+  />
+);
+
 const OtherLogo = () => (
   <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
@@ -104,6 +114,11 @@ const getAgentInfo = (agentType: string | null) => {
       return {
         name: 'Windsurf',
         logo: <WindsurfLogo />
+      };
+    case 'factory':
+      return {
+        name: 'Droid',
+        logo: <FactoryLogo />
       };
     case 'other':
       return {

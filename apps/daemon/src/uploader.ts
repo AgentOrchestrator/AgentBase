@@ -163,6 +163,10 @@ export async function uploadChatHistory(
       } else {
         agentLabel = '[Cursor]';
       }
+    } else if (history.agent_type === 'factory') {
+      agentLabel = '[Factory]';
+    } else if (history.agent_type === 'vscode') {
+      agentLabel = '[VSCode]';
     }
 
     // Format latest message timestamp (in UTC to match database)
