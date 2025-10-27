@@ -8,7 +8,8 @@ import { signOut } from "@/lib/auth";
 import { useSidebar } from "./sidebar-provider";
 import {
   Home,
-  Inbox,
+  LayoutGrid,
+  Brain,
   Settings,
   ChevronDown,
   ChevronRight,
@@ -209,6 +210,19 @@ export function Sidebar() {
     refreshInvitations();
   }, [refreshTeamData, refreshInvitations]);
 
+  // Initialize all team members as collapsed by default
+  useEffect(() => {
+    if (teamMembers.length > 0) {
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev);
+        teamMembers.forEach(member => {
+          newSet.add(`team-${member.id}`);
+        });
+        return newSet;
+      });
+    }
+  }, [teamMembers]);
+
   // Auto-refresh team data and invitations every minute
   useEffect(() => {
     const interval = setInterval(() => {
@@ -266,6 +280,8 @@ export function Sidebar() {
       router.push("/");
     } else if (itemId === "canvas") {
       router.push("/canvas");
+    } else if (itemId === "memory") {
+      router.push("/rules");
     } else if (itemId === "settings") {
       router.push("/settings");
     } else if (itemId === "workspaces") {
@@ -290,6 +306,8 @@ export function Sidebar() {
       return pathname === "/";
     } else if (itemId === "canvas") {
       return pathname === "/canvas";
+    } else if (itemId === "memory") {
+      return pathname === "/rules";
     } else if (itemId === "settings") {
       return pathname === "/settings";
     } else if (itemId === "workspaces") {
@@ -314,7 +332,12 @@ export function Sidebar() {
         {
           id: "canvas",
           label: "Canvas",
-          icon: <Inbox className="h-4 w-4" />,
+          icon: <LayoutGrid className="h-4 w-4" />,
+        },
+        {
+          id: "memory",
+          label: "Memory",
+          icon: <Brain className="h-4 w-4" />,
         },
         {
           id: "workspaces",
