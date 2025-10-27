@@ -12,6 +12,7 @@ from mem0 import Memory, MemoryClient
 from anthropic import Anthropic
 
 from .config import settings
+from .api_keys import APIKeyManager
 
 logger = structlog.get_logger(__name__)
 
@@ -28,19 +29,30 @@ class SharedMemoryProcessor:
     """
 
     def __init__(self):
-        """Initialize mem0 and LLM clients."""
+        """Initialize mem0 and LLM clients with fallback to database for API keys."""
+        # Initialize API key manager
+        self.api_key_manager = APIKeyManager(
+            supabase_url=settings.supabase_url,
+            supabase_service_key=settings.supabase_service_role_key
+        )
+
+        # Get API keys with fallback to database
+        anthropic_key = settings.anthropic_api_key or self.api_key_manager.get_anthropic_key()
+        openai_key = settings.openai_api_key or self.api_key_manager.get_openai_key()
+        mem0_key = settings.mem0_api_key or self.api_key_manager.get_mem0_key()
+
         # Initialize mem0 based on mode
         if settings.mem0_mode == "platform":
             logger.info("Initializing mem0 in platform mode")
-            if not settings.mem0_api_key:
-                raise ValueError("MEM0_API_KEY required for platform mode")
-            self.memory = MemoryClient(api_key=settings.mem0_api_key)
+            if not mem0_key:
+                raise ValueError("MEM0_API_KEY required for platform mode (check .env or database)")
+            self.memory = MemoryClient(api_key=mem0_key)
         else:
             logger.info("Initializing mem0 in self-hosted mode")
             # Self-hosted mode - set OpenAI key in environment if available
-            if settings.openai_api_key:
+            if openai_key:
                 import os
-                os.environ['OPENAI_API_KEY'] = settings.openai_api_key
+                os.environ['OPENAI_API_KEY'] = openai_key
                 logger.info("Using OpenAI embeddings for mem0")
                 self.memory = Memory()
             else:
@@ -49,7 +61,10 @@ class SharedMemoryProcessor:
                 self.memory = None  # Will skip mem0 operations
 
         # Initialize Claude for rule extraction
-        self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        if not anthropic_key:
+            raise ValueError("ANTHROPIC_API_KEY required for rule extraction (check .env or database)")
+
+        self.anthropic = Anthropic(api_key=anthropic_key)
 
         logger.info("SharedMemoryProcessor initialized", mode=settings.mem0_mode)
 
