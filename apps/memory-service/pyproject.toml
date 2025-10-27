@@ -1,0 +1,44 @@
+[project]
+name = "memory-service"
+version = "0.1.0"
+description = "Memory processing service using mem0 for Agent Orchestrator"
+requires-python = ">=3.11"
+dependencies = [
+    "mem0ai>=0.1.13",
+    "supabase>=2.10.0",
+    "psycopg2-binary>=2.9.9",
+    "anthropic>=0.42.0",
+    "openai>=1.58.1",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.28.1",
+    "structlog>=25.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.2",
+    "black>=25.1.0",
+    "ruff>=0.9.1",
+    "mypy>=1.15.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

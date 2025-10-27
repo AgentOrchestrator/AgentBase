@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { signOut } from "@/lib/auth";
 import { useSidebar } from "./sidebar-provider";
+import { useWorkspace } from "./workspace-provider";
 import {
   Home,
   Inbox,
@@ -140,6 +141,7 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { toggleSidebar } = useSidebar();
+  const { selectedWorkspace, setSelectedWorkspace, workspaces, loading: workspaceLoading } = useWorkspace();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(new Set());
   const [user, setUser] = useState<User | null>(null);
@@ -149,6 +151,25 @@ export function Sidebar() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [pendingInvitationsCount, setPendingInvitationsCount] = useState(0);
   const [invitationsLoading, setInvitationsLoading] = useState(true);
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowWorkspaceDropdown(false);
+      }
+    };
+
+    if (showWorkspaceDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showWorkspaceDropdown]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -172,20 +193,27 @@ export function Sidebar() {
 
   // Function to refresh team data from API
   const refreshTeamData = useCallback(async () => {
+    if (!selectedWorkspace) {
+      setTeamMembers([]);
+      setTeamLoading(false);
+      return;
+    }
+
+    setTeamLoading(true);
     try {
-      const response = await fetch('/api/team');
+      const response = await fetch(`/api/workspaces/team?workspace_id=${selectedWorkspace.id}`);
       if (response.ok) {
         const data = await response.json();
-        setTeamMembers(data.teamMembers || []);
+        setTeamMembers(data.workspaceMembers || []);
       } else {
-        console.error('Error fetching team members:', response.statusText);
+        console.error('Error fetching workspace members:', response.statusText);
       }
     } catch (error) {
-      console.error('Error fetching team members:', error);
+      console.error('Error fetching workspace members:', error);
     } finally {
       setTeamLoading(false);
     }
-  }, []);
+  }, [selectedWorkspace]);
 
   // Function to refresh pending invitations count
   const refreshInvitations = useCallback(async () => {
@@ -334,12 +362,24 @@ export function Sidebar() {
       ],
     },
     {
-      title: "Team",
+      title: selectedWorkspace ? selectedWorkspace.name : "Select Workspace",
       items: teamLoading ? [
         {
           id: "team-loading",
           label: "Loading...",
           icon: <div className="h-4 w-4 bg-gray-300 rounded animate-pulse" />,
+        }
+      ] : !selectedWorkspace ? [
+        {
+          id: "no-workspace",
+          label: "No workspace selected",
+          icon: <Users className="h-4 w-4" />,
+        }
+      ] : teamMembers.length === 0 ? [
+        {
+          id: "no-members",
+          label: "No members yet",
+          icon: <Users className="h-4 w-4" />,
         }
       ] : teamMembers.map((member) => {
         // Get display name, or email username (part before @) if no name
@@ -386,9 +426,9 @@ export function Sidebar() {
               {loading ? (
                 <div className="h-5 w-5 bg-gray-300 rounded-full animate-pulse" />
               ) : user?.user_metadata?.x_github_avatar_url || user?.user_metadata?.avatar_url ? (
-                <img 
-                  src={user.user_metadata.x_github_avatar_url || user.user_metadata.avatar_url} 
-                  alt="Profile" 
+                <img
+                  src={user.user_metadata.x_github_avatar_url || user.user_metadata.avatar_url}
+                  alt="Profile"
                   className="h-5 w-5 rounded-full object-cover"
                 />
               ) : (
@@ -398,22 +438,84 @@ export function Sidebar() {
                 {loading ? (
                   <div className="h-4 w-24 bg-gray-300 rounded animate-pulse" />
                 ) : (
-                  user?.user_metadata?.x_github_name || 
-                  user?.user_metadata?.display_name || 
-                  user?.user_metadata?.name || 
-                  user?.email || 
+                  user?.user_metadata?.x_github_name ||
+                  user?.user_metadata?.display_name ||
+                  user?.user_metadata?.name ||
+                  user?.email ||
                   "User"
                 )}
               </span>
             </div>
           </div>
-          <button 
+          <button
             onClick={toggleSidebar}
             className="p-1 hover:bg-sidebar-accent rounded"
             aria-label="Collapse sidebar"
           >
             <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           </button>
+        </div>
+      </div>
+
+      {/* Workspace Selector */}
+      <div className="p-4 border-b border-sidebar-border">
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded bg-sidebar-accent hover:bg-sidebar-accent/80 transition-colors"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="font-medium text-muted-foreground truncate">
+                {workspaceLoading ? (
+                  "Loading..."
+                ) : selectedWorkspace ? (
+                  selectedWorkspace.name
+                ) : workspaces.length > 0 ? (
+                  "Select Workspace"
+                ) : (
+                  "No Workspaces"
+                )}
+              </span>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          </button>
+
+          {/* Dropdown Menu */}
+          {showWorkspaceDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-sidebar border border-sidebar-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+              {workspaces.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground text-center">
+                  No workspaces available
+                </div>
+              ) : (
+                workspaces.map((workspace) => (
+                  <button
+                    key={workspace.id}
+                    onClick={() => {
+                      setSelectedWorkspace(workspace);
+                      setShowWorkspaceDropdown(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-accent transition-colors ${
+                      selectedWorkspace?.id === workspace.id ? "bg-sidebar-accent" : ""
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="font-medium text-muted-foreground truncate">
+                        {workspace.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        /{workspace.slug}
+                      </div>
+                    </div>
+                    {selectedWorkspace?.id === workspace.id && (
+                      <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -448,10 +550,10 @@ export function Sidebar() {
                           ? "bg-sidebar-accent text-muted-foreground" 
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-muted-foreground"
                       } ${
-                        section.title === "Team" ? "ml-4" : ""
+                        section.title !== "Navigation" ? "ml-4" : ""
                       }`}
                     >
-                      {section.title === "Team" && item.children && (
+                      {section.title !== "Navigation" && item.children && (
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
@@ -473,7 +575,7 @@ export function Sidebar() {
                           {item.timeIndicator}
                         </div>
                       )}
-                      {section.title !== "Team" && item.children && (
+                      {section.title === "Navigation" && item.children && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -489,10 +591,10 @@ export function Sidebar() {
                         </button>
                       )}
                     </button>
-                    
+
                     {/* Render children if item has them and is not collapsed */}
                     {item.children && !collapsedItems.has(item.id) && (
-                      <div className={`space-y-1 ${section.title === "Team" ? "ml-8" : "ml-6"}`}>
+                      <div className={`space-y-1 ${section.title !== "Navigation" ? "ml-8" : "ml-6"}`}>
                         {item.children.map((child) => (
                           <button
                             key={child.id}

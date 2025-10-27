@@ -1,0 +1,25 @@
+# Mem0 - Memory layer for AI applications
+mem0ai>=0.1.13
+
+# Database
+supabase>=2.10.0
+psycopg2-binary>=2.9.9
+
+# LLM and AI
+anthropic>=0.42.0
+openai>=1.58.1
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+
+# HTTP client
+httpx>=0.28.1
+
+# Logging
+structlog>=25.2.0
+
+# Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0

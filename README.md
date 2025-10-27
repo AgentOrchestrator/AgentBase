@@ -40,6 +40,11 @@ You can run Agent Base locally on your machine for personal development and test
 
 **Prerequisites:** Node.js 18+
 
+**Platform Compatibility:**
+- ✅ **macOS** - Fully tested and supported
+- 🚧 **Windows** - Coming soon
+- 🚧 **Linux** - Coming soon
+
 ### Get Started
 
 ```bash
@@ -228,13 +233,13 @@ Agent Base connects with your favorite AI coding assistants to provide real-time
 
 ### Integration Features:
 
-| Feature | Claude Code | Cursor | Windsurf | Codex |
-| ------- | ----------- | ------ | -------- | ----- |
-| Chat History Sync | ✅ | ✅ | 🚧 | 🚧 |
-| Real-time Updates | ✅ | ✅ | 🚧 | 🚧 |
-| AI Summaries | ✅ | ✅ | 🚧 | 🚧 |
-| Project Detection | ✅ | ✅ | 🚧 | 🚧 |
-| File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 |
+| Feature | Claude Code | Cursor | Windsurf | Codex | FactoryDroid |
+| ------- | ----------- | ------ | -------- | ----- | ------- |
+| Chat History Sync | ✅ | ✅ | 🚧 | ⏸️  | ✅ |
+| Real-time Updates | ✅ | ✅ | 🚧 | ⏸️  | ✅ |
+| AI Summaries      | ✅ | ✅ | 🚧 | ⏸️ | ✅ |
+| Project Detection | ✅ | ✅ | 🚧 | ⏸️ | ✅ |
+| File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 | 🚧 |
 
 **Legend:**
 - ✅ Fully supported
