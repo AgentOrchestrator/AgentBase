@@ -7,7 +7,7 @@
 
 **Stay in sync with your team's coding sessions — see what they're building in real-time**
 
-When you're deep in flow working with AI agnts, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Base gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
+When you're deep in flow working with AI agents, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Base gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
 
 <div align="center">
 <img src="./assets/agent_base_1.png" alt="Agent Base" width="618"/>
@@ -48,8 +48,8 @@ You can run Agent Base locally on your machine for personal development and test
 ### Get Started
 
 ```bash
-git clone https://github.com/AgentOrchestrator/agent-orchestrator.git
-cd agent-orchestrator
+git clone https://github.com/AgentOrchestrator/agentbase.git
+cd agentbase
 
 # Using pnpm (recommended - faster and more efficient)
 pnpm install
