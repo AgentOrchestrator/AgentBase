@@ -2,6 +2,7 @@ import { readChatHistories, extractProjectsFromClaudeCodeHistories } from './cla
 import { readCursorHistories, convertCursorToStandardFormat, extractProjectsFromConversations } from './cursor-reader.js';
 import { readVSCodeHistories, convertVSCodeToStandardFormat, extractProjectsFromConversations as extractVSCodeProjects } from './vscode-reader.js';
 import { readFactoryHistories, extractProjectsFromFactoryHistories } from './factory-reader.js';
+import { readCodexHistories, extractProjectsFromCodexHistories } from './codex-reader.js';
 import { uploadAllHistories, syncProjects } from './uploader.js';
 import { runPeriodicSummaryUpdate, runPeriodicKeywordUpdate, runPeriodicTitleUpdate } from './summarizer.js';
 import { AuthManager } from './auth-manager.js';
@@ -53,8 +54,8 @@ async function processHistories() {
       return;
     }
 
-    // Get session lookback period from environment (default: 30 days)
-    const lookbackDays = parseInt(process.env.SESSION_LOOKBACK_DAYS || '30', 10);
+    // Get session lookback period from environment (default: 7 days)
+    const lookbackDays = parseInt(process.env.SESSION_LOOKBACK_DAYS || '7', 10);
     console.log(`Using session lookback period: ${lookbackDays} days`);
 
     // Calculate the time threshold for filtering sessions
@@ -85,25 +86,30 @@ async function processHistories() {
     const factoryHistories = readFactoryHistories(lookbackDays, useIncrementalSync ? lastSyncTime : undefined);
     console.log(`Found ${factoryHistories.length} Factory chat histories.`);
 
+    // Read Codex histories (with date-based folder filtering)
+    const codexHistories = readCodexHistories(lookbackDays, useIncrementalSync ? lastSyncTime : undefined);
+    console.log(`Found ${codexHistories.length} Codex chat histories.`);
+
     // Retry any previously failed syncs
     const failedSyncs = db.getFailedSyncsForRetry();
     if (failedSyncs.length > 0) {
       console.log(`Retrying ${failedSyncs.length} previously failed syncs...`);
     }
 
-    // Extract and merge projects from Claude Code, Cursor, VSCode, and Factory
+    // Extract and merge projects from Claude Code, Cursor, VSCode, Factory, and Codex
     const claudeCodeProjects = extractProjectsFromClaudeCodeHistories(claudeHistories);
     const cursorProjects = extractProjectsFromConversations(cursorConversations);
     const vscodeProjects = extractVSCodeProjects(vscodeConversations);
     const factoryProjects = extractProjectsFromFactoryHistories(factoryHistories);
-    const allProjects = mergeProjects(cursorProjects, claudeCodeProjects, vscodeProjects, factoryProjects);
+    const codexProjects = extractProjectsFromCodexHistories(codexHistories);
+    const allProjects = mergeProjects(cursorProjects, claudeCodeProjects, vscodeProjects, factoryProjects, codexProjects);
 
     if (allProjects.length > 0) {
       await syncProjects(allProjects, accountId, accessToken, refreshToken);
     }
 
     // Combine all histories
-    const allHistories = [...claudeHistories, ...cursorHistories, ...vscodeHistories, ...factoryHistories];
+    const allHistories = [...claudeHistories, ...cursorHistories, ...vscodeHistories, ...factoryHistories, ...codexHistories];
 
     if (allHistories.length === 0 && failedSyncs.length === 0) {
       console.log('No new chat histories found and no failed syncs to retry.');
