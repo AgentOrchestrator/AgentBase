@@ -98,12 +98,16 @@ class SharedMemoryProcessor:
         if self.memory is not None:
             # Transform messages to mem0 format (role + content)
             mem0_messages = self._transform_messages_for_mem0(messages)
-            self.memory.add(mem0_messages, user_id=chat_history_id)
+
+
+            add_result = self.memory.add(mem0_messages, user_id=user_id)
 
             # 2. Search for similar patterns across other conversations
             # This provides context from previous sessions
+            search_query = "coding conventions, repeated corrections, workflow preferences"
+
             similar_memories = self.memory.search(
-                query="coding conventions, repeated corrections, workflow preferences",
+                query=search_query,
                 user_id=user_id,
                 limit=10,
             )
@@ -112,6 +116,7 @@ class SharedMemoryProcessor:
                 "Retrieved similar memories",
                 count=len(similar_memories.get("results", [])),
             )
+
         else:
             logger.warning("mem0 not initialized - skipping memory operations")
 
@@ -127,6 +132,29 @@ class SharedMemoryProcessor:
             "rules": rules,
             "similar_memory_count": len(similar_memories.get("results", [])),
         }
+
+    def get_all_memories(self, user_id: str) -> list[dict[str, Any]]:
+        """
+        Get all memories for a user (for debugging).
+
+        Args:
+            user_id: User ID to fetch memories for
+
+        Returns:
+            List of all memories for the user
+        """
+        if self.memory is None:
+            logger.warning("mem0 not initialized")
+            return []
+
+        try:
+            # Use mem0's get_all method
+            all_memories = self.memory.get_all(user_id=user_id)
+            logger.info("Retrieved all memories for user", user_id=user_id, count=len(all_memories))
+            return all_memories
+        except Exception as e:
+            logger.error("Failed to retrieve memories", error=str(e), user_id=user_id)
+            return []
 
     async def batch_process_histories(
         self,
@@ -146,6 +174,15 @@ class SharedMemoryProcessor:
             List of extraction results
         """
         logger.info("Batch processing histories", count=len(chat_history_ids))
+
+        # Debug: Check existing memories before processing
+        if self.memory is not None:
+            existing_memories = self.get_all_memories(user_id)
+            logger.debug(
+                "Existing memories before batch",
+                user_id=user_id,
+                memory_count=len(existing_memories)
+            )
 
         results = []
         for chat_id in chat_history_ids:
