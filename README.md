@@ -40,6 +40,11 @@ You can run Agent Base locally on your machine for personal development and test
 
 **Prerequisites:** Node.js 18+
 
+**Platform Compatibility:**
+- ✅ **macOS** - Fully tested and supported
+- 🚧 **Windows** - Coming soon
+- 🚧 **Linux** - Coming soon
+
 ### Get Started
 
 ```bash
