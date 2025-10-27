@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase-server';
 import { getRules } from '@/lib/rules/rules-queries';
 import { RulesList } from '@/components/rules/rules-list';
+import { RulesHeader } from '@/components/rules/rules-header';
 import { redirect } from 'next/navigation';
 
 export default async function RulesPage() {
@@ -33,12 +34,7 @@ export default async function RulesPage() {
   return (
     <div className="container mx-auto py-10 space-y-6 px-24">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Shared Memory</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Manage coding rules extracted from your team's chat histories
-        </p>
-      </div>
+      <RulesHeader />
 
       {/* Rules List */}
       <RulesList rules={allRules} />
