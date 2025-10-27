@@ -105,7 +105,7 @@ export function RulesDashboard({ stats }: RulesDashboardProps) {
               </div>
             </Button>
 
-            <Button variant="outline" onClick={() => (window.location.href = '/rules/prompts')} className="h-auto py-4">
+            <Button variant="outline" onClick={() => (window.location.href = '/rules/prompts')} className="h-auto py-4" disabled>
               <div className="text-center">
                 <p className="font-semibold">Manage Prompts</p>
                 <p className="text-xs opacity-80 mt-1">Customize extraction</p>

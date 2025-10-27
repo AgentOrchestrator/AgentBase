@@ -233,13 +233,13 @@ Agent Base connects with your favorite AI coding assistants to provide real-time
 
 ### Integration Features:
 
-| Feature | Claude Code | Cursor | Windsurf | Codex |
-| ------- | ----------- | ------ | -------- | ----- |
-| Chat History Sync | ✅ | ✅ | 🚧 | 🚧 |
-| Real-time Updates | ✅ | ✅ | 🚧 | 🚧 |
-| AI Summaries | ✅ | ✅ | 🚧 | 🚧 |
-| Project Detection | ✅ | ✅ | 🚧 | 🚧 |
-| File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 |
+| Feature | Claude Code | Cursor | Windsurf | Codex | FactoryDroid |
+| ------- | ----------- | ------ | -------- | ----- | ------- |
+| Chat History Sync | ✅ | ✅ | 🚧 | ⏸️  | ✅ |
+| Real-time Updates | ✅ | ✅ | 🚧 | ⏸️  | ✅ |
+| AI Summaries      | ✅ | ✅ | 🚧 | ⏸️ | ✅ |
+| Project Detection | ✅ | ✅ | 🚧 | ⏸️ | ✅ |
+| File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 | 🚧 |
 
 **Legend:**
 - ✅ Fully supported
