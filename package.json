@@ -16,7 +16,8 @@
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
     "setup": "node scripts/setup.js",
     "dev:daemon": "pnpm --filter agent-orchestrator-daemon run dev",
-    "dev:web": "pnpm --filter web run dev"
+    "dev:web": "pnpm --filter web run dev",
+    "dev:memory": "cd apps/memory-service && venv/bin/python -m src.main"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
