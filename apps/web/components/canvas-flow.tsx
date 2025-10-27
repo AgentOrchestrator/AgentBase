@@ -1635,30 +1635,34 @@ function CanvasFlowInner({ usersWithMessages, initialData }: CanvasFlowProps) {
       if (change.type === 'position' && change.position && change.dragging) {
         const node = nodes.find(n => n.id === change.id);
 
-        // Check if this is a user node being dragged
+        // Check if this is a user node being dragged AND if the user is linked
         if (node && node.type === 'user' && node.data && 'userId' in node.data) {
           const userId = node.data.userId as string;
-          const deltaX = change.position.x - node.position.x;
-          const deltaY = change.position.y - node.position.y;
 
-          // Only apply group dragging if there's actual movement
-          if (deltaX !== 0 || deltaY !== 0) {
-            // Apply elasticity factor (0.95 = slight lag for elastic feel)
-            const elasticity = 0.95;
+          // Only apply group dragging if the user has "Link user" enabled
+          if (linkedUsers.has(userId)) {
+            const deltaX = change.position.x - node.position.x;
+            const deltaY = change.position.y - node.position.y;
 
-            // Create position changes for conversation nodes
-            nodes.forEach((n) => {
-              if (n.type === 'conversation' && n.data && 'userId' in n.data && n.data.userId === userId) {
-                additionalChanges.push({
-                  id: n.id,
-                  type: 'position',
-                  position: {
-                    x: n.position.x + (deltaX * elasticity),
-                    y: n.position.y + (deltaY * elasticity)
-                  }
-                });
-              }
-            });
+            // Only apply group dragging if there's actual movement
+            if (deltaX !== 0 || deltaY !== 0) {
+              // Apply elasticity factor (0.95 = slight lag for elastic feel)
+              const elasticity = 0.95;
+
+              // Create position changes for conversation nodes
+              nodes.forEach((n) => {
+                if (n.type === 'conversation' && n.data && 'userId' in n.data && n.data.userId === userId) {
+                  additionalChanges.push({
+                    id: n.id,
+                    type: 'position',
+                    position: {
+                      x: n.position.x + (deltaX * elasticity),
+                      y: n.position.y + (deltaY * elasticity)
+                    }
+                  });
+                }
+              });
+            }
           }
         }
       }
@@ -1666,7 +1670,7 @@ function CanvasFlowInner({ usersWithMessages, initialData }: CanvasFlowProps) {
 
     // Apply original changes plus additional conversation node movements
     onNodesChange([...changes, ...additionalChanges]);
-  }, [nodes, onNodesChange]);
+  }, [nodes, onNodesChange, linkedUsers]);
 
 
   // Update nodes when initialNodes change, preserving existing positions and managing animations
