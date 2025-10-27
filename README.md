@@ -228,17 +228,18 @@ Agent Base connects with your favorite AI coding assistants to provide real-time
 | ----------- | ------ | ----------- |
 | [Claude Code](https://claude.ai/claude-code) | ✅ Supported | Anthropic's AI coding assistant - full integration with chat history tracking and real-time updates |
 | [Cursor](https://cursor.sh) | ✅ Supported | AI-first code editor - tracks conversations and project context |
+| [Codex](https://openai.com/blog/openai-codex) | ✅ Supported | OpenAI's code generation model - tracks chat history and project context |
+| [FactoryDroid](https://www.factory.ai/) | ✅ Supported | Factory AI's coding agent - full integration with chat history tracking |
 | [Windsurf](https://codeium.com/windsurf) | 🚧 Coming Soon | Codeium's AI coding assistant - integration in development |
-| [Codex](https://openai.com/blog/openai-codex) | 🚧 Coming Soon | OpenAI's code generation model - integration planned |
 
 ### Integration Features:
 
-| Feature | Claude Code | Cursor | Windsurf | Codex | FactoryDroid |
-| ------- | ----------- | ------ | -------- | ----- | ------- |
-| Chat History Sync | ✅ | ✅ | 🚧 | ⏸✅ | ✅ |
-| Real-time Updates | ✅ | ✅ | 🚧 | ⏸✅ | ✅ |
-| AI Summaries      | ✅ | ✅ | 🚧 | ⏸✅ | ✅ |
-| Project Detection | ✅ | ✅ | 🚧 | ⏸✅ | ✅ |
+| Feature | Claude Code | Cursor | Codex | Droid | Windsurf |
+| ------- | ----------- | ------ | ----- | ------------ | -------- |
+| Chat History Sync | ✅ | ✅ | ✅ | ✅ | 🚧 |
+| Real-time Updates | ✅ | ✅ | ✅ | ✅ | 🚧 |
+| AI Summaries      | ✅ | ✅ | ✅ | ✅ | 🚧 |
+| Project Detection | ✅ | ✅ | ✅ | ✅ | 🚧 |
 | File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 | 🚧 |
 
 **Legend:**
