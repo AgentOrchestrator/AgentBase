@@ -404,24 +404,25 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
             </button>
           )}
 
-          {/* Pill-shaped white box */}
-          <div
-            onClick={!isPillSquare ? togglePill : undefined}
-            className={`fixed bottom-4 z-30 bg-background border border-border transition-all duration-300 ease-in-out ${
-              !isPillSquare ? 'cursor-pointer' : 'cursor-default'
-            } ${
-              isPillExpanded ? 'w-96' : 'w-40'
-            } ${
-              isPillSquare ? 'h-96' : 'h-10'
-            } ${
-              !shouldShowSidebar || isCollapsed
-                ? 'left-1/2 transform -translate-x-1/2'
-                : 'left-1/2 transform -translate-x-1/2 ml-32'
-            }`}
-            style={{
-              borderRadius: isPillSquare ? '24px' : '20px'
-            }}
-          >
+          {/* Pill-shaped white box - only show when authenticated */}
+          {shouldShowSidebar && (
+            <div
+              onClick={!isPillSquare ? togglePill : undefined}
+              className={`fixed bottom-4 z-30 bg-background border border-border transition-all duration-300 ease-in-out ${
+                !isPillSquare ? 'cursor-pointer' : 'cursor-default'
+              } ${
+                isPillExpanded ? 'w-96' : 'w-40'
+              } ${
+                isPillSquare ? 'h-96' : 'h-10'
+              } ${
+                isCollapsed
+                  ? 'left-1/2 transform -translate-x-1/2'
+                  : 'left-1/2 transform -translate-x-1/2 ml-32'
+              }`}
+              style={{
+                borderRadius: isPillSquare ? '24px' : '20px'
+              }}
+            >
             {!isPillSquare ? (
               <div className={`text-sm text-foreground text-center flex items-center justify-center h-full transition-all duration-[1000ms] ease-out ${
                 isTextVisible 
@@ -589,6 +590,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
               </div>
             ) : null}
           </div>
+          )}
 
           <main className={`overflow-y-auto h-full transition-all duration-300 ease-in-out ${
             isCollapsed ? 'p-6' : 'p-6'
