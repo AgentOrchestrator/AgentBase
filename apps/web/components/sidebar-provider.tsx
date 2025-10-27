@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { RightSidebar } from "./right-sidebar";
 import { ChevronRight, Send, Loader2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { MentionAutocomplete } from "./mention-autocomplete";
+import { supabase } from "@/lib/supabase";
 
 interface SidebarContextType {
   isCollapsed: boolean;
@@ -50,6 +52,9 @@ interface SidebarProviderProps {
 }
 
 export function SidebarProvider({ children }: SidebarProviderProps) {
+  const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isPillExpanded, setIsPillExpanded] = useState(false);
@@ -79,6 +84,32 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsAuthenticated(!!user);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -322,6 +353,12 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     });
   };
 
+  // Determine if sidebar should be shown
+  const isAuthPage = pathname?.startsWith('/login') ||
+                     pathname?.startsWith('/register') ||
+                     pathname?.startsWith('/auth/callback');
+  const shouldShowSidebar = isAuthenticated && !isAuthPage && !authLoading;
+
   return (
     <SidebarContext.Provider value={{ isCollapsed, toggleSidebar, isRightSidebarOpen, toggleRightSidebar }}>
       <style jsx>{`
@@ -345,17 +382,19 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
         }
       `}</style>
       <div className="flex h-screen">
-        {/* Left Sidebar */}
-        <div className={`transition-all duration-300 ease-in-out ${
-          isCollapsed ? "w-0 overflow-hidden" : "w-64"
-        }`}>
-          <Sidebar />
-        </div>
+        {/* Left Sidebar - only show when authenticated and not on auth pages */}
+        {shouldShowSidebar && (
+          <div className={`transition-all duration-300 ease-in-out ${
+            isCollapsed ? "w-0 overflow-hidden" : "w-64"
+          }`}>
+            <Sidebar />
+          </div>
+        )}
 
         {/* Main content area */}
         <div className="flex-1 relative">
-          {/* Expand button when left sidebar is collapsed */}
-          {isCollapsed && (
+          {/* Expand button when left sidebar is collapsed - only show if sidebar should be visible */}
+          {shouldShowSidebar && isCollapsed && (
             <button
               onClick={toggleSidebar}
               className="absolute top-4 left-4 z-50 p-2 bg-background border border-sidebar-border rounded-md hover:bg-sidebar-accent transition-colors"
@@ -375,7 +414,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
             } ${
               isPillSquare ? 'h-96' : 'h-10'
             } ${
-              isCollapsed
+              !shouldShowSidebar || isCollapsed
                 ? 'left-1/2 transform -translate-x-1/2'
                 : 'left-1/2 transform -translate-x-1/2 ml-32'
             }`}
