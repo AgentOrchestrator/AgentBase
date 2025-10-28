@@ -1,11 +1,12 @@
 /**
- * Main Rules Dashboard Page
- * Server Component that fetches initial statistics
+ * Main Rules Page
+ * Server Component that fetches all rules
  */
 
 import { createClient } from '@/lib/supabase-server';
-import { getRulesStats } from '@/lib/rules/rules-queries';
-import { RulesDashboard } from '@/components/rules/rules-dashboard';
+import { getRules } from '@/lib/rules/rules-queries';
+import { RulesList } from '@/components/rules/rules-list';
+import { RulesHeader } from '@/components/rules/rules-header';
 import { redirect } from 'next/navigation';
 
 export default async function RulesPage() {
@@ -20,23 +21,23 @@ export default async function RulesPage() {
     redirect('/login');
   }
 
-  // Fetch rules statistics
-  let stats;
+  // Fetch all rules
+  let allRules = [];
   try {
-    stats = await getRulesStats();
+    const result = await getRules({ limit: 1000 });
+    allRules = result.rules;
   } catch (error) {
-    console.error('Error fetching rules stats:', error);
-    stats = {
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-      recent_extractions: [],
-    };
+    console.error('Error fetching rules:', error);
+    allRules = [];
   }
 
   return (
-    <div className="container py-8">
-      <RulesDashboard stats={stats} />
+    <div className="container mx-auto py-10 space-y-6 px-24">
+      {/* Header */}
+      <RulesHeader />
+
+      {/* Rules List */}
+      <RulesList rules={allRules} />
     </div>
   );
 }
