@@ -53,17 +53,8 @@ const InstallApp = () => {
 
 	const runInstall = async () => {
 		try {
-			// Step 0: Check Supabase CLI and ask user preference
+			// Step 0: Ask user preference
 			setCurrentStep(0);
-			updateStep(0, 'running');
-			try {
-				const { stdout } = await execAsync('supabase --version');
-				updateStep(0, 'success', `Supabase CLI found: ${stdout.trim()}`);
-			} catch {
-				updateStep(0, 'success', 'Supabase CLI not found');
-			}
-
-			// Always ask user for their preference
 			updateStep(0, 'running', 'Choose Supabase setup method...');
 			setNeedsSupabaseChoice(true);
 			return; // Wait for user input
@@ -298,11 +289,11 @@ LOG_LEVEL=INFO
 			updateStep(3, 'running', 'Please provide your remote Supabase credentials...');
 			setNeedsRemoteCredentials(true);
 		} else {
-			// Use local Supabase CLI
+			// Use local Supabase CLI - check if it's installed
+			updateStep(0, 'running', 'Checking for Supabase CLI...');
 			try {
-				// Check if Supabase CLI is already installed
-				await execAsync('supabase --version');
-				updateStep(0, 'success', 'Using existing Supabase CLI');
+				const { stdout } = await execAsync('supabase --version');
+				updateStep(0, 'success', `Supabase CLI found: ${stdout.trim()}`);
 			} catch {
 				// Install Supabase CLI locally
 				updateStep(0, 'running', 'Installing Supabase CLI...');
@@ -312,12 +303,12 @@ LOG_LEVEL=INFO
 						// Try common Homebrew paths with explicit environment
 						const brewPaths = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'];
 						let brewPath = '';
-						
+
 						for (const path of brewPaths) {
 							try {
 								await execAsync(`${path} --version`, {
-									env: { 
-										...process.env, 
+									env: {
+										...process.env,
 										PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 									}
 								});
@@ -327,7 +318,7 @@ LOG_LEVEL=INFO
 								continue;
 							}
 						}
-						
+
 						if (!brewPath) {
 							// Fallback: try to install Supabase CLI directly without Homebrew
 							updateStep(0, 'running', 'Installing Supabase CLI via curl...');
@@ -357,7 +348,7 @@ LOG_LEVEL=INFO
 					throw new Error(`Failed to install Supabase CLI: ${error instanceof Error ? error.message : 'Unknown error'}`);
 				}
 			}
-			
+
 			// Continue with local Supabase setup
 			await continueLocalSupabaseSetup();
 		}
