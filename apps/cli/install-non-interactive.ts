@@ -71,7 +71,7 @@ async function install(options: InstallOptions = {}) {
 	}
 
 	try {
-		// Step 0: Validate Supabase credentials
+		// Step 1: Validate Supabase credentials
 		log('Validating Supabase credentials...', 'running');
 		const supabaseUrl = options.supabaseUrl || '';
 		const supabaseAnonKey = options.supabaseAnonKey || '';
@@ -79,6 +79,8 @@ async function install(options: InstallOptions = {}) {
 		if (!supabaseUrl || !supabaseAnonKey) {
 			throw new Error(`
 Supabase credentials are required.
+
+Setup instructions:
 
 For LOCAL Supabase:
 1. Install Supabase CLI:
@@ -89,19 +91,19 @@ For LOCAL Supabase:
 
 3. Get credentials: supabase status
    Then run setup with:
-   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> npm run setup -- --non-interactive
+   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> pnpm run setup --non-interactive
 
 For REMOTE Supabase:
 1. Create project at https://supabase.com
 2. Get credentials from Project Settings → API
 3. Run setup with:
-   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> npm run setup -- --non-interactive
+   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> pnpm run setup --non-interactive
 			`);
 		}
 
 		log(`Using Supabase URL: ${supabaseUrl}`, 'success');
 
-		// Step 3: Get OpenAI key
+		// Step 2: Get OpenAI key
 		log('Configuring OpenAI API Key...', 'running');
 		let openaiKey = options.openaiApiKey || '';
 
@@ -127,7 +129,7 @@ For REMOTE Supabase:
 			log('Using provided OpenAI key', 'success');
 		}
 
-		// Step 4: Create/update .env files
+		// Step 3: Create/update .env files
 		log('Creating .env files...', 'running');
 
 		// Root .env
@@ -172,7 +174,7 @@ For REMOTE Supabase:
 
 		log('Environment files created', 'success');
 
-		// Step 5: Install dependencies (skip if already in postinstall)
+		// Step 4: Install dependencies (skip if already in postinstall)
 		if (process.env.npm_lifecycle_event !== 'install') {
 			log('Installing monorepo dependencies with pnpm...', 'running');
 			const rootPath = path.join(process.cwd(), '..', '..');
@@ -185,7 +187,7 @@ For REMOTE Supabase:
 			log('Skipping dependency installation (already running as part of pnpm install)', 'info');
 		}
 
-		// Step 6: Install Python dependencies for memory service
+		// Step 5: Install Python dependencies for memory service
 		log('Setting up memory service (Python)...', 'running');
 		const memoryServicePath = path.join(process.cwd(), '..', '..', 'apps', 'memory-service');
 		try {
