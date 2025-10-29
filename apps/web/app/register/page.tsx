@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signUp } from '@/lib/auth';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 
 export default function RegisterPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
 
@@ -48,9 +47,9 @@ export default function RegisterPage() {
       } else {
         setSuccess(true);
         // Auto-redirect to specified page or home after successful registration
+        // Use window.location.href for full page reload to ensure cookies are picked up
         setTimeout(() => {
-          router.push(redirect);
-          router.refresh();
+          window.location.href = redirect;
         }, 2000);
       }
     } catch (err) {

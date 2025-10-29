@@ -8,8 +8,15 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  // For cookie storage: use NEXT_PUBLIC_SUPABASE_URL (must match client-side)
+  // For API calls: use SUPABASE_SERVER_URL if available (for Docker networking)
+  const cookieUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const apiUrl = process.env.SUPABASE_SERVER_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
+  console.log('[Middleware] Cookie URL:', cookieUrl, 'API URL:', apiUrl);
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    cookieUrl, // This determines cookie names (must match client)
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -23,11 +30,29 @@ export async function middleware(request: NextRequest) {
           });
         },
       },
+      global: {
+        // Override fetch to use SUPABASE_SERVER_URL for actual API calls
+        fetch: (url, options) => {
+          // Convert Request object to string URL if needed
+          const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+          const urlObj = new URL(urlString);
+
+          // Replace the URL origin with the server URL for API calls
+          if (apiUrl !== cookieUrl) {
+            const apiUrlObj = new URL(apiUrl);
+            urlObj.protocol = apiUrlObj.protocol;
+            urlObj.host = apiUrlObj.host;
+            urlObj.port = apiUrlObj.port;
+          }
+          return fetch(urlObj.toString(), options);
+        },
+      },
     }
   );
 
   // Refresh session if expired - required for Server Components
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  console.log('[Middleware] getUser - user:', user?.id, 'error:', error?.message);
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
                      request.nextUrl.pathname.startsWith('/register') ||

@@ -133,7 +133,7 @@ export class AuthManager {
   }
 
   getAuthUrl(): string {
-    const webUrl = process.env.WEB_URL || 'http://localhost:3000';
+    const webUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
     return `${webUrl}/daemon-auth?device_id=${this.deviceId}`;
   }
 

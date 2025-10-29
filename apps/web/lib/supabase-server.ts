@@ -7,12 +7,20 @@ import { cookies } from 'next/headers';
  * This client properly handles authentication cookies and SSR.
  *
  * IMPORTANT: This should only be used in Server Components, not Client Components.
+ *
+ * Uses NEXT_PUBLIC_SUPABASE_URL for cookie names (must match client-side)
+ * But uses SUPABASE_SERVER_URL for actual API calls (for Docker networking)
  */
 export async function createClient() {
   const cookieStore = await cookies();
 
+  // For cookie storage: use NEXT_PUBLIC_SUPABASE_URL (must match client-side)
+  // For API calls: use SUPABASE_SERVER_URL if available (for Docker networking)
+  const cookieUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const apiUrl = process.env.SUPABASE_SERVER_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    cookieUrl, // This determines cookie names (must match client)
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -30,6 +38,23 @@ export async function createClient() {
           }
         },
       },
+      global: {
+        // Override fetch to use SUPABASE_SERVER_URL for actual API calls
+        fetch: (url, options) => {
+          // Convert Request object to string URL if needed
+          const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+          const urlObj = new URL(urlString);
+
+          // Replace the URL origin with the server URL for API calls
+          if (apiUrl !== cookieUrl) {
+            const apiUrlObj = new URL(apiUrl);
+            urlObj.protocol = apiUrlObj.protocol;
+            urlObj.host = apiUrlObj.host;
+            urlObj.port = apiUrlObj.port;
+          }
+          return fetch(urlObj.toString(), options);
+        },
+      },
     }
   );
 }
@@ -42,8 +67,11 @@ export async function createClient() {
  * @param refreshToken - The user's refresh token from their session
  */
 export async function createClientWithAuth(accessToken: string, refreshToken: string) {
+  // Use server-specific URL if available (for Docker), otherwise use public URL
+  const supabaseUrl = process.env.SUPABASE_SERVER_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
   const client = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {

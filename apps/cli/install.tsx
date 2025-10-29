@@ -4,11 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { render, Box, Text, Newline } from 'ink';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
-import { exec, execSync } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { useInput } from 'ink';
 
 const execAsync = promisify(exec);
 
@@ -21,9 +20,7 @@ type Step = {
 const InstallApp = () => {
 	const [currentStep, setCurrentStep] = useState(0);
 	const [steps, setSteps] = useState<Step[]>([
-		{ name: 'Check Supabase CLI', status: 'pending' },
-		{ name: 'Start Supabase', status: 'pending' },
-		{ name: 'Extract Supabase credentials', status: 'pending' },
+		{ name: 'Configure Supabase credentials', status: 'pending' },
 		{ name: 'Configure OpenAI API Key', status: 'pending' },
 		{ name: 'Create .env files', status: 'pending' },
 		{ name: 'Install dependencies', status: 'pending' },
@@ -35,13 +32,8 @@ const InstallApp = () => {
 	const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
 	const [completed, setCompleted] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [useRemoteSupabase, setUseRemoteSupabase] = useState<boolean | null>(null);
-	const [needsSupabaseChoice, setNeedsSupabaseChoice] = useState(false);
-	const [needsRemoteCredentials, setNeedsRemoteCredentials] = useState(false);
-	const [remoteSupabaseUrl, setRemoteSupabaseUrl] = useState('');
-	const [remoteSupabaseAnonKey, setRemoteSupabaseAnonKey] = useState('');
+	const [needsSupabaseCredentials, setNeedsSupabaseCredentials] = useState(false);
 	const [currentCredentialInput, setCurrentCredentialInput] = useState<'url' | 'anon'>('url');
-	const [supabaseChoiceInput, setSupabaseChoiceInput] = useState('');
 
 	const updateStep = (index: number, status: Step['status'], message?: string) => {
 		setSteps(prev => {
@@ -53,19 +45,10 @@ const InstallApp = () => {
 
 	const runInstall = async () => {
 		try {
-			// Step 0: Check Supabase CLI and ask user preference
+			// Step 0: Ask for Supabase credentials
 			setCurrentStep(0);
-			updateStep(0, 'running');
-			try {
-				const { stdout } = await execAsync('supabase --version');
-				updateStep(0, 'success', `Supabase CLI found: ${stdout.trim()}`);
-			} catch {
-				updateStep(0, 'success', 'Supabase CLI not found');
-			}
-
-			// Always ask user for their preference
-			updateStep(0, 'running', 'Choose Supabase setup method...');
-			setNeedsSupabaseChoice(true);
+			updateStep(0, 'running', 'Please provide your Supabase credentials...');
+			setNeedsSupabaseCredentials(true);
 			return; // Wait for user input
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -117,30 +100,13 @@ const InstallApp = () => {
 		anonKey: string
 	) => {
 		try {
-			// Step 4: Create/update .env files
-			setCurrentStep(4);
-			updateStep(4, 'running');
-
-			// Root .env
-			const rootEnvPath = path.join(process.cwd(), '.env');
-			if (!fs.existsSync(rootEnvPath)) {
-				// Create with comments if new
-				const header = `# Supabase Local Development Credentials
-# These are default local development keys from \`supabase start\`
-# DO NOT use these in production!
-
-`;
-				fs.writeFileSync(rootEnvPath, header);
-			}
-			mergeEnvFile(rootEnvPath, {
-				SUPABASE_URL: url,
-				SUPABASE_ANON_KEY: anonKey,
-			});
+			// Step 2: Create/update .env files
+			setCurrentStep(2);
+			updateStep(2, 'running');
 
 			// Daemon .env
 			const daemonEnvPath = path.join(process.cwd(), '..', '..', 'apps', 'daemon', '.env');
 			if (!fs.existsSync(daemonEnvPath)) {
-				// Create with comments if new
 				const header = `# Supabase Configuration
 # OpenAI Configuration (for AI summaries)
 # Claude Code Home Directory (optional)
@@ -155,22 +121,6 @@ const InstallApp = () => {
 				CLAUDE_CODE_HOME: '',
 			});
 
-			// Web .env (server-side)
-			const webEnvPath = path.join(process.cwd(), '..', '..', 'apps', 'web', '.env');
-			if (!fs.existsSync(webEnvPath)) {
-				// Create with comments if new
-				const header = `# Supabase Local Development Credentials
-# These are default local development keys from \`supabase start\`
-# DO NOT use these in production!
-
-`;
-				fs.writeFileSync(webEnvPath, header);
-			}
-			mergeEnvFile(webEnvPath, {
-				SUPABASE_URL: url,
-				SUPABASE_ANON_KEY: anonKey,
-			});
-
 			// Web .env.local (client-side)
 			const webEnvLocalPath = path.join(process.cwd(), '..', '..', 'apps', 'web', '.env.local');
 			mergeEnvFile(webEnvLocalPath, {
@@ -178,22 +128,22 @@ const InstallApp = () => {
 				NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
 			});
 
-			updateStep(4, 'success');
+			updateStep(2, 'success');
 
-			// Step 5: Install dependencies (monorepo with pnpm)
-			setCurrentStep(5);
-			updateStep(5, 'running', 'Installing monorepo dependencies with pnpm...');
+			// Step 3: Install dependencies (monorepo with pnpm)
+			setCurrentStep(3);
+			updateStep(3, 'running', 'Installing monorepo dependencies with pnpm...');
 			const rootPath = path.join(process.cwd(), '..', '..');
 			await execAsync('pnpm install', {
 				cwd: rootPath,
 				maxBuffer: 1024 * 1024 * 10,
 			});
 
-			updateStep(5, 'success');
+			updateStep(3, 'success');
 
-			// Step 6: Setup Python memory service
-			setCurrentStep(6);
-			updateStep(6, 'running', 'Setting up Python memory service...');
+			// Step 4: Setup Python memory service
+			setCurrentStep(4);
+			updateStep(4, 'running', 'Setting up Python memory service...');
 			const memoryServicePath = path.join(process.cwd(), '..', '..', 'apps', 'memory-service');
 
 			try {
@@ -203,14 +153,14 @@ const InstallApp = () => {
 				// Create virtual environment if it doesn't exist
 				const venvPath = path.join(memoryServicePath, 'venv');
 				if (!fs.existsSync(venvPath)) {
-					updateStep(6, 'running', 'Creating Python virtual environment...');
+					updateStep(4, 'running', 'Creating Python virtual environment...');
 					await execAsync('python3 -m venv venv', {
 						cwd: memoryServicePath,
 					});
 				}
 
 				// Install dependencies in venv
-				updateStep(6, 'running', 'Installing Python dependencies in venv...');
+				updateStep(4, 'running', 'Installing Python dependencies in venv...');
 				const pipInstallCmd = process.platform === 'win32'
 					? 'venv\\Scripts\\pip install -r requirements.txt'
 					: 'venv/bin/pip install -r requirements.txt';
@@ -225,9 +175,9 @@ const InstallApp = () => {
 				if (!fs.existsSync(memoryEnvPath)) {
 					const memoryEnvContent = `# Memory Service Configuration
 # Supabase
-SUPABASE_URL=${supabaseUrl}
-SUPABASE_SERVICE_ROLE_KEY=  # TODO: Add your service role key from supabase status
-SUPABASE_ANON_KEY=${supabaseAnonKey}
+SUPABASE_URL=${url}
+SUPABASE_SERVICE_ROLE_KEY=  # TODO: Add your service role key
+SUPABASE_ANON_KEY=${anonKey}
 
 # Anthropic API (for Claude)
 ANTHROPIC_API_KEY=  # TODO: Add your Anthropic API key
@@ -244,9 +194,9 @@ LOG_LEVEL=INFO
 					fs.writeFileSync(memoryEnvPath, memoryEnvContent);
 				}
 
-				updateStep(6, 'success', 'Python memory service ready');
+				updateStep(4, 'success', 'Python memory service ready');
 			} catch (error) {
-				updateStep(6, 'success', 'Python 3 not found - memory service skipped (optional)');
+				updateStep(4, 'success', 'Python 3 not found - memory service skipped (optional)');
 			}
 
 			setCompleted(true);
@@ -271,189 +221,45 @@ LOG_LEVEL=INFO
 		runInstall();
 	}, []);
 
-	// Handle keyboard input for choices
-	useInput((input, key) => {
-		if (needsSupabaseChoice) {
-			if (input === '1') {
-				handleSupabaseChoice(false);
-			} else if (input === '2') {
-				handleSupabaseChoice(true);
-			}
-		}
-	});
-
-	const handleSupabaseChoice = async (useRemote: boolean) => {
-		setUseRemoteSupabase(useRemote);
-		setNeedsSupabaseChoice(false);
-		
-		if (useRemote) {
-			// Skip local Supabase installation
-			updateStep(0, 'success', 'Using remote Supabase (skipped local installation)');
-			// Skip steps 1 and 2 (Start Supabase and Extract credentials)
-			updateStep(1, 'success', 'Skipped (using remote)');
-			updateStep(2, 'success', 'Skipped (using remote)');
-
-			// Ask for remote Supabase credentials
-			setCurrentStep(3);
-			updateStep(3, 'running', 'Please provide your remote Supabase credentials...');
-			setNeedsRemoteCredentials(true);
-		} else {
-			// Use local Supabase CLI
-			try {
-				// Check if Supabase CLI is already installed
-				await execAsync('supabase --version');
-				updateStep(0, 'success', 'Using existing Supabase CLI');
-			} catch {
-				// Install Supabase CLI locally
-				updateStep(0, 'running', 'Installing Supabase CLI...');
-				try {
-					const isMac = process.platform === 'darwin';
-					if (isMac) {
-						// Try common Homebrew paths with explicit environment
-						const brewPaths = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'];
-						let brewPath = '';
-						
-						for (const path of brewPaths) {
-							try {
-								await execAsync(`${path} --version`, {
-									env: { 
-										...process.env, 
-										PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
-									}
-								});
-								brewPath = path;
-								break;
-							} catch {
-								continue;
-							}
-						}
-						
-						if (!brewPath) {
-							// Fallback: try to install Supabase CLI directly without Homebrew
-							updateStep(0, 'running', 'Installing Supabase CLI via curl...');
-							await execAsync('curl -fsSL https://supabase.com/install.sh | sh', {
-								env: {
-									...process.env,
-									PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
-								}
-							});
-							updateStep(0, 'success', 'Installed via curl');
-						} else {
-							await execAsync(`${brewPath} install supabase/tap/supabase`, {
-								env: {
-									...process.env,
-									PATH: '/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
-								}
-							});
-							updateStep(0, 'success', 'Installed via Homebrew');
-						}
-					} else if (process.platform === 'linux') {
-						await execAsync('curl -fsSL https://supabase.com/install.sh | sh');
-						updateStep(0, 'success', 'Installed via curl');
-					} else {
-						throw new Error('Unsupported OS. Please install Supabase CLI manually.');
-					}
-				} catch (error) {
-					throw new Error(`Failed to install Supabase CLI: ${error instanceof Error ? error.message : 'Unknown error'}`);
-				}
-			}
-			
-			// Continue with local Supabase setup
-			await continueLocalSupabaseSetup();
-		}
-	};
-
-	const continueLocalSupabaseSetup = async () => {
-		// Step 1: Start Supabase
-		setCurrentStep(1);
-		updateStep(1, 'running');
-		try {
-			await execAsync('supabase status');
-			updateStep(1, 'success', 'Already running');
-		} catch {
-			updateStep(1, 'running', 'Starting Supabase (this may take a minute)...');
-			await execAsync('supabase start', { maxBuffer: 1024 * 1024 * 10 });
-			updateStep(1, 'success', 'Started successfully');
-		}
-
-		// Step 2: Extract Supabase credentials
-		setCurrentStep(2);
-		updateStep(2, 'running');
-		const { stdout: envOutput } = await execAsync('supabase status -o env');
-
-		// Match both old format (SUPABASE_URL=...) and new format (API_URL="...")
-		const urlMatch = envOutput.match(/API_URL="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_URL="?([^"\n]+)"?/);
-		const anonMatch = envOutput.match(/ANON_KEY="?([^"\n]+)"?/) || envOutput.match(/SUPABASE_ANON_KEY="?([^"\n]+)"?/);
-
-		if (!urlMatch || !anonMatch) {
-			throw new Error('Failed to extract Supabase credentials');
-		}
-
-		setSupabaseUrl(urlMatch[1].trim());
-		setSupabaseAnonKey(anonMatch[1].trim());
-		updateStep(2, 'success');
-
-		// Continue with OpenAI setup
-		await continueWithOpenAI(urlMatch[1].trim(), anonMatch[1].trim());
-	};
-
-	const continueWithOpenAI = async (url: string, anonKey: string) => {
-		// Step 3: Get OpenAI key
-		setCurrentStep(3);
-		updateStep(3, 'running');
-
-		// Check if already exists
-		const daemonEnvPath = path.join(process.cwd(), '..', '..', 'apps', 'daemon', '.env');
-		let existingKey = '';
-		if (fs.existsSync(daemonEnvPath)) {
-			const existingEnv = fs.readFileSync(daemonEnvPath, 'utf-8');
-			const keyMatch = existingEnv.match(/OPENAI_API_KEY=(.+)/);
-			if (keyMatch && keyMatch[1] !== 'sk-your_openai_api_key_here') {
-				existingKey = keyMatch[1].trim();
-			}
-		}
-
-		if (existingKey) {
-			setOpenaiKey(existingKey);
-			updateStep(3, 'success', 'Using existing key');
-			setCurrentStep(4);
-			await continueInstall(existingKey, url, anonKey);
-		} else {
-			setNeedsOpenaiInput(true);
-		}
-	};
-
-	const handleRemoteCredentialSubmit = (value: string) => {
+	const handleSupabaseCredentialSubmit = (value: string) => {
 		if (currentCredentialInput === 'url') {
-			setRemoteSupabaseUrl(value);
+			setSupabaseUrl(value);
 			setCurrentCredentialInput('anon');
 		} else if (currentCredentialInput === 'anon') {
-			setRemoteSupabaseAnonKey(value);
-			setNeedsRemoteCredentials(false);
-			updateStep(2, 'success', 'Remote credentials provided');
-
-			// Set the credentials for use
-			setSupabaseUrl(remoteSupabaseUrl);
 			setSupabaseAnonKey(value);
+			setNeedsSupabaseCredentials(false);
+			updateStep(0, 'success', 'Supabase credentials provided');
 
 			// Continue with OpenAI setup
-			setCurrentStep(3);
-			updateStep(3, 'running');
-			setNeedsOpenaiInput(true);
+			setCurrentStep(1);
+			updateStep(1, 'running');
+
+			// Check if OpenAI key already exists
+			const daemonEnvPath = path.join(process.cwd(), '..', '..', 'apps', 'daemon', '.env');
+			let existingKey = '';
+			if (fs.existsSync(daemonEnvPath)) {
+				const existingEnv = fs.readFileSync(daemonEnvPath, 'utf-8');
+				const keyMatch = existingEnv.match(/OPENAI_API_KEY=(.+)/);
+				if (keyMatch && keyMatch[1] !== 'sk-your_openai_api_key_here' && keyMatch[1] !== '') {
+					existingKey = keyMatch[1].trim();
+				}
+			}
+
+			if (existingKey) {
+				setOpenaiKey(existingKey);
+				updateStep(1, 'success', 'Using existing key');
+				continueInstall(existingKey, supabaseUrl, value);
+			} else {
+				setNeedsOpenaiInput(true);
+			}
 		}
 	};
 
 	const handleOpenAISubmit = (value: string) => {
 		setOpenaiKey(value);
 		setNeedsOpenaiInput(false);
-		updateStep(3, 'success');
-		setCurrentStep(4);
-
-		if (useRemoteSupabase) {
-			continueInstall(value, remoteSupabaseUrl, remoteSupabaseAnonKey);
-		} else {
-			continueInstall(value, supabaseUrl, supabaseAnonKey);
-		}
+		updateStep(1, 'success');
+		continueInstall(value, supabaseUrl, supabaseAnonKey);
 	};
 
 	const getStatusIcon = (status: Step['status']) => {
@@ -497,36 +303,26 @@ LOG_LEVEL=INFO
 				</Box>
 			))}
 
-			{needsSupabaseChoice && (
+			{needsSupabaseCredentials && (
 				<Box marginTop={1} flexDirection="column">
 					<Text color="yellow">
 						<Newline />
-						How would you like to set up Supabase?
+						Enter your Supabase credentials:
 					</Text>
-					<Text color="cyan">1. Use local Supabase (install CLI and start local instance)</Text>
-					<Text color="cyan">2. Use remote Supabase (connect to existing project)</Text>
+					<Text dimColor>
+						Get these from your Supabase project settings or from `supabase status` if using local.
+					</Text>
 					<Newline />
-					<Text color="white">Press 1 for local, 2 for remote:</Text>
-					<Text color="gray">(Just press the number key, no need to press Enter)</Text>
-				</Box>
-			)}
-
-			{needsRemoteCredentials && (
-				<Box marginTop={1} flexDirection="column">
-					<Text color="yellow">
-						<Newline />
-						Enter your remote Supabase credentials:
-					</Text>
 					{currentCredentialInput === 'url' && (
 						<>
-							<Text color="cyan">1. Supabase URL (e.g., https://your-project.supabase.co):</Text>
-							<TextInput value={remoteSupabaseUrl} onChange={setRemoteSupabaseUrl} onSubmit={handleRemoteCredentialSubmit} />
+							<Text color="cyan">Supabase URL (e.g., https://your-project.supabase.co):</Text>
+							<TextInput value={supabaseUrl} onChange={setSupabaseUrl} onSubmit={handleSupabaseCredentialSubmit} />
 						</>
 					)}
 					{currentCredentialInput === 'anon' && (
 						<>
-							<Text color="cyan">2. Supabase Anon Key:</Text>
-							<TextInput value={remoteSupabaseAnonKey} onChange={setRemoteSupabaseAnonKey} onSubmit={handleRemoteCredentialSubmit} />
+							<Text color="cyan">Supabase Anon Key:</Text>
+							<TextInput value={supabaseAnonKey} onChange={setSupabaseAnonKey} onSubmit={handleSupabaseCredentialSubmit} />
 						</>
 					)}
 				</Box>
@@ -536,7 +332,7 @@ LOG_LEVEL=INFO
 				<Box marginTop={1} flexDirection="column">
 					<Text color="yellow">
 						<Newline />
-						Enter your OpenAI API Key:
+						Enter your OpenAI API Key (optional - press Enter to skip):
 					</Text>
 					<TextInput value={openaiKey} onChange={setOpenaiKey} onSubmit={handleOpenAISubmit} />
 				</Box>
@@ -569,7 +365,6 @@ LOG_LEVEL=INFO
 					<Text color="cyan">http://localhost:3000</Text>
 					<Newline />
 					<Text dimColor>To stop services: Press Ctrl+C</Text>
-					<Text dimColor>To stop Supabase later: supabase stop</Text>
 				</Box>
 			)}
 		</Box>

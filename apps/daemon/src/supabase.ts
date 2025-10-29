@@ -1,9 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
 import type { Database } from './database.types.js';
 
-dotenv.config();
-
+// Environment variables loaded via --env-file=.env flag in package.json scripts
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
