@@ -96,7 +96,7 @@ function handleAuthenticate() {
     });
   } else {
     // Fallback: open default daemon-auth page
-    const webUrl = process.env.WEB_URL || 'http://localhost:3000';
+    const webUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
     exec(`open "${webUrl}/daemon-auth"`, (error) => {
       if (error) {
         console.error('Failed to open browser:', error);

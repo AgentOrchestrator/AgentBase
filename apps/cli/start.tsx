@@ -174,7 +174,7 @@ const StartApp = () => {
 				// Check for authentication URL pattern
 				const urlMatch = stdoutBuffer.match(/daemon-auth\?device_id=([a-f0-9-]+)/);
 				if (urlMatch) {
-					const webUrl = process.env.WEB_URL || 'http://localhost:3000';
+					const webUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
 					const authUrl = `${webUrl}/daemon-auth?device_id=${urlMatch[1]}`;
 					setAuthPrompt({ url: authUrl, timestamp: Date.now() });
 				}

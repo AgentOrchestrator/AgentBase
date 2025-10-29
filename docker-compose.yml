@@ -18,7 +18,8 @@ services:
       - CLAUDE_CODE_HOME=/root/.claude
       - PERIODIC_SYNC_INTERVAL_MS=${PERIODIC_SYNC_INTERVAL_MS:-600000}
       - SESSION_LOOKBACK_DAYS=${SESSION_LOOKBACK_DAYS:-30}
-      - WEB_URL=http://web:3000
+      # Public URL for authentication links (accessible from host machine)
+      - PUBLIC_WEB_URL=${PUBLIC_WEB_URL:-http://localhost:3000}
     volumes:
       # Mount AI assistant directories from host (read-only)
       # Paths are configured in .env file based on your OS
