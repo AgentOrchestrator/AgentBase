@@ -43,6 +43,23 @@ You can run Agent Base locally on your machine for personal development and test
 - 🚧 **Windows** - Coming soon
 - 🚧 **Linux** - Coming soon
 
+**Requirements**
+- Supabase credentials (local or remote setup possible)
+
+**Get your supabase credentials ready:**
+
+For local Supabase:
+```bash
+# Install and start Supabase CLI first
+brew install supabase/tap/supabase  # macOS
+supabase start
+supabase status -o env
+```
+
+For remote Supabase:
+- Create project at [supabase.com](https://supabase.com)
+- Get credentials from Project Settings → API
+
 Choose your preferred installation method:
 
 ### 🐳 Docker based setup
@@ -61,9 +78,6 @@ cp .env.example .env
 
 # 2. Start all services
 docker compose up -d
-
-# 3. View logs (optional)
-docker compose logs -f
 ```
 
 Then open **http://localhost:3000** in your browser!
@@ -92,72 +106,8 @@ npm run setup
 npm run dev
 ```
 
-Then open **http://localhost:3000** in your browser!
-
-### What the setup wizard does:
-
-The setup wizard (`npm run setup` or `pnpm run setup`) will ask you to choose between:
-- **🏠 Local Supabase** - Solo development, testing, or personal use. Runs entirely on your machine.
-- **👥 Remote Supabase** - Team collaboration where you can see each other's AI conversations in real-time.
-
-The setup script automatically:
-- Installs Supabase CLI (if using local)
-- Starts local Supabase or prompts for remote credentials
-- Configures environment variables
-- Sets up OpenAI API key for AI summaries
-
-### Access points:
-- **Web UI**: http://localhost:3000
-- **Supabase Studio** (local only): http://localhost:54323
-
-> **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
-
----
-
-### Local vs Remote Supabase
-
-| Feature | 🏠 Local Supabase | 👥 Remote Supabase |
-|---------|------------------|-------------------|
-| **Use Case** | Solo development, testing | Team collaboration |
-| **Setup** | Automatic (via setup script) | Requires [supabase.com](https://supabase.com) project |
-| **Data Sharing** | Only on your machine | Shared across team in real-time |
-| **Internet Required** | No | Yes |
-| **Cost** | Free | Free tier available, paid plans for production |
-| **Supabase Studio** | http://localhost:54323 | Via Supabase dashboard |
-
-**For Remote Supabase (Team Setup):**
-
-One team member should:
-1. Create a project at [supabase.com](https://supabase.com)
-2. Go to Project Settings → Database and run migrations from `supabase/migrations/`
-3. Share the project URL and anon key with the team
-
-Each team member then:
-1. Clone the repository
-2. Run `pnpm install && pnpm run setup` (or `npm install && npm run setup`)
-3. Choose "Remote Supabase" and enter the shared credentials
-
----
 
 ### Non-Interactive Setup (for coding assistants or CI/CD)
-
-For automated setups where you can't use the interactive wizard, you must provide Supabase credentials:
-
-**First, get your credentials:**
-
-For local Supabase:
-```bash
-# Install and start Supabase CLI first
-brew install supabase/tap/supabase  # macOS
-supabase start
-supabase status  # Get URL and anon key
-```
-
-For remote Supabase:
-- Create project at [supabase.com](https://supabase.com)
-- Get credentials from Project Settings → API
-
-**Then run setup:**
 
 ```bash
 # Using environment variables (recommended)
@@ -175,6 +125,12 @@ pnpm run setup --non-interactive \
   --supabase-anon-key eyJh... \
   --openai-key sk-xxx
 ```
+
+### Access points:
+- **Web UI**: http://localhost:3000
+- **Supabase Studio** (local only): http://localhost:54323
+
+> **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
 
 ---
 
@@ -217,18 +173,6 @@ All commands work with both **pnpm** (recommended) and **npm**. For npm, use `np
 | `--openai-key <key>` | OpenAI API key (optional) |
 | `--skip-openai` | Skip OpenAI API key setup (development mode) |
 | `--help` | Show detailed help for the setup command |
-
-**Example:**
-```bash
-# Using env file
-pnpm run setup --non-interactive -e .env.production
-
-# Using CLI args
-pnpm run setup --non-interactive \
-  --supabase-url http://127.0.0.1:54321 \
-  --supabase-anon-key eyJh... \
-  --skip-openai
-```
 
 ---
 
