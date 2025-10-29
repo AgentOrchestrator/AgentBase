@@ -38,14 +38,44 @@ You can run Agent Base locally on your machine for personal development and test
 
 ## 🚀 Installation
 
-**Prerequisites:** Node.js 18+
-
 **Platform Compatibility:**
 - ✅ **macOS** - Fully tested and supported
 - 🚧 **Windows** - Coming soon
 - 🚧 **Linux** - Coming soon
 
-### Get Started
+Choose your preferred installation method:
+
+### 🐳 Docker based setup
+
+**Prerequisites:** Docker and Docker Compose
+
+```bash
+git clone https://github.com/AgentOrchestrator/agentbase.git
+cd agentbase
+
+# 1. Copy environment file
+cp .env.example .env
+# Edit .env:
+#   - Linux users: uncomment Linux paths, comment out macOS paths
+#   - Optional: add Supabase credentials (defaults work for local)
+
+# 2. Start all services
+docker compose up -d
+
+# 3. View logs (optional)
+docker compose logs -f
+```
+
+Then open **http://localhost:3000** in your browser!
+
+**Docker includes:**
+- ✅ Web UI (port 3000)
+- ✅ Daemon service
+- ✅ Memory service (port 8000)
+- ✅ Local Supabase database (port 54322)
+- ✅ Supabase Studio (port 54323)
+
+### 📦 npm/pnpm Installation (If you don't like to use docker)
 
 ```bash
 git clone https://github.com/AgentOrchestrator/agentbase.git
@@ -149,6 +179,20 @@ pnpm run setup --non-interactive \
 ---
 
 ## 📋 Available Commands
+
+### Docker Commands
+
+| Command | Description |
+|---------|-------------|
+| `docker compose up -d` | Start all services in background (detached mode) |
+| `docker compose up` | Start all services with logs visible |
+| `docker compose down` | Stop and remove all containers |
+| `docker compose logs -f` | View logs from all services |
+| `docker compose restart` | Restart all services |
+| `docker compose down -v` | Stop services and remove volumes (fresh start) |
+| `docker compose build` | Rebuild all Docker images |
+
+### npm/pnpm Commands (Non-Docker)
 
 All commands work with both **pnpm** (recommended) and **npm**. For npm, use `npm run <command>` instead of `pnpm <command>`.
 

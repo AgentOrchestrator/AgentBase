@@ -132,20 +132,6 @@ For REMOTE Supabase:
 		// Step 3: Create/update .env files
 		log('Creating .env files...', 'running');
 
-		// Root .env
-		const rootEnvPath = path.join(process.cwd(), '..', '..', '.env');
-		if (!fs.existsSync(rootEnvPath)) {
-			const header = `# Supabase Configuration
-# DO NOT use these in production!
-
-`;
-			fs.writeFileSync(rootEnvPath, header);
-		}
-		mergeEnvFile(rootEnvPath, {
-			SUPABASE_URL: supabaseUrl,
-			SUPABASE_ANON_KEY: supabaseAnonKey,
-		});
-
 		// Daemon .env
 		if (!fs.existsSync(daemonEnvPath)) {
 			const header = `# Supabase Configuration

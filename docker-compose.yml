@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Agent Orchestrator Daemon
+  daemon:
+    build:
+      context: .
+      dockerfile: apps/daemon/Dockerfile
+    container_name: agent-orchestrator-daemon
+    restart: unless-stopped
+    environment:
+      # Use server URL for daemon since it runs in container
+      # Falls back to SUPABASE_URL if SUPABASE_SERVER_URL not set
+      - SUPABASE_URL=${SUPABASE_SERVER_URL:-${SUPABASE_URL}}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEVELOPMENT=${DEVELOPMENT:-true}
+      - CLAUDE_CODE_HOME=/root/.claude
+      - PERIODIC_SYNC_INTERVAL_MS=${PERIODIC_SYNC_INTERVAL_MS:-600000}
+      - SESSION_LOOKBACK_DAYS=${SESSION_LOOKBACK_DAYS:-30}
+      - WEB_URL=http://web:3000
+    volumes:
+      # Mount AI assistant directories from host (read-only)
+      # Paths are configured in .env file based on your OS
+      - ${CLAUDE_CODE_PATH}:/root/.claude:ro
+      - ${CURSOR_PATH}:/root/Library/Application Support/Cursor:ro
+      - ${CODEX_PATH}:/root/.codex:ro
+      - ${FACTORY_PATH}:/root/.factory:ro
+      - ${VSCODE_PATH}:/root/Library/Application Support/Code:ro
+
+      # Mount for development (comment out for production)
+      # - ./apps/daemon/src:/app/apps/daemon/src:ro
+    networks:
+      - agent-orchestrator
+
+  # Web Interface (Next.js)
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Client-side URL (embedded in browser JavaScript bundle)
+        # Use SUPABASE_CLIENT_URL (localhost) so browser can reach Supabase
+        # Falls back to SUPABASE_URL if SUPABASE_CLIENT_URL not set
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_CLIENT_URL:-${SUPABASE_URL}}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    container_name: agent-orchestrator-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Client-side URL (for browser) - same as build arg
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_CLIENT_URL:-${SUPABASE_URL}}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      # Server-side URL (for Next.js SSR/API routes inside container)
+      # Use host.docker.internal, falls back to SUPABASE_URL if not set
+      - SUPABASE_SERVER_URL=${SUPABASE_SERVER_URL:-${SUPABASE_URL}}
+      - NODE_ENV=development
+    volumes:
+      # Mount for development (comment out for production)
+      - ./apps/web/app:/app/apps/web/app:ro
+      - ./apps/web/lib:/app/apps/web/lib:ro
+      - ./apps/web/components:/app/apps/web/components:ro
+      - ./apps/web/middleware.ts:/app/apps/web/middleware.ts:ro
+    depends_on:
+      - daemon
+    networks:
+      - agent-orchestrator
+
+networks:
+  agent-orchestrator:
+    driver: bridge

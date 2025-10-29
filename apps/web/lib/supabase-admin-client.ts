@@ -13,7 +13,8 @@ import { createClient } from '@supabase/supabase-js';
  * The admin user is created via: npx agent-orchestrator setup-admin
  */
 export async function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // Use server-specific URL if available (for Docker), otherwise use public URL
+  const supabaseUrl = process.env.SUPABASE_SERVER_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const adminEmail = process.env.ADMIN_USER_EMAIL;
   const adminPassword = process.env.ADMIN_USER_PASSWORD;
 

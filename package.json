@@ -17,7 +17,14 @@
     "setup": "node scripts/setup.js",
     "dev:daemon": "pnpm --filter agent-orchestrator-daemon run dev",
     "dev:web": "pnpm --filter web run dev",
-    "dev:memory": "cd apps/memory-service && venv/bin/python -m src.main"
+    "dev:memory": "cd apps/memory-service && venv/bin/python -m src.main",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:dev": "docker compose up",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:restart": "docker compose restart",
+    "docker:clean": "docker compose down -v"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

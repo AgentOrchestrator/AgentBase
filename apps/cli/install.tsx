@@ -104,20 +104,6 @@ const InstallApp = () => {
 			setCurrentStep(2);
 			updateStep(2, 'running');
 
-			// Root .env
-			const rootEnvPath = path.join(process.cwd(), '..', '..', '.env');
-			if (!fs.existsSync(rootEnvPath)) {
-				const header = `# Supabase Configuration
-# DO NOT use service role keys in client-side code!
-
-`;
-				fs.writeFileSync(rootEnvPath, header);
-			}
-			mergeEnvFile(rootEnvPath, {
-				SUPABASE_URL: url,
-				SUPABASE_ANON_KEY: anonKey,
-			});
-
 			// Daemon .env
 			const daemonEnvPath = path.join(process.cwd(), '..', '..', 'apps', 'daemon', '.env');
 			if (!fs.existsSync(daemonEnvPath)) {
