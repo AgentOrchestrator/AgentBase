@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
 import './Canvas.css';
+import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 
 // Custom node component
 const CustomNode = ({ data }: { data: { label: string } }) => {
@@ -78,6 +79,25 @@ function CanvasFlow() {
       setIsLinearConnected(true);
     }
   }, []);
+
+  // Listen for node update events from TerminalNode
+  useEffect(() => {
+    const handleUpdateNode = (event: CustomEvent) => {
+      const { nodeId, data } = event.detail;
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...data } }
+            : node
+        )
+      );
+    };
+
+    window.addEventListener('update-node', handleUpdateNode as EventListener);
+    return () => {
+      window.removeEventListener('update-node', handleUpdateNode as EventListener);
+    };
+  }, [setNodes]);
 
   const handleLinearConnect = useCallback(() => {
     if (linearApiKey.trim()) {
@@ -206,10 +226,11 @@ function CanvasFlow() {
     e.preventDefault();
 
     try {
-      const issueData = e.dataTransfer.getData('application/json');
-      if (!issueData) return;
+      const jsonData = e.dataTransfer.getData('application/json');
+      if (!jsonData) return;
 
-      const issue = JSON.parse(issueData);
+      const data = JSON.parse(jsonData);
+      const attachmentType = e.dataTransfer.getData('attachment-type');
 
       // Get the drop position relative to the ReactFlow canvas
       const position = screenToFlowPosition({
@@ -218,18 +239,23 @@ function CanvasFlow() {
       });
 
       const terminalId = `terminal-${terminalCounterRef.current++}`;
+
+      // Create attachment based on type
+      let attachment;
+      if (attachmentType === 'workspace-metadata') {
+        attachment = createWorkspaceMetadataAttachment(data);
+      } else {
+        // Default to Linear issue if no type specified (for backward compatibility)
+        attachment = createLinearIssueAttachment(data);
+      }
+
       const newNode: Node = {
         id: `node-${Date.now()}`,
         type: 'terminal',
         position,
         data: {
           terminalId,
-          issue: {
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            url: `https://linear.app/issue/${issue.identifier}`,
-          },
+          attachments: [attachment],
         },
       };
 

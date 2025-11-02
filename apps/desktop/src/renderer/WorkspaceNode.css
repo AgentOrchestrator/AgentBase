@@ -1,0 +1,114 @@
+.workspace-node {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 2px solid #8b9dc3;
+  border-radius: 12px;
+  padding: 0;
+  min-width: 280px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.workspace-node:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.workspace-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.workspace-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.workspace-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.workspace-node-content {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workspace-path {
+  font-size: 13px;
+  color: #ffffff;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  word-break: break-all;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.workspace-path:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.workspace-path-input {
+  width: 100%;
+  font-size: 13px;
+  color: #ffffff;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.workspace-path-input:focus {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.workspace-path-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Handle styles for workspace node */
+.workspace-node .react-flow__handle {
+  background: #8b9dc3;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+}
+
+.workspace-node .react-flow__handle:hover {
+  background: #a0b4d8;
+}
+
+/* Drag hint indicator */
+.workspace-node-header .drag-hint {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  line-height: 1;
+  cursor: grab;
+  transition: color 0.2s ease;
+}
+
+.workspace-node[draggable="true"]:hover .drag-hint {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.workspace-node[draggable="true"]:active {
+  cursor: grabbing;
+}

@@ -6,9 +6,18 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
 import IssueDetailsModal from './IssueDetailsModal';
+import AttachmentHeader from './AttachmentHeader';
+import {
+  TerminalAttachment,
+  isLinearIssueAttachment,
+  createLinearIssueAttachment,
+  createWorkspaceMetadataAttachment,
+} from './types/attachments';
 
 interface TerminalNodeData {
   terminalId: string;
+  attachments?: TerminalAttachment[];
+  // Legacy support - will be migrated to attachments array
   issue?: {
     id?: string;
     identifier: string;
@@ -17,7 +26,7 @@ interface TerminalNodeData {
   };
 }
 
-function TerminalNode({ data }: NodeProps) {
+function TerminalNode({ data, id }: NodeProps) {
   const nodeData = data as unknown as TerminalNodeData;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -29,6 +38,7 @@ function TerminalNode({ data }: NodeProps) {
 
   const count = useRef(0);
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
 
   useEffect(() => {
@@ -816,35 +826,93 @@ function TerminalNode({ data }: NodeProps) {
     };
   }, [terminalId]);
 
+  // Migrate legacy issue to attachments array
+  const attachments = nodeData.attachments || [];
+  if (nodeData.issue && attachments.length === 0) {
+    // Legacy format - convert to new format
+    attachments.push({
+      type: 'linear-issue',
+      id: nodeData.issue.id || nodeData.issue.identifier,
+      identifier: nodeData.issue.identifier,
+      title: nodeData.issue.title,
+      url: nodeData.issue.url,
+    });
+  }
+
+  // Find the first Linear issue for the modal
+  const linearIssue = attachments.find(isLinearIssueAttachment);
+
+  // Handle drag-and-drop to attach items to this terminal
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      const jsonData = e.dataTransfer.getData('application/json');
+      if (!jsonData) return;
+
+      const data = JSON.parse(jsonData);
+      const attachmentType = e.dataTransfer.getData('attachment-type');
+
+      // Create attachment based on type
+      let newAttachment;
+      if (attachmentType === 'workspace-metadata') {
+        newAttachment = createWorkspaceMetadataAttachment(data);
+      } else {
+        // Default to Linear issue
+        newAttachment = createLinearIssueAttachment(data);
+      }
+
+      // Add to existing attachments
+      if (!nodeData.attachments) {
+        nodeData.attachments = [];
+      }
+      nodeData.attachments.push(newAttachment);
+
+      // Trigger a re-render by updating the node
+      window.dispatchEvent(new CustomEvent('update-node', {
+        detail: { nodeId: id, data: nodeData }
+      }));
+    } catch (error) {
+      console.error('Error handling drop on terminal:', error);
+    }
+  };
+
   return (
-    <div className="terminal-node">
+    <div
+      className={`terminal-node ${isDragOver ? 'drag-over' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <Handle type="target" position={Position.Top} />
-      {nodeData.issue && (
-        <div className="terminal-node-header">
-          <div
-            className="issue-link"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (nodeData.issue?.id) {
-                setShowIssueModal(true);
-              }
-            }}
-          >
-            <span className="issue-id">{nodeData.issue.identifier}</span>
-            <span className="issue-title">{nodeData.issue.title}</span>
-          </div>
-          <a
-            href={nodeData.issue.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="issue-external-link-icon"
-            onClick={(e) => e.stopPropagation()}
-            title="Open in Linear"
-          >
-            ↗
-          </a>
-        </div>
-      )}
+
+      {/* Render all attachments */}
+      {attachments.map((attachment, index) => (
+        <AttachmentHeader
+          key={`${attachment.type}-${attachment.id}-${index}`}
+          attachment={attachment}
+          onDetailsClick={
+            isLinearIssueAttachment(attachment) && attachment.id
+              ? () => setShowIssueModal(true)
+              : undefined
+          }
+        />
+      ))}
+
       <div
         ref={terminalRef}
         className="terminal-node-content"
@@ -853,9 +921,9 @@ function TerminalNode({ data }: NodeProps) {
       <Handle type="source" position={Position.Bottom} />
 
       {/* Issue Details Modal */}
-      {showIssueModal && nodeData.issue?.id && (
+      {showIssueModal && linearIssue?.id && (
         <IssueDetailsModal
-          issueId={nodeData.issue.id}
+          issueId={linearIssue.id}
           onClose={() => setShowIssueModal(false)}
         />
       )}

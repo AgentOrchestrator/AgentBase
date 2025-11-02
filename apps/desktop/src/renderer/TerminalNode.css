@@ -8,6 +8,12 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.terminal-node.drag-over {
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  transform: scale(1.02);
 }
 
 .terminal-node-header {
@@ -126,5 +132,64 @@
 
 .terminal-node .react-flow__handle-bottom {
   bottom: -5px;
+}
+
+/* Workspace metadata header styles */
+.terminal-node-header.workspace-header {
+  background: #1e1e1e;
+}
+
+.terminal-node-header .workspace-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.terminal-node-header .workspace-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.terminal-node-header .workspace-name {
+  color: #d4d4d4;
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-node-header .git-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #888;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 11px;
+  background: #2a2c36;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.terminal-node-header .git-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.terminal-node-header .project-type-badge {
+  color: #4a9eff;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 10px;
+  background: rgba(74, 158, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.terminal-node-header.unknown-attachment {
+  background: #3a1e1e;
+  color: #ff6b6b;
 }
 
