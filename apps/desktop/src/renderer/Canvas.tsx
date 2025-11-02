@@ -203,10 +203,10 @@ function CanvasFlow() {
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.1}
         maxZoom={4}
-        panOnScroll={true}
+        panOnScroll={isNodeDragEnabled}
         zoomOnScroll={false}
-        panOnDrag={true}
-        zoomOnPinch={true}
+        panOnDrag={isNodeDragEnabled}
+        zoomOnPinch={isNodeDragEnabled}
         nodesDraggable={isNodeDragEnabled}
         nodesConnectable={isNodeDragEnabled}
         elementsSelectable={true}
