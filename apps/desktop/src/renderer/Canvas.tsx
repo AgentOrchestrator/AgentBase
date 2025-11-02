@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
+import WorkspaceNode from './WorkspaceNode';
 import './Canvas.css';
 
 // Custom node component
@@ -36,6 +37,7 @@ const CustomNode = ({ data }: { data: { label: string } }) => {
 const nodeTypes = {
   custom: CustomNode,
   terminal: TerminalNode,
+  workspace: WorkspaceNode,
 };
 
 const initialNodes: Node[] = [];
@@ -223,6 +225,7 @@ function CanvasFlow() {
         data: {
           terminalId,
           issue: {
+            id: issue.id,
             identifier: issue.identifier,
             title: issue.title,
             url: `https://linear.app/issue/${issue.identifier}`,
@@ -292,6 +295,39 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
+  const addWorkspaceNode = useCallback((position?: { x: number; y: number }) => {
+    let nodePosition = position;
+
+    // If no position provided and context menu is open, use context menu position
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    // If still no position, use center of viewport
+    if (!nodePosition) {
+      // Default to center of canvas view
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'workspace',
+      position: nodePosition,
+      data: {
+        path: '',
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition, setNodes]);
+
   // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -308,7 +344,7 @@ function CanvasFlow() {
     }
   }, [contextMenu]);
 
-  // Keyboard shortcut: CMD+K (Mac) or CTRL+K (Windows/Linux) to add terminal
+  // Keyboard shortcuts: CMD+K to add terminal, CMD+W to add workspace
   useEffect(() => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
@@ -319,6 +355,12 @@ function CanvasFlow() {
       if (modifierKey && event.key === 'k') {
         event.preventDefault(); // Prevent default browser behavior
         addTerminalNode();
+      }
+
+      // CMD+W / CTRL+W to add workspace
+      if (modifierKey && event.key === 'w') {
+        event.preventDefault(); // Prevent default browser behavior
+        addWorkspaceNode();
       }
 
       // Enable node drag mode while holding CMD (Mac) or CTRL (Windows/Linux)
@@ -342,7 +384,7 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addTerminalNode, isNodeDragEnabled]);
+  }, [addTerminalNode, addWorkspaceNode, isNodeDragEnabled]);
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
@@ -401,6 +443,12 @@ function CanvasFlow() {
             <span>Add Terminal</span>
             <span className="context-menu-shortcut">
               {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+            </span>
+          </div>
+          <div className="context-menu-item" onClick={() => addWorkspaceNode()}>
+            <span>Add Workspace</span>
+            <span className="context-menu-shortcut">
+              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
             </span>
           </div>
         </div>
@@ -483,6 +531,12 @@ function CanvasFlow() {
                   <span>Add Terminal</span>
                   <span className="settings-shortcut">
                     {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+                  </span>
+                </div>
+                <div className="settings-item">
+                  <span>Add Workspace</span>
+                  <span className="settings-shortcut">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
                   </span>
                 </div>
                 <div className="settings-item">

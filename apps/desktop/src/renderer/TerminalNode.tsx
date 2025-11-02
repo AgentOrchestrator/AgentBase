@@ -1,14 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
+import IssueDetailsModal from './IssueDetailsModal';
 
 interface TerminalNodeData {
   terminalId: string;
   issue?: {
+    id?: string;
     identifier: string;
     title: string;
     url: string;
@@ -26,6 +28,7 @@ function TerminalNode({ data }: NodeProps) {
   const terminalId = nodeData.terminalId;
 
   const count = useRef(0);
+  const [showIssueModal, setShowIssueModal] = useState(false);
 
 
   useEffect(() => {
@@ -818,15 +821,27 @@ function TerminalNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Top} />
       {nodeData.issue && (
         <div className="terminal-node-header">
+          <div
+            className="issue-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (nodeData.issue?.id) {
+                setShowIssueModal(true);
+              }
+            }}
+          >
+            <span className="issue-id">{nodeData.issue.identifier}</span>
+            <span className="issue-title">{nodeData.issue.title}</span>
+          </div>
           <a
             href={nodeData.issue.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="issue-link"
+            className="issue-external-link-icon"
             onClick={(e) => e.stopPropagation()}
+            title="Open in Linear"
           >
-            <span className="issue-id">{nodeData.issue.identifier}</span>
-            <span className="issue-title">{nodeData.issue.title}</span>
+            ↗
           </a>
         </div>
       )}
@@ -836,6 +851,14 @@ function TerminalNode({ data }: NodeProps) {
         onClick={() => terminalInstanceRef.current?.focus()}
       />
       <Handle type="source" position={Position.Bottom} />
+
+      {/* Issue Details Modal */}
+      {showIssueModal && nodeData.issue?.id && (
+        <IssueDetailsModal
+          issueId={nodeData.issue.id}
+          onClose={() => setShowIssueModal(false)}
+        />
+      )}
     </div>
   );
 }

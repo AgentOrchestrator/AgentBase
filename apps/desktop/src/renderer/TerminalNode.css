@@ -18,20 +18,43 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
+  gap: 8px;
 }
 
 .terminal-node-header .issue-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  text-decoration: none;
   color: inherit;
-  transition: opacity 0.2s ease;
   flex: 1;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  padding: 4px;
+  border-radius: 4px;
+  margin: -4px;
 }
 
 .terminal-node-header .issue-link:hover {
   opacity: 0.8;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.terminal-node-header .issue-external-link-icon {
+  color: #4a9eff;
+  text-decoration: none;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terminal-node-header .issue-external-link-icon:hover {
+  background: rgba(74, 158, 255, 0.2);
+  transform: scale(1.1);
 }
 
 .terminal-node-header .issue-id {
