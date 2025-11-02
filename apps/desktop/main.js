@@ -36,6 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const pty = __importStar(require("node-pty"));
 const path = __importStar(require("path"));
+// Map to store terminal instances by ID
+const terminalProcesses = new Map();
 const createWindow = () => {
     const win = new electron_1.BrowserWindow({
         width: 1000,
@@ -55,37 +57,75 @@ const createWindow = () => {
     else {
         win.loadFile(path.join(__dirname, './dist/index.html'));
     }
-    // Initialize and spawn shell
-    const ptyProcess = pty.spawn(process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash', [], {
-        name: 'xterm-color',
-        cols: 80,
-        rows: 30,
-        cwd: process.env.HOME || process.cwd(),
-        env: process.env
-    });
-    // Handle shell data - send to renderer via IPC
-    ptyProcess.onData((data) => {
-        win.webContents.send('terminal-data', data);
-    });
-    // Handle shell exit
-    ptyProcess.onExit((exitInfo) => {
-        win.webContents.send('terminal-exit', { code: exitInfo.exitCode, signal: exitInfo.signal });
+    // Create a new terminal instance
+    electron_1.ipcMain.on('terminal-create', (event, terminalId) => {
+        // If terminal already exists, check if it's still alive
+        const existingProcess = terminalProcesses.get(terminalId);
+        if (existingProcess) {
+            // Check if process is still running (pty processes don't have a direct way to check)
+            // We'll try to write a null byte to check, but for now just return
+            // The exit handler will clean it up, so we can recreate
+            return;
+        }
+        const shell = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash';
+        const shellArgs = process.platform === 'win32'
+            ? []
+            : ['-i']; // Use interactive shell to ensure it stays open
+        const ptyProcess = pty.spawn(shell, shellArgs, {
+            name: 'xterm-256color',
+            cols: 80,
+            rows: 30,
+            cwd: process.env.HOME || process.cwd(),
+            env: {
+                ...process.env,
+                TERM: 'xterm-256color',
+                COLORTERM: 'truecolor'
+            }
+        });
+        // Handle shell data - send to renderer via IPC with terminal ID
+        ptyProcess.onData((data) => {
+            win.webContents.send('terminal-data', { terminalId, data });
+        });
+        // Handle shell exit
+        ptyProcess.onExit((exitInfo) => {
+            win.webContents.send('terminal-exit', {
+                terminalId,
+                code: exitInfo.exitCode,
+                signal: exitInfo.signal
+            });
+            // Remove from map when process exits so it can be recreated
+            terminalProcesses.delete(terminalId);
+        });
+        terminalProcesses.set(terminalId, ptyProcess);
     });
     // Handle resize from renderer
-    electron_1.ipcMain.on('terminal-resize', (_event, { cols, rows }) => {
-        ptyProcess.resize(cols, rows);
+    electron_1.ipcMain.on('terminal-resize', (_event, { terminalId, cols, rows }) => {
+        const ptyProcess = terminalProcesses.get(terminalId);
+        if (ptyProcess) {
+            ptyProcess.resize(cols, rows);
+        }
     });
     // Handle input from renderer
-    electron_1.ipcMain.on('terminal-input', (_event, data) => {
-        ptyProcess.write(data);
+    electron_1.ipcMain.on('terminal-input', (_event, { terminalId, data }) => {
+        const ptyProcess = terminalProcesses.get(terminalId);
+        if (ptyProcess) {
+            ptyProcess.write(data);
+        }
     });
-    // Get initial terminal size based on window size
-    win.on('resize', () => {
-        const { width, height } = win.getContentBounds();
-        // Approximate cols/rows (rough calculation)
-        const cols = Math.floor((width - 40) / 9);
-        const rows = Math.floor((height - 40) / 17);
-        ptyProcess.resize(Math.max(cols, 10), Math.max(rows, 10));
+    // Handle terminal destroy
+    electron_1.ipcMain.on('terminal-destroy', (_event, terminalId) => {
+        const ptyProcess = terminalProcesses.get(terminalId);
+        if (ptyProcess) {
+            ptyProcess.kill();
+            terminalProcesses.delete(terminalId);
+        }
+    });
+    // Clean up all terminals when window closes
+    win.on('closed', () => {
+        terminalProcesses.forEach((ptyProcess) => {
+            ptyProcess.kill();
+        });
+        terminalProcesses.clear();
     });
 };
 electron_1.app.whenReady().then(() => {

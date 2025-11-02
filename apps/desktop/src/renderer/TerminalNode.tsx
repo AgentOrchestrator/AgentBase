@@ -13,6 +13,7 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const terminalId = data.terminalId;
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -60,22 +61,46 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
     terminalInstanceRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
+    // Create terminal process in main process
+    if (window.electronAPI) {
+      window.electronAPI.createTerminal(terminalId);
+    }
+
     // Send terminal input to main process (if API is available)
-    terminal.onData((data: string) => {
+    terminal.onData((inputData: string) => {
       if (window.electronAPI) {
-        window.electronAPI.sendTerminalInput(data);
+        window.electronAPI.sendTerminalInput(terminalId, inputData);
       }
     });
 
     // Receive terminal output from main process (if API is available)
-    if (window.electronAPI) {
-      window.electronAPI.onTerminalData((data: string) => {
-        terminal.write(data);
-      });
+    let handleTerminalData: ((data: { terminalId: string; data: string }) => void) | null = null;
+    let handleTerminalExit: ((data: { terminalId: string; code: number; signal?: number }) => void) | null = null;
 
-      window.electronAPI.onTerminalExit(({ code, signal }: { code: number; signal?: number }) => {
-        terminal.write(`\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`);
-      });
+    if (window.electronAPI) {
+      handleTerminalData = ({ terminalId: dataTerminalId, data: outputData }: { terminalId: string; data: string }) => {
+        // Only process data for this specific terminal
+        if (dataTerminalId === terminalId) {
+          terminal.write(outputData);
+        }
+      };
+
+      handleTerminalExit = ({ terminalId: dataTerminalId, code, signal }: { terminalId: string; code: number; signal?: number }) => {
+        // Only process exit for this specific terminal
+        if (dataTerminalId === terminalId) {
+          terminal.write(`\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`);
+          terminal.write('\r\n[Terminal closed. Creating new session...]\r\n');
+          // Automatically restart the terminal
+          if (window.electronAPI) {
+            setTimeout(() => {
+              window.electronAPI.createTerminal(terminalId);
+            }, 100);
+          }
+        }
+      };
+
+      window.electronAPI.onTerminalData(handleTerminalData);
+      window.electronAPI.onTerminalExit(handleTerminalExit);
     } else {
       // Fallback: write welcome message if no API
       terminal.writeln('Terminal Node');
@@ -89,7 +114,7 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
         fitAddon.fit();
         const dimensions = fitAddon.proposeDimensions();
         if (dimensions && window.electronAPI) {
-          window.electronAPI.sendTerminalResize(dimensions.cols, dimensions.rows);
+          window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
         }
       }
     };
@@ -104,7 +129,7 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       fitAddon.fit();
       const dimensions = fitAddon.proposeDimensions();
       if (dimensions && window.electronAPI) {
-        window.electronAPI.sendTerminalResize(dimensions.cols, dimensions.rows);
+        window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
       }
     }, 100);
 
@@ -112,8 +137,11 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
     return () => {
       resizeObserver.disconnect();
       terminal.dispose();
+      if (window.electronAPI) {
+        window.electronAPI.destroyTerminal(terminalId);
+      }
     };
-  }, []);
+  }, [terminalId]);
 
   return (
     <div className="terminal-node">

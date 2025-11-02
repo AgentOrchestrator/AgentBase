@@ -2,6 +2,9 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import * as pty from 'node-pty';
 import * as path from 'path';
 
+// Map to store terminal instances by ID
+const terminalProcesses = new Map<string, pty.IPty>();
+
 const createWindow = (): void => {
   const win = new BrowserWindow({
     width: 1000,
@@ -22,46 +25,88 @@ const createWindow = (): void => {
     win.loadFile(path.join(__dirname, './dist/index.html'));
   }
 
-  // Initialize and spawn shell
-  const ptyProcess = pty.spawn(
-    process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash',
-    [],
-    {
-      name: 'xterm-color',
-      cols: 80,
-      rows: 30,
-      cwd: process.env.HOME || process.cwd(),
-      env: process.env as { [key: string]: string }
+  // Create a new terminal instance
+  ipcMain.on('terminal-create', (event, terminalId: string) => {
+    // If terminal already exists, check if it's still alive
+    const existingProcess = terminalProcesses.get(terminalId);
+    if (existingProcess) {
+      // Check if process is still running (pty processes don't have a direct way to check)
+      // We'll try to write a null byte to check, but for now just return
+      // The exit handler will clean it up, so we can recreate
+      return;
     }
-  );
 
-  // Handle shell data - send to renderer via IPC
-  ptyProcess.onData((data: string) => {
-    win.webContents.send('terminal-data', data);
-  });
+    const shell = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash';
+    const shellArgs = process.platform === 'win32' 
+      ? [] 
+      : ['-i']; // Use interactive shell to ensure it stays open
 
-  // Handle shell exit
-  ptyProcess.onExit((exitInfo: { exitCode: number; signal?: number }) => {
-    win.webContents.send('terminal-exit', { code: exitInfo.exitCode, signal: exitInfo.signal });
+    const ptyProcess = pty.spawn(
+      shell,
+      shellArgs,
+      {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 30,
+        cwd: process.env.HOME || process.cwd(),
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor'
+        } as { [key: string]: string }
+      }
+    );
+
+    // Handle shell data - send to renderer via IPC with terminal ID
+    ptyProcess.onData((data: string) => {
+      win.webContents.send('terminal-data', { terminalId, data });
+    });
+
+    // Handle shell exit
+    ptyProcess.onExit((exitInfo: { exitCode: number; signal?: number }) => {
+      win.webContents.send('terminal-exit', {
+        terminalId,
+        code: exitInfo.exitCode,
+        signal: exitInfo.signal
+      });
+      // Remove from map when process exits so it can be recreated
+      terminalProcesses.delete(terminalId);
+    });
+
+    terminalProcesses.set(terminalId, ptyProcess);
   });
 
   // Handle resize from renderer
-  ipcMain.on('terminal-resize', (_event, { cols, rows }: { cols: number; rows: number }) => {
-    ptyProcess.resize(cols, rows);
+  ipcMain.on('terminal-resize', (_event, { terminalId, cols, rows }: { terminalId: string; cols: number; rows: number }) => {
+    const ptyProcess = terminalProcesses.get(terminalId);
+    if (ptyProcess) {
+      ptyProcess.resize(cols, rows);
+    }
   });
 
   // Handle input from renderer
-  ipcMain.on('terminal-input', (_event, data: string) => {
-    ptyProcess.write(data);
+  ipcMain.on('terminal-input', (_event, { terminalId, data }: { terminalId: string; data: string }) => {
+    const ptyProcess = terminalProcesses.get(terminalId);
+    if (ptyProcess) {
+      ptyProcess.write(data);
+    }
   });
 
-  // Get initial terminal size based on window size
-  win.on('resize', () => {
-    const { width, height } = win.getContentBounds();
-    // Approximate cols/rows (rough calculation)
-    const cols = Math.floor((width - 40) / 9);
-    const rows = Math.floor((height - 40) / 17);
-    ptyProcess.resize(Math.max(cols, 10), Math.max(rows, 10));
+  // Handle terminal destroy
+  ipcMain.on('terminal-destroy', (_event, terminalId: string) => {
+    const ptyProcess = terminalProcesses.get(terminalId);
+    if (ptyProcess) {
+      ptyProcess.kill();
+      terminalProcesses.delete(terminalId);
+    }
+  });
+
+  // Clean up all terminals when window closes
+  win.on('closed', () => {
+    terminalProcesses.forEach((ptyProcess) => {
+      ptyProcess.kill();
+    });
+    terminalProcesses.clear();
   });
 };
 
