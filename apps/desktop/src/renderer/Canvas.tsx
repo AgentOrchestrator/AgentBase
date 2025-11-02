@@ -55,6 +55,7 @@ function CanvasFlow() {
   const { screenToFlowPosition } = useReactFlow();
   const terminalCounterRef = useRef(1);
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -215,6 +216,46 @@ function CanvasFlow() {
             <span className="context-menu-shortcut">
               {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Settings FAB */}
+      <button
+        className="settings-fab"
+        onClick={() => setIsSettingsOpen(true)}
+        aria-label="Settings"
+      >
+        ⚙️
+      </button>
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-modal-header">
+              <h2>Settings</h2>
+              <button className="settings-close-button" onClick={() => setIsSettingsOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="settings-modal-content">
+              <div className="settings-section">
+                <h3>Keyboard Shortcuts</h3>
+                <div className="settings-item">
+                  <span>Add Terminal</span>
+                  <span className="settings-shortcut">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+                  </span>
+                </div>
+                <div className="settings-item">
+                  <span>Node Drag Mode</span>
+                  <span className="settings-shortcut">
+                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘' : 'Hold Ctrl'}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
