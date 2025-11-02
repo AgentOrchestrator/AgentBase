@@ -5,7 +5,11 @@
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.0.6",
+  "packageManager": "npm@10.2.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -15,8 +19,8 @@
     "type-check": "turbo run type-check",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
     "setup": "node scripts/setup.js",
-    "dev:daemon": "pnpm --filter agent-orchestrator-daemon run dev",
-    "dev:web": "pnpm --filter web run dev",
+    "dev:daemon": "npm run dev --workspace=agent-orchestrator-daemon",
+    "dev:web": "npm run dev --workspace=web",
     "dev:memory": "cd apps/memory-service && venv/bin/python -m src.main",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d",

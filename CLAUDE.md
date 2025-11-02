@@ -1,7 +1,7 @@
 # Agent Orchestrator Project Instructions
 
 ## Monorepo Structure
-This is a **monorepo** using **pnpm workspaces** and **Turborepo** for build orchestration.
+This is a **monorepo** using **npm workspaces** and **Turborepo** for build orchestration.
 
 ### Project Structure
 ```
@@ -14,16 +14,15 @@ agent-orchestrator/
 │   └── shared/        # Shared types and utilities
 ├── supabase/          # Database migrations and config
 ├── scripts/           # Utility scripts
-├── pnpm-workspace.yaml
 ├── turbo.json
 └── package.json       # Root workspace configuration
 ```
 
 ### Package Management
-- **Use pnpm** for all package management operations
+- **Use npm** for all package management operations
 - Each app/package has its own `package.json`
 - Dependencies are hoisted to the root `node_modules` when possible
-- Run `pnpm install` from the root to install all dependencies
+- Run `npm install` from the root to install all dependencies
 
 ### Working with the Monorepo
 All changes are made within the single repository. You can:
@@ -93,52 +92,52 @@ The repository has branch protection enabled on the `main` branch:
 ### Development
 ```bash
 # Install all dependencies
-pnpm install
+npm install
 
 # Run all apps in dev mode (parallel)
-pnpm dev
+npm run dev
 
 # Run specific app in dev mode
-pnpm dev:daemon
-pnpm dev:web
+npm run dev:daemon
+npm run dev:web
 
 # Build all apps
-pnpm build
+npm run build
 
-# Setup (interactive) - works with both npm and pnpm
-pnpm run setup  # or: npm run setup
+# Setup (interactive)
+npm run setup
 
 # Setup (non-interactive for CI/CD) - requires Supabase credentials
 export SUPABASE_URL=https://xxx.supabase.co
 export SUPABASE_ANON_KEY=eyJh...
-pnpm run setup --non-interactive
+npm run setup --non-interactive
 
 # Start all services (production)
-pnpm start
+npm start
 ```
 
 ### Package-Specific Commands
 ```bash
 # Run command in specific package
-pnpm --filter <package-name> <command>
+npm run <command> --workspace=<package-name>
 
 # Examples:
-pnpm --filter agent-orchestrator-daemon run dev
-pnpm --filter web run build
-pnpm --filter @agent-orchestrator/shared run type-check
+npm run dev --workspace=agent-orchestrator-daemon
+npm run build --workspace=web
+npm run type-check --workspace=@agent-orchestrator/shared
 ```
 
 ### Adding Dependencies
 ```bash
 # Add to root (dev dependencies only)
-pnpm add -D <package> -w
+npm install -D <package> -w
 
 # Add to specific workspace package
-pnpm --filter <package-name> add <dependency>
+npm install <dependency> --workspace=<package-name>
 
 # Examples:
-pnpm --filter web add lucide-react
-pnpm --filter agent-orchestrator-daemon add uuid
+npm install lucide-react --workspace=web
+npm install uuid --workspace=agent-orchestrator-daemon
 ```
 
 ### Shared Package Usage
