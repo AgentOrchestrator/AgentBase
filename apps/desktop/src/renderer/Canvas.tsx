@@ -231,10 +231,15 @@ function CanvasFlow() {
       };
 
       setNodes((nds) => [...nds, newNode]);
+
+      // Close the issues pill after dropping
+      if (isPillExpanded) {
+        collapsePill();
+      }
     } catch (error) {
       console.error('Error handling drop:', error);
     }
-  }, [screenToFlowPosition, setNodes]);
+  }, [screenToFlowPosition, setNodes, isPillExpanded, collapsePill]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
