@@ -155,38 +155,51 @@ function CanvasFlow() {
 
   // Keyboard shortcut: CMD+K (Mac) or CTRL+K (Windows/Linux) to add terminal
   useEffect(() => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for CMD+K (Mac) or CTRL+K (Windows/Linux)
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifierKey = isMac ? event.metaKey : event.ctrlKey;
 
+      // CMD+K / CTRL+K to add terminal
       if (modifierKey && event.key === 'k') {
         event.preventDefault(); // Prevent default browser behavior
         addTerminalNode();
       }
 
-      // Toggle node drag mode with Space key
-      if (event.key === ' ' && !event.repeat) {
-        event.preventDefault();
-        setIsNodeDragEnabled((prev) => !prev);
+      // Enable node drag mode while holding CMD (Mac) or CTRL (Windows/Linux)
+      if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
+        if (!isNodeDragEnabled) {
+          setIsNodeDragEnabled(true);
+        }
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Disable node drag mode when CMD/CTRL key is released
+      if ((isMac && event.key === 'Meta') || (!isMac && event.key === 'Control')) {
+        setIsNodeDragEnabled(false);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addTerminalNode]);
+  }, [addTerminalNode, isNodeDragEnabled]);
 
   return (
-    <div className="canvas-container">
+    <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
       {/* Mode indicator */}
       <div className={`mode-indicator ${isNodeDragEnabled ? 'drag-mode' : 'terminal-mode'}`}>
         <span className="mode-icon">{isNodeDragEnabled ? '🔄' : '⌨️'}</span>
         <span className="mode-text">
           {isNodeDragEnabled ? 'Node Drag Mode' : 'Terminal Mode'}
         </span>
-        <span className="mode-hint">Press Space to toggle</span>
+        <span className="mode-hint">
+          {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘ to drag nodes' : 'Hold Ctrl to drag nodes'}
+        </span>
       </div>
 
       <ReactFlow
@@ -203,10 +216,10 @@ function CanvasFlow() {
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.1}
         maxZoom={4}
-        panOnScroll={isNodeDragEnabled}
-        zoomOnScroll={false}
+        panOnScroll={true}
+        zoomOnScroll={true}
         panOnDrag={isNodeDragEnabled}
-        zoomOnPinch={isNodeDragEnabled}
+        zoomOnPinch={true}
         nodesDraggable={isNodeDragEnabled}
         nodesConnectable={isNodeDragEnabled}
         elementsSelectable={true}

@@ -4,6 +4,15 @@
   position: relative;
 }
 
+/* Change cursor when in drag mode */
+.canvas-container.drag-mode {
+  cursor: grab;
+}
+
+.canvas-container.drag-mode:active {
+  cursor: grabbing;
+}
+
 /* Mode indicator */
 .mode-indicator {
   position: fixed;
