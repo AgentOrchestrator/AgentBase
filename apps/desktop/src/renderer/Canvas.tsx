@@ -56,6 +56,137 @@ function CanvasFlow() {
   const terminalCounterRef = useRef(1);
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [linearApiKey, setLinearApiKey] = useState('');
+  const [isLinearConnected, setIsLinearConnected] = useState(false);
+
+  // Issues pill state
+  const [isPillExpanded, setIsPillExpanded] = useState(false);
+  const [isPillSquare, setIsPillSquare] = useState(false);
+  const [showPillContent, setShowPillContent] = useState(false);
+  const [isContentVisible, setIsContentVisible] = useState(false);
+  const [isTextVisible, setIsTextVisible] = useState(true);
+  const [issues, setIssues] = useState<any[]>([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+
+  // Load Linear API key from localStorage on mount
+  useEffect(() => {
+    const storedKey = localStorage.getItem('linear_api_key');
+    if (storedKey) {
+      setLinearApiKey(storedKey);
+      setIsLinearConnected(true);
+    }
+  }, []);
+
+  const handleLinearConnect = useCallback(() => {
+    if (linearApiKey.trim()) {
+      localStorage.setItem('linear_api_key', linearApiKey);
+      setIsLinearConnected(true);
+    }
+  }, [linearApiKey]);
+
+  const handleLinearDisconnect = useCallback(() => {
+    localStorage.removeItem('linear_api_key');
+    setLinearApiKey('');
+    setIsLinearConnected(false);
+  }, []);
+
+  const fetchLinearIssues = useCallback(async () => {
+    const apiKey = localStorage.getItem('linear_api_key');
+    if (!apiKey) return;
+
+    setLoadingIssues(true);
+    try {
+      const query = `
+        query {
+          issues(filter: { state: { type: { in: ["started", "unstarted"] } } }, first: 10) {
+            nodes {
+              id
+              title
+              identifier
+              state {
+                name
+                color
+              }
+              priority
+              assignee {
+                name
+                avatarUrl
+              }
+              createdAt
+              updatedAt
+            }
+          }
+        }
+      `;
+
+      const response = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await response.json();
+      if (data.data?.issues?.nodes) {
+        setIssues(data.data.issues.nodes);
+      }
+    } catch (error) {
+      console.error('Error fetching Linear issues:', error);
+    } finally {
+      setLoadingIssues(false);
+    }
+  }, []);
+
+  const togglePill = useCallback(() => {
+    if (!isPillExpanded) {
+      // Fetch issues when expanding
+      fetchLinearIssues();
+
+      // Hide text immediately when expanding
+      setIsTextVisible(false);
+      // Both phases start simultaneously
+      setIsPillExpanded(true);
+      setIsPillSquare(true);
+      // Show pill content after expansion completes (300ms) + 50ms delay
+      setTimeout(() => {
+        setShowPillContent(true);
+        // Start content animation after pill content is shown
+        setTimeout(() => {
+          setIsContentVisible(true);
+        }, 100);
+      }, 350);
+    } else {
+      // Hide animations immediately when collapsing
+      setIsContentVisible(false);
+      // Hide pill content immediately when collapsing
+      setShowPillContent(false);
+      // Both phases collapse simultaneously
+      setIsPillSquare(false);
+      setIsPillExpanded(false);
+      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
+      setTimeout(() => {
+        setIsTextVisible(true);
+      }, 350);
+    }
+  }, [isPillExpanded, fetchLinearIssues]);
+
+  const collapsePill = useCallback(() => {
+    // First hide animations immediately
+    setIsContentVisible(false);
+    // First hide content with 50ms delay
+    setShowPillContent(false);
+    setTimeout(() => {
+      // Then collapse the pill
+      setIsPillSquare(false);
+      setIsPillExpanded(false);
+      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
+      setTimeout(() => {
+        setIsTextVisible(true);
+      }, 350);
+    }, 50);
+  }, []);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -241,6 +372,57 @@ function CanvasFlow() {
             </div>
             <div className="settings-modal-content">
               <div className="settings-section">
+                <h3>Integrations</h3>
+                <div className="settings-integration">
+                  <div className="integration-header">
+                    <div className="integration-info">
+                      <span className="integration-name">Linear</span>
+                      <span className={`integration-status ${isLinearConnected ? 'connected' : 'disconnected'}`}>
+                        {isLinearConnected ? '● Connected' : '○ Not connected'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="integration-content">
+                    <input
+                      type="password"
+                      placeholder="Enter Linear API Key"
+                      value={linearApiKey}
+                      onChange={(e) => setLinearApiKey(e.target.value)}
+                      className="integration-input"
+                      disabled={isLinearConnected}
+                    />
+                    {isLinearConnected ? (
+                      <button
+                        onClick={handleLinearDisconnect}
+                        className="integration-button disconnect"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleLinearConnect}
+                        className="integration-button connect"
+                        disabled={!linearApiKey.trim()}
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                  <div className="integration-help">
+                    Get your API key from{' '}
+                    <a
+                      href="https://linear.app/settings/api"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="integration-link"
+                    >
+                      Linear Settings → API
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
                 <h3>Keyboard Shortcuts</h3>
                 <div className="settings-item">
                   <span>Add Terminal</span>
@@ -257,6 +439,73 @@ function CanvasFlow() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Issues Pill */}
+      {isLinearConnected && (
+        <div
+          onClick={!isPillSquare ? togglePill : undefined}
+          className={`issues-pill ${!isPillSquare ? 'cursor-pointer' : 'cursor-default'} ${
+            isPillExpanded ? 'expanded' : ''
+          } ${isPillSquare ? 'square' : ''}`}
+          style={{
+            borderRadius: isPillSquare ? '24px' : '20px'
+          }}
+        >
+          {!isPillSquare ? (
+            <div className={`pill-text ${isTextVisible ? 'visible' : ''}`}>
+              View Issues...
+            </div>
+          ) : showPillContent ? (
+            <div className="pill-content-wrapper" onClick={(e) => e.stopPropagation()}>
+              {/* Collapse nozzle at top */}
+              <div
+                className={`collapse-nozzle ${isContentVisible ? 'visible' : ''}`}
+                onClick={collapsePill}
+                title="Collapse issues"
+              />
+
+              {/* Issues list */}
+              <div className={`issues-list ${isContentVisible ? 'visible' : ''}`}>
+                {loadingIssues ? (
+                  <div className="loading-state">Loading issues...</div>
+                ) : issues.length === 0 ? (
+                  <div className="empty-state">No open issues found</div>
+                ) : (
+                  issues.map((issue) => (
+                    <div key={issue.id} className="issue-card">
+                      <div className="issue-header">
+                        <span className="issue-identifier">{issue.identifier}</span>
+                        <span
+                          className="issue-status"
+                          style={{ backgroundColor: issue.state.color }}
+                        >
+                          {issue.state.name}
+                        </span>
+                      </div>
+                      <div className="issue-title">{issue.title}</div>
+                      {issue.assignee && (
+                        <div className="issue-assignee">
+                          {issue.assignee.avatarUrl && (
+                            <img
+                              src={issue.assignee.avatarUrl}
+                              alt={issue.assignee.name}
+                              className="assignee-avatar"
+                            />
+                          )}
+                          <span className="assignee-name">{issue.assignee.name}</span>
+                        </div>
+                      )}
+                      <div className="issue-priority">
+                        Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
