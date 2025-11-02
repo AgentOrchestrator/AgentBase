@@ -468,7 +468,7 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       let mouseDownY = 0;
       let mouseDownTime = 0;
       let hasDragged = false;
-      const DRAG_THRESHOLD = 3; // pixels - movement less than this is considered a click
+      const DRAG_THRESHOLD = 5; // pixels - increased from 3 to reduce false positives
       const CLICK_MAX_DURATION = 200; // ms - clicks should be quick
 
       const handleXtermMouseDown = (e: MouseEvent) => {
@@ -477,7 +477,15 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
         mouseDownY = e.clientY;
         mouseDownTime = Date.now();
         hasDragged = false;
-        
+
+        // Clear any existing selection on mousedown to prevent sticky selections
+        // This helps when clicking in a new area
+        const existingSelection = terminal.getSelection();
+        if (existingSelection.length > 0) {
+          console.log('[TerminalNode] 🔵 Clearing existing selection on mousedown');
+          terminal.clearSelection();
+        }
+
         console.log('[TerminalNode] 🔵 Xterm mousedown', {
           button: e.button,
           clientX: e.clientX,
@@ -520,22 +528,31 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
           });
 
           // Clear selection if:
-          // 1. It's whitespace-only (always clear these)
-          // 2. It's a quick click without drag AND no text was selected (user just clicked, didn't intend to select)
+          // 1. It's whitespace-only (always clear these - false drag detection)
+          // 2. It's a quick click with minimal movement (user just clicked, didn't intend to select)
+          // 3. Selection is very small and there was no intentional drag
           const hasTextSelection = selection.length > 0 && !isWhitespaceOnly;
+          const isVerySmallSelection = selection.length > 0 && selection.length <= 2;
+          const shouldClear =
+            isWhitespaceOnly ||
+            (isQuickClick && !isActualDrag && !hasTextSelection) ||
+            (isVerySmallSelection && !isActualDrag && timeSinceMouseDown < 300);
 
-          if (isWhitespaceOnly || (isQuickClick && e.button === 0 && !hasTextSelection)) {
+          if (shouldClear) {
             console.log('[TerminalNode] ⚠️ Clearing selection on mouseup', {
-              reason: isWhitespaceOnly ? 'whitespace-only selection' : 'quick click with no selection',
+              reason: isWhitespaceOnly ? 'whitespace-only' :
+                      isQuickClick ? 'quick click' :
+                      'small accidental selection',
               distance: totalDistance.toFixed(2),
               timeSinceMouseDown,
               isActualDrag,
               hasDragged,
-              hasTextSelection
+              hasTextSelection,
+              selectionLength: selection.length
             });
             setTimeout(() => {
               terminal.clearSelection();
-            }, 20);
+            }, 10);
           }
         }, 10);
       };
@@ -545,7 +562,7 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
           const distanceX = Math.abs(e.clientX - mouseDownX);
           const distanceY = Math.abs(e.clientY - mouseDownY);
           const totalDistance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-          
+
           if (totalDistance >= DRAG_THRESHOLD) {
             hasDragged = true;
           }
@@ -554,7 +571,7 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
           if (selection.length > 0) {
             const isWhitespaceOnly = /^[\n\r\s]+$/.test(selection);
             const isActualDrag = totalDistance >= DRAG_THRESHOLD;
-            
+
             console.log('[TerminalNode] 🔵 Xterm mousemove', {
               distance: totalDistance.toFixed(2),
               isActualDrag,
@@ -567,10 +584,13 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
               terminalId
             });
 
-            // Always clear whitespace-only selections, even during real drags
-            // Xterm shouldn't be selecting empty lines/whitespace
-            if (isWhitespaceOnly) {
-              console.log('[TerminalNode] ⚠️ Clearing whitespace-only selection during drag', {
+            // Clear unwanted selections during movement:
+            // 1. Whitespace-only selections (always clear)
+            // 2. Very small selections during non-drag movement (accidental selections)
+            const isVerySmallSelection = selection.length <= 2;
+            if (isWhitespaceOnly || (isVerySmallSelection && !isActualDrag)) {
+              console.log('[TerminalNode] ⚠️ Clearing unwanted selection during mousemove', {
+                reason: isWhitespaceOnly ? 'whitespace-only' : 'small accidental selection',
                 distance: totalDistance.toFixed(2),
                 isActualDrag,
                 selectionLength: selection.length
