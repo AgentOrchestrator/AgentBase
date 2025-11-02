@@ -102,19 +102,31 @@ function CanvasFlow() {
     setContextMenu(null);
   }, []);
 
-  const addTerminalNode = useCallback(() => {
-    if (!contextMenu) return;
+  const addTerminalNode = useCallback((position?: { x: number; y: number }) => {
+    let nodePosition = position;
 
-    const position = screenToFlowPosition({
-      x: contextMenu.x,
-      y: contextMenu.y,
-    });
+    // If no position provided and context menu is open, use context menu position
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    // If still no position, use center of viewport
+    if (!nodePosition) {
+      // Default to center of canvas view
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
 
     const terminalId = `terminal-${terminalCounterRef.current++}`;
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type: 'terminal',
-      position,
+      position: nodePosition,
       data: {
         terminalId,
       },
@@ -139,6 +151,25 @@ function CanvasFlow() {
       };
     }
   }, [contextMenu]);
+
+  // Keyboard shortcut: CMD+K (Mac) or CTRL+K (Windows/Linux) to add terminal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for CMD+K (Mac) or CTRL+K (Windows/Linux)
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+
+      if (modifierKey && event.key === 'k') {
+        event.preventDefault(); // Prevent default browser behavior
+        addTerminalNode();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [addTerminalNode]);
 
   return (
     <div className="canvas-container">
@@ -180,8 +211,11 @@ function CanvasFlow() {
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="context-menu-item" onClick={addTerminalNode}>
+          <div className="context-menu-item" onClick={() => addTerminalNode()}>
             <span>Add Terminal</span>
+            <span className="context-menu-shortcut">
+              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+            </span>
           </div>
         </div>
       )}

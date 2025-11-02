@@ -53,10 +53,24 @@
   border-radius: 4px;
   font-size: 14px;
   transition: background-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
 }
 
 .context-menu-item:hover {
   background: #3a3c46;
+}
+
+.context-menu-shortcut {
+  font-size: 12px;
+  color: #888;
+  font-family: 'Menlo', 'Monaco', monospace;
+  background: #1e1e1e;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #3a3c46;
 }
 
 /* Custom controls styling */
