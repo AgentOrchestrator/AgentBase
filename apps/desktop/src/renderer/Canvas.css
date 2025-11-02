@@ -35,6 +35,30 @@
   bottom: -5px;
 }
 
+/* Context menu */
+.context-menu {
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  min-width: 160px;
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  color: #d4d4d4;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+  background: #3a3c46;
+}
+
 /* Custom controls styling */
 .react-flow__controls {
   background: #2a2c36;

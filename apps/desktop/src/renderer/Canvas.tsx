@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -13,8 +13,10 @@ import {
   Node,
   Handle,
   Position,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import TerminalNode from './TerminalNode';
 import './Canvas.css';
 
 // Custom node component
@@ -33,6 +35,7 @@ const CustomNode = ({ data }: { data: { label: string } }) => {
 // Define node types
 const nodeTypes = {
   custom: CustomNode,
+  terminal: TerminalNode,
 };
 
 const initialNodes: Node[] = [
@@ -69,14 +72,73 @@ const initialEdges: Edge[] = [
   },
 ];
 
+type ContextMenu = {
+  x: number;
+  y: number;
+} | null;
+
 function CanvasFlow() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const { screenToFlowPosition } = useReactFlow();
+  const terminalCounterRef = useRef(1);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const addTerminalNode = useCallback(() => {
+    if (!contextMenu) return;
+    
+    const position = screenToFlowPosition({
+      x: contextMenu.x,
+      y: contextMenu.y,
+    });
+
+    const terminalId = `terminal-${terminalCounterRef.current++}`;
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'terminal',
+      position,
+      data: {
+        terminalId,
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition, setNodes]);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as HTMLElement)) {
+        setContextMenu(null);
+      }
+    };
+
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [contextMenu]);
 
   return (
     <div className="canvas-container">
@@ -86,6 +148,8 @@ function CanvasFlow() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onPaneContextMenu={onPaneContextMenu}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
         style={{ backgroundColor: '#1e1e1e' }}
@@ -104,6 +168,23 @@ function CanvasFlow() {
         <MiniMap />
         <Background variant="dots" gap={12} size={1} />
       </ReactFlow>
+      
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-item" onClick={addTerminalNode}>
+            <span>Add Terminal</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

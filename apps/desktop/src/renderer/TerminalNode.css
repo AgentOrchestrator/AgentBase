@@ -1,0 +1,54 @@
+.terminal-node {
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 400px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.terminal-node-header {
+  background: #1e1e1e;
+  padding: 8px 12px;
+  border-bottom: 1px solid #3a3c46;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.terminal-node-title {
+  color: #d4d4d4;
+  font-weight: 500;
+}
+
+.terminal-node-id {
+  color: #888;
+  font-family: 'Menlo', 'Monaco', monospace;
+}
+
+.terminal-node-content {
+  flex: 1;
+  padding: 4px;
+  min-height: 250px;
+}
+
+/* Terminal handle styles */
+.terminal-node .react-flow__handle {
+  background: #4a9eff;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #2a2c36;
+}
+
+.terminal-node .react-flow__handle-top {
+  top: -5px;
+}
+
+.terminal-node .react-flow__handle-bottom {
+  bottom: -5px;
+}
+
