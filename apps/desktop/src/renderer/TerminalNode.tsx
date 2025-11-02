@@ -521,17 +521,17 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
 
           // Clear selection if:
           // 1. It's whitespace-only (always clear these)
-          // 2. It's a quick click without drag (user just clicked, didn't intend to select)
-          // 3. User didn't actually drag (stayed in same spot)
-          if (isWhitespaceOnly || (isQuickClick && e.button === 0) || (!hasDragged && e.button === 0)) {
+          // 2. It's a quick click without drag AND no text was selected (user just clicked, didn't intend to select)
+          const hasTextSelection = selection.length > 0 && !isWhitespaceOnly;
+
+          if (isWhitespaceOnly || (isQuickClick && e.button === 0 && !hasTextSelection)) {
             console.log('[TerminalNode] ⚠️ Clearing selection on mouseup', {
-              reason: isWhitespaceOnly ? 'whitespace-only selection' : 
-                      isQuickClick ? 'quick click (not a drag)' : 
-                      'no drag detected (clicked in place)',
+              reason: isWhitespaceOnly ? 'whitespace-only selection' : 'quick click with no selection',
               distance: totalDistance.toFixed(2),
               timeSinceMouseDown,
               isActualDrag,
-              hasDragged
+              hasDragged,
+              hasTextSelection
             });
             setTimeout(() => {
               terminal.clearSelection();
