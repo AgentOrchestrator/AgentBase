@@ -38,39 +38,9 @@ const nodeTypes = {
   terminal: TerminalNode,
 };
 
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    type: 'custom',
-    position: { x: 250, y: 100 },
-    data: { label: 'Node 1' },
-  },
-  {
-    id: '2',
-    type: 'custom',
-    position: { x: 100, y: 200 },
-    data: { label: 'Node 2' },
-  },
-  {
-    id: '3',
-    type: 'custom',
-    position: { x: 400, y: 200 },
-    data: { label: 'Node 3' },
-  },
-];
+const initialNodes: Node[] = [];
 
-const initialEdges: Edge[] = [
-  {
-    id: 'e1-2',
-    source: '1',
-    target: '2',
-  },
-  {
-    id: 'e1-3',
-    source: '1',
-    target: '3',
-  },
-];
+const initialEdges: Edge[] = [];
 
 type ContextMenu = {
   x: number;
