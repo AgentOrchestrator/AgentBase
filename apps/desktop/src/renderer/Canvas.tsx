@@ -17,7 +17,6 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
-import SimpleTerminalNode from './SimpleTerminalNode';
 import './Canvas.css';
 
 // Custom node component
@@ -37,7 +36,6 @@ const CustomNode = ({ data }: { data: { label: string } }) => {
 const nodeTypes = {
   custom: CustomNode,
   terminal: TerminalNode,
-  'simple-terminal': SimpleTerminalNode,
 };
 
 const initialNodes: Node[] = [
@@ -86,7 +84,6 @@ function CanvasFlow() {
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const terminalCounterRef = useRef(1);
-  const simpleTerminalCounterRef = useRef(1);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -107,7 +104,7 @@ function CanvasFlow() {
 
   const addTerminalNode = useCallback(() => {
     if (!contextMenu) return;
-    
+
     const position = screenToFlowPosition({
       x: contextMenu.x,
       y: contextMenu.y,
@@ -121,30 +118,6 @@ function CanvasFlow() {
       data: {
         terminalId,
       },
-    };
-
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
-
-  const addSimpleTerminalNode = useCallback(() => {
-    if (!contextMenu) return;
-    
-    const position = screenToFlowPosition({
-      x: contextMenu.x,
-      y: contextMenu.y,
-    });
-
-    const terminalId = `terminal-${simpleTerminalCounterRef.current++}`;
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'simple-terminal',
-      position,
-      data: {
-        terminalId,
-      },
-      draggable: false, // Disable dragging for simple terminal to allow text selection
-      selectable: true,
     };
 
     setNodes((nds) => [...nds, newNode]);
@@ -208,10 +181,7 @@ function CanvasFlow() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="context-menu-item" onClick={addTerminalNode}>
-            <span>Add Terminal (xterm.js)</span>
-          </div>
-          <div className="context-menu-item" onClick={addSimpleTerminalNode}>
-            <span>Add Simple Terminal</span>
+            <span>Add Terminal</span>
           </div>
         </div>
       )}
