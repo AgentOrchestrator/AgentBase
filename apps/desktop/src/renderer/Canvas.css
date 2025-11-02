@@ -585,6 +585,7 @@
   padding: 12px;
   margin-bottom: 12px;
   transition: all 0.2s ease;
+  cursor: grab;
 }
 
 .issue-card:hover {
@@ -592,6 +593,11 @@
   border-color: #4a9eff;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.issue-card:active {
+  cursor: grabbing;
+  opacity: 0.7;
 }
 
 .issue-card:last-child {

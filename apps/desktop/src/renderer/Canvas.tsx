@@ -188,6 +188,54 @@ function CanvasFlow() {
     }, 50);
   }, []);
 
+  // Drag and drop handlers for issue cards
+  const handleIssueDragStart = useCallback((e: React.DragEvent, issue: any) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/json', JSON.stringify(issue));
+    e.dataTransfer.setData('text/plain', `${issue.identifier}: ${issue.title}`);
+  }, []);
+
+  const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleCanvasDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+
+    try {
+      const issueData = e.dataTransfer.getData('application/json');
+      if (!issueData) return;
+
+      const issue = JSON.parse(issueData);
+
+      // Get the drop position relative to the ReactFlow canvas
+      const position = screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      const terminalId = `terminal-${terminalCounterRef.current++}`;
+      const newNode: Node = {
+        id: `node-${Date.now()}`,
+        type: 'terminal',
+        position,
+        data: {
+          terminalId,
+          issue: {
+            identifier: issue.identifier,
+            title: issue.title,
+            url: `https://linear.app/issue/${issue.identifier}`,
+          },
+        },
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+    } catch (error) {
+      console.error('Error handling drop:', error);
+    }
+  }, [screenToFlowPosition, setNodes]);
+
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
@@ -312,6 +360,8 @@ function CanvasFlow() {
         onConnect={onConnect}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={onPaneClick}
+        onDragOver={handleCanvasDragOver}
+        onDrop={handleCanvasDrop}
         nodeTypes={nodeTypes}
         fitView
         style={{ backgroundColor: '#1e1e1e' }}
@@ -474,7 +524,12 @@ function CanvasFlow() {
                   <div className="empty-state">No open issues found</div>
                 ) : (
                   issues.map((issue) => (
-                    <div key={issue.id} className="issue-card">
+                    <div
+                      key={issue.id}
+                      className="issue-card"
+                      draggable
+                      onDragStart={(e) => handleIssueDragStart(e, issue)}
+                    >
                       <div className="issue-header">
                         <span className="issue-identifier">{issue.identifier}</span>
                         <span

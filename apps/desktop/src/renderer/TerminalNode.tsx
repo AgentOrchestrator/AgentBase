@@ -8,16 +8,22 @@ import './TerminalNode.css';
 
 interface TerminalNodeData {
   terminalId: string;
+  issue?: {
+    identifier: string;
+    title: string;
+    url: string;
+  };
 }
 
-function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
+function TerminalNode({ data }: NodeProps) {
+  const nodeData = data as unknown as TerminalNodeData;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const webglAddonRef = useRef<WebglAddon | null>(null);
   const isInitializedRef = useRef(false); // Guard against double initialization (React StrictMode)
   const terminalProcessCreatedRef = useRef(false); // Guard against multiple process creations
-  const terminalId = data.terminalId;
+  const terminalId = nodeData.terminalId;
 
   const count = useRef(0);
 
@@ -810,6 +816,20 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
   return (
     <div className="terminal-node">
       <Handle type="target" position={Position.Top} />
+      {nodeData.issue && (
+        <div className="terminal-node-header">
+          <a
+            href={nodeData.issue.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="issue-link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="issue-id">{nodeData.issue.identifier}</span>
+            <span className="issue-title">{nodeData.issue.title}</span>
+          </a>
+        </div>
+      )}
       <div
         ref={terminalRef}
         className="terminal-node-content"

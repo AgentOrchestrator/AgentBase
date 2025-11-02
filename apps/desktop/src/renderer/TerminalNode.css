@@ -20,6 +20,39 @@
   font-size: 12px;
 }
 
+.terminal-node-header .issue-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.2s ease;
+  flex: 1;
+}
+
+.terminal-node-header .issue-link:hover {
+  opacity: 0.8;
+}
+
+.terminal-node-header .issue-id {
+  color: #888;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-weight: 600;
+  font-size: 11px;
+  background: #2a2c36;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.terminal-node-header .issue-title {
+  color: #d4d4d4;
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .terminal-node-title {
   color: #d4d4d4;
   font-weight: 500;
