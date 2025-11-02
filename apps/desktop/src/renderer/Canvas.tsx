@@ -257,6 +257,10 @@ function CanvasFlow() {
           terminalId,
           attachments: [attachment],
         },
+        style: {
+          width: 600,
+          height: 400,
+        },
       };
 
       setNodes((nds) => [...nds, newNode]);
@@ -314,6 +318,10 @@ function CanvasFlow() {
       position: nodePosition,
       data: {
         terminalId,
+      },
+      style: {
+        width: 600,
+        height: 400,
       },
     };
 
@@ -448,6 +456,7 @@ function CanvasFlow() {
         nodesDraggable={isNodeDragEnabled}
         nodesConnectable={isNodeDragEnabled}
         elementsSelectable={true}
+        nodesFocusable={true}
       >
         <Controls />
         <MiniMap />

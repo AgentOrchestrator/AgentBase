@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
 import IssueDetailsModal from './IssueDetailsModal';
@@ -898,6 +898,17 @@ function TerminalNode({ data, id }: NodeProps) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <NodeResizer
+        minWidth={400}
+        minHeight={300}
+        isVisible={true}
+        lineStyle={{ borderColor: 'transparent' }}
+        handleStyle={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+        }}
+      />
       <Handle type="target" position={Position.Top} />
 
       {/* Render all attachments */}
