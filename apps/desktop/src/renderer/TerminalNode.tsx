@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { Terminal } from 'xterm';
+import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import 'xterm/css/xterm.css';
+import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
 
 interface TerminalNodeData {
@@ -13,10 +14,39 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const webglAddonRef = useRef<WebglAddon | null>(null);
+  const isInitializedRef = useRef(false); // Guard against double initialization (React StrictMode)
+  const terminalProcessCreatedRef = useRef(false); // Guard against multiple process creations
   const terminalId = data.terminalId;
+
+  const count = useRef(0);
+
 
   useEffect(() => {
     if (!terminalRef.current) return;
+    
+    // Guard against double initialization (React StrictMode in development)
+    // Check both the ref flag AND if an xterm already exists in the DOM
+    const existingXterm = terminalRef.current.querySelector('.xterm');
+    if (isInitializedRef.current || existingXterm) {
+      console.log('[TerminalNode] ⚠️ Terminal already initialized, skipping duplicate mount', { 
+        terminalId, 
+        refFlag: isInitializedRef.current,
+        hasXtermInDOM: !!existingXterm 
+      });
+      return;
+    }
+
+    count.current++;
+    
+    // Track mount time to detect StrictMode unmounts
+    if (!(window as any).__terminalMountTimes) {
+      (window as any).__terminalMountTimes = {};
+    }
+    (window as any).__terminalMountTimes[terminalId] = Date.now();
+    
+    console.log('[TerminalNode] TerminalNode initializing', { terminalId, count: count.current });
+    isInitializedRef.current = true;
 
     const wrapper = terminalRef.current;
     let isMouseDown = false;
@@ -235,10 +265,43 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
 
     // Open terminal in DOM
     terminal.open(terminalRef.current);
-    fitAddon.fit();
+
+    // Load WebGL addon for better rendering performance
+    // WebGL must be loaded AFTER terminal.open()
+    try {
+      const webglAddon = new WebglAddon();
+      terminal.loadAddon(webglAddon);
+      webglAddonRef.current = webglAddon;
+      console.log('[TerminalNode] ✅ WebGL renderer enabled', { terminalId });
+    } catch (error) {
+      console.warn('[TerminalNode] ⚠️ WebGL addon failed to load, falling back to canvas renderer', error);
+      // Terminal will continue to work with default canvas renderer
+    }
+
+    // Store refs BEFORE fit() to ensure they're available
+    terminalInstanceRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    // Fit terminal - wrap in try-catch to handle timing issues
+    try {
+      fitAddon.fit();
+    } catch (error) {
+      console.warn('[TerminalNode] Error fitting terminal initially, retrying...', error);
+      // Retry after a short delay
+      setTimeout(() => {
+        try {
+          if (fitAddonRef.current && terminalInstanceRef.current) {
+            fitAddonRef.current.fit();
+          }
+        } catch (retryError) {
+          console.error('[TerminalNode] Failed to fit terminal on retry', retryError);
+        }
+      }, 100);
+    }
 
     // Log initial state
-    console.log('[TerminalNode] Terminal mounted', {
+    console.log('[TerminalNode] ✅ Terminal mounted successfully', {
+      terminalId,
       wrapperClass: wrapper.className,
       wrapperUserSelect: window.getComputedStyle(wrapper).userSelect,
       xtermElement: wrapper.querySelector('.xterm')?.className,
@@ -247,10 +310,6 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
 
     // Focus terminal
     terminal.focus();
-
-    // Store refs
-    terminalInstanceRef.current = terminal;
-    fitAddonRef.current = fitAddon;
 
     // Capture xterm selection events
     const handleXtermSelectionChange = () => {
@@ -317,13 +376,24 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
     terminal.onSelectionChange(handleXtermSelectionChange);
 
     // Also monitor selection periodically when terminal is active
+    // Track the last selection to only log when it changes
+    let lastSelectionText = '';
+    let lastSelectionLength = 0;
     let selectionCheckInterval: NodeJS.Timeout | null = null;
     const startSelectionMonitoring = () => {
       if (selectionCheckInterval) return;
       
       selectionCheckInterval = setInterval(() => {
         const selection = terminal.getSelection();
-        if (selection.length > 0) {
+        const currentSelectionText = selection;
+        const currentSelectionLength = selection.length;
+        
+        // Only log if selection changed (new selection or cleared)
+        const selectionChanged = 
+          currentSelectionLength !== lastSelectionLength ||
+          currentSelectionText !== lastSelectionText;
+        
+        if (selection.length > 0 && selectionChanged) {
           // Filter out selections that are only whitespace/newlines
           const trimmedSelection = selection.trim();
           if (trimmedSelection.length === 0) {
@@ -335,14 +405,21 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
               terminalId
             });
           } else {
-            // This is a meaningful selection with actual content
-            console.log('[TerminalNode] 🔵 Xterm Selection Active (periodic check)', {
+            // This is a meaningful selection with actual content (only log when it's NEW)
+            console.log('[TerminalNode] 🔵 Xterm Selection Active (periodic check - NEW selection detected)', {
               length: selection.length,
               text: selection.substring(0, 100),
               terminalId
             });
           }
+        } else if (selection.length === 0 && lastSelectionLength > 0) {
+          // Selection was cleared
+          console.log('[TerminalNode] 🔵 Xterm Selection Cleared (periodic check)', { terminalId });
         }
+        
+        // Update tracked values
+        lastSelectionText = currentSelectionText;
+        lastSelectionLength = currentSelectionLength;
       }, 200); // Check every 200ms
     };
 
@@ -350,17 +427,29 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       if (selectionCheckInterval) {
         clearInterval(selectionCheckInterval);
         selectionCheckInterval = null;
+        // Reset tracking when stopping
+        lastSelectionText = '';
+        lastSelectionLength = 0;
       }
     };
 
     // Start monitoring when terminal gets focus
     wrapper.addEventListener('focusin', () => {
       console.log('[TerminalNode] Terminal focused - starting selection monitoring');
+      // Reset tracking on focus
+      lastSelectionText = '';
+      lastSelectionLength = 0;
       startSelectionMonitoring();
     });
 
     wrapper.addEventListener('focusout', () => {
       console.log('[TerminalNode] Terminal blurred - stopping selection monitoring');
+      // Clear any lingering selection when blurring
+      const selection = terminal.getSelection();
+      if (selection.length > 0) {
+        console.log('[TerminalNode] Clearing lingering selection on blur');
+        terminal.clearSelection();
+      }
       stopSelectionMonitoring();
     });
 
@@ -430,14 +519,19 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
             terminalId
           });
 
-          // Always clear whitespace-only selections, regardless of whether it's a drag or click
-          // Also clear if it's a quick click (not an actual drag)
-          if (isWhitespaceOnly || (isQuickClick && e.button === 0)) {
-            console.log('[TerminalNode] ⚠️ Clearing selection', {
-              reason: isWhitespaceOnly ? 'whitespace-only selection' : 'quick click (not a drag)',
+          // Clear selection if:
+          // 1. It's whitespace-only (always clear these)
+          // 2. It's a quick click without drag (user just clicked, didn't intend to select)
+          // 3. User didn't actually drag (stayed in same spot)
+          if (isWhitespaceOnly || (isQuickClick && e.button === 0) || (!hasDragged && e.button === 0)) {
+            console.log('[TerminalNode] ⚠️ Clearing selection on mouseup', {
+              reason: isWhitespaceOnly ? 'whitespace-only selection' : 
+                      isQuickClick ? 'quick click (not a drag)' : 
+                      'no drag detected (clicked in place)',
               distance: totalDistance.toFixed(2),
               timeSinceMouseDown,
-              isActualDrag
+              isActualDrag,
+              hasDragged
             });
             setTimeout(() => {
               terminal.clearSelection();
@@ -502,9 +596,13 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       (wrapper as any)._cleanupXtermListeners = cleanupXtermListeners;
     }
 
-    // Create terminal process in main process
-    if (window.electronAPI) {
+    // Create terminal process in main process (only once)
+    if (window.electronAPI && !terminalProcessCreatedRef.current) {
+      terminalProcessCreatedRef.current = true;
+      console.log('[TerminalNode] Creating terminal process', { terminalId });
       window.electronAPI.createTerminal(terminalId);
+    } else if (terminalProcessCreatedRef.current) {
+      console.log('[TerminalNode] Terminal process already created, skipping', { terminalId });
     }
 
     // Send terminal input to main process (if API is available)
@@ -529,13 +627,27 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       handleTerminalExit = ({ terminalId: dataTerminalId, code, signal }: { terminalId: string; code: number; signal?: number }) => {
         // Only process exit for this specific terminal
         if (dataTerminalId === terminalId) {
-          terminal.write(`\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`);
-          terminal.write('\r\n[Terminal closed. Creating new session...]\r\n');
-          // Automatically restart the terminal
+          // Don't show exit message if it exited immediately on startup (likely a configuration issue)
+          // Exit code 1 with signal often indicates the shell couldn't start properly
+          const isImmediateExit = code === 1 && signal === 1;
+          
+          if (!isImmediateExit) {
+            terminal.write(`\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`);
+            terminal.write('\r\n[Terminal closed. Creating new session...]\r\n');
+          } else {
+            terminal.write(`\r\n\n[Shell exited immediately - check shell configuration]\r\n`);
+            terminal.write(`[Shell: ${process.env.SHELL || '/bin/bash'}]\r\n`);
+          }
+          
+          // Automatically restart the terminal (but delay longer for immediate exits to avoid loop)
           if (window.electronAPI) {
             setTimeout(() => {
+              // Reset the flag to allow recreation
+              terminalProcessCreatedRef.current = false;
+              console.log('[TerminalNode] Restarting terminal process', { terminalId });
               window.electronAPI.createTerminal(terminalId);
-            }, 100);
+              terminalProcessCreatedRef.current = true;
+            }, isImmediateExit ? 1000 : 100);
           }
         }
       };
@@ -549,33 +661,172 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       terminal.write('$ ');
     }
 
-    // Handle resize
-    const handleResize = () => {
-      if (fitAddon && terminal) {
-        fitAddon.fit();
-        const dimensions = fitAddon.proposeDimensions();
+    // Handle resize with optimized throttling for smooth React Flow resizing
+    let resizeTimeout: NodeJS.Timeout | null = null;
+    let lastResizeDimensions: { cols: number; rows: number } | null = null;
+    let lastContainerSize: { width: number; height: number } | null = null;
+    let isFitting = false; // Flag to prevent feedback loop during fit()
+    let isResizing = false; // Track if actively resizing
+    let resizeStartTime = 0;
+
+    // Declare resizeObserver variable first so it can be referenced in handleResize
+    let resizeObserver: ResizeObserver;
+
+    const performFit = () => {
+      if (!fitAddonRef.current || !terminalInstanceRef.current || !terminalRef.current) return;
+
+      try {
+        isFitting = true;
+        fitAddonRef.current.fit();
+        const dimensions = fitAddonRef.current.proposeDimensions();
         if (dimensions && window.electronAPI) {
-          window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
+          // Only send resize if dimensions actually changed
+          if (!lastResizeDimensions ||
+              lastResizeDimensions.cols !== dimensions.cols ||
+              lastResizeDimensions.rows !== dimensions.rows) {
+            lastResizeDimensions = { cols: dimensions.cols, rows: dimensions.rows };
+            window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
+          }
         }
+      } finally {
+        isFitting = false;
       }
     };
 
-    const resizeObserver = new ResizeObserver(handleResize);
+    const handleResize = () => {
+      if (!fitAddonRef.current || !terminalInstanceRef.current || !terminalRef.current) return;
+      if (isFitting) return; // Prevent feedback loop
+
+      // Get current container size
+      const container = terminalRef.current;
+      const currentWidth = container.clientWidth;
+      const currentHeight = container.clientHeight;
+
+      // Only proceed if container size actually changed (prevents unnecessary fits)
+      if (lastContainerSize &&
+          lastContainerSize.width === currentWidth &&
+          lastContainerSize.height === currentHeight) {
+        return; // Container size hasn't changed, skip resize
+      }
+
+      // Update tracked container size
+      lastContainerSize = { width: currentWidth, height: currentHeight };
+
+      const now = Date.now();
+
+      // If this is the start of a resize, mark it
+      if (!isResizing) {
+        isResizing = true;
+        resizeStartTime = now;
+      }
+
+      // Clear any pending timeout
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+
+      // For smooth resizing during drag: use shorter delay (50ms)
+      // For final resize after drag ends: use longer delay (150ms)
+      const timeSinceStart = now - resizeStartTime;
+      const isDragging = timeSinceStart < 2000; // Assume dragging if resize started less than 2s ago
+      const delay = isDragging ? 50 : 150;
+
+      resizeTimeout = setTimeout(() => {
+        try {
+          if (fitAddonRef.current && terminalInstanceRef.current && terminalRef.current) {
+            // Use requestAnimationFrame for smooth rendering
+            requestAnimationFrame(() => {
+              performFit();
+            });
+          }
+        } catch (error) {
+          console.warn('[TerminalNode] Error handling resize', error);
+        } finally {
+          // Reset resizing flag after delay
+          setTimeout(() => {
+            isResizing = false;
+          }, 300);
+        }
+      }, delay);
+    };
+
+    resizeObserver = new ResizeObserver(handleResize);
     if (terminalRef.current) {
       resizeObserver.observe(terminalRef.current);
     }
 
-    // Initial resize
+    // Initial resize (use the throttled handler)
     setTimeout(() => {
-      fitAddon.fit();
-      const dimensions = fitAddon.proposeDimensions();
-      if (dimensions && window.electronAPI) {
-        window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
-      }
+      handleResize();
     }, 100);
 
     // Cleanup
     return () => {
+      const cleanupTime = Date.now();
+      const mountTime = (window as any).__terminalMountTimes?.[terminalId];
+      const componentLifetime = mountTime ? cleanupTime - mountTime : null;
+      
+      console.log('[TerminalNode] 🧹 Cleanup triggered', {
+        terminalId,
+        componentLifetime: componentLifetime ? `${componentLifetime}ms` : 'unknown',
+        wasInitialized: isInitializedRef.current,
+        stackTrace: new Error().stack?.split('\n').slice(2, 6).join('\n')
+      });
+
+      // In React StrictMode, cleanup runs immediately after mount - don't destroy terminal process
+      // Only destroy if component was actually initialized and had time to run
+      const isStrictModeUnmount = !isInitializedRef.current || (componentLifetime !== null && componentLifetime < 500);
+      
+      if (isStrictModeUnmount) {
+        console.log('[TerminalNode] ⚠️ Skipping terminal destroy - likely StrictMode unmount', {
+          terminalId,
+          componentLifetime,
+          wasInitialized: isInitializedRef.current
+        });
+        // Clean up DOM and listeners but don't destroy the terminal process
+        if (webglAddonRef.current) {
+          try {
+            webglAddonRef.current.dispose();
+            webglAddonRef.current = null;
+          } catch (e) {
+            console.warn('[TerminalNode] Error disposing WebGL addon in cleanup', e);
+          }
+        }
+        if (terminalInstanceRef.current) {
+          try {
+            terminalInstanceRef.current.dispose();
+          } catch (e) {
+            console.warn('[TerminalNode] Error disposing terminal in cleanup', e);
+          }
+        }
+        stopSelectionMonitoring();
+        // Cleanup xterm-specific listeners if they were added
+        if ((wrapper as any)._cleanupXtermListeners) {
+          (wrapper as any)._cleanupXtermListeners();
+        }
+        wrapper.removeEventListener('selectstart', preventSelection);
+        wrapper.removeEventListener('dragstart', handleDragStart);
+        wrapper.removeEventListener('mousedown', handleMouseDown);
+        wrapper.removeEventListener('mouseup', handleMouseUp);
+        wrapper.removeEventListener('mousemove', handleMouseMove);
+        wrapper.removeEventListener('click', handleClick);
+        wrapper.removeEventListener('select', handleSelect);
+        document.removeEventListener('selectionchange', handleSelectionChange);
+        resizeObserver.disconnect();
+        isInitializedRef.current = false;
+        terminalProcessCreatedRef.current = false; // Reset flag but don't destroy process
+        return; // Early return - don't destroy the terminal process
+      }
+
+      isInitializedRef.current = false; // Reset on cleanup
+      terminalProcessCreatedRef.current = false; // Reset process creation flag
+      
+      // Clear resize timeout
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = null;
+      }
+      
       stopSelectionMonitoring();
       // Cleanup xterm-specific listeners if they were added
       if ((wrapper as any)._cleanupXtermListeners) {
@@ -590,7 +841,21 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       wrapper.removeEventListener('select', handleSelect);
       document.removeEventListener('selectionchange', handleSelectionChange);
       resizeObserver.disconnect();
-      terminal.dispose();
+
+      if (webglAddonRef.current) {
+        try {
+          webglAddonRef.current.dispose();
+          webglAddonRef.current = null;
+        } catch (e) {
+          console.warn('[TerminalNode] Error disposing WebGL addon', e);
+        }
+      }
+
+      if (terminalInstanceRef.current) {
+        terminalInstanceRef.current.dispose();
+      }
+
+      console.log('[TerminalNode] 🗑️ Destroying terminal process', { terminalId });
       if (window.electronAPI) {
         window.electronAPI.destroyTerminal(terminalId);
       }

@@ -39,6 +39,10 @@
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
+  /* Enable hardware acceleration for smoother resizing */
+  will-change: width, height;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 /* Re-enable text selection only inside the xterm terminal where text is rendered */
@@ -47,6 +51,9 @@
   -webkit-user-select: text !important;
   -moz-user-select: text !important;
   -ms-user-select: text !important;
+  /* Hardware acceleration for xterm canvas */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .terminal-node-content .xterm * {
