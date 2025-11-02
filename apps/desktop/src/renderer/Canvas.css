@@ -19,43 +19,97 @@
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
-  border-radius: 8px;
-  padding: 8px 16px;
+  background: rgba(42, 44, 54, 0.3);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(139, 157, 195, 0.1);
+  border-radius: 24px;
+  padding: 10px 18px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.85;
+}
+
+.mode-indicator:hover {
+  opacity: 1;
+  border-color: rgba(139, 157, 195, 0.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2), 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Pulsation animations */
+@keyframes pulse-blue {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(74, 158, 255, 0.7);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(74, 158, 255, 0);
+  }
+}
+
+@keyframes pulse-orange {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.7);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(255, 165, 0, 0);
+  }
 }
 
 .mode-indicator.terminal-mode {
-  border-color: #4a9eff;
+  border-color: rgba(74, 158, 255, 0.15);
+}
+
+.mode-indicator.terminal-mode::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(74, 158, 255, 0.8);
+  animation: pulse-blue 2s ease-in-out infinite;
 }
 
 .mode-indicator.drag-mode {
-  border-color: #ffa500;
+  border-color: rgba(255, 165, 0, 0.15);
+  background: rgba(42, 44, 54, 0.4);
+}
+
+.mode-indicator.drag-mode::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 165, 0, 0.8);
+  animation: pulse-orange 2s ease-in-out infinite;
 }
 
 .mode-icon {
-  font-size: 18px;
-  line-height: 1;
+  display: none;
 }
 
 .mode-text {
-  color: #d4d4d4;
-  font-size: 14px;
-  font-weight: 500;
+  display: none;
 }
 
 .mode-hint {
-  color: #888;
-  font-size: 12px;
-  margin-left: 8px;
-  padding-left: 8px;
-  border-left: 1px solid #3a3c46;
+  color: rgba(212, 212, 212, 0.6);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
 }
 
 .custom-node {
