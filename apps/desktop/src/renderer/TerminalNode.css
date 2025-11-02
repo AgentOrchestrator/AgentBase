@@ -1,6 +1,6 @@
 .terminal-node {
   background: #2a2c36;
-  border: 1px solid #3a3c46;
+  border: none;
   border-radius: 8px;
   overflow: hidden;
   min-width: 400px;
@@ -32,17 +32,13 @@
 
 .terminal-node-content {
   flex: 1;
-  padding: 4px;
+  padding: 0;
   min-height: 250px;
   /* Prevent text selection on the wrapper and all children by default */
   user-select: none !important;
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
-  /* Enable hardware acceleration for smoother resizing */
-  will-change: width, height;
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 
 /* Re-enable text selection only inside the xterm terminal where text is rendered */
@@ -51,9 +47,6 @@
   -webkit-user-select: text !important;
   -moz-user-select: text !important;
   -ms-user-select: text !important;
-  /* Hardware acceleration for xterm canvas */
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 .terminal-node-content .xterm * {

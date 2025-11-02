@@ -453,167 +453,92 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       stopSelectionMonitoring();
     });
 
-    // Also log when selection is cleared
-    const originalClearSelection = terminal.clearSelection.bind(terminal);
-    terminal.clearSelection = function() {
-      console.log('[TerminalNode] 🔵 Xterm Selection Cleared', { terminalId });
-      originalClearSelection();
-    };
-
-    // Add mouse event listeners specifically to xterm element
+    // Add logging to debug selection offset
     const xtermElement = wrapper.querySelector('.xterm');
     if (xtermElement) {
-      let xtermIsMouseDown = false;
-      let mouseDownX = 0;
-      let mouseDownY = 0;
-      let mouseDownTime = 0;
-      let hasDragged = false;
-      const DRAG_THRESHOLD = 5; // pixels - increased from 3 to reduce false positives
-      const CLICK_MAX_DURATION = 200; // ms - clicks should be quick
+      let mouseDownPos = { x: 0, y: 0 };
+      let mouseMovePos = { x: 0, y: 0 };
 
-      const handleXtermMouseDown = (e: MouseEvent) => {
-        xtermIsMouseDown = true;
-        mouseDownX = e.clientX;
-        mouseDownY = e.clientY;
-        mouseDownTime = Date.now();
-        hasDragged = false;
+      const handleDebugMouseDown = (e: MouseEvent) => {
+        mouseDownPos = { x: e.clientX, y: e.clientY };
+        const rect = xtermElement.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        const relativeY = e.clientY - rect.top;
 
-        // Clear any existing selection on mousedown to prevent sticky selections
-        // This helps when clicking in a new area
-        const existingSelection = terminal.getSelection();
-        if (existingSelection.length > 0) {
-          console.log('[TerminalNode] 🔵 Clearing existing selection on mousedown');
-          terminal.clearSelection();
-        }
-
-        console.log('[TerminalNode] 🔵 Xterm mousedown', {
-          button: e.button,
+        console.log('[TerminalNode] 🔍 Mouse Down Debug', {
           clientX: e.clientX,
           clientY: e.clientY,
-          target: (e.target as HTMLElement).className,
+          xtermRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          relativeToXterm: { x: relativeX, y: relativeY },
           terminalId
         });
       };
 
-      const handleXtermMouseUp = (e: MouseEvent) => {
-        const mouseUpTime = Date.now();
-        const timeSinceMouseDown = mouseUpTime - mouseDownTime;
-        const distanceX = Math.abs(e.clientX - mouseDownX);
-        const distanceY = Math.abs(e.clientY - mouseDownY);
-        const totalDistance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-        const isActualDrag = totalDistance >= DRAG_THRESHOLD;
-        const isQuickClick = timeSinceMouseDown < CLICK_MAX_DURATION && !isActualDrag;
+      const handleDebugMouseMove = (e: MouseEvent) => {
+        mouseMovePos = { x: e.clientX, y: e.clientY };
+      };
 
-        xtermIsMouseDown = false;
-        
-        // Check selection after a short delay to allow xterm to process
+      const handleDebugMouseUp = (e: MouseEvent) => {
+        const rect = xtermElement.getBoundingClientRect();
+        const mouseUpRelativeX = e.clientX - rect.left;
+        const mouseUpRelativeY = e.clientY - rect.top;
+        const mouseDownRelativeX = mouseDownPos.x - rect.left;
+        const mouseDownRelativeY = mouseDownPos.y - rect.top;
+
+        // Get xterm selection info
         setTimeout(() => {
           const selection = terminal.getSelection();
-          const browserSelection = window.getSelection();
-          const isWhitespaceOnly = selection.length > 0 && /^[\n\r\s]+$/.test(selection);
-          
-          console.log('[TerminalNode] 🔵 Xterm mouseup', {
-            button: e.button,
-            distance: totalDistance.toFixed(2),
-            isActualDrag,
-            isQuickClick,
-            timeSinceMouseDown,
-            hasDragged,
-            xtermSelection: selection.substring(0, 100),
-            xtermSelectionLength: selection.length,
-            isWhitespaceOnly,
-            browserSelection: browserSelection?.toString().substring(0, 100) || 'none',
-            browserSelectionLength: browserSelection?.toString().length || 0,
+          const hasSelection = terminal.hasSelection();
+
+          // Try to get the selection buffer range if available
+          let selectionRange = null;
+          try {
+            // @ts-ignore - accessing internal API for debugging
+            if (terminal._core?.buffer?.active && terminal._core?.selectionManager) {
+              // @ts-ignore
+              const selectionModel = terminal._core?.selectionManager?.model;
+              if (selectionModel) {
+                selectionRange = {
+                  // @ts-ignore
+                  start: selectionModel.finalSelectionStart ? [...selectionModel.finalSelectionStart] : null,
+                  // @ts-ignore
+                  end: selectionModel.finalSelectionEnd ? [...selectionModel.finalSelectionEnd] : null,
+                };
+              }
+            }
+          } catch (err) {
+            console.warn('[TerminalNode] Could not access selection range', err);
+          }
+
+          console.log('[TerminalNode] 🔍 Selection Debug', {
+            hasSelection,
+            selectionText: selection.substring(0, 100),
+            selectionLength: selection.length,
+            mousePositions: {
+              down: { client: mouseDownPos, relative: { x: mouseDownRelativeX, y: mouseDownRelativeY } },
+              up: { client: { x: e.clientX, y: e.clientY }, relative: { x: mouseUpRelativeX, y: mouseUpRelativeY } },
+              dragDistance: {
+                x: Math.abs(e.clientX - mouseDownPos.x),
+                y: Math.abs(e.clientY - mouseDownPos.y)
+              }
+            },
+            xtermRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+            selectionRange,
             terminalId
           });
-
-          // Clear selection if:
-          // 1. It's whitespace-only (always clear these - false drag detection)
-          // 2. It's a quick click with minimal movement (user just clicked, didn't intend to select)
-          // 3. Selection is very small and there was no intentional drag
-          const hasTextSelection = selection.length > 0 && !isWhitespaceOnly;
-          const isVerySmallSelection = selection.length > 0 && selection.length <= 2;
-          const shouldClear =
-            isWhitespaceOnly ||
-            (isQuickClick && !isActualDrag && !hasTextSelection) ||
-            (isVerySmallSelection && !isActualDrag && timeSinceMouseDown < 300);
-
-          if (shouldClear) {
-            console.log('[TerminalNode] ⚠️ Clearing selection on mouseup', {
-              reason: isWhitespaceOnly ? 'whitespace-only' :
-                      isQuickClick ? 'quick click' :
-                      'small accidental selection',
-              distance: totalDistance.toFixed(2),
-              timeSinceMouseDown,
-              isActualDrag,
-              hasDragged,
-              hasTextSelection,
-              selectionLength: selection.length
-            });
-            setTimeout(() => {
-              terminal.clearSelection();
-            }, 10);
-          }
-        }, 10);
+        }, 50); // Wait a bit for xterm to finalize selection
       };
 
-      const handleXtermMouseMove = (e: MouseEvent) => {
-        if (xtermIsMouseDown) {
-          const distanceX = Math.abs(e.clientX - mouseDownX);
-          const distanceY = Math.abs(e.clientY - mouseDownY);
-          const totalDistance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+      xtermElement.addEventListener('mousedown', handleDebugMouseDown);
+      xtermElement.addEventListener('mousemove', handleDebugMouseMove);
+      xtermElement.addEventListener('mouseup', handleDebugMouseUp);
 
-          if (totalDistance >= DRAG_THRESHOLD) {
-            hasDragged = true;
-          }
-
-          const selection = terminal.getSelection();
-          if (selection.length > 0) {
-            const isWhitespaceOnly = /^[\n\r\s]+$/.test(selection);
-            const isActualDrag = totalDistance >= DRAG_THRESHOLD;
-
-            console.log('[TerminalNode] 🔵 Xterm mousemove', {
-              distance: totalDistance.toFixed(2),
-              isActualDrag,
-              hasDragged,
-              selectionLength: selection.length,
-              selectionText: selection.substring(0, 50),
-              isWhitespaceOnly,
-              clientX: e.clientX,
-              clientY: e.clientY,
-              terminalId
-            });
-
-            // Clear unwanted selections during movement:
-            // 1. Whitespace-only selections (always clear)
-            // 2. Very small selections during non-drag movement (accidental selections)
-            const isVerySmallSelection = selection.length <= 2;
-            if (isWhitespaceOnly || (isVerySmallSelection && !isActualDrag)) {
-              console.log('[TerminalNode] ⚠️ Clearing unwanted selection during mousemove', {
-                reason: isWhitespaceOnly ? 'whitespace-only' : 'small accidental selection',
-                distance: totalDistance.toFixed(2),
-                isActualDrag,
-                selectionLength: selection.length
-              });
-              terminal.clearSelection();
-            }
-          }
-        }
+      // Store cleanup function
+      (wrapper as any)._cleanupDebugListeners = () => {
+        xtermElement.removeEventListener('mousedown', handleDebugMouseDown);
+        xtermElement.removeEventListener('mousemove', handleDebugMouseMove);
+        xtermElement.removeEventListener('mouseup', handleDebugMouseUp);
       };
-
-      xtermElement.addEventListener('mousedown', handleXtermMouseDown);
-      xtermElement.addEventListener('mouseup', handleXtermMouseUp);
-      xtermElement.addEventListener('mousemove', handleXtermMouseMove);
-
-      // Cleanup xterm event listeners
-      const cleanupXtermListeners = () => {
-        xtermElement.removeEventListener('mousedown', handleXtermMouseDown);
-        xtermElement.removeEventListener('mouseup', handleXtermMouseUp);
-        xtermElement.removeEventListener('mousemove', handleXtermMouseMove);
-      };
-
-      // Store cleanup function to call in main cleanup
-      (wrapper as any)._cleanupXtermListeners = cleanupXtermListeners;
     }
 
     // Create terminal process in main process (only once)
@@ -820,9 +745,9 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
           }
         }
         stopSelectionMonitoring();
-        // Cleanup xterm-specific listeners if they were added
-        if ((wrapper as any)._cleanupXtermListeners) {
-          (wrapper as any)._cleanupXtermListeners();
+        // Cleanup debug listeners
+        if ((wrapper as any)._cleanupDebugListeners) {
+          (wrapper as any)._cleanupDebugListeners();
         }
         wrapper.removeEventListener('selectstart', preventSelection);
         wrapper.removeEventListener('dragstart', handleDragStart);
@@ -848,9 +773,9 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
       }
       
       stopSelectionMonitoring();
-      // Cleanup xterm-specific listeners if they were added
-      if ((wrapper as any)._cleanupXtermListeners) {
-        (wrapper as any)._cleanupXtermListeners();
+      // Cleanup debug listeners
+      if ((wrapper as any)._cleanupDebugListeners) {
+        (wrapper as any)._cleanupDebugListeners();
       }
       wrapper.removeEventListener('selectstart', preventSelection);
       wrapper.removeEventListener('dragstart', handleDragStart);
@@ -885,12 +810,8 @@ function TerminalNode({ data, id }: NodeProps<TerminalNodeData>) {
   return (
     <div className="terminal-node">
       <Handle type="target" position={Position.Top} />
-      <div className="terminal-node-header">
-        <span className="terminal-node-title">Terminal</span>
-        <span className="terminal-node-id">{data.terminalId}</span>
-      </div>
-      <div 
-        ref={terminalRef} 
+      <div
+        ref={terminalRef}
         className="terminal-node-content"
         onClick={() => terminalInstanceRef.current?.focus()}
       />
