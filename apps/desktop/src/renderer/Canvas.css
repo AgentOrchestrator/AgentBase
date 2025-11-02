@@ -1,0 +1,64 @@
+.canvas-container {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+}
+
+.custom-node {
+  padding: 10px 20px;
+  border-radius: 8px;
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+  color: #d4d4d4;
+  min-width: 150px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.custom-node-content {
+  padding: 8px;
+}
+
+/* Custom handle styles */
+.custom-node .react-flow__handle {
+  background: #4a9eff;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #2a2c36;
+}
+
+.custom-node .react-flow__handle-top {
+  top: -5px;
+}
+
+.custom-node .react-flow__handle-bottom {
+  bottom: -5px;
+}
+
+/* Custom controls styling */
+.react-flow__controls {
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+}
+
+.react-flow__controls button {
+  background: #2a2c36;
+  border-bottom: 1px solid #3a3c46;
+  color: #d4d4d4;
+}
+
+.react-flow__controls button:hover {
+  background: #3a3c46;
+}
+
+/* Custom minimap styling */
+.react-flow__minimap {
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+}
+
+/* Custom background dots */
+.react-flow__background {
+  background-color: #1e1e1e;
+}
+
