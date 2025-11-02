@@ -4,6 +4,51 @@
   position: relative;
 }
 
+/* Mode indicator */
+.mode-indicator {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+  border-radius: 8px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+}
+
+.mode-indicator.terminal-mode {
+  border-color: #4a9eff;
+}
+
+.mode-indicator.drag-mode {
+  border-color: #ffa500;
+}
+
+.mode-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mode-text {
+  color: #d4d4d4;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mode-hint {
+  color: #888;
+  font-size: 12px;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid #3a3c46;
+}
+
 .custom-node {
   padding: 10px 20px;
   border-radius: 8px;

@@ -84,6 +84,7 @@ function CanvasFlow() {
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const terminalCounterRef = useRef(1);
+  const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -163,6 +164,12 @@ function CanvasFlow() {
         event.preventDefault(); // Prevent default browser behavior
         addTerminalNode();
       }
+
+      // Toggle node drag mode with Space key
+      if (event.key === ' ' && !event.repeat) {
+        event.preventDefault();
+        setIsNodeDragEnabled((prev) => !prev);
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -173,6 +180,15 @@ function CanvasFlow() {
 
   return (
     <div className="canvas-container">
+      {/* Mode indicator */}
+      <div className={`mode-indicator ${isNodeDragEnabled ? 'drag-mode' : 'terminal-mode'}`}>
+        <span className="mode-icon">{isNodeDragEnabled ? '🔄' : '⌨️'}</span>
+        <span className="mode-text">
+          {isNodeDragEnabled ? 'Node Drag Mode' : 'Terminal Mode'}
+        </span>
+        <span className="mode-hint">Press Space to toggle</span>
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -191,8 +207,8 @@ function CanvasFlow() {
         zoomOnScroll={false}
         panOnDrag={true}
         zoomOnPinch={true}
-        nodesDraggable={true}
-        nodesConnectable={true}
+        nodesDraggable={isNodeDragEnabled}
+        nodesConnectable={isNodeDragEnabled}
         elementsSelectable={true}
       >
         <Controls />
