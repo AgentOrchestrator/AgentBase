@@ -1,3 +1,5 @@
+import type { CanvasState, CanvasMetadata } from '../main/types/database';
+
 export interface ElectronAPI {
   createTerminal: (terminalId: string) => void;
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
@@ -8,9 +10,20 @@ export interface ElectronAPI {
   removeAllListeners: (channel: string) => void;
 }
 
+export interface CanvasAPI {
+  saveCanvas: (canvasId: string, state: CanvasState) => Promise<void>;
+  loadCanvas: (canvasId: string) => Promise<CanvasState | null>;
+  listCanvases: () => Promise<CanvasMetadata[]>;
+  deleteCanvas: (canvasId: string) => Promise<void>;
+  getCurrentCanvasId: () => Promise<string | null>;
+  setCurrentCanvasId: (canvasId: string) => Promise<void>;
+}
+
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
+    canvasAPI?: CanvasAPI;
   }
 }
 
+export {};

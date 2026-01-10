@@ -20,6 +20,7 @@ import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
 import './Canvas.css';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
+import { useCanvasPersistence } from './hooks';
 
 // Custom node component
 const CustomNode = ({ data }: { data: { label: string } }) => {
@@ -41,9 +42,43 @@ const nodeTypes = {
   workspace: WorkspaceNode,
 };
 
-const initialNodes: Node[] = [];
+const defaultNodes: Node[] = [];
 
-const initialEdges: Edge[] = [];
+const defaultEdges: Edge[] = [];
+
+type LinearProject = {
+  id: string;
+  name: string;
+};
+
+type LinearMilestone = {
+  id: string;
+  name: string;
+  project?: LinearProject;
+};
+
+type LinearWorkflowState = {
+  id: string;
+  name: string;
+  color: string;
+  type?: string;
+};
+
+type LinearIssue = {
+  id: string;
+  title: string;
+  identifier: string;
+  state: LinearWorkflowState;
+  priority: number;
+  assignee?: {
+    name: string;
+    avatarUrl?: string;
+  };
+  project?: LinearProject;
+  projectMilestone?: LinearMilestone;
+  createdAt: string;
+  updatedAt: string;
+};
 
 type ContextMenu = {
   x: number;
@@ -51,8 +86,56 @@ type ContextMenu = {
 } | null;
 
 function CanvasFlow() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Canvas persistence hook - centralized save/restore logic
+  const {
+    isLoading: isCanvasLoading,
+    isSaving,
+    lastSavedAt,
+    initialNodes,
+    initialEdges,
+    // initialViewport and persistViewport available for future viewport persistence
+    persistNodes,
+    persistEdges,
+  } = useCanvasPersistence({ debounceMs: 1000 });
+
+  // Initialize React Flow state with restored data or defaults
+  const [nodes, setNodes, onNodesChange] = useNodesState(
+    initialNodes.length > 0 ? initialNodes : defaultNodes
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    initialEdges.length > 0 ? initialEdges : defaultEdges
+  );
+
+  // Track if initial state has been applied
+  const initialStateApplied = useRef(false);
+
+  // Apply restored state when it becomes available
+  useEffect(() => {
+    if (!isCanvasLoading && initialNodes.length > 0 && !initialStateApplied.current) {
+      setNodes(initialNodes);
+      setEdges(initialEdges);
+      initialStateApplied.current = true;
+    }
+  }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
+
+  // Persist nodes when they change
+  const prevNodesRef = useRef<Node[]>(nodes);
+  useEffect(() => {
+    if (!isCanvasLoading && nodes !== prevNodesRef.current) {
+      prevNodesRef.current = nodes;
+      persistNodes(nodes);
+    }
+  }, [nodes, isCanvasLoading, persistNodes]);
+
+  // Persist edges when they change
+  const prevEdgesRef = useRef<Edge[]>(edges);
+  useEffect(() => {
+    if (!isCanvasLoading && edges !== prevEdgesRef.current) {
+      prevEdgesRef.current = edges;
+      persistEdges(edges);
+    }
+  }, [edges, isCanvasLoading, persistEdges]);
+
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -68,8 +151,13 @@ function CanvasFlow() {
   const [showPillContent, setShowPillContent] = useState(false);
   const [isContentVisible, setIsContentVisible] = useState(false);
   const [isTextVisible, setIsTextVisible] = useState(true);
-  const [issues, setIssues] = useState<any[]>([]);
+  const [issues, setIssues] = useState<LinearIssue[]>([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
+  const [linearWorkspaceName, setLinearWorkspaceName] = useState('');
+  const [linearProjects, setLinearProjects] = useState<LinearProject[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('all');
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState('all');
+  const [selectedStatusId, setSelectedStatusId] = useState('all');
 
   // Load Linear API key from localStorage on mount
   useEffect(() => {
@@ -77,6 +165,40 @@ function CanvasFlow() {
     if (storedKey) {
       setLinearApiKey(storedKey);
       setIsLinearConnected(true);
+    }
+  }, []);
+
+  const fetchLinearProjects = useCallback(async () => {
+    const apiKey = localStorage.getItem('linear_api_key');
+    if (!apiKey) return;
+
+    try {
+      const query = `
+        query {
+          projects(first: 100) {
+            nodes {
+              id
+              name
+            }
+          }
+        }
+      `;
+
+      const response = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await response.json();
+      if (data.data?.projects?.nodes) {
+        setLinearProjects(data.data.projects.nodes);
+      }
+    } catch (error) {
+      console.error('Error fetching Linear projects:', error);
     }
   }, []);
 
@@ -110,6 +232,8 @@ function CanvasFlow() {
     localStorage.removeItem('linear_api_key');
     setLinearApiKey('');
     setIsLinearConnected(false);
+    setLinearWorkspaceName('');
+    setLinearProjects([]);
   }, []);
 
   const fetchLinearIssues = useCallback(async () => {
@@ -120,19 +244,41 @@ function CanvasFlow() {
     try {
       const query = `
         query {
-          issues(filter: { state: { type: { in: ["started", "unstarted"] } } }, first: 10) {
+          viewer {
+            organization {
+              name
+            }
+          }
+          issues(
+            filter: { state: { type: { in: ["triage", "backlog", "unstarted", "started"] } } }
+            first: 50
+          ) {
             nodes {
               id
               title
               identifier
               state {
+                id
                 name
                 color
+                type
               }
               priority
               assignee {
                 name
                 avatarUrl
+              }
+              project {
+                id
+                name
+              }
+              projectMilestone {
+                id
+                name
+                project {
+                  id
+                  name
+                }
               }
               createdAt
               updatedAt
@@ -154,6 +300,11 @@ function CanvasFlow() {
       if (data.data?.issues?.nodes) {
         setIssues(data.data.issues.nodes);
       }
+      const workspaceName =
+        data.data?.viewer?.organization?.name ?? data.data?.organization?.name ?? '';
+      if (workspaceName) {
+        setLinearWorkspaceName(workspaceName);
+      }
     } catch (error) {
       console.error('Error fetching Linear issues:', error);
     } finally {
@@ -161,10 +312,130 @@ function CanvasFlow() {
     }
   }, []);
 
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, LinearProject>();
+    linearProjects.forEach((project) => {
+      if (project.id) {
+        map.set(project.id, project);
+      }
+    });
+    issues.forEach((issue) => {
+      if (issue.project?.id) {
+        map.set(issue.project.id, issue.project);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [issues, linearProjects]);
+
+  const milestoneOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; label: string; projectId?: string }>();
+    issues.forEach((issue) => {
+      if (issue.projectMilestone?.id) {
+        const milestone = issue.projectMilestone;
+        const label = milestone.project?.name
+          ? `${milestone.project.name} / ${milestone.name}`
+          : milestone.name;
+        map.set(milestone.id, {
+          id: milestone.id,
+          name: milestone.name,
+          label,
+          projectId: milestone.project?.id,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [issues]);
+
+  const statusOptions = useMemo(() => {
+    const map = new Map<string, LinearWorkflowState>();
+    issues.forEach((issue) => {
+      if (issue.state?.id) {
+        map.set(issue.state.id, issue.state);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [issues]);
+
+  const hasUnassignedProject = useMemo(
+    () => issues.some((issue) => !issue.project),
+    [issues]
+  );
+
+  const hasUnassignedMilestone = useMemo(
+    () => issues.some((issue) => !issue.projectMilestone),
+    [issues]
+  );
+
+  const visibleMilestoneOptions = useMemo(() => {
+    if (selectedProjectId === 'all') {
+      return milestoneOptions;
+    }
+    if (selectedProjectId === 'none') {
+      return [];
+    }
+    return milestoneOptions.filter((milestone) => milestone.projectId === selectedProjectId);
+  }, [milestoneOptions, selectedProjectId]);
+
+  useEffect(() => {
+    if (
+      selectedProjectId !== 'all' &&
+      selectedProjectId !== 'none' &&
+      !projectOptions.some((project) => project.id === selectedProjectId)
+    ) {
+      setSelectedProjectId('all');
+    }
+  }, [projectOptions, selectedProjectId]);
+
+  useEffect(() => {
+    if (
+      selectedMilestoneId !== 'all' &&
+      selectedMilestoneId !== 'none' &&
+      !visibleMilestoneOptions.some((milestone) => milestone.id === selectedMilestoneId)
+    ) {
+      setSelectedMilestoneId('all');
+    }
+  }, [visibleMilestoneOptions, selectedMilestoneId]);
+
+  useEffect(() => {
+    if (selectedStatusId !== 'all' && !statusOptions.some((state) => state.id === selectedStatusId)) {
+      setSelectedStatusId('all');
+    }
+  }, [statusOptions, selectedStatusId]);
+
+  const filteredIssues = useMemo(() => {
+    return issues.filter((issue) => {
+      if (selectedProjectId === 'none' && issue.project) {
+        return false;
+      }
+      if (
+        selectedProjectId !== 'all' &&
+        selectedProjectId !== 'none' &&
+        issue.project?.id !== selectedProjectId
+      ) {
+        return false;
+      }
+      if (selectedMilestoneId === 'none' && issue.projectMilestone) {
+        return false;
+      }
+      if (
+        selectedMilestoneId !== 'all' &&
+        selectedMilestoneId !== 'none' &&
+        issue.projectMilestone?.id !== selectedMilestoneId
+      ) {
+        return false;
+      }
+      if (selectedStatusId !== 'all' && issue.state?.id !== selectedStatusId) {
+        return false;
+      }
+      return true;
+    });
+  }, [issues, selectedProjectId, selectedMilestoneId, selectedStatusId]);
+
   const togglePill = useCallback(() => {
     if (!isPillExpanded) {
-      // Fetch issues when expanding
+      // Fetch issues and projects when expanding
       fetchLinearIssues();
+      fetchLinearProjects();
 
       // Hide text immediately when expanding
       setIsTextVisible(false);
@@ -192,7 +463,7 @@ function CanvasFlow() {
         setIsTextVisible(true);
       }, 350);
     }
-  }, [isPillExpanded, fetchLinearIssues]);
+  }, [isPillExpanded, fetchLinearIssues, fetchLinearProjects]);
 
   const collapsePill = useCallback(() => {
     // First hide animations immediately
@@ -211,7 +482,7 @@ function CanvasFlow() {
   }, []);
 
   // Drag and drop handlers for issue cards
-  const handleIssueDragStart = useCallback((e: React.DragEvent, issue: any) => {
+  const handleIssueDragStart = useCallback((e: React.DragEvent, issue: LinearIssue) => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('application/json', JSON.stringify(issue));
     e.dataTransfer.setData('text/plain', `${issue.identifier}: ${issue.title}`);
@@ -420,8 +691,25 @@ function CanvasFlow() {
     };
   }, [addTerminalNode, addWorkspaceNode, isNodeDragEnabled]);
 
+  // Show loading state while canvas is being restored
+  if (isCanvasLoading) {
+    return (
+      <div className="canvas-loading">
+        <div className="canvas-loading-content">
+          <div className="canvas-loading-spinner" />
+          <span>Restoring canvas...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
+      {/* Save status indicator */}
+      <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
+        {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
+      </div>
+
       {/* Mode indicator */}
       <div className={`mode-indicator ${isNodeDragEnabled ? 'drag-mode' : 'terminal-mode'}`}>
         <span className="mode-icon">{isNodeDragEnabled ? '🔄' : '⌨️'}</span>
@@ -611,46 +899,122 @@ function CanvasFlow() {
               />
 
               {/* Issues list */}
-              <div className={`issues-list ${isContentVisible ? 'visible' : ''}`}>
+                <div className={`issues-list ${isContentVisible ? 'visible' : ''}`}>
+                <div className="issues-toolbar">
+                  <div className="issues-workspace">
+                    <span className="issues-workspace-label">Workspace</span>
+                    <span className="issues-workspace-name">
+                      {linearWorkspaceName || (loadingIssues ? 'Loading...' : 'Unknown')}
+                    </span>
+                  </div>
+                  <div className="issues-filters">
+                    <div className="issues-filter">
+                      <label htmlFor="issues-filter-project">Project</label>
+                      <select
+                        id="issues-filter-project"
+                        className="issues-select"
+                        value={selectedProjectId}
+                        onChange={(event) => setSelectedProjectId(event.target.value)}
+                      >
+                        <option value="all">All projects</option>
+                        {hasUnassignedProject && <option value="none">No project</option>}
+                        {projectOptions.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="issues-filter">
+                      <label htmlFor="issues-filter-milestone">Milestone</label>
+                      <select
+                        id="issues-filter-milestone"
+                        className="issues-select"
+                        value={selectedMilestoneId}
+                        onChange={(event) => setSelectedMilestoneId(event.target.value)}
+                      >
+                        <option value="all">All milestones</option>
+                        {hasUnassignedMilestone && <option value="none">No milestone</option>}
+                        {visibleMilestoneOptions.map((milestone) => (
+                          <option key={milestone.id} value={milestone.id}>
+                            {milestone.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="issues-filter">
+                      <label htmlFor="issues-filter-status">Status</label>
+                      <select
+                        id="issues-filter-status"
+                        className="issues-select"
+                        value={selectedStatusId}
+                        onChange={(event) => setSelectedStatusId(event.target.value)}
+                      >
+                        <option value="all">All statuses</option>
+                        {statusOptions.map((state) => (
+                          <option key={state.id} value={state.id}>
+                            {state.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 {loadingIssues ? (
                   <div className="loading-state">Loading issues...</div>
-                ) : issues.length === 0 ? (
-                  <div className="empty-state">No open issues found</div>
+                ) : filteredIssues.length === 0 ? (
+                  <div className="empty-state">
+                    {issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
+                  </div>
                 ) : (
-                  issues.map((issue) => (
-                    <div
-                      key={issue.id}
-                      className="issue-card"
-                      draggable
-                      onDragStart={(e) => handleIssueDragStart(e, issue)}
-                    >
-                      <div className="issue-header">
-                        <span className="issue-identifier">{issue.identifier}</span>
-                        <span
-                          className="issue-status"
-                          style={{ backgroundColor: issue.state.color }}
-                        >
-                          {issue.state.name}
-                        </span>
-                      </div>
-                      <div className="issue-title">{issue.title}</div>
-                      {issue.assignee && (
-                        <div className="issue-assignee">
-                          {issue.assignee.avatarUrl && (
-                            <img
-                              src={issue.assignee.avatarUrl}
-                              alt={issue.assignee.name}
-                              className="assignee-avatar"
-                            />
-                          )}
-                          <span className="assignee-name">{issue.assignee.name}</span>
+                  filteredIssues.map((issue) => {
+                    const projectLabel = issue.project?.name;
+                    const milestoneLabel = issue.projectMilestone?.name;
+                    return (
+                      <div
+                        key={issue.id}
+                        className="issue-card"
+                        draggable
+                        onDragStart={(e) => handleIssueDragStart(e, issue)}
+                      >
+                        <div className="issue-header">
+                          <span className="issue-identifier">{issue.identifier}</span>
+                          <span
+                            className="issue-status"
+                            style={{ backgroundColor: issue.state.color }}
+                          >
+                            {issue.state.name}
+                          </span>
                         </div>
-                      )}
-                      <div className="issue-priority">
-                        Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                        <div className="issue-title">{issue.title}</div>
+                        {(projectLabel || milestoneLabel) && (
+                          <div className="issue-meta">
+                            {projectLabel && <span>Project: {projectLabel}</span>}
+                            {projectLabel && milestoneLabel && (
+                              <span className="issue-meta-sep">|</span>
+                            )}
+                            {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
+                          </div>
+                        )}
+                        {issue.assignee && (
+                          <div className="issue-assignee">
+                            {issue.assignee.avatarUrl && (
+                              <img
+                                src={issue.assignee.avatarUrl}
+                                alt={issue.assignee.name}
+                                className="assignee-avatar"
+                              />
+                            )}
+                            <span className="assignee-name">{issue.assignee.name}</span>
+                          </div>
+                        )}
+                        <div className="issue-priority">
+                          Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -668,4 +1032,3 @@ export default function Canvas() {
     </ReactFlowProvider>
   );
 }
-

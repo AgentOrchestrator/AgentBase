@@ -1,9 +1,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as pty from 'node-pty';
 import * as path from 'path';
+import { DatabaseFactory } from './database';
+import { IDatabase } from './database/IDatabase';
+import { CanvasState } from './types/database';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
+
+// Database instance
+let database: IDatabase;
 
 const createWindow = (): void => {
   const win = new BrowserWindow({
@@ -18,7 +24,10 @@ const createWindow = (): void => {
 
   // Load from Vite dev server in development, otherwise load from dist
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
-    win.loadURL('http://localhost:5173');
+    const devServerPort = process.env.VITE_DEV_SERVER_PORT || '5173';
+    const devServerUrl = `http://localhost:${devServerPort}`;
+    console.log('[Main] Loading from dev server:', devServerUrl);
+    win.loadURL(devServerUrl);
     // Open DevTools in development
     win.webContents.openDevTools();
   } else {
@@ -96,17 +105,23 @@ const createWindow = (): void => {
     // Handle shell data - send to renderer via IPC with terminal ID
     ptyProcess.onData((data: string) => {
       // Don't log every piece of data - too verbose (logs every terminal output)
-      win.webContents.send('terminal-data', { terminalId, data });
+      // Check if window is still valid before sending
+      if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.send('terminal-data', { terminalId, data });
+      }
     });
 
     // Handle shell exit
     ptyProcess.onExit((exitInfo: { exitCode: number; signal?: number }) => {
       console.log('[Main] Terminal exited', { terminalId, exitInfo });
-      win.webContents.send('terminal-exit', {
-        terminalId,
-        code: exitInfo.exitCode,
-        signal: exitInfo.signal
-      });
+      // Check if window is still valid before sending
+      if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.send('terminal-exit', {
+          terminalId,
+          code: exitInfo.exitCode,
+          signal: exitInfo.signal
+        });
+      }
       // Remove from map when process exits so it can be recreated
       terminalProcesses.delete(terminalId);
       // Also remove from "being created" set if it's still there
@@ -178,8 +193,91 @@ const createWindow = (): void => {
   });
 };
 
-app.whenReady().then(() => {
+// Database IPC handlers
+ipcMain.handle('canvas:save', async (_event, canvasId: string, state: CanvasState) => {
+  try {
+    await database.saveCanvas(canvasId, state);
+    console.log('[Main] Canvas saved successfully', { canvasId });
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Error saving canvas', { canvasId, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('canvas:load', async (_event, canvasId: string) => {
+  try {
+    const canvas = await database.loadCanvas(canvasId);
+    console.log('[Main] Canvas loaded', { canvasId, found: !!canvas });
+    return { success: true, data: canvas };
+  } catch (error) {
+    console.error('[Main] Error loading canvas', { canvasId, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('canvas:list', async () => {
+  try {
+    const canvases = await database.listCanvases();
+    console.log('[Main] Listed canvases', { count: canvases.length });
+    return { success: true, data: canvases };
+  } catch (error) {
+    console.error('[Main] Error listing canvases', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('canvas:delete', async (_event, canvasId: string) => {
+  try {
+    await database.deleteCanvas(canvasId);
+    console.log('[Main] Canvas deleted', { canvasId });
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Error deleting canvas', { canvasId, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('canvas:get-current-id', async () => {
+  try {
+    const canvasId = await database.getCurrentCanvasId();
+    console.log('[Main] Current canvas ID retrieved', { canvasId });
+    return { success: true, data: canvasId };
+  } catch (error) {
+    console.error('[Main] Error getting current canvas ID', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('canvas:set-current-id', async (_event, canvasId: string) => {
+  try {
+    await database.setCurrentCanvasId(canvasId);
+    console.log('[Main] Current canvas ID set', { canvasId });
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Error setting current canvas ID', { canvasId, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+app.whenReady().then(async () => {
   console.log('[Main] App ready');
+
+  // Initialize database
+  try {
+    database = await DatabaseFactory.getDatabase('sqlite');
+    console.log('[Main] Database initialized successfully');
+  } catch (error) {
+    console.error('[Main] Error initializing database', error);
+    // Continue without database - app should still function
+  }
+
   createWindow();
+});
+
+// Clean up database on app quit
+app.on('will-quit', () => {
+  console.log('[Main] App quitting, closing database');
+  DatabaseFactory.closeDatabase();
 });
 

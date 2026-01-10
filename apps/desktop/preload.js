@@ -26,3 +26,25 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         electron_1.ipcRenderer.removeAllListeners(channel);
     }
 });
+async function unwrapResponse(promise) {
+    const response = await promise;
+    if (!response.success) {
+        throw new Error(response.error || 'Unknown error');
+    }
+    return response.data;
+}
+// Expose canvas persistence API
+electron_1.contextBridge.exposeInMainWorld('canvasAPI', {
+    saveCanvas: async (canvasId, state) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('canvas:save', canvasId, state));
+    },
+    loadCanvas: (canvasId) => unwrapResponse(electron_1.ipcRenderer.invoke('canvas:load', canvasId)),
+    listCanvases: () => unwrapResponse(electron_1.ipcRenderer.invoke('canvas:list')),
+    deleteCanvas: async (canvasId) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('canvas:delete', canvasId));
+    },
+    getCurrentCanvasId: () => unwrapResponse(electron_1.ipcRenderer.invoke('canvas:get-current-id')),
+    setCurrentCanvasId: async (canvasId) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('canvas:set-current-id', canvasId));
+    },
+});
