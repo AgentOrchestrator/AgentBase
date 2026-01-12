@@ -6,6 +6,16 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import type {
+  CodingAgentType,
+  AgentCapabilities,
+  GenerateRequest,
+  GenerateResponse,
+  SessionIdentifier,
+  SessionInfo,
+  ForkOptions,
+  ContinueOptions,
+} from './services/coding-agent';
 
 // Type definitions for the electron API
 export interface ElectronAPI {
@@ -46,6 +56,39 @@ export interface AgentStatusAPI {
   loadAgentStatus: (agentId: string) => Promise<CodingAgentState | null>;
   deleteAgentStatus: (agentId: string) => Promise<void>;
   loadAllAgentStatuses: () => Promise<CodingAgentState[]>;
+}
+
+// Type definitions for the coding agent API
+export interface CodingAgentAPI {
+  /** Generate a one-off response */
+  generate: (
+    agentType: CodingAgentType,
+    request: GenerateRequest
+  ) => Promise<GenerateResponse>;
+
+  /** Continue an existing session */
+  continueSession: (
+    agentType: CodingAgentType,
+    identifier: SessionIdentifier,
+    prompt: string,
+    options?: ContinueOptions
+  ) => Promise<GenerateResponse>;
+
+  /** Fork an existing session */
+  forkSession: (
+    agentType: CodingAgentType,
+    parentIdentifier: SessionIdentifier,
+    options?: ForkOptions
+  ) => Promise<SessionInfo>;
+
+  /** Get list of available agent types */
+  getAvailableAgents: () => Promise<CodingAgentType[]>;
+
+  /** Get capabilities for a specific agent type */
+  getCapabilities: (agentType: CodingAgentType) => Promise<AgentCapabilities>;
+
+  /** Check if a specific agent is available */
+  isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -142,3 +185,41 @@ contextBridge.exposeInMainWorld('agentStatusAPI', {
   loadAllAgentStatuses: () =>
     unwrapResponse<CodingAgentState[]>(ipcRenderer.invoke('agent-status:load-all')),
 } as AgentStatusAPI);
+
+// Expose coding agent API
+contextBridge.exposeInMainWorld('codingAgentAPI', {
+  generate: (agentType: CodingAgentType, request: GenerateRequest) =>
+    unwrapResponse<GenerateResponse>(
+      ipcRenderer.invoke('coding-agent:generate', agentType, request)
+    ),
+
+  continueSession: (
+    agentType: CodingAgentType,
+    identifier: SessionIdentifier,
+    prompt: string,
+    options?: ContinueOptions
+  ) =>
+    unwrapResponse<GenerateResponse>(
+      ipcRenderer.invoke('coding-agent:continue-session', agentType, identifier, prompt, options)
+    ),
+
+  forkSession: (
+    agentType: CodingAgentType,
+    parentIdentifier: SessionIdentifier,
+    options?: ForkOptions
+  ) =>
+    unwrapResponse<SessionInfo>(
+      ipcRenderer.invoke('coding-agent:fork-session', agentType, parentIdentifier, options)
+    ),
+
+  getAvailableAgents: () =>
+    unwrapResponse<CodingAgentType[]>(ipcRenderer.invoke('coding-agent:get-available')),
+
+  getCapabilities: (agentType: CodingAgentType) =>
+    unwrapResponse<AgentCapabilities>(
+      ipcRenderer.invoke('coding-agent:get-capabilities', agentType)
+    ),
+
+  isAgentAvailable: (agentType: CodingAgentType) =>
+    unwrapResponse<boolean>(ipcRenderer.invoke('coding-agent:is-available', agentType)),
+} as CodingAgentAPI);

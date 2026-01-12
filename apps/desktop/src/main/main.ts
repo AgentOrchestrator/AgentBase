@@ -7,6 +7,18 @@ import { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import {
+  CodingAgentFactory,
+  isSessionResumable,
+  isSessionForkable,
+} from './services/coding-agent';
+import type {
+  CodingAgentType,
+  GenerateRequest,
+  SessionIdentifier,
+  ForkOptions,
+  ContinueOptions,
+} from './services/coding-agent';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
@@ -311,6 +323,151 @@ ipcMain.handle('agent-status:load-all', async () => {
   }
 });
 
+// ============================================
+// Coding Agent IPC Handlers
+// ============================================
+
+ipcMain.handle(
+  'coding-agent:generate',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    request: GenerateRequest
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        console.error('[Main] Error getting coding agent', { agentType, error: agentResult.error });
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const result = await agentResult.data.generate(request);
+      if (result.success === false) {
+        console.error('[Main] Error generating response', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Generated response', { agentType, contentLength: result.data.content.length });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:generate', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:continue-session',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    identifier: SessionIdentifier,
+    prompt: string,
+    options?: ContinueOptions
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isSessionResumable(agent)) {
+        return { success: false, error: `${agentType} does not support session resumption` };
+      }
+
+      const result = await agent.continueSession(identifier, prompt, options);
+      if (result.success === false) {
+        console.error('[Main] Error continuing session', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Continued session', { agentType, identifier });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:continue-session', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:fork-session',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    parentIdentifier: SessionIdentifier,
+    options?: ForkOptions
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isSessionForkable(agent)) {
+        return { success: false, error: `${agentType} does not support session forking` };
+      }
+
+      const result = await agent.forkSession(parentIdentifier, options);
+      if (result.success === false) {
+        console.error('[Main] Error forking session', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Forked session', { agentType, newSessionId: result.data.id });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:fork-session', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('coding-agent:get-available', async () => {
+  try {
+    const available = await CodingAgentFactory.getAvailableAgents();
+    console.log('[Main] Available coding agents', { agents: available });
+    return { success: true, data: available };
+  } catch (error) {
+    console.error('[Main] Error getting available agents', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle(
+  'coding-agent:get-capabilities',
+  async (_event, agentType: CodingAgentType) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const capabilities = agentResult.data.getCapabilities();
+      console.log('[Main] Agent capabilities', { agentType, capabilities });
+      return { success: true, data: capabilities };
+    } catch (error) {
+      console.error('[Main] Error getting capabilities', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:is-available',
+  async (_event, agentType: CodingAgentType) => {
+    try {
+      const available = await CodingAgentFactory.isAgentAvailable(agentType);
+      return { success: true, data: available };
+    } catch (error) {
+      console.error('[Main] Error checking agent availability', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
@@ -341,9 +498,10 @@ app.whenReady().then(async () => {
 });
 
 // Clean up on app quit
-app.on('will-quit', () => {
-  console.log('[Main] App quitting, closing database and worktree manager');
+app.on('will-quit', async () => {
+  console.log('[Main] App quitting, closing database, worktree manager, and coding agents');
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
+  await CodingAgentFactory.disposeAll();
 });
 
