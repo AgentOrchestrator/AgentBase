@@ -16,6 +16,18 @@ import type {
   ForkOptions,
   ContinueOptions,
 } from './services/coding-agent';
+import type {
+  RepresentationType,
+  RepresentationInput,
+  RepresentationCapabilities,
+  AnyRepresentationOutput,
+  ImageRepresentationOutput,
+  SummaryRepresentationOutput,
+  AudioRepresentationOutput,
+  ImageTransformOptions,
+  SummaryTransformOptions,
+  AudioTransformOptions,
+} from './services/representation';
 
 // Type definitions for the electron API
 export interface ElectronAPI {
@@ -89,6 +101,47 @@ export interface CodingAgentAPI {
 
   /** Check if a specific agent is available */
   isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
+}
+
+// Type definitions for provider info returned by the API
+export interface ProviderInfo {
+  providerId: string;
+  providerName: string;
+  representationType: RepresentationType;
+  capabilities: RepresentationCapabilities;
+}
+
+// Type definitions for the representation API
+export interface RepresentationAPI {
+  /** Get available representation types based on registered providers */
+  getAvailableTypes: () => Promise<RepresentationType[]>;
+
+  /** Transform using a specific provider */
+  transform: (
+    providerId: string,
+    input: RepresentationInput
+  ) => Promise<AnyRepresentationOutput>;
+
+  /** Transform to image using the first available image provider */
+  transformToImage: (
+    input: RepresentationInput,
+    options?: ImageTransformOptions
+  ) => Promise<ImageRepresentationOutput>;
+
+  /** Transform to summary using the first available summary provider */
+  transformToSummary: (
+    input: RepresentationInput,
+    options?: SummaryTransformOptions
+  ) => Promise<SummaryRepresentationOutput>;
+
+  /** Transform to audio using the first available audio provider */
+  transformToAudio: (
+    input: RepresentationInput,
+    options?: AudioTransformOptions
+  ) => Promise<AudioRepresentationOutput>;
+
+  /** Get all registered providers */
+  getAllProviders: () => Promise<ProviderInfo[]>;
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -223,3 +276,32 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
   isAgentAvailable: (agentType: CodingAgentType) =>
     unwrapResponse<boolean>(ipcRenderer.invoke('coding-agent:is-available', agentType)),
 } as CodingAgentAPI);
+
+// Expose representation API
+contextBridge.exposeInMainWorld('representationAPI', {
+  getAvailableTypes: () =>
+    unwrapResponse<RepresentationType[]>(ipcRenderer.invoke('representation:get-available-types')),
+
+  transform: (providerId: string, input: RepresentationInput) =>
+    unwrapResponse<AnyRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform', providerId, input)
+    ),
+
+  transformToImage: (input: RepresentationInput, options?: ImageTransformOptions) =>
+    unwrapResponse<ImageRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform-to-image', input, options)
+    ),
+
+  transformToSummary: (input: RepresentationInput, options?: SummaryTransformOptions) =>
+    unwrapResponse<SummaryRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform-to-summary', input, options)
+    ),
+
+  transformToAudio: (input: RepresentationInput, options?: AudioTransformOptions) =>
+    unwrapResponse<AudioRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform-to-audio', input, options)
+    ),
+
+  getAllProviders: () =>
+    unwrapResponse<ProviderInfo[]>(ipcRenderer.invoke('representation:get-all-providers')),
+} as RepresentationAPI);
