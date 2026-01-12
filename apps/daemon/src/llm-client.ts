@@ -3,7 +3,11 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { getApiKey } from './api-key-manager.js';
-import { type AuthenticatedContext } from './supabase.js';
+import type {
+  IApiKeyRepository,
+  IUserPreferencesRepository,
+  UserPreferences,
+} from './interfaces/repositories.js';
 
 // Type for language model returned by AI SDK providers
 type LanguageModel = ReturnType<ReturnType<typeof createOpenAI>>;
@@ -11,75 +15,22 @@ type LanguageModel = ReturnType<ReturnType<typeof createOpenAI>>;
 export interface LLMConfig {
   provider: string;
   model: string;
-  accountId?: string;
-  accessToken?: string;
-  refreshToken?: string;
+  userId?: string;
+  apiKeyRepo?: IApiKeyRepository;
 }
 
-export interface UserPreferences {
-  user_id: string;
-  ai_summary_enabled: boolean;
-  ai_title_enabled: boolean;
-  ai_model_provider?: string;
-  ai_model_name?: string;
-}
+// Re-export UserPreferences from interfaces for backward compatibility
+export type { UserPreferences } from './interfaces/repositories.js';
 
 /**
  * Fetch user preferences from the database
  * Returns default preferences if not found
  */
 export async function getUserPreferences(
-  auth: AuthenticatedContext
+  userPrefsRepo: IUserPreferencesRepository,
+  userId: string
 ): Promise<UserPreferences> {
-  try {
-    const { data, error } = await auth.client
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', auth.accountId)
-      .maybeSingle();
-
-    if (error) {
-      console.error(`[LLM Client] Error fetching preferences for user ${auth.accountId}:`, error);
-      // Return defaults on error
-      return {
-        user_id: auth.accountId,
-        ai_summary_enabled: true,
-        ai_title_enabled: true,
-        ai_model_provider: 'openai',
-        ai_model_name: 'gpt-4o-mini',
-      };
-    }
-
-    if (!data) {
-      // Return default preferences if not found
-      console.log(`[LLM Client] No preferences found for user ${auth.accountId}, using defaults`);
-      return {
-        user_id: auth.accountId,
-        ai_summary_enabled: true,
-        ai_title_enabled: true,
-        ai_model_provider: 'openai',
-        ai_model_name: 'gpt-4o-mini',
-      };
-    }
-
-    return {
-      user_id: data.user_id,
-      ai_summary_enabled: data.ai_summary_enabled ?? true,
-      ai_title_enabled: data.ai_title_enabled ?? true,
-      ai_model_provider: data.ai_model_provider ?? 'openai',
-      ai_model_name: data.ai_model_name ?? 'gpt-4o-mini',
-    };
-  } catch (error) {
-    console.error(`[LLM Client] Error fetching preferences for user ${auth.accountId}:`, error);
-    // Return defaults on error
-    return {
-      user_id: auth.accountId,
-      ai_summary_enabled: true,
-      ai_title_enabled: true,
-      ai_model_provider: 'openai',
-      ai_model_name: 'gpt-4o-mini',
-    };
-  }
+  return userPrefsRepo.findByUserId(userId);
 }
 
 /**
@@ -87,21 +38,10 @@ export async function getUserPreferences(
  * Returns null if the API key is not available
  */
 export async function createLLMClient(config: LLMConfig): Promise<LanguageModel | null> {
-  const { provider, model, accountId, accessToken, refreshToken } = config;
+  const { provider, model, userId, apiKeyRepo } = config;
 
   // Get API key with fallback priority: env var -> database -> null
-  // If we have full auth context, create the authenticated client for DB lookup
-  let auth: AuthenticatedContext | null = null;
-  if (accountId && accessToken && refreshToken) {
-    try {
-      const { createAuthenticatedClient } = await import('./supabase.js');
-      auth = await createAuthenticatedClient(accessToken, refreshToken);
-    } catch (error) {
-      console.error('[LLM Client] Failed to create authenticated client for API key lookup:', error);
-    }
-  }
-
-  const apiKey = await getApiKey(provider, auth);
+  const apiKey = await getApiKey(provider, apiKeyRepo, userId);
 
   if (!apiKey) {
     console.log(`[LLM Client] No API key found for provider: ${provider}`);
@@ -179,15 +119,16 @@ export async function generateLLMText(
  * Falls back to defaults if preferences not found
  */
 export async function getUserLLMConfig(
-  auth: AuthenticatedContext
+  userPrefsRepo: IUserPreferencesRepository,
+  apiKeyRepo: IApiKeyRepository,
+  userId: string
 ): Promise<LLMConfig> {
-  const preferences = await getUserPreferences(auth);
+  const preferences = await getUserPreferences(userPrefsRepo, userId);
 
   return {
-    provider: preferences.ai_model_provider || 'openai',
-    model: preferences.ai_model_name || 'gpt-4o-mini',
-    accountId: auth.accountId,
-    accessToken: auth.accessToken,
-    refreshToken: auth.refreshToken,
+    provider: preferences.aiModelProvider || 'openai',
+    model: preferences.aiModelName || 'gpt-4o-mini',
+    userId,
+    apiKeyRepo,
   };
 }

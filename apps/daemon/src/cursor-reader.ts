@@ -3,8 +3,8 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { createHash } from 'crypto';
-import { createAuthenticatedClient } from './supabase.js';
 import type { SessionMetadata } from './types.js';
+import type { IChatHistoryRepository, IRepositoryFactory } from './interfaces/repositories.js';
 
 export interface CursorMessage {
   id: string;
@@ -103,24 +103,28 @@ function getCursorStatePath(): string {
   );
 }
 
-// Authenticated Supabase client for database lookups
+// Repository for database lookups
 // Initialized with user session when readCursorHistories is called
-let authenticatedClient: Awaited<ReturnType<typeof createAuthenticatedClient>>['client'] | null = null;
-let authenticatedAccountId: string | null = null;
+let chatHistoryRepo: IChatHistoryRepository | null = null;
+let authenticatedUserId: string | null = null;
 
 /**
- * Initialize authenticated Supabase client
+ * Initialize repositories for database lookups
  * Must be called before fetching sessions from database
  */
-async function initializeAuthenticatedClient(accessToken: string, refreshToken: string): Promise<void> {
+async function initializeRepositories(
+  accessToken: string,
+  refreshToken: string,
+  repositoryFactory: IRepositoryFactory
+): Promise<void> {
   try {
-    const { client, accountId } = await createAuthenticatedClient(accessToken, refreshToken);
-    authenticatedClient = client;
-    authenticatedAccountId = accountId;
+    const repos = await repositoryFactory.createRepositories(accessToken, refreshToken);
+    chatHistoryRepo = repos.chatHistories;
+    authenticatedUserId = repos.userId;
   } catch (error) {
-    console.warn('[Cursor Reader] Could not initialize authenticated Supabase client:', error);
-    authenticatedClient = null;
-    authenticatedAccountId = null;
+    console.warn('[Cursor Reader] Could not initialize repositories:', error);
+    chatHistoryRepo = null;
+    authenticatedUserId = null;
   }
 }
 
@@ -143,23 +147,23 @@ async function getStateDbModificationTime(): Promise<string> {
  * Fetch an existing session from the database by ID
  * Returns null if session not found or database unavailable
  */
-async function fetchExistingSession(sessionId: string): Promise<{ id: string; messages: any[]; timestamp: string; latest_message_timestamp: string | null } | null> {
-  if (!authenticatedClient) {
+async function fetchExistingSession(sessionId: string): Promise<{ id: string; messages: any[]; timestamp: string; latestMessageTimestamp: string | null } | null> {
+  if (!chatHistoryRepo || !authenticatedUserId) {
     return null;
   }
 
   try {
-    const { data, error } = await authenticatedClient
-      .from('chat_histories')
-      .select('id, messages, timestamp, latest_message_timestamp')
-      .eq('id', sessionId)
-      .single();
-
-    if (error || !data) {
+    const record = await chatHistoryRepo.findById(sessionId, authenticatedUserId);
+    if (!record) {
       return null;
     }
 
-    return data as any;
+    return {
+      id: record.id,
+      messages: record.messages,
+      timestamp: record.timestamp,
+      latestMessageTimestamp: record.latestMessageTimestamp,
+    };
   } catch (error) {
     console.warn(`[Cursor Reader] Error fetching session ${sessionId}:`, error);
     return null;
@@ -171,7 +175,7 @@ async function fetchExistingSession(sessionId: string): Promise<{ id: string; me
  * Returns information about new messages
  */
 function detectNewMessages(
-  existingSession: { id: string; messages: any[]; timestamp: string; latest_message_timestamp: string | null } | null,
+  existingSession: { id: string; messages: any[]; timestamp: string; latestMessageTimestamp: string | null } | null,
   newMessages: CursorMessage[]
 ): { hasNewMessages: boolean; newMessageStartIndex: number } {
   if (!existingSession || !existingSession.messages) {
@@ -571,7 +575,7 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
               }
 
               // Apply heuristic timestamp for new messages (only if authenticated client available)
-              if (authenticatedClient) {
+              if (chatHistoryRepo) {
                 try {
                   // Check if this session exists in the database and if new messages were added
                   const existingSession = await fetchExistingSession(sessionId);
@@ -900,21 +904,23 @@ function buildWorkspaceMap(): Map<string, WorkspaceInfo> {
  * @param accessToken - Optional access token for authenticated database lookups (enables heuristic timestamps)
  * @param refreshToken - Optional refresh token for authenticated database lookups
  * @param sinceTimestamp - Optional timestamp to filter sessions updated after this time (for incremental sync)
+ * @param repositoryFactory - Optional repository factory for database lookups (enables heuristic timestamps)
  */
 export async function readCursorHistories(
   lookbackDays?: number,
   accessToken?: string,
   refreshToken?: string,
-  sinceTimestamp?: number
+  sinceTimestamp?: number,
+  repositoryFactory?: IRepositoryFactory
 ): Promise<CursorConversation[]> {
   const conversations: CursorConversation[] = [];
 
-  // Initialize authenticated client if tokens provided
-  if (accessToken && refreshToken) {
-    await initializeAuthenticatedClient(accessToken, refreshToken);
-    console.log('[Cursor Reader] Authenticated client initialized for heuristic timestamps');
+  // Initialize repositories if tokens and factory provided
+  if (accessToken && refreshToken && repositoryFactory) {
+    await initializeRepositories(accessToken, refreshToken, repositoryFactory);
+    console.log('[Cursor Reader] Repositories initialized for heuristic timestamps');
   } else {
-    console.log('[Cursor Reader] No auth tokens provided - heuristic timestamps disabled');
+    console.log('[Cursor Reader] No auth tokens or repository factory provided - heuristic timestamps disabled');
   }
 
   // Calculate cutoff date - use sinceTimestamp if provided, otherwise fall back to lookbackDays
@@ -1087,7 +1093,7 @@ export async function readCursorHistories(
         }
 
         // Apply heuristic timestamp for new messages (only if authenticated client available)
-        if (authenticatedClient) {
+        if (chatHistoryRepo) {
           try {
             // Check if this session exists in the database and if new messages were added
             const existingSession = await fetchExistingSession(composerId);
