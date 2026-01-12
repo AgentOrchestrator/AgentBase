@@ -6,6 +6,7 @@
 import sqlite3 from 'sqlite3';
 import { IDatabase } from './IDatabase';
 import { CanvasState, CanvasMetadata, CanvasNode, CanvasEdge } from '../types/database';
+import type { CodingAgentState } from '../../../types/coding-agent-status';
 
 export class SQLiteDatabase implements IDatabase {
   private db: sqlite3.Database;
@@ -70,6 +71,19 @@ export class SQLiteDatabase implements IDatabase {
     // Create indices for better query performance
     await this.run('CREATE INDEX IF NOT EXISTS idx_nodes_canvas_id ON nodes(canvas_id)');
     await this.run('CREATE INDEX IF NOT EXISTS idx_edges_canvas_id ON edges(canvas_id)');
+
+    // Create agent_statuses table for CodingAgentStatusManager
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS agent_statuses (
+        agent_id TEXT PRIMARY KEY,
+        agent_type TEXT NOT NULL,
+        status_info TEXT NOT NULL,
+        title TEXT NOT NULL,
+        summary TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
   }
 
   async saveCanvas(canvasId: string, state: CanvasState): Promise<void> {
@@ -283,6 +297,107 @@ export class SQLiteDatabase implements IDatabase {
 
   close(): void {
     this.db.close();
+  }
+
+  // ===========================================================================
+  // Agent Status Methods
+  // ===========================================================================
+
+  async saveAgentStatus(agentId: string, state: CodingAgentState): Promise<void> {
+    const existing = await this.get<{ agent_id: string }>(
+      'SELECT agent_id FROM agent_statuses WHERE agent_id = ?',
+      [agentId]
+    );
+
+    if (existing) {
+      await this.run(
+        `UPDATE agent_statuses SET
+          agent_type = ?,
+          status_info = ?,
+          title = ?,
+          summary = ?,
+          updated_at = ?
+        WHERE agent_id = ?`,
+        [
+          state.agentType,
+          JSON.stringify(state.statusInfo),
+          JSON.stringify(state.title),
+          state.summary,
+          state.updatedAt,
+          agentId,
+        ]
+      );
+    } else {
+      await this.run(
+        `INSERT INTO agent_statuses
+          (agent_id, agent_type, status_info, title, summary, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          agentId,
+          state.agentType,
+          JSON.stringify(state.statusInfo),
+          JSON.stringify(state.title),
+          state.summary,
+          state.createdAt,
+          state.updatedAt,
+        ]
+      );
+    }
+  }
+
+  async loadAgentStatus(agentId: string): Promise<CodingAgentState | null> {
+    const row = await this.get<{
+      agent_id: string;
+      agent_type: string;
+      status_info: string;
+      title: string;
+      summary: string | null;
+      created_at: number;
+      updated_at: number;
+    }>(
+      'SELECT agent_id, agent_type, status_info, title, summary, created_at, updated_at FROM agent_statuses WHERE agent_id = ?',
+      [agentId]
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      agentId: row.agent_id,
+      agentType: row.agent_type as CodingAgentState['agentType'],
+      statusInfo: JSON.parse(row.status_info),
+      title: JSON.parse(row.title),
+      summary: row.summary,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async deleteAgentStatus(agentId: string): Promise<void> {
+    await this.run('DELETE FROM agent_statuses WHERE agent_id = ?', [agentId]);
+  }
+
+  async loadAllAgentStatuses(): Promise<CodingAgentState[]> {
+    const rows = await this.all<{
+      agent_id: string;
+      agent_type: string;
+      status_info: string;
+      title: string;
+      summary: string | null;
+      created_at: number;
+      updated_at: number;
+    }>('SELECT agent_id, agent_type, status_info, title, summary, created_at, updated_at FROM agent_statuses');
+
+    return rows.map((row) => ({
+      agentId: row.agent_id,
+      agentType: row.agent_type as CodingAgentState['agentType'],
+      statusInfo: JSON.parse(row.status_info),
+      title: JSON.parse(row.title),
+      summary: row.summary,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
   }
 
   // Helper methods to promisify sqlite3 callbacks

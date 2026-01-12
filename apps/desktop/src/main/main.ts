@@ -4,6 +4,9 @@ import * as path from 'path';
 import { DatabaseFactory } from './database';
 import { IDatabase } from './database/IDatabase';
 import { CanvasState } from './types/database';
+import { WorktreeManagerFactory } from './worktree';
+import { registerWorktreeIpcHandlers } from './worktree/ipc';
+import type { CodingAgentState } from '../../types/coding-agent-status';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
@@ -260,6 +263,54 @@ ipcMain.handle('canvas:set-current-id', async (_event, canvasId: string) => {
   }
 });
 
+// Agent Status IPC handlers
+ipcMain.handle(
+  'agent-status:save',
+  async (_event, agentId: string, state: CodingAgentState) => {
+    try {
+      await database.saveAgentStatus(agentId, state);
+      console.log('[Main] Agent status saved', { agentId });
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error saving agent status', { agentId, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('agent-status:load', async (_event, agentId: string) => {
+  try {
+    const state = await database.loadAgentStatus(agentId);
+    console.log('[Main] Agent status loaded', { agentId, found: !!state });
+    return { success: true, data: state };
+  } catch (error) {
+    console.error('[Main] Error loading agent status', { agentId, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('agent-status:delete', async (_event, agentId: string) => {
+  try {
+    await database.deleteAgentStatus(agentId);
+    console.log('[Main] Agent status deleted', { agentId });
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Error deleting agent status', { agentId, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('agent-status:load-all', async () => {
+  try {
+    const states = await database.loadAllAgentStatuses();
+    console.log('[Main] Loaded all agent statuses', { count: states.length });
+    return { success: true, data: states };
+  } catch (error) {
+    console.error('[Main] Error loading all agent statuses', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
@@ -272,12 +323,27 @@ app.whenReady().then(async () => {
     // Continue without database - app should still function
   }
 
+  // Initialize WorktreeManager
+  try {
+    const worktreeBaseDir = path.join(app.getPath('userData'), 'worktrees');
+    WorktreeManagerFactory.configure({
+      baseWorktreeDirectory: worktreeBaseDir,
+    });
+    await WorktreeManagerFactory.getManager();
+    registerWorktreeIpcHandlers();
+    console.log('[Main] WorktreeManager initialized successfully');
+  } catch (error) {
+    console.error('[Main] Error initializing WorktreeManager', error);
+    // Continue without worktree manager - app should still function
+  }
+
   createWindow();
 });
 
-// Clean up database on app quit
+// Clean up on app quit
 app.on('will-quit', () => {
-  console.log('[Main] App quitting, closing database');
+  console.log('[Main] App quitting, closing database and worktree manager');
   DatabaseFactory.closeDatabase();
+  WorktreeManagerFactory.closeManager();
 });
 

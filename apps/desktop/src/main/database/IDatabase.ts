@@ -4,6 +4,7 @@
  */
 
 import { CanvasState, CanvasMetadata } from '../types/database';
+import type { CodingAgentState } from '../../../types/coding-agent-status';
 
 export interface IDatabase {
   /**
@@ -53,4 +54,34 @@ export interface IDatabase {
    * Close the database connection
    */
   close(): void;
+
+  // ==========================================================================
+  // Agent Status Methods
+  // ==========================================================================
+
+  /**
+   * Save an agent's status state
+   * @param agentId - Unique identifier for the agent
+   * @param state - The agent state to save
+   */
+  saveAgentStatus(agentId: string, state: CodingAgentState): Promise<void>;
+
+  /**
+   * Load an agent's status state
+   * @param agentId - Unique identifier for the agent
+   * @returns The agent state, or null if not found
+   */
+  loadAgentStatus(agentId: string): Promise<CodingAgentState | null>;
+
+  /**
+   * Delete an agent's status state
+   * @param agentId - Unique identifier for the agent
+   */
+  deleteAgentStatus(agentId: string): Promise<void>;
+
+  /**
+   * Load all agent status states
+   * @returns Array of all agent states
+   */
+  loadAllAgentStatuses(): Promise<CodingAgentState[]>;
 }

@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CanvasState, CanvasMetadata } from './types/database';
+import type {
+  WorktreeInfo,
+  WorktreeProvisionOptions,
+  WorktreeReleaseOptions,
+} from './types/worktree';
+import type { CodingAgentState } from '../../types/coding-agent-status';
 
 // Type definitions for the electron API
 export interface ElectronAPI {
@@ -20,6 +26,26 @@ export interface CanvasAPI {
   deleteCanvas: (canvasId: string) => Promise<void>;
   getCurrentCanvasId: () => Promise<string | null>;
   setCurrentCanvasId: (canvasId: string) => Promise<void>;
+}
+
+// Type definitions for the worktree API
+export interface WorktreeAPI {
+  provision: (
+    repoPath: string,
+    branchName: string,
+    options?: WorktreeProvisionOptions
+  ) => Promise<WorktreeInfo>;
+  release: (worktreeId: string, options?: WorktreeReleaseOptions) => Promise<void>;
+  get: (worktreeId: string) => Promise<WorktreeInfo | null>;
+  list: (repoPath?: string) => Promise<WorktreeInfo[]>;
+}
+
+// Type definitions for the agent status API
+export interface AgentStatusAPI {
+  saveAgentStatus: (agentId: string, state: CodingAgentState) => Promise<void>;
+  loadAgentStatus: (agentId: string) => Promise<CodingAgentState | null>;
+  deleteAgentStatus: (agentId: string) => Promise<void>;
+  loadAllAgentStatuses: () => Promise<CodingAgentState[]>;
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -81,3 +107,38 @@ contextBridge.exposeInMainWorld('canvasAPI', {
     await unwrapResponse(ipcRenderer.invoke('canvas:set-current-id', canvasId));
   },
 } as CanvasAPI);
+
+// Expose worktree API
+contextBridge.exposeInMainWorld('worktreeAPI', {
+  provision: (
+    repoPath: string,
+    branchName: string,
+    options?: WorktreeProvisionOptions
+  ) =>
+    unwrapResponse<WorktreeInfo>(
+      ipcRenderer.invoke('worktree:provision', repoPath, branchName, options)
+    ),
+  release: async (worktreeId: string, options?: WorktreeReleaseOptions) => {
+    await unwrapResponse(ipcRenderer.invoke('worktree:release', worktreeId, options));
+  },
+  get: (worktreeId: string) =>
+    unwrapResponse<WorktreeInfo | null>(ipcRenderer.invoke('worktree:get', worktreeId)),
+  list: (repoPath?: string) =>
+    unwrapResponse<WorktreeInfo[]>(ipcRenderer.invoke('worktree:list', repoPath)),
+} as WorktreeAPI);
+
+// Expose agent status API
+contextBridge.exposeInMainWorld('agentStatusAPI', {
+  saveAgentStatus: async (agentId: string, state: CodingAgentState) => {
+    await unwrapResponse(ipcRenderer.invoke('agent-status:save', agentId, state));
+  },
+  loadAgentStatus: (agentId: string) =>
+    unwrapResponse<CodingAgentState | null>(
+      ipcRenderer.invoke('agent-status:load', agentId)
+    ),
+  deleteAgentStatus: async (agentId: string) => {
+    await unwrapResponse(ipcRenderer.invoke('agent-status:delete', agentId));
+  },
+  loadAllAgentStatuses: () =>
+    unwrapResponse<CodingAgentState[]>(ipcRenderer.invoke('agent-status:load-all')),
+} as AgentStatusAPI);
