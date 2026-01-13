@@ -19,7 +19,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
-import AgentNode from './AgentNode';
+import { AgentNode } from './nodes/AgentNode';
 import './Canvas.css';
 import { agentStore } from './stores';
 import { createDefaultAgentTitle } from './types/agent-node';
