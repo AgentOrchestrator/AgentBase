@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
 import type { UserMessageGroup } from '../types/conversation';
 import './UserMessageNode.css';
@@ -10,6 +10,24 @@ interface UserMessageNodeData {
 function UserMessageNode({ data, id, selected }: NodeProps) {
   const nodeData = data as unknown as UserMessageNodeData;
   const { messageGroup } = nodeData;
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Handle scroll events when node is selected
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement || !selected) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Always prevent canvas scrolling when node is selected
+      // This prevents the "snap" effect when reaching boundaries
+      e.stopPropagation();
+    };
+
+    contentElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      contentElement.removeEventListener('wheel', handleWheel);
+    };
+  }, [selected]);
 
   return (
     <div className={`user-message-node ${selected ? 'selected' : ''}`}>
@@ -23,7 +41,10 @@ function UserMessageNode({ data, id, selected }: NodeProps) {
         </span>
       </div>
       
-      <div className="user-message-content">
+      <div 
+        ref={contentRef}
+        className="user-message-content"
+      >
         {messageGroup.text}
       </div>
       

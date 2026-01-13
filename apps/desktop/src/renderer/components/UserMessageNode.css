@@ -3,12 +3,17 @@
   border: 1px solid #4a5568;
   border-radius: 8px;
   padding: 12px;
+  width: 100%;
+  height: 100%;
   min-width: 300px;
   min-height: 100px;
   color: #e2e8f0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 .user-message-node.selected {
@@ -42,24 +47,34 @@
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
-  max-height: 400px;
+  flex: 1;
   overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 
-.user-message-content::-webkit-scrollbar {
-  width: 6px;
+/* Hide scrollbar when not needed or not selected */
+.user-message-node:not(.selected) .user-message-content::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
 }
 
-.user-message-content::-webkit-scrollbar-track {
+.user-message-node.selected .user-message-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.user-message-node.selected .user-message-content::-webkit-scrollbar-track {
   background: #1a1c24;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
-.user-message-content::-webkit-scrollbar-thumb {
+.user-message-node.selected .user-message-content::-webkit-scrollbar-thumb {
   background: #4a5568;
-  border-radius: 3px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
 }
 
-.user-message-content::-webkit-scrollbar-thumb:hover {
+.user-message-node.selected .user-message-content::-webkit-scrollbar-thumb:hover {
   background: #5a6578;
 }

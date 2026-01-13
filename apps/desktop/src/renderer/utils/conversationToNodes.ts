@@ -17,32 +17,32 @@ export function conversationToNodesAndEdges(
   const uuidMap = buildUuidMap(groups);
   const nodePositions = new Map<string, { x: number; y: number }>();
 
-  // Calculate positions for all nodes
+  // Calculate positions for all nodes in a straight vertical column
   let currentY = startY;
-  let maxX = startX;
+  const fixedX = startX; // All nodes in the same column
 
   for (const group of groups) {
-    // Find parent node position if exists
-    let x = startX;
-    if (group.parentUuid) {
-      const parentPos = nodePositions.get(group.parentUuid);
-      if (parentPos) {
-        x = parentPos.x + spacingX;
-      }
-    }
+    // Store position - all nodes in the same column
+    nodePositions.set(group.uuid, { x: fixedX, y: currentY });
 
-    // Store position
-    nodePositions.set(group.uuid, { x, y: currentY });
-    maxX = Math.max(maxX, x);
-
-    // Create node
+    // Create node with default sizes
+    // Assistant nodes: same size as terminal nodes (600x400)
+    // User nodes: same width, half height (600x200)
+    const isUser = group.type === 'user';
+    const nodeHeight = isUser ? 200 : 400;
     const node: Node = {
       id: group.uuid,
-      type: group.type === 'user' ? 'userMessage' : 'assistantMessage',
-      position: { x, y: currentY },
+      type: isUser ? 'userMessage' : 'assistantMessage',
+      position: { x: fixedX, y: currentY },
       data: {
         messageGroup: group,
       },
+      style: {
+        width: 600,
+        height: nodeHeight,
+      },
+      width: 600,
+      height: nodeHeight,
     };
 
     nodes.push(node);
@@ -59,8 +59,8 @@ export function conversationToNodesAndEdges(
       });
     }
 
-    // Move to next row
-    currentY += spacingY;
+    // Move to next row - use the actual node height plus some spacing
+    currentY += nodeHeight + 20; // 20px spacing between nodes
   }
 
   return { nodes, edges };

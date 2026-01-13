@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
 import type { AssistantMessageGroup, MessageContent } from '../types/conversation';
 import './AssistantMessageNode.css';
@@ -10,19 +10,27 @@ interface AssistantMessageNodeData {
 function AssistantMessageNode({ data, id, selected }: NodeProps) {
   const nodeData = data as unknown as AssistantMessageNodeData;
   const { messageGroup } = nodeData;
-  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  const toggleTool = (toolId: string) => {
-    const newExpanded = new Set(expandedTools);
-    if (newExpanded.has(toolId)) {
-      newExpanded.delete(toolId);
-    } else {
-      newExpanded.add(toolId);
-    }
-    setExpandedTools(newExpanded);
-  };
+  // Handle scroll events when node is selected
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement || !selected) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Always prevent canvas scrolling when node is selected
+      // This prevents the "snap" effect when reaching boundaries
+      e.stopPropagation();
+    };
+
+    contentElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      contentElement.removeEventListener('wheel', handleWheel);
+    };
+  }, [selected]);
 
   const renderContent = (content: MessageContent, entryIndex: number) => {
+    // Only display text content, skip tool_use and tool_result
     if (content.type === 'text') {
       return (
         <div key={`text-${entryIndex}`} className="assistant-text-content">
@@ -31,54 +39,7 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
       );
     }
 
-    if (content.type === 'tool_use') {
-      const isExpanded = expandedTools.has(content.id);
-      return (
-        <div key={`tool-${content.id}`} className="assistant-tool-use">
-          <button
-            className="tool-use-header"
-            onClick={() => toggleTool(content.id)}
-          >
-            <span className="tool-icon">🔧</span>
-            <span className="tool-name">{content.name}</span>
-            <span className="tool-toggle">{isExpanded ? '▼' : '▶'}</span>
-          </button>
-          {isExpanded && (
-            <div className="tool-use-details">
-              <div className="tool-input">
-                <div className="tool-input-label">Input:</div>
-                <pre>{JSON.stringify(content.input, null, 2)}</pre>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (content.type === 'tool_result') {
-      const resultContent = Array.isArray(content.content)
-        ? content.content.map((c) => c.text).join('\n')
-        : content.content;
-      
-      return (
-        <div key={`result-${content.tool_use_id}`} className="assistant-tool-result">
-          <div className="tool-result-label">Result:</div>
-          <div className="tool-result-content">
-            {resultContent.length > 500 ? (
-              <>
-                <pre>{resultContent.substring(0, 500)}...</pre>
-                <div className="tool-result-truncated">
-                  (truncated, {resultContent.length} chars total)
-                </div>
-              </>
-            ) : (
-              <pre>{resultContent}</pre>
-            )}
-          </div>
-        </div>
-      );
-    }
-
+    // Skip tool_use and tool_result - don't render them
     return null;
   };
 
@@ -97,14 +58,27 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
         </span>
       </div>
       
-      <div className="assistant-message-content">
-        {messageGroup.entries.map((entry, entryIndex) => (
-          <div key={entry.uuid} className="assistant-entry">
-            {entry.message.content.map((content, contentIndex) =>
-              renderContent(content, `${entryIndex}-${contentIndex}`)
-            )}
-          </div>
-        ))}
+      <div 
+        ref={contentRef}
+        className="assistant-message-content"
+      >
+        {messageGroup.entries.map((entry, entryIndex) => {
+          // Filter to only text content
+          const textContent = entry.message.content.filter(c => c.type === 'text');
+          
+          // Skip entries with no text content
+          if (textContent.length === 0) {
+            return null;
+          }
+          
+          return (
+            <div key={entry.uuid} className="assistant-entry">
+              {textContent.map((content, contentIndex) =>
+                renderContent(content, `${entryIndex}-${contentIndex}`)
+              )}
+            </div>
+          );
+        })}
       </div>
       
       <Handle type="source" position={Position.Bottom} />
