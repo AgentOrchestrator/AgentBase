@@ -26,6 +26,7 @@ export {
   type ImageRepresentationOutput,
   type SummaryRepresentationOutput,
   type AudioRepresentationOutput,
+  type ExplanationRepresentationOutput,
   type AnyRepresentationOutput,
   type ProviderConfig,
 } from './provider.types';

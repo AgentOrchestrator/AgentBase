@@ -1,7 +1,7 @@
 /**
  * Supported representation output types
  */
-export type RepresentationType = 'image' | 'summary' | 'audio';
+export type RepresentationType = 'image' | 'summary' | 'audio' | 'explanation';
 
 /**
  * Provider capabilities for runtime checking

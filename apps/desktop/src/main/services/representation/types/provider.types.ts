@@ -53,12 +53,33 @@ export interface AudioRepresentationOutput extends RepresentationOutput {
 }
 
 /**
+ * Explanation representation output
+ * Transforms cryptic code or CLI commands into human-understandable explanations
+ */
+export interface ExplanationRepresentationOutput extends RepresentationOutput {
+  type: 'explanation';
+  /** The human-readable explanation */
+  explanation: string;
+  /** Original code or command being explained */
+  codeSnippet?: string;
+  /** Detected language (bash, typescript, python, etc.) */
+  language?: string;
+  /** Complexity assessment of the code/command */
+  complexity?: 'simple' | 'moderate' | 'complex';
+  /** Key concepts referenced in the explanation */
+  relatedConcepts?: string[];
+  /** Word count of the explanation */
+  wordCount: number;
+}
+
+/**
  * Union type for all representation outputs
  */
 export type AnyRepresentationOutput =
   | ImageRepresentationOutput
   | SummaryRepresentationOutput
-  | AudioRepresentationOutput;
+  | AudioRepresentationOutput
+  | ExplanationRepresentationOutput;
 
 /**
  * Configuration for a provider

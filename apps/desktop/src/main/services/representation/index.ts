@@ -13,5 +13,9 @@ export type {
   IIdGenerator,
 } from './implementations/RepresentationService';
 
+// Providers
+export { ClaudeExplanationProvider } from './providers';
+export type { IIdGenerator as IExplanationIdGenerator } from './providers';
+
 // Utilities
 export * from './utils/capability-checker';

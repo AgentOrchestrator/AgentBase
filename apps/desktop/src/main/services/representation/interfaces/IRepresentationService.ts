@@ -8,6 +8,7 @@ import type {
   ImageRepresentationOutput,
   SummaryRepresentationOutput,
   AudioRepresentationOutput,
+  ExplanationRepresentationOutput,
 } from '../types';
 import type { ImageTransformOptions } from './IRepresentationImageProvider';
 import type {
@@ -15,6 +16,10 @@ import type {
   SummaryStreamCallback,
 } from './IRepresentationSummaryProvider';
 import type { AudioTransformOptions } from './IRepresentationAudioProvider';
+import type {
+  ExplanationTransformOptions,
+  ExplanationStreamCallback,
+} from './IRepresentationExplanationProvider';
 
 /**
  * Service lifecycle interface
@@ -126,6 +131,24 @@ export interface IRepresentationService
     input: RepresentationInput,
     options?: AudioTransformOptions
   ): Promise<RepresentationResult<AudioRepresentationOutput, RepresentationError>>;
+
+  /**
+   * Transform to explanation using the first available explanation provider
+   * Converts cryptic code or CLI commands into human-understandable explanations
+   */
+  transformToExplanation(
+    input: RepresentationInput,
+    options?: ExplanationTransformOptions
+  ): Promise<RepresentationResult<ExplanationRepresentationOutput, RepresentationError>>;
+
+  /**
+   * Transform to explanation with streaming
+   */
+  transformToExplanationStreaming(
+    input: RepresentationInput,
+    onChunk: ExplanationStreamCallback,
+    options?: ExplanationTransformOptions
+  ): Promise<RepresentationResult<ExplanationRepresentationOutput, RepresentationError>>;
 
   /**
    * Get available representation types based on registered providers

@@ -2,6 +2,7 @@ import type { IRepresentationProvider } from '../interfaces/IRepresentationProvi
 import type { IRepresentationImageProvider } from '../interfaces/IRepresentationImageProvider';
 import type { IRepresentationSummaryProvider } from '../interfaces/IRepresentationSummaryProvider';
 import type { IRepresentationAudioProvider } from '../interfaces/IRepresentationAudioProvider';
+import type { IRepresentationExplanationProvider } from '../interfaces/IRepresentationExplanationProvider';
 
 /**
  * Type guard to check if a provider produces images
@@ -51,6 +52,32 @@ export function supportsSummaryStreaming(
     isSummaryProvider(provider) &&
     provider.getCapabilities().supportsStreaming &&
     typeof provider.transformToSummaryStreaming === 'function'
+  );
+}
+
+/**
+ * Type guard to check if a provider produces explanations
+ */
+export function isExplanationProvider(
+  provider: IRepresentationProvider
+): provider is IRepresentationExplanationProvider {
+  return provider.representationType === 'explanation';
+}
+
+/**
+ * Check if an explanation provider supports streaming output
+ */
+export function supportsExplanationStreaming(
+  provider: IRepresentationProvider
+): provider is IRepresentationExplanationProvider & {
+  transformToExplanationStreaming: NonNullable<
+    IRepresentationExplanationProvider['transformToExplanationStreaming']
+  >;
+} {
+  return (
+    isExplanationProvider(provider) &&
+    provider.getCapabilities().supportsStreaming &&
+    typeof provider.transformToExplanationStreaming === 'function'
   );
 }
 

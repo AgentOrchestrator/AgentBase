@@ -13,6 +13,11 @@ export type {
   AudioTransformOptions,
 } from './IRepresentationAudioProvider';
 export type {
+  IRepresentationExplanationProvider,
+  ExplanationTransformOptions,
+  ExplanationStreamCallback,
+} from './IRepresentationExplanationProvider';
+export type {
   IRepresentationService,
   IRepresentationServiceLifecycle,
   IRepresentationProviderRegistry,

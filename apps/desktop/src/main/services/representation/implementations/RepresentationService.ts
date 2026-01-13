@@ -4,10 +4,13 @@ import type {
   IRepresentationImageProvider,
   IRepresentationSummaryProvider,
   IRepresentationAudioProvider,
+  IRepresentationExplanationProvider,
   ImageTransformOptions,
   SummaryTransformOptions,
   SummaryStreamCallback,
   AudioTransformOptions,
+  ExplanationTransformOptions,
+  ExplanationStreamCallback,
 } from '../interfaces';
 import type {
   RepresentationResult,
@@ -18,13 +21,16 @@ import type {
   ImageRepresentationOutput,
   SummaryRepresentationOutput,
   AudioRepresentationOutput,
+  ExplanationRepresentationOutput,
 } from '../types';
 import { RepresentationErrorCode, ok, err, representationError } from '../types';
 import {
   isImageProvider,
   isSummaryProvider,
   isAudioProvider,
+  isExplanationProvider,
   supportsSummaryStreaming,
+  supportsExplanationStreaming,
 } from '../utils/capability-checker';
 
 /**
@@ -84,6 +90,7 @@ export class RepresentationService implements IRepresentationService {
     this.providersByType.set('image', new Set());
     this.providersByType.set('summary', new Set());
     this.providersByType.set('audio', new Set());
+    this.providersByType.set('explanation', new Set());
   }
 
   // ==================== Lifecycle ====================
@@ -368,6 +375,57 @@ export class RepresentationService implements IRepresentationService {
     }
 
     return provider.transformToAudio(input, options);
+  }
+
+  async transformToExplanation(
+    input: RepresentationInput,
+    options?: ExplanationTransformOptions
+  ): Promise<RepresentationResult<ExplanationRepresentationOutput, RepresentationError>> {
+    const initCheck = this.ensureInitialized();
+    if (!initCheck.success) {
+      return initCheck;
+    }
+
+    const explanationProviders = this.getProvidersByType('explanation');
+    const provider = explanationProviders.find((p) => isExplanationProvider(p)) as
+      | IRepresentationExplanationProvider
+      | undefined;
+
+    if (!provider) {
+      return err(
+        representationError(
+          RepresentationErrorCode.PROVIDER_NOT_FOUND,
+          'No explanation provider registered'
+        )
+      );
+    }
+
+    return provider.transformToExplanation(input, options);
+  }
+
+  async transformToExplanationStreaming(
+    input: RepresentationInput,
+    onChunk: ExplanationStreamCallback,
+    options?: ExplanationTransformOptions
+  ): Promise<RepresentationResult<ExplanationRepresentationOutput, RepresentationError>> {
+    const initCheck = this.ensureInitialized();
+    if (!initCheck.success) {
+      return initCheck;
+    }
+
+    const explanationProviders = this.getProvidersByType('explanation');
+    const provider = explanationProviders.find((p) => supportsExplanationStreaming(p));
+
+    if (!provider || !supportsExplanationStreaming(provider)) {
+      return err(
+        representationError(
+          RepresentationErrorCode.CAPABILITY_NOT_SUPPORTED,
+          'No explanation provider with streaming support registered'
+        )
+      );
+    }
+
+    return provider.transformToExplanationStreaming(input, onChunk, options);
   }
 
   // ==================== Private Helpers ====================
