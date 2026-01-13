@@ -20,7 +20,15 @@ export function WorkspaceSelectionModal({
   const handleBrowse = async () => {
     setIsSelecting(true);
     try {
-      const path = await window.shellAPI?.openDirectoryDialog({
+      // Debug: log what's in shellAPI
+      console.log('[WorkspaceSelectionModal] shellAPI:', window.shellAPI);
+      console.log('[WorkspaceSelectionModal] shellAPI keys:', window.shellAPI ? Object.keys(window.shellAPI) : 'undefined');
+
+      if (!window.shellAPI?.openDirectoryDialog) {
+        throw new Error('openDirectoryDialog not available in shellAPI');
+      }
+
+      const path = await window.shellAPI.openDirectoryDialog({
         title: 'Select Workspace Directory',
       });
       if (path) {
