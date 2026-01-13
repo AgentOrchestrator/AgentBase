@@ -224,9 +224,10 @@ export function AgentNodePresentation({
         />
       ))}
 
-      {/* Content Area */}
+      {/* Content Area - Both views are always mounted, visibility controlled via CSS */}
+      {/* This preserves terminal session state when switching between tabs */}
       <div className="agent-node-content">
-        {activeView === 'overview' ? (
+        <div style={{ display: activeView === 'overview' ? 'contents' : 'none' }}>
           <AgentOverviewView
             agentId={data.agentId}
             title={data.title}
@@ -237,9 +238,10 @@ export function AgentNodePresentation({
             workspacePath={workspacePath ?? undefined}
             onTitleChange={handleTitleChange}
           />
-        ) : (
+        </div>
+        <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
           <AgentTerminalView terminalId={data.terminalId} />
-        )}
+        </div>
       </div>
 
       <Handle type="source" position={Position.Bottom} />
