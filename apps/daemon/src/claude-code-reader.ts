@@ -1,17 +1,32 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { ChatMessage, ChatHistory, SessionMetadata } from './types.js';
+import type {
+  ChatMessage,
+  ChatHistory,
+  SessionMetadata,
+  ProjectInfo,
+  LoaderOptions,
+  IChatHistoryLoader,
+} from '@agent-orchestrator/shared';
+import { IDE_DATA_PATHS } from '@agent-orchestrator/shared';
 
 // Re-export types for backward compatibility
-export type { ChatMessage, ChatHistory, SessionMetadata } from './types.js';
+export type { ChatMessage, ChatHistory, SessionMetadata, ProjectInfo } from '@agent-orchestrator/shared';
 
-export interface ProjectInfo {
-  name: string;
-  path: string;
-  workspaceIds: string[];
-  claudeCodeSessionCount: number;
-  lastActivity: string;
+interface JsonlLine {
+  type?: string;
+  message?: {
+    role: string;
+    content: unknown;
+  };
+  display?: string;
+  pastedContents?: Record<string, unknown>;
+  timestamp?: string | number;
+  project?: string;
+  sessionId?: string;
+  cwd?: string;
+  summary?: string;
 }
 
 export function getClaudeConfigPath(): string {
@@ -28,23 +43,7 @@ export function getClaudeConfigPath(): string {
     return path.dirname(claudeJsonPath);
   }
 
-  // Default to ~/.claude.json location
   return homeDir;
-}
-
-interface JsonlLine {
-  type?: string;
-  message?: {
-    role: string;
-    content: any;
-  };
-  display?: string;
-  pastedContents?: Record<string, any>;
-  timestamp?: string | number;
-  project?: string;
-  sessionId?: string;
-  cwd?: string;
-  summary?: string;
 }
 
 /**
@@ -67,23 +66,19 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
       try {
         const data: JsonlLine = JSON.parse(line);
 
-        // Extract summary from first line if available
         if (data.type === 'summary' && data.summary) {
           summary = data.summary;
         }
 
-        // Extract session ID
         if (data.sessionId) {
           sessionId = data.sessionId;
         }
 
-        // Extract user messages
         if (data.type === 'user' && data.message?.content) {
           const timestamp = data.timestamp?.toString() || '';
           if (!firstTimestamp) firstTimestamp = timestamp;
           lastTimestamp = timestamp;
 
-          // Parse content array
           const contentParts = Array.isArray(data.message.content)
             ? data.message.content
             : [data.message.content];
@@ -96,9 +91,9 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
                 role: 'user',
                 timestamp: timestamp || new Date().toISOString()
               });
-            } else if (part?.type === 'text' && part.text) {
+            } else if (part && typeof part === 'object' && 'type' in part && part.type === 'text' && 'text' in part) {
               messages.push({
-                display: part.text,
+                display: String(part.text),
                 pastedContents: {},
                 role: 'user',
                 timestamp: timestamp || new Date().toISOString()
@@ -107,7 +102,6 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
           }
         }
 
-        // Extract assistant messages
         if (data.type === 'assistant' && data.message?.content) {
           const timestamp = data.timestamp?.toString() || '';
           if (!firstTimestamp) firstTimestamp = timestamp;
@@ -125,9 +119,9 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
                 role: 'assistant',
                 timestamp: timestamp || new Date().toISOString()
               });
-            } else if (part?.type === 'text' && part.text) {
+            } else if (part && typeof part === 'object' && 'type' in part && part.type === 'text' && 'text' in part) {
               messages.push({
-                display: part.text,
+                display: String(part.text),
                 pastedContents: {},
                 role: 'assistant',
                 timestamp: timestamp || new Date().toISOString()
@@ -135,13 +129,11 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
             }
           }
         }
-      } catch (lineError) {
-        // Skip malformed lines
+      } catch {
         continue;
       }
     }
 
-    // Extract project name from path
     const projectName = projectPath ? path.basename(projectPath) : undefined;
 
     const metadata: SessionMetadata = {
@@ -173,22 +165,19 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
 /**
  * Read all chat histories from ~/.claude directory
  * @param lookbackDays - Number of days to look back (default: 30)
- * @param sinceTimestamp - Optional timestamp to filter files modified after this time (for incremental sync)
+ * @param sinceTimestamp - Optional timestamp to filter files modified after this time
  */
 export function readChatHistories(lookbackDays?: number, sinceTimestamp?: number): ChatHistory[] {
   const histories: ChatHistory[] = [];
 
   try {
-    const homeDir = os.homedir();
-    const claudeDir = path.join(homeDir, '.claude');
-    const projectsDir = path.join(claudeDir, 'projects');
+    const projectsDir = IDE_DATA_PATHS.claudeCode();
 
     if (!fs.existsSync(projectsDir)) {
       console.log('No ~/.claude/projects directory found');
       return histories;
     }
 
-    // Calculate cutoff date - use sinceTimestamp if provided, otherwise fall back to lookbackDays
     let cutoffDate: Date | null = null;
     if (sinceTimestamp && sinceTimestamp > 0) {
       cutoffDate = new Date(sinceTimestamp);
@@ -199,7 +188,6 @@ export function readChatHistories(lookbackDays?: number, sinceTimestamp?: number
       console.log(`[Claude Code Reader] Filtering files modified after ${cutoffDate.toISOString()}`);
     }
 
-    // Read all project directories
     const projectDirs = fs.readdirSync(projectsDir);
 
     for (const projectDir of projectDirs) {
@@ -207,21 +195,15 @@ export function readChatHistories(lookbackDays?: number, sinceTimestamp?: number
 
       if (!fs.statSync(projectDirPath).isDirectory()) continue;
 
-      // Convert directory name back to project path
-      // e.g., "-Users-duonghaidang-Developer-agent-orchestrator" -> "/Users/duonghaidang/Developer/agent-orchestrator"
       const projectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
-
-      // Read all session files in this project
       const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
 
       for (const sessionFile of sessionFiles) {
         const sessionFilePath = path.join(projectDirPath, sessionFile);
 
-        // Check file modification time if filtering is enabled
         if (cutoffDate) {
           const stats = fs.statSync(sessionFilePath);
           if (stats.mtime < cutoffDate) {
-            // Skip files that haven't been modified within the lookback period
             continue;
           }
         }
@@ -262,7 +244,6 @@ export function extractProjectsFromClaudeCodeHistories(
       continue;
     }
 
-    // Extract project name from path (last directory)
     const projectName = path.basename(projectPath);
 
     if (!projectsMap.has(projectPath)) {
@@ -277,7 +258,6 @@ export function extractProjectsFromClaudeCodeHistories(
     const project = projectsMap.get(projectPath)!;
     project.sessionCount++;
 
-    // Update last activity
     const historyDate = new Date(history.timestamp);
     if (historyDate > project.lastActivity) {
       project.lastActivity = historyDate;
@@ -287,8 +267,32 @@ export function extractProjectsFromClaudeCodeHistories(
   return Array.from(projectsMap.values()).map(project => ({
     name: project.name,
     path: project.path,
-    workspaceIds: [], // Claude Code doesn't have workspace IDs
+    workspaceIds: [],
     claudeCodeSessionCount: project.sessionCount,
     lastActivity: project.lastActivity.toISOString()
   }));
 }
+
+/**
+ * Claude Code Loader - implements IChatHistoryLoader interface
+ */
+export class ClaudeCodeLoader implements IChatHistoryLoader {
+  readonly agentType = 'claude_code' as const;
+  readonly name = 'Claude Code';
+
+  readHistories(options?: LoaderOptions): ChatHistory[] {
+    return readChatHistories(options?.lookbackDays, options?.sinceTimestamp);
+  }
+
+  extractProjects(histories: ChatHistory[]): ProjectInfo[] {
+    return extractProjectsFromClaudeCodeHistories(histories);
+  }
+
+  isAvailable(): boolean {
+    const projectsDir = IDE_DATA_PATHS.claudeCode();
+    return fs.existsSync(projectsDir);
+  }
+}
+
+// Default instance for convenience
+export const claudeCodeLoader = new ClaudeCodeLoader();

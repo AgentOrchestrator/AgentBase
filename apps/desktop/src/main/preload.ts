@@ -6,6 +6,7 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
   AgentCapabilities,
@@ -16,6 +17,13 @@ import type {
   ForkOptions,
   ContinueOptions,
 } from './services/coding-agent';
+import type {
+  ChatRequest,
+  ChatResponse,
+  VendorId,
+  ModelInfo,
+  LLMCapabilities,
+} from './services/llm';
 import type {
   RepresentationType,
   RepresentationInput,
@@ -68,6 +76,51 @@ export interface AgentStatusAPI {
   loadAgentStatus: (agentId: string) => Promise<CodingAgentState | null>;
   deleteAgentStatus: (agentId: string) => Promise<void>;
   loadAllAgentStatuses: () => Promise<CodingAgentState[]>;
+}
+
+// Type definitions for the LLM API
+export interface LLMAPI {
+  /** Generate a chat completion */
+  chat: (request: ChatRequest) => Promise<ChatResponse>;
+
+  /** Generate a chat completion with streaming */
+  chatStream: (
+    requestId: string,
+    request: ChatRequest,
+    onChunk: (chunk: string) => void
+  ) => Promise<ChatResponse>;
+
+  /** Chat with automatic tool execution */
+  chatWithTools: (
+    request: ChatRequest,
+    maxIterations?: number
+  ) => Promise<ChatResponse>;
+
+  /** Store an API key in the keychain */
+  setApiKey: (vendor: VendorId, apiKey: string) => Promise<void>;
+
+  /** Delete an API key from the keychain */
+  deleteApiKey: (vendor: VendorId) => Promise<void>;
+
+  /** Check if an API key exists */
+  hasApiKey: (vendor: VendorId) => Promise<boolean>;
+
+  /** List vendors with stored API keys */
+  listVendorsWithKeys: () => Promise<VendorId[]>;
+
+  /** Get available models */
+  getAvailableModels: () => Promise<ModelInfo[]>;
+
+  /** Check if the service is configured */
+  isConfigured: () => Promise<boolean>;
+
+  /** Get service capabilities */
+  getCapabilities: () => Promise<LLMCapabilities>;
+
+  /** Subscribe to stream chunks (for use with chatStream) */
+  onStreamChunk: (
+    callback: (data: { requestId: string; chunk: string }) => void
+  ) => () => void;
 }
 
 // Type definitions for the coding agent API
@@ -277,6 +330,77 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     unwrapResponse<boolean>(ipcRenderer.invoke('coding-agent:is-available', agentType)),
 } as CodingAgentAPI);
 
+// Expose LLM API
+contextBridge.exposeInMainWorld('llmAPI', {
+  chat: (request: ChatRequest) =>
+    unwrapResponse<ChatResponse>(ipcRenderer.invoke('llm:chat', request)),
+
+  chatStream: async (
+    requestId: string,
+    request: ChatRequest,
+    onChunk: (chunk: string) => void
+  ) => {
+    // Set up chunk listener
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: string }
+    ) => {
+      if (data.requestId === requestId) {
+        onChunk(data.chunk);
+      }
+    };
+    ipcRenderer.on('llm:stream-chunk', handler);
+
+    try {
+      return await unwrapResponse<ChatResponse>(
+        ipcRenderer.invoke('llm:chat-stream', requestId, request)
+      );
+    } finally {
+      ipcRenderer.removeListener('llm:stream-chunk', handler);
+    }
+  },
+
+  chatWithTools: (request: ChatRequest, maxIterations?: number) =>
+    unwrapResponse<ChatResponse>(
+      ipcRenderer.invoke('llm:chat-with-tools', request, maxIterations)
+    ),
+
+  setApiKey: async (vendor: VendorId, apiKey: string) => {
+    await unwrapResponse(ipcRenderer.invoke('llm:set-api-key', vendor, apiKey));
+  },
+
+  deleteApiKey: async (vendor: VendorId) => {
+    await unwrapResponse(ipcRenderer.invoke('llm:delete-api-key', vendor));
+  },
+
+  hasApiKey: (vendor: VendorId) =>
+    unwrapResponse<boolean>(ipcRenderer.invoke('llm:has-api-key', vendor)),
+
+  listVendorsWithKeys: () =>
+    unwrapResponse<VendorId[]>(ipcRenderer.invoke('llm:list-vendors-with-keys')),
+
+  getAvailableModels: () =>
+    unwrapResponse<ModelInfo[]>(ipcRenderer.invoke('llm:get-available-models')),
+
+  isConfigured: () =>
+    unwrapResponse<boolean>(ipcRenderer.invoke('llm:is-configured')),
+
+  getCapabilities: () =>
+    unwrapResponse<LLMCapabilities>(ipcRenderer.invoke('llm:get-capabilities')),
+
+  onStreamChunk: (
+    callback: (data: { requestId: string; chunk: string }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: string }
+    ) => callback(data);
+    ipcRenderer.on('llm:stream-chunk', handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener('llm:stream-chunk', handler);
+  },
+} as LLMAPI);
+
 // Expose representation API
 contextBridge.exposeInMainWorld('representationAPI', {
   getAvailableTypes: () =>
@@ -317,6 +441,8 @@ export interface ShellAPI {
   getAvailableEditors: () => Promise<EditorApp[]>;
   /** Open a path in the system file manager */
   showInFolder: (path: string) => Promise<void>;
+  /** Open a directory picker dialog */
+  openDirectoryDialog: (options?: { title?: string; defaultPath?: string }) => Promise<string | null>;
 }
 
 // Expose shell API
@@ -329,4 +455,28 @@ contextBridge.exposeInMainWorld('shellAPI', {
   showInFolder: async (path: string) => {
     await unwrapResponse(ipcRenderer.invoke('shell:show-in-folder', path));
   },
+  openDirectoryDialog: (options?: { title?: string; defaultPath?: string }) =>
+    unwrapResponse<string | null>(ipcRenderer.invoke('shell:open-directory-dialog', options)),
 } as ShellAPI);
+
+// Git info types
+// Re-export GitInfo from shared package for backward compatibility
+export type { GitInfo } from '@agent-orchestrator/shared';
+
+// Type definitions for the git API
+export interface GitAPI {
+  /** Get git information for a workspace path */
+  getInfo: (workspacePath: string) => Promise<GitInfo | null>;
+}
+
+// Expose git API
+contextBridge.exposeInMainWorld('gitAPI', {
+  getInfo: async (workspacePath: string) => {
+    try {
+      return await unwrapResponse<GitInfo>(ipcRenderer.invoke('git:get-info', workspacePath));
+    } catch {
+      // Return null if git info cannot be retrieved
+      return null;
+    }
+  },
+} as GitAPI);

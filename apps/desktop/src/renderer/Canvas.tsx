@@ -12,19 +12,13 @@ import {
   Connection,
   Edge,
   Node,
-  Handle,
-  Position,
   useReactFlow,
   OnConnectStartParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import TerminalNode from './TerminalNode';
-import WorkspaceNode from './WorkspaceNode';
-import AgentNode from './AgentNode';
-import ForkGhostNode from './ForkGhostNode';
 import ForkSessionModal from './ForkSessionModal';
 import './Canvas.css';
-import { agentStore, forkStore } from './stores';
+import { forkStore } from './stores';
 import { forkService } from './services';
 import { createDefaultAgentTitle } from './types/agent-node';
 import type { AgentNodeData } from './types/agent-node';
@@ -34,27 +28,10 @@ import {
   isWorkspaceMetadataAttachment,
 } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
+import { nodeRegistry } from './nodes/registry';
 
-// Custom node component
-const CustomNode = ({ data }: { data: { label: string } }) => {
-  return (
-    <div className="custom-node">
-      <Handle type="target" position={Position.Top} />
-      <div className="custom-node-content">
-        {data.label}
-      </div>
-      <Handle type="source" position={Position.Bottom} />
-    </div>
-  );
-};
-
-// Define node types
-const nodeTypes = {
-  custom: CustomNode,
-  terminal: TerminalNode,
-  workspace: WorkspaceNode,
-  agent: AgentNode,
-};
+// Use node types from the registry (single source of truth)
+const nodeTypes = nodeRegistry.reactFlowNodeTypes;
 
 const defaultNodes: Node[] = [];
 
@@ -857,10 +834,7 @@ function CanvasFlow() {
       });
     }
 
-    // Get first mock agent from store for demo purposes
-    const mockAgents = agentStore.getAllAgents();
-    const mockAgent = mockAgents[0];
-
+    // Always generate unique IDs for each new node
     const agentId = `agent-${crypto.randomUUID()}`;
     const terminalId = `terminal-${crypto.randomUUID()}`;
 
@@ -868,7 +842,7 @@ function CanvasFlow() {
       id: `node-${Date.now()}`,
       type: 'agent',
       position: nodePosition,
-      data: mockAgent || {
+      data: {
         agentId,
         terminalId,
         agentType: 'claude_code',

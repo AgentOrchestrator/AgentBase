@@ -1,12 +1,69 @@
 /**
+ * Message types for coding agent sessions
+ *
+ * Re-exports rich type information from shared package and extends
+ * with desktop-specific fields.
+ */
+
+// Re-export rich message types from shared package
+export type {
+  MessageType,
+  ToolCategory,
+  ToolInfo,
+  ThinkingInfo,
+  McpInfo,
+  ErrorInfo,
+} from '@agent-orchestrator/shared';
+
+import type {
+  MessageType,
+  ToolInfo,
+  ThinkingInfo,
+  McpInfo,
+  ErrorInfo,
+} from '@agent-orchestrator/shared';
+
+/**
  * Chat message in a session
+ * Extended with rich type information for tool calls, thinking, etc.
  */
 export interface ChatMessage {
+  // =========================================================================
+  // Core fields (existing)
+  // =========================================================================
+
+  /** Unique message ID */
   id: string;
-  role: 'user' | 'assistant';
+  /** Message role */
+  role: 'user' | 'assistant' | 'system';
+  /** Message content (display text) */
   content: string;
+  /** ISO timestamp */
   timestamp: string;
+  /** Generic metadata */
   metadata?: Record<string, unknown>;
+
+  // =========================================================================
+  // Rich type information (NEW)
+  // =========================================================================
+
+  /** Rich message type for filtering and display */
+  messageType?: MessageType;
+
+  /** Tool-specific information (when messageType is tool_call or tool_result) */
+  tool?: ToolInfo;
+
+  /** Thinking/reasoning content (when messageType is thinking/reasoning) */
+  thinking?: ThinkingInfo;
+
+  /** MCP-specific information (when messageType is mcp_tool) */
+  mcp?: McpInfo;
+
+  /** Error information (when messageType is error) */
+  error?: ErrorInfo;
+
+  /** Agent-specific metadata preserved from raw data */
+  agentMetadata?: Record<string, unknown>;
 }
 
 /**

@@ -17,6 +17,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@agent-orchestrator/shared": "*",
     "@ai-sdk/anthropic": "^2.0.33",
     "@ai-sdk/google": "^2.0.23",
     "@ai-sdk/openai": "^2.0.52",
