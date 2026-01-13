@@ -12,40 +12,17 @@ import {
   Connection,
   Edge,
   Node,
-  Handle,
-  Position,
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import TerminalNode from './TerminalNode';
-import WorkspaceNode from './WorkspaceNode';
-import { AgentNode } from './nodes/AgentNode';
 import './Canvas.css';
-import { agentStore } from './stores';
 import { createDefaultAgentTitle } from './types/agent-node';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
+import { nodeRegistry } from './nodes/registry';
 
-// Custom node component
-const CustomNode = ({ data }: { data: { label: string } }) => {
-  return (
-    <div className="custom-node">
-      <Handle type="target" position={Position.Top} />
-      <div className="custom-node-content">
-        {data.label}
-      </div>
-      <Handle type="source" position={Position.Bottom} />
-    </div>
-  );
-};
-
-// Define node types
-const nodeTypes = {
-  custom: CustomNode,
-  terminal: TerminalNode,
-  workspace: WorkspaceNode,
-  agent: AgentNode,
-};
+// Use node types from the registry (single source of truth)
+const nodeTypes = nodeRegistry.reactFlowNodeTypes;
 
 const defaultNodes: Node[] = [];
 

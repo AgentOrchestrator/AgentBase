@@ -5,21 +5,48 @@ import type {
   NodeData,
   Viewport as DbViewport,
 } from '../../main/types/database';
+import { nodeRegistry } from '../nodes/registry';
 
 /**
  * Convert React Flow nodes to database CanvasNodes
+ *
+ * Uses the node registry to:
+ * 1. Filter out non-persistent node types
+ * 2. Validate node data against schemas
  */
 export function nodesToCanvasNodes(nodes: Node[]): CanvasNode[] {
-  return nodes.map((node) => ({
-    id: node.id,
-    type: (node.type || 'custom') as 'custom' | 'terminal' | 'workspace',
-    position: {
-      x: node.position.x,
-      y: node.position.y,
-    },
-    data: node.data as NodeData,
-    style: node.style as { width?: number; height?: number } | undefined,
-  }));
+  return nodes
+    .filter((node) => {
+      const nodeType = node.type || 'custom';
+      if (!nodeRegistry.isPersistedType(nodeType)) {
+        console.log(`[canvasConverters] Skipping non-persistent node: ${nodeType}`);
+        return false;
+      }
+      return true;
+    })
+    .map((node) => {
+      const nodeType = node.type || 'custom';
+
+      // Validate against schema if available
+      const validation = nodeRegistry.validateNodeData(nodeType, node.data);
+      if (!validation.success) {
+        console.warn(
+          `[canvasConverters] Invalid data for ${nodeType} node ${node.id}:`,
+          validation.error
+        );
+      }
+
+      return {
+        id: node.id,
+        type: nodeType as CanvasNode['type'],
+        position: {
+          x: node.position.x,
+          y: node.position.y,
+        },
+        data: node.data as NodeData,
+        style: node.style as { width?: number; height?: number } | undefined,
+      };
+    });
 }
 
 /**
