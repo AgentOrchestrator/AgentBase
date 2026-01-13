@@ -152,6 +152,13 @@ export interface IAgentService extends INodeService {
   /** Enable/disable CLI auto-start */
   setAutoStart(enabled: boolean): void;
 
+  // Workspace
+  /**
+   * Set workspace and navigate terminal to it.
+   * If autoStartCli is true, also starts the CLI after navigation.
+   */
+  setWorkspace(path: string, autoStartCli?: boolean): Promise<void>;
+
   // Session management
   /** Get CLI command for this agent type */
   getCliCommand(): string;

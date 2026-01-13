@@ -51,28 +51,32 @@ function AgentNode({ data, id }: NodeProps) {
     return unsubscribe;
   }, [nodeData.agentId]);
 
-  // Handle data changes from presentation component
-  const handleDataChange = useCallback(
-    (updates: Partial<AgentNodeData>) => {
-      const updatedData = { ...agentData, ...updates };
-
-      // Update local state
+  // Helper to update state and notify canvas (single source of truth)
+  const dispatchNodeUpdate = useCallback(
+    (updatedData: AgentNodeData) => {
       setAgentData(updatedData);
-
-      // Notify canvas of changes
       window.dispatchEvent(
         new CustomEvent('update-node', {
           detail: { nodeId: id, data: updatedData },
         })
       );
     },
-    [id, agentData]
+    [id]
   );
 
-  // Extract workspace path from attachments
-  const attachmentWorkspacePath = agentData.attachments
-    ?.filter((a) => a.type === 'workspace-metadata')
-    .map((a) => (a as { path: string }).path)[0];
+  // Handle data changes from presentation component
+  const handleDataChange = useCallback(
+    (updates: Partial<AgentNodeData>) => {
+      dispatchNodeUpdate({ ...agentData, ...updates });
+    },
+    [agentData, dispatchNodeUpdate]
+  );
+
+  // Extract workspace path from attachments (use find instead of filter/map)
+  const workspaceAttachment = agentData.attachments?.find(
+    (a) => a.type === 'workspace-metadata'
+  ) as { path: string } | undefined;
+  const attachmentWorkspacePath = workspaceAttachment?.path;
 
   // Determine final workspace path (priority: attachment > selected > inherited)
   const workspacePath = attachmentWorkspacePath || selectedWorkspace || inheritedWorkspacePath;
@@ -85,31 +89,24 @@ function AgentNode({ data, id }: NodeProps) {
   }, [workspacePath, showWorkspaceModal]);
 
   // Handler for workspace selection
-  const handleWorkspaceSelect = (path: string) => {
-    setSelectedWorkspace(path);
-    setShowWorkspaceModal(false);
+  const handleWorkspaceSelect = useCallback(
+    (path: string) => {
+      setSelectedWorkspace(path);
+      setShowWorkspaceModal(false);
 
-    // Create workspace attachment and update node data
-    const workspaceAttachment = createWorkspaceMetadataAttachment({
-      path,
-      name: path.split('/').pop() || 'Workspace',
-    });
+      // Create workspace attachment and update node data
+      const newAttachment = createWorkspaceMetadataAttachment({
+        path,
+        name: path.split('/').pop() || 'Workspace',
+      });
 
-    const currentAttachments = agentData.attachments || [];
-    const updatedData = {
-      ...agentData,
-      attachments: [...currentAttachments, workspaceAttachment],
-    };
-
-    setAgentData(updatedData);
-
-    // Notify canvas of changes
-    window.dispatchEvent(
-      new CustomEvent('update-node', {
-        detail: { nodeId: id, data: updatedData },
-      })
-    );
-  };
+      dispatchNodeUpdate({
+        ...agentData,
+        attachments: [...(agentData.attachments || []), newAttachment],
+      });
+    },
+    [agentData, dispatchNodeUpdate]
+  );
 
   const handleWorkspaceCancel = () => {
     // Close modal - node will remain without workspace

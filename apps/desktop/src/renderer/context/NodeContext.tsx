@@ -205,37 +205,19 @@ export function NodeContextProvider({
 
     const services = servicesRef.current;
 
-    // If we have a terminal service, change to the new workspace directory
-    if (hasTerminalService(services)) {
+    // Delegate workspace handling to the appropriate service
+    if (hasAgentService(services)) {
+      // Agent service handles terminal navigation + CLI start
+      services.agent.setWorkspace(workspacePath, autoStartCli);
+    } else if (hasTerminalService(services)) {
+      // For non-agent nodes, just navigate the terminal
       const terminal = services.terminal;
-
-      // Create terminal if not running
       if (!terminal.isRunning()) {
         terminal.create().then(() => {
-          // Small delay to let shell initialize, then cd to workspace
-          setTimeout(() => {
-            terminal.write(`cd "${workspacePath}"\n`);
-
-            // Start CLI if autoStartCli is enabled and we have an agent service
-            if (autoStartCli && hasAgentService(services)) {
-              // Small delay to let cd complete
-              setTimeout(() => {
-                terminal.write('claude\n');
-              }, 200);
-            }
-          }, 300);
+          setTimeout(() => terminal.write(`cd "${workspacePath}"\n`), 300);
         });
       } else {
-        // Terminal already running, just cd to workspace
         terminal.write(`cd "${workspacePath}"\n`);
-
-        // Start CLI if autoStartCli is enabled and we have an agent service
-        if (autoStartCli && hasAgentService(services)) {
-          // Small delay to let cd complete
-          setTimeout(() => {
-            terminal.write('claude\n');
-          }, 200);
-        }
       }
     }
   }, [isInitialized, workspacePath, autoStartCli]);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { WorktreeInfo } from '../../main/types/worktree';
 
@@ -18,6 +18,14 @@ export function useWorkspaceInheritance(nodeId: string): WorkspaceInheritanceRes
   const [worktree, setWorktree] = useState<WorktreeInfo | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
 
+  // Ref to track current worktree for cleanup (avoids stale closure issues)
+  const worktreeRef = useRef<WorktreeInfo | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    worktreeRef.current = worktree;
+  }, [worktree]);
+
   // Find parent workspace node from incoming edges
   const edges = getEdges();
   const nodes = getNodes();
@@ -29,8 +37,8 @@ export function useWorkspaceInheritance(nodeId: string): WorkspaceInheritanceRes
   const parentWorkspaceNode = parentNode?.type === 'workspace' ? parentNode : null;
   const parentWorkspacePath = parentWorkspaceNode?.data?.path as string | undefined;
 
+  // Provision worktree when parent workspace is detected
   useEffect(() => {
-    // When parent workspace is detected and no worktree yet, provision one
     if (parentWorkspacePath && !worktree && !isProvisioning) {
       setIsProvisioning(true);
       const branchName = `agent-${nodeId}`;
@@ -45,16 +53,18 @@ export function useWorkspaceInheritance(nodeId: string): WorkspaceInheritanceRes
           setIsProvisioning(false);
         });
     }
+  }, [parentWorkspacePath, nodeId, worktree, isProvisioning]);
 
-    // Cleanup worktree on unmount
+  // Cleanup worktree on unmount (separate effect to avoid stale closure)
+  useEffect(() => {
     return () => {
-      if (worktree) {
-        window.worktreeAPI?.release(worktree.id).catch((err) => {
+      if (worktreeRef.current) {
+        window.worktreeAPI?.release(worktreeRef.current.id).catch((err) => {
           console.error('[useWorkspaceInheritance] Failed to release worktree:', err);
         });
       }
     };
-  }, [parentWorkspacePath, nodeId, worktree, isProvisioning]);
+  }, []);
 
   return {
     inheritedWorkspacePath: worktree?.worktreePath || null,

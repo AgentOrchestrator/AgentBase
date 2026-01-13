@@ -62,10 +62,33 @@ export class AgentServiceImpl implements IAgentService {
   }
 
   /**
-   * Set the workspace path for the agent
+   * Set workspace and navigate terminal to it.
+   * If autoStartCli is true, also starts the CLI after navigation.
    */
-  setWorkspacePath(path: string): void {
+  async setWorkspace(path: string, autoStartCli?: boolean): Promise<void> {
     this.workspacePath = path;
+
+    // Ensure terminal is created and running
+    if (!this.terminalService.isRunning()) {
+      await this.terminalService.create();
+      // Wait for shell to initialize
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    // Navigate to workspace
+    this.terminalService.write(`cd "${path}"\n`);
+
+    // Start CLI if requested and not already started
+    if (autoStartCli && !this.isStarted) {
+      // Wait for cd to complete
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const cliCommand = this.getCliCommand();
+      if (cliCommand) {
+        this.terminalService.write(`${cliCommand}\n`);
+        this.isStarted = true;
+        this.updateStatus('running');
+      }
+    }
   }
 
   /**
