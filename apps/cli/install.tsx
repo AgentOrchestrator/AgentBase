@@ -11,6 +11,31 @@ import path from 'path';
 
 const execAsync = promisify(exec);
 
+/**
+ * Detect the package manager being used.
+ * Priority: npm_execpath env var > lockfile detection > fallback to npm
+ */
+function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | 'bun' {
+	// Check if we're being run via a specific package manager
+	const execPath = process.env.npm_execpath || '';
+	if (execPath.includes('pnpm')) return 'pnpm';
+	if (execPath.includes('yarn')) return 'yarn';
+	if (execPath.includes('bun')) return 'bun';
+
+	// Check for lockfiles in root directory
+	const rootPath = path.join(process.cwd(), '..', '..');
+	if (fs.existsSync(path.join(rootPath, 'pnpm-lock.yaml'))) return 'pnpm';
+	if (fs.existsSync(path.join(rootPath, 'yarn.lock'))) return 'yarn';
+	if (fs.existsSync(path.join(rootPath, 'bun.lockb'))) return 'bun';
+	if (fs.existsSync(path.join(rootPath, 'package-lock.json'))) return 'npm';
+
+	// Default to npm
+	return 'npm';
+}
+
+const packageManager = detectPackageManager();
+const runCmd = packageManager === 'npm' ? 'npm run' : packageManager;
+
 type Step = {
 	name: string;
 	status: 'pending' | 'running' | 'success' | 'error';
@@ -130,11 +155,11 @@ const InstallApp = () => {
 
 			updateStep(2, 'success');
 
-			// Step 3: Install dependencies (monorepo with pnpm)
+			// Step 3: Install dependencies (monorepo)
 			setCurrentStep(3);
-			updateStep(3, 'running', 'Installing monorepo dependencies with pnpm...');
+			updateStep(3, 'running', `Installing monorepo dependencies with ${packageManager}...`);
 			const rootPath = path.join(process.cwd(), '..', '..');
-			await execAsync('pnpm install', {
+			await execAsync(`${packageManager} install`, {
 				cwd: rootPath,
 				maxBuffer: 1024 * 1024 * 10,
 			});
@@ -354,12 +379,12 @@ LOG_LEVEL=INFO
 					<Newline />
 					<Text>Next steps:</Text>
 					<Text>  1. Run </Text>
-					<Text color="cyan">pnpm dev</Text>
+					<Text color="cyan">{runCmd} dev</Text>
 					<Text> to start all services</Text>
 					<Text>     Or use </Text>
-					<Text color="cyan">pnpm dev:daemon</Text>
+					<Text color="cyan">{runCmd} dev:daemon</Text>
 					<Text> and </Text>
-					<Text color="cyan">pnpm dev:web</Text>
+					<Text color="cyan">{runCmd} dev:web</Text>
 					<Text> separately</Text>
 					<Text>  2. Access the web app at </Text>
 					<Text color="cyan">http://localhost:3000</Text>
