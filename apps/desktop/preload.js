@@ -48,3 +48,32 @@ electron_1.contextBridge.exposeInMainWorld('canvasAPI', {
         await unwrapResponse(electron_1.ipcRenderer.invoke('canvas:set-current-id', canvasId));
     },
 });
+// Expose worktree API
+electron_1.contextBridge.exposeInMainWorld('worktreeAPI', {
+    provision: (repoPath, branchName, options) => unwrapResponse(electron_1.ipcRenderer.invoke('worktree:provision', repoPath, branchName, options)),
+    release: async (worktreeId, options) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('worktree:release', worktreeId, options));
+    },
+    get: (worktreeId) => unwrapResponse(electron_1.ipcRenderer.invoke('worktree:get', worktreeId)),
+    list: (repoPath) => unwrapResponse(electron_1.ipcRenderer.invoke('worktree:list', repoPath)),
+});
+// Expose agent status API
+electron_1.contextBridge.exposeInMainWorld('agentStatusAPI', {
+    saveAgentStatus: async (agentId, state) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('agent-status:save', agentId, state));
+    },
+    loadAgentStatus: (agentId) => unwrapResponse(electron_1.ipcRenderer.invoke('agent-status:load', agentId)),
+    deleteAgentStatus: async (agentId) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('agent-status:delete', agentId));
+    },
+    loadAllAgentStatuses: () => unwrapResponse(electron_1.ipcRenderer.invoke('agent-status:load-all')),
+});
+// Expose coding agent API
+electron_1.contextBridge.exposeInMainWorld('codingAgentAPI', {
+    generate: (agentType, request) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:generate', agentType, request)),
+    continueSession: (agentType, identifier, prompt, options) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:continue-session', agentType, identifier, prompt, options)),
+    forkSession: (agentType, parentIdentifier, options) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:fork-session', agentType, parentIdentifier, options)),
+    getAvailableAgents: () => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:get-available')),
+    getCapabilities: (agentType) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:get-capabilities', agentType)),
+    isAgentAvailable: (agentType) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:is-available', agentType)),
+});

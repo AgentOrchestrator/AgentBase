@@ -37,6 +37,9 @@ const electron_1 = require("electron");
 const pty = __importStar(require("node-pty"));
 const path = __importStar(require("path"));
 const database_1 = require("./database");
+const worktree_1 = require("./worktree");
+const ipc_1 = require("./worktree/ipc");
+const coding_agent_1 = require("./services/coding-agent");
 // Map to store terminal instances by ID
 const terminalProcesses = new Map();
 // Database instance
@@ -267,6 +270,156 @@ electron_1.ipcMain.handle('canvas:set-current-id', async (_event, canvasId) => {
         return { success: false, error: error.message };
     }
 });
+// Agent Status IPC handlers
+electron_1.ipcMain.handle('agent-status:save', async (_event, agentId, state) => {
+    try {
+        await database.saveAgentStatus(agentId, state);
+        console.log('[Main] Agent status saved', { agentId });
+        return { success: true };
+    }
+    catch (error) {
+        console.error('[Main] Error saving agent status', { agentId, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('agent-status:load', async (_event, agentId) => {
+    try {
+        const state = await database.loadAgentStatus(agentId);
+        console.log('[Main] Agent status loaded', { agentId, found: !!state });
+        return { success: true, data: state };
+    }
+    catch (error) {
+        console.error('[Main] Error loading agent status', { agentId, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('agent-status:delete', async (_event, agentId) => {
+    try {
+        await database.deleteAgentStatus(agentId);
+        console.log('[Main] Agent status deleted', { agentId });
+        return { success: true };
+    }
+    catch (error) {
+        console.error('[Main] Error deleting agent status', { agentId, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('agent-status:load-all', async () => {
+    try {
+        const states = await database.loadAllAgentStatuses();
+        console.log('[Main] Loaded all agent statuses', { count: states.length });
+        return { success: true, data: states };
+    }
+    catch (error) {
+        console.error('[Main] Error loading all agent statuses', { error });
+        return { success: false, error: error.message };
+    }
+});
+// ============================================
+// Coding Agent IPC Handlers
+// ============================================
+electron_1.ipcMain.handle('coding-agent:generate', async (_event, agentType, request) => {
+    try {
+        const agentResult = await coding_agent_1.CodingAgentFactory.getAgent(agentType);
+        if (agentResult.success === false) {
+            console.error('[Main] Error getting coding agent', { agentType, error: agentResult.error });
+            return { success: false, error: agentResult.error.message };
+        }
+        const result = await agentResult.data.generate(request);
+        if (result.success === false) {
+            console.error('[Main] Error generating response', { agentType, error: result.error });
+            return { success: false, error: result.error.message };
+        }
+        console.log('[Main] Generated response', { agentType, contentLength: result.data.content.length });
+        return { success: true, data: result.data };
+    }
+    catch (error) {
+        console.error('[Main] Error in coding-agent:generate', { agentType, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('coding-agent:continue-session', async (_event, agentType, identifier, prompt, options) => {
+    try {
+        const agentResult = await coding_agent_1.CodingAgentFactory.getAgent(agentType);
+        if (agentResult.success === false) {
+            return { success: false, error: agentResult.error.message };
+        }
+        const agent = agentResult.data;
+        if (!(0, coding_agent_1.isSessionResumable)(agent)) {
+            return { success: false, error: `${agentType} does not support session resumption` };
+        }
+        const result = await agent.continueSession(identifier, prompt, options);
+        if (result.success === false) {
+            console.error('[Main] Error continuing session', { agentType, error: result.error });
+            return { success: false, error: result.error.message };
+        }
+        console.log('[Main] Continued session', { agentType, identifier });
+        return { success: true, data: result.data };
+    }
+    catch (error) {
+        console.error('[Main] Error in coding-agent:continue-session', { agentType, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('coding-agent:fork-session', async (_event, agentType, parentIdentifier, options) => {
+    try {
+        const agentResult = await coding_agent_1.CodingAgentFactory.getAgent(agentType);
+        if (agentResult.success === false) {
+            return { success: false, error: agentResult.error.message };
+        }
+        const agent = agentResult.data;
+        if (!(0, coding_agent_1.isSessionForkable)(agent)) {
+            return { success: false, error: `${agentType} does not support session forking` };
+        }
+        const result = await agent.forkSession(parentIdentifier, options);
+        if (result.success === false) {
+            console.error('[Main] Error forking session', { agentType, error: result.error });
+            return { success: false, error: result.error.message };
+        }
+        console.log('[Main] Forked session', { agentType, newSessionId: result.data.id });
+        return { success: true, data: result.data };
+    }
+    catch (error) {
+        console.error('[Main] Error in coding-agent:fork-session', { agentType, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('coding-agent:get-available', async () => {
+    try {
+        const available = await coding_agent_1.CodingAgentFactory.getAvailableAgents();
+        console.log('[Main] Available coding agents', { agents: available });
+        return { success: true, data: available };
+    }
+    catch (error) {
+        console.error('[Main] Error getting available agents', { error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('coding-agent:get-capabilities', async (_event, agentType) => {
+    try {
+        const agentResult = await coding_agent_1.CodingAgentFactory.getAgent(agentType);
+        if (agentResult.success === false) {
+            return { success: false, error: agentResult.error.message };
+        }
+        const capabilities = agentResult.data.getCapabilities();
+        console.log('[Main] Agent capabilities', { agentType, capabilities });
+        return { success: true, data: capabilities };
+    }
+    catch (error) {
+        console.error('[Main] Error getting capabilities', { agentType, error });
+        return { success: false, error: error.message };
+    }
+});
+electron_1.ipcMain.handle('coding-agent:is-available', async (_event, agentType) => {
+    try {
+        const available = await coding_agent_1.CodingAgentFactory.isAgentAvailable(agentType);
+        return { success: true, data: available };
+    }
+    catch (error) {
+        console.error('[Main] Error checking agent availability', { agentType, error });
+        return { success: false, error: error.message };
+    }
+});
 electron_1.app.whenReady().then(async () => {
     console.log('[Main] App ready');
     // Initialize database
@@ -278,10 +431,26 @@ electron_1.app.whenReady().then(async () => {
         console.error('[Main] Error initializing database', error);
         // Continue without database - app should still function
     }
+    // Initialize WorktreeManager
+    try {
+        const worktreeBaseDir = path.join(electron_1.app.getPath('userData'), 'worktrees');
+        worktree_1.WorktreeManagerFactory.configure({
+            baseWorktreeDirectory: worktreeBaseDir,
+        });
+        await worktree_1.WorktreeManagerFactory.getManager();
+        (0, ipc_1.registerWorktreeIpcHandlers)();
+        console.log('[Main] WorktreeManager initialized successfully');
+    }
+    catch (error) {
+        console.error('[Main] Error initializing WorktreeManager', error);
+        // Continue without worktree manager - app should still function
+    }
     createWindow();
 });
-// Clean up database on app quit
-electron_1.app.on('will-quit', () => {
-    console.log('[Main] App quitting, closing database');
+// Clean up on app quit
+electron_1.app.on('will-quit', async () => {
+    console.log('[Main] App quitting, closing database, worktree manager, and coding agents');
     database_1.DatabaseFactory.closeDatabase();
+    worktree_1.WorktreeManagerFactory.closeManager();
+    await coding_agent_1.CodingAgentFactory.disposeAll();
 });
