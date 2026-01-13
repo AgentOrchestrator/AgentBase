@@ -7,6 +7,7 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
   AgentCapabilities,
@@ -492,6 +493,8 @@ export interface ShellAPI {
   getAvailableEditors: () => Promise<EditorApp[]>;
   /** Open a path in the system file manager */
   showInFolder: (path: string) => Promise<void>;
+  /** Open a directory picker dialog */
+  openDirectoryDialog: (options?: { title?: string; defaultPath?: string }) => Promise<string | null>;
 }
 
 // Expose shell API
@@ -504,6 +507,8 @@ contextBridge.exposeInMainWorld('shellAPI', {
   showInFolder: async (path: string) => {
     await unwrapResponse(ipcRenderer.invoke('shell:show-in-folder', path));
   },
+  openDirectoryDialog: (options?: { title?: string; defaultPath?: string }) =>
+    unwrapResponse<string | null>(ipcRenderer.invoke('shell:open-directory-dialog', options)),
 } as ShellAPI);
 
 // Type definitions for the file API
@@ -516,3 +521,25 @@ contextBridge.exposeInMainWorld('fileAPI', {
   readFile: (filePath: string) =>
     unwrapResponse<string>(ipcRenderer.invoke('file:read', filePath)),
 } as FileAPI);
+
+// Git info types
+// Re-export GitInfo from shared package for backward compatibility
+export type { GitInfo } from '@agent-orchestrator/shared';
+
+// Type definitions for the git API
+export interface GitAPI {
+  /** Get git information for a workspace path */
+  getInfo: (workspacePath: string) => Promise<GitInfo | null>;
+}
+
+// Expose git API
+contextBridge.exposeInMainWorld('gitAPI', {
+  getInfo: async (workspacePath: string) => {
+    try {
+      return await unwrapResponse<GitInfo>(ipcRenderer.invoke('git:get-info', workspacePath));
+    } catch {
+      // Return null if git info cannot be retrieved
+      return null;
+    }
+  },
+} as GitAPI);

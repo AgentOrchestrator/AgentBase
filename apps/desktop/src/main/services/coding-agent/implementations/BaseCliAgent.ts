@@ -26,6 +26,8 @@ interface ProcessHandle {
 interface SpawnOptions {
   workingDirectory?: string;
   timeout?: number;
+  /** Input to write to stdin (will be written and stdin closed immediately) */
+  stdinInput?: string;
 }
 
 /**
@@ -182,6 +184,12 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
         });
         this.activeProcesses.delete(processId);
       });
+
+      // Write to stdin if input provided, then close stdin
+      if (options?.stdinInput !== undefined) {
+        proc.stdin?.write(options.stdinInput);
+        proc.stdin?.end();
+      }
 
       return ok(handle);
     } catch (error) {

@@ -125,10 +125,11 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
       return null;
     }
 
-    // TODO: Implement git info retrieval
-    // Could use git commands via IPC or dedicated git service
-    // For now, return null - can be enhanced later
-    return null;
+    if (!window.gitAPI) {
+      return null;
+    }
+
+    return window.gitAPI.getInfo(this._workspacePath);
   }
 
   /**

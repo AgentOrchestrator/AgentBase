@@ -128,6 +128,9 @@ export function NodeContextProvider({
     autoStartCli,
   };
 
+  // Track the previous workspace path to detect changes
+  const prevWorkspacePathRef = useRef<string | undefined>(undefined);
+
   // Initialize services on mount
   useEffect(() => {
     let mounted = true;
@@ -176,6 +179,48 @@ export function NodeContextProvider({
       }
     };
   }, [nodeId, nodeType, registry]);
+
+  // Handle workspace path changes after initialization
+  useEffect(() => {
+    // Skip if not initialized or no services
+    if (!isInitialized || !servicesRef.current) {
+      return;
+    }
+
+    // Skip if workspace path hasn't actually changed
+    if (workspacePath === prevWorkspacePathRef.current) {
+      return;
+    }
+
+    // Update the previous workspace path
+    const previousPath = prevWorkspacePathRef.current;
+    prevWorkspacePathRef.current = workspacePath;
+
+    // Skip if there's no new workspace path
+    if (!workspacePath) {
+      return;
+    }
+
+    console.log(`[NodeContext] Workspace path changed: ${previousPath} -> ${workspacePath}`);
+
+    const services = servicesRef.current;
+
+    // Delegate workspace handling to the appropriate service
+    if (hasAgentService(services)) {
+      // Agent service handles terminal navigation + CLI start
+      services.agent.setWorkspace(workspacePath, autoStartCli);
+    } else if (hasTerminalService(services)) {
+      // For non-agent nodes, just navigate the terminal
+      const terminal = services.terminal;
+      if (!terminal.isRunning()) {
+        terminal.create().then(() => {
+          setTimeout(() => terminal.write(`cd "${workspacePath}"\n`), 300);
+        });
+      } else {
+        terminal.write(`cd "${workspacePath}"\n`);
+      }
+    }
+  }, [isInitialized, workspacePath, autoStartCli]);
 
   // Build context value
   const contextValue: NodeContextValue | null = servicesRef.current

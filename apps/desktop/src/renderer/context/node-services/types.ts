@@ -12,6 +12,10 @@ import type {
   CodingAgentStatusInfo,
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
+
+// Re-export for consumers
+export type { GitInfo };
 
 // =============================================================================
 // Node Types
@@ -83,17 +87,6 @@ export interface ITerminalService extends INodeService {
 // =============================================================================
 
 /**
- * Git repository information
- */
-export interface GitInfo {
-  branch: string;
-  remote?: string;
-  status: 'clean' | 'dirty' | 'unknown';
-  ahead: number;
-  behind: number;
-}
-
-/**
  * Workspace service - manages workspace metadata and worktrees.
  * Wraps Electron IPC for worktree operations.
  */
@@ -158,6 +151,13 @@ export interface IAgentService extends INodeService {
   isAutoStartEnabled(): boolean;
   /** Enable/disable CLI auto-start */
   setAutoStart(enabled: boolean): void;
+
+  // Workspace
+  /**
+   * Set workspace and navigate terminal to it.
+   * If autoStartCli is true, also starts the CLI after navigation.
+   */
+  setWorkspace(path: string, autoStartCli?: boolean): Promise<void>;
 
   // Session management
   /** Get CLI command for this agent type */
