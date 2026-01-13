@@ -326,6 +326,20 @@ ipcMain.handle(
   }
 );
 
+// File reading API for debug mode
+ipcMain.handle('file:read', async (_event, filePath: string) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: `File does not exist: ${filePath}` };
+    }
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return { success: true, data: content };
+  } catch (error: any) {
+    console.error('[Main] Error reading file', { error, filePath });
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+});
+
 ipcMain.handle('agent-status:load', async (_event, agentId: string) => {
   try {
     const state = await database.loadAgentStatus(agentId);

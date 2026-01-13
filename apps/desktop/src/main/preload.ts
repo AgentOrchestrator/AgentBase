@@ -453,3 +453,14 @@ contextBridge.exposeInMainWorld('shellAPI', {
     await unwrapResponse(ipcRenderer.invoke('shell:show-in-folder', path));
   },
 } as ShellAPI);
+
+// Type definitions for the file API
+export interface FileAPI {
+  readFile: (filePath: string) => Promise<string>;
+}
+
+// Expose file API for debug mode
+contextBridge.exposeInMainWorld('fileAPI', {
+  readFile: (filePath: string) =>
+    unwrapResponse<string>(ipcRenderer.invoke('file:read', filePath)),
+} as FileAPI);

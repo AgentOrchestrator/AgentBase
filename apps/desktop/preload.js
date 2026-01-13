@@ -114,3 +114,7 @@ electron_1.contextBridge.exposeInMainWorld('llmAPI', {
         return () => electron_1.ipcRenderer.removeListener('llm:stream-chunk', handler);
     },
 });
+// Expose file API for debug mode
+electron_1.contextBridge.exposeInMainWorld('fileAPI', {
+    readFile: (filePath) => unwrapResponse(electron_1.ipcRenderer.invoke('file:read', filePath)),
+});

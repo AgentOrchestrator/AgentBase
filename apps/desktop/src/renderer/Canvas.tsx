@@ -18,11 +18,15 @@ import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
 import AgentNode from './AgentNode';
+import UserMessageNode from './components/UserMessageNode';
+import AssistantMessageNode from './components/AssistantMessageNode';
 import './Canvas.css';
 import { agentStore } from './stores';
 import { createDefaultAgentTitle } from './types/agent-node';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
+import { parseConversationFile, groupConversationMessages } from './utils/conversationParser';
+import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 
 // Custom node component
 const CustomNode = ({ data }: { data: { label: string } }) => {
@@ -43,6 +47,8 @@ const nodeTypes = {
   terminal: TerminalNode,
   workspace: WorkspaceNode,
   agent: AgentNode,
+  userMessage: UserMessageNode,
+  assistantMessage: AssistantMessageNode,
 };
 
 const defaultNodes: Node[] = [];
@@ -111,10 +117,45 @@ function CanvasFlow() {
 
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
+  const debugConversationLoaded = useRef(false);
+
+  // DEBUG MODE: Load conversation file on mount
+  useEffect(() => {
+    // Only load if we haven't loaded it yet and there are no initial nodes
+    if (debugConversationLoaded.current || initialNodes.length > 0) {
+      return;
+    }
+
+    const loadDebugConversation = async () => {
+      try {
+        const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/4d1822da-3c76-4691-adff-b1a3a5a8d336.jsonl';
+        
+        // Use Electron IPC to read the file
+        if (!(window as any).fileAPI) {
+          console.log('File API not available, skipping debug conversation load');
+          return;
+        }
+
+        const fileContent = await (window as any).fileAPI.readFile(conversationPath);
+        const entries = parseConversationFile(fileContent);
+        const groups = groupConversationMessages(entries);
+        const { nodes: conversationNodes, edges: conversationEdges } = conversationToNodesAndEdges(groups);
+        
+        setNodes(conversationNodes);
+        setEdges(conversationEdges);
+        debugConversationLoaded.current = true;
+        console.log('Debug conversation loaded:', { nodes: conversationNodes.length, edges: conversationEdges.length });
+      } catch (error) {
+        console.error('Failed to load debug conversation:', error);
+      }
+    };
+
+    loadDebugConversation();
+  }, [setNodes, setEdges, initialNodes.length]);
 
   // Apply restored state when it becomes available
   useEffect(() => {
-    if (!isCanvasLoading && initialNodes.length > 0 && !initialStateApplied.current) {
+    if (!isCanvasLoading && initialNodes.length > 0 && !initialStateApplied.current && !debugConversationLoaded.current) {
       setNodes(initialNodes);
       setEdges(initialEdges);
       initialStateApplied.current = true;
