@@ -11,7 +11,7 @@
     "start": "npm run build && npm run build:main && electron .",
     "build": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
-    "dev": "concurrently \"npm run build:main\" \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "dev:vite": "vite",
     "electron": "electron .",
     "test": "vitest run",
