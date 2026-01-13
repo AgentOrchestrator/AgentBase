@@ -223,4 +223,18 @@ export const IDE_DATA_PATHS = {
     const home = getHomeDir();
     return `${home}/.factory/sessions`;
   },
+
+  /**
+   * Get Windsurf global storage path (platform-specific)
+   * Windsurf is Codeium's AI IDE, similar structure to VSCode/Cursor
+   */
+  windsurf: (): string => {
+    const home = getHomeDir();
+    if (process.platform === 'darwin') {
+      return `${home}/Library/Application Support/Windsurf/User/globalStorage`;
+    } else if (process.platform === 'win32') {
+      return `${process.env.APPDATA}/Windsurf/User/globalStorage`;
+    }
+    return `${home}/.config/Windsurf/User/globalStorage`;
+  },
 };
