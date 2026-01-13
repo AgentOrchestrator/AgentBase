@@ -9,7 +9,7 @@ import structlog
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Any
+from typing import Any, Dict, List, Optional
 from supabase import create_client, Client as SupabaseClient
 
 from .config import settings
@@ -54,9 +54,9 @@ memory_processor = SharedMemoryProcessor()
 class ExtractRulesRequest(BaseModel):
     """Request to extract rules from chat histories."""
 
-    chat_history_ids: list[str] = Field(..., description="List of chat_history UUIDs to process")
+    chat_history_ids: List[str] = Field(..., description="List of chat_history UUIDs to process")
     user_id: str = Field(..., description="User ID for memory association")
-    prompt_id: str | None = Field(None, description="Optional custom extraction prompt ID")
+    prompt_id: Optional[str] = Field(None, description="Optional custom extraction prompt ID")
 
 
 class ExtractedRule(BaseModel):
@@ -73,7 +73,7 @@ class ExtractRulesResponse(BaseModel):
 
     success: bool
     rules_count: int
-    rules: list[ExtractedRule]
+    rules: List[ExtractedRule]
     chat_histories_processed: int
 
 
@@ -169,7 +169,7 @@ async def extract_rules(request: ExtractRulesRequest, background_tasks: Backgrou
 # ============================================================================
 
 
-async def _fetch_chat_histories(chat_history_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+async def _fetch_chat_histories(chat_history_ids: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     """Fetch chat histories from Supabase."""
     messages_by_id = {}
 
@@ -185,7 +185,7 @@ async def _fetch_chat_histories(chat_history_ids: list[str]) -> dict[str, list[d
 
 
 async def _store_extracted_rules(
-    rules: list[dict[str, Any]], user_id: str, source_session_ids: list[str]
+    rules: List[Dict[str, Any]], user_id: str, source_session_ids: List[str]
 ):
     """Store extracted rules in the database."""
     logger.info("Storing extracted rules", count=len(rules))
