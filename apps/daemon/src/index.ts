@@ -3,11 +3,17 @@ import { readCursorHistories, convertCursorToStandardFormat, extractProjectsFrom
 import { readVSCodeHistories, convertVSCodeToStandardFormat, extractProjectsFromConversations as extractVSCodeProjects } from './vscode-reader.js';
 import { readFactoryHistories, extractProjectsFromFactoryHistories } from './factory-reader.js';
 import { readCodexHistories, extractProjectsFromCodexHistories } from './codex-reader.js';
-import { uploadAllHistories, syncProjects } from './uploader.js';
+import { uploadAllHistoriesWithTokens, syncProjectsWithTokens } from './uploader.js';
 import { runPeriodicSummaryUpdate, runPeriodicKeywordUpdate, runPeriodicTitleUpdate } from './summarizer.js';
 import { AuthManager } from './auth-manager.js';
 import { mergeProjects } from './project-aggregator.js';
 import { getDatabase } from './database.js';
+import { createSupabaseAuthProvider, createSupabaseRepositoryFactory } from './infrastructure/supabase/index.js';
+import type { IRepositoryFactory } from './interfaces/repositories.js';
+
+// Create infrastructure instances
+const authProvider = createSupabaseAuthProvider();
+const repositoryFactory: IRepositoryFactory = createSupabaseRepositoryFactory();
 
 let authManager: AuthManager;
 
@@ -73,7 +79,7 @@ async function processHistories() {
     console.log(`Found ${claudeHistories.length} Claude Code chat histories.`);
 
     // Read Cursor histories (with timestamp filtering and authenticated session for heuristic timestamps)
-    const cursorConversations = await readCursorHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined);
+    const cursorConversations = await readCursorHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined, repositoryFactory);
     const cursorHistories = convertCursorToStandardFormat(cursorConversations);
     console.log(`Found ${cursorHistories.length} Cursor chat histories.`);
 
@@ -105,7 +111,7 @@ async function processHistories() {
     const allProjects = mergeProjects(cursorProjects, claudeCodeProjects, vscodeProjects, factoryProjects, codexProjects);
 
     if (allProjects.length > 0) {
-      await syncProjects(allProjects, accountId, accessToken, refreshToken);
+      await syncProjectsWithTokens(allProjects, accountId, accessToken, refreshToken, repositoryFactory);
     }
 
     // Combine all histories
@@ -118,7 +124,7 @@ async function processHistories() {
     }
 
     console.log(`Total: ${allHistories.length} chat histories to sync.`);
-    const uploadResult = await uploadAllHistories(allHistories, accountId, accessToken, refreshToken, failedSyncs);
+    const uploadResult = await uploadAllHistoriesWithTokens(allHistories, accountId, accessToken, refreshToken, repositoryFactory, failedSyncs);
     console.log('Upload complete.');
 
     // Mark sync as completed successfully
@@ -137,8 +143,8 @@ async function main() {
   console.log('Agent Orchestrator Daemon Starting...');
   console.log('Running in background watch mode...');
 
-  // Initialize auth manager
-  authManager = new AuthManager();
+  // Initialize auth manager with the auth provider
+  authManager = new AuthManager(authProvider);
 
   // Check authentication status on startup
   const alreadyAuthenticated = await authManager.isAuthenticated();
@@ -191,9 +197,9 @@ async function main() {
       return;
     }
 
-    await runPeriodicSummaryUpdate(accessToken, refreshToken);
-    await runPeriodicKeywordUpdate(accessToken, refreshToken);
-    await runPeriodicTitleUpdate(accessToken, refreshToken);
+    await runPeriodicSummaryUpdate(accessToken, refreshToken, repositoryFactory);
+    await runPeriodicKeywordUpdate(accessToken, refreshToken, repositoryFactory);
+    await runPeriodicTitleUpdate(accessToken, refreshToken, repositoryFactory);
   };
 
   // Run immediately on startup

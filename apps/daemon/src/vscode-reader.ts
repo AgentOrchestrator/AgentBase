@@ -3,7 +3,6 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { createHash } from 'crypto';
-import { createAuthenticatedClient } from './supabase.js';
 import type { SessionMetadata } from './types.js';
 
 export interface VSCodeMessage {

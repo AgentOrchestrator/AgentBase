@@ -7,7 +7,7 @@ extract actionable coding rules that can be maintained in rule files.
 
 import json
 import structlog
-from typing import Any
+from typing import Any, Dict, List
 from mem0 import Memory, MemoryClient
 from anthropic import Anthropic
 
@@ -71,9 +71,9 @@ class SharedMemoryProcessor:
     async def process_chat_history(
         self,
         chat_history_id: str,
-        messages: list[dict[str, Any]],
+        messages: List[Dict[str, Any]],
         user_id: str,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """
         Process a single chat history and extract rules.
 
@@ -133,7 +133,7 @@ class SharedMemoryProcessor:
             "similar_memory_count": len(similar_memories.get("results", [])),
         }
 
-    def get_all_memories(self, user_id: str) -> list[dict[str, Any]]:
+    def get_all_memories(self, user_id: str) -> List[Dict[str, Any]]:
         """
         Get all memories for a user (for debugging).
 
@@ -158,10 +158,10 @@ class SharedMemoryProcessor:
 
     async def batch_process_histories(
         self,
-        chat_history_ids: list[str],
+        chat_history_ids: List[str],
         user_id: str,
-        messages_by_id: dict[str, list[dict[str, Any]]],
-    ) -> list[dict[str, Any]]:
+        messages_by_id: Dict[str, List[Dict[str, Any]]],
+    ) -> List[Dict[str, Any]]:
         """
         Process multiple chat histories in batch.
 
@@ -199,9 +199,9 @@ class SharedMemoryProcessor:
 
     async def _extract_rules_with_context(
         self,
-        messages: list[dict[str, Any]],
-        similar_memories: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        messages: List[Dict[str, Any]],
+        similar_memories: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
         """
         Use Claude to extract structured rules from conversation + mem0 context.
 
@@ -262,7 +262,7 @@ class SharedMemoryProcessor:
             logger.error("Failed to parse LLM response as JSON", error=str(e), response=content[:500])
             return []
 
-    def _transform_messages_for_mem0(self, messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+    def _transform_messages_for_mem0(self, messages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
         """
         Transform our message format to mem0's expected format.
 
@@ -283,7 +283,7 @@ class SharedMemoryProcessor:
 
         return transformed
 
-    def _format_conversation(self, messages: list[dict[str, Any]]) -> str:
+    def _format_conversation(self, messages: List[Dict[str, Any]]) -> str:
         """Format messages into readable conversation text."""
         lines = []
         for msg in messages:
@@ -292,7 +292,7 @@ class SharedMemoryProcessor:
             lines.append(f"{role.upper()}: {content}")
         return "\n\n".join(lines)
 
-    def _format_memories(self, similar_memories: dict[str, Any]) -> str:
+    def _format_memories(self, similar_memories: Dict[str, Any]) -> str:
         """Format mem0 memories into context string."""
         if not similar_memories or "results" not in similar_memories:
             return "No similar memories found."

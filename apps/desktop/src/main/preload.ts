@@ -23,6 +23,18 @@ import type {
   ModelInfo,
   LLMCapabilities,
 } from './services/llm';
+import type {
+  RepresentationType,
+  RepresentationInput,
+  RepresentationCapabilities,
+  AnyRepresentationOutput,
+  ImageRepresentationOutput,
+  SummaryRepresentationOutput,
+  AudioRepresentationOutput,
+  ImageTransformOptions,
+  SummaryTransformOptions,
+  AudioTransformOptions,
+} from './services/representation';
 
 // Type definitions for the electron API
 export interface ElectronAPI {
@@ -141,6 +153,47 @@ export interface CodingAgentAPI {
 
   /** Check if a specific agent is available */
   isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
+}
+
+// Type definitions for provider info returned by the API
+export interface ProviderInfo {
+  providerId: string;
+  providerName: string;
+  representationType: RepresentationType;
+  capabilities: RepresentationCapabilities;
+}
+
+// Type definitions for the representation API
+export interface RepresentationAPI {
+  /** Get available representation types based on registered providers */
+  getAvailableTypes: () => Promise<RepresentationType[]>;
+
+  /** Transform using a specific provider */
+  transform: (
+    providerId: string,
+    input: RepresentationInput
+  ) => Promise<AnyRepresentationOutput>;
+
+  /** Transform to image using the first available image provider */
+  transformToImage: (
+    input: RepresentationInput,
+    options?: ImageTransformOptions
+  ) => Promise<ImageRepresentationOutput>;
+
+  /** Transform to summary using the first available summary provider */
+  transformToSummary: (
+    input: RepresentationInput,
+    options?: SummaryTransformOptions
+  ) => Promise<SummaryRepresentationOutput>;
+
+  /** Transform to audio using the first available audio provider */
+  transformToAudio: (
+    input: RepresentationInput,
+    options?: AudioTransformOptions
+  ) => Promise<AudioRepresentationOutput>;
+
+  /** Get all registered providers */
+  getAllProviders: () => Promise<ProviderInfo[]>;
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -346,3 +399,57 @@ contextBridge.exposeInMainWorld('llmAPI', {
     return () => ipcRenderer.removeListener('llm:stream-chunk', handler);
   },
 } as LLMAPI);
+
+// Expose representation API
+contextBridge.exposeInMainWorld('representationAPI', {
+  getAvailableTypes: () =>
+    unwrapResponse<RepresentationType[]>(ipcRenderer.invoke('representation:get-available-types')),
+
+  transform: (providerId: string, input: RepresentationInput) =>
+    unwrapResponse<AnyRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform', providerId, input)
+    ),
+
+  transformToImage: (input: RepresentationInput, options?: ImageTransformOptions) =>
+    unwrapResponse<ImageRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform-to-image', input, options)
+    ),
+
+  transformToSummary: (input: RepresentationInput, options?: SummaryTransformOptions) =>
+    unwrapResponse<SummaryRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform-to-summary', input, options)
+    ),
+
+  transformToAudio: (input: RepresentationInput, options?: AudioTransformOptions) =>
+    unwrapResponse<AudioRepresentationOutput>(
+      ipcRenderer.invoke('representation:transform-to-audio', input, options)
+    ),
+
+  getAllProviders: () =>
+    unwrapResponse<ProviderInfo[]>(ipcRenderer.invoke('representation:get-all-providers')),
+} as RepresentationAPI);
+
+// Editor application identifiers
+export type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
+
+// Type definitions for the shell API
+export interface ShellAPI {
+  /** Open a directory with a specific editor application */
+  openWithEditor: (directoryPath: string, editor: EditorApp) => Promise<void>;
+  /** Get list of available editors on this system */
+  getAvailableEditors: () => Promise<EditorApp[]>;
+  /** Open a path in the system file manager */
+  showInFolder: (path: string) => Promise<void>;
+}
+
+// Expose shell API
+contextBridge.exposeInMainWorld('shellAPI', {
+  openWithEditor: async (directoryPath: string, editor: EditorApp) => {
+    await unwrapResponse(ipcRenderer.invoke('shell:open-with-editor', directoryPath, editor));
+  },
+  getAvailableEditors: () =>
+    unwrapResponse<EditorApp[]>(ipcRenderer.invoke('shell:get-available-editors')),
+  showInFolder: async (path: string) => {
+    await unwrapResponse(ipcRenderer.invoke('shell:show-in-folder', path));
+  },
+} as ShellAPI);

@@ -1,0 +1,222 @@
+/**
+ * Agent Node Styles
+ *
+ * Dark theme wrapper component with tabs for switching between views.
+ */
+
+/* Agent Node Container */
+.agent-node {
+  background: #2a2c36;
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  min-width: 450px;
+  min-height: 350px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.agent-node:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.agent-node.drag-over {
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
+  transform: scale(1.01);
+}
+
+/* Tab Bar */
+.agent-node-tabs {
+  display: flex;
+  background: #1e1e1e;
+  border-bottom: 1px solid #3a3c46;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.agent-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.agent-tab:hover {
+  color: #d4d4d4;
+  background: rgba(74, 158, 255, 0.05);
+}
+
+.agent-tab.active {
+  color: #4a9eff;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.agent-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #4a9eff;
+}
+
+/* Content Area */
+.agent-node-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Handle styles */
+.agent-node .react-flow__handle {
+  background: #4a9eff;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #2a2c36;
+}
+
+.agent-node .react-flow__handle:hover {
+  background: #6bb3ff;
+}
+
+/* Resize handles */
+.agent-node .react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border: 1px solid #666;
+  background: #888;
+  border-radius: 50%;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.agent-node .react-flow__resize-control.handle:hover {
+  opacity: 1;
+  transform: scale(1.3);
+}
+
+/* Position resize handles at corners */
+.agent-node .react-flow__resize-control.handle.top-left {
+  top: -4px;
+  left: -4px;
+}
+
+.agent-node .react-flow__resize-control.handle.top-right {
+  top: -4px;
+  right: -4px;
+}
+
+.agent-node .react-flow__resize-control.handle.bottom-left {
+  bottom: -4px;
+  left: -4px;
+}
+
+.agent-node .react-flow__resize-control.handle.bottom-right {
+  bottom: -4px;
+  right: -4px;
+}
+
+/* Attachment headers within agent node */
+.agent-node .terminal-node-header {
+  background: #1e1e1e;
+  border-bottom: 1px solid #3a3c46;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.agent-node .terminal-node-header .issue-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-node .terminal-node-header .issue-id {
+  color: #4a9eff;
+  font-weight: 600;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.agent-node .terminal-node-header .issue-title {
+  color: #d4d4d4;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-node .terminal-node-header .issue-external-link-icon {
+  color: #888;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.agent-node .terminal-node-header .issue-external-link-icon:hover {
+  color: #4a9eff;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+/* Workspace header styles */
+.agent-node .workspace-header {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+}
+
+.agent-node .workspace-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-node .workspace-icon {
+  font-size: 14px;
+}
+
+.agent-node .workspace-name {
+  color: #d4d4d4;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.agent-node .git-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #888;
+  font-size: 11px;
+}
+
+.agent-node .git-icon {
+  font-size: 12px;
+}
+
+.agent-node .project-type-badge {
+  color: #888;
+  font-size: 10px;
+  background: #3a3c46;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
