@@ -1,72 +1,48 @@
 .starter-node {
   background: #2a2c36;
-  border-radius: 12px;
-  padding: 16px;
+  border: 3px solid #ffffff;
+  border-radius: 8px;
+  padding: 12px;
   width: 100%;
   height: 100%;
-  min-width: 400px;
+  min-width: 300px;
+  min-height: 100px;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
-/* Input mode - dashed border to indicate it's a starter */
-.starter-node.input-mode {
-  border: 2px dashed #4a9eff;
-  min-height: 160px;
-}
-
-.starter-node.input-mode:hover {
-  border-color: #6bb3ff;
-  box-shadow: 0 4px 16px rgba(74, 158, 255, 0.2);
-}
-
-/* Conversation mode - solid border */
-.starter-node.conversation-mode {
-  border: 1px solid #475569;
-  min-height: 300px;
-}
-
 .starter-node.selected {
   border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
 }
 
-/* Hide React Flow's default selection border */
+/* Hide React Flow's default selection border/outline and resize handles */
 .react-flow__node.starter.react-flow__node-selected {
   outline: none !important;
   border: none !important;
 }
 
-/* Header */
+.react-flow__node.starter .react-flow__resize-control {
+  display: none !important;
+}
+
 .starter-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.starter-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #4a9eff 0%, #6b5ce7 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 16px;
-  color: white;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3a3c46;
 }
 
 .starter-label {
-  font-weight: 600;
+  font-weight: 700;
+  color: #ffffff;
   font-size: 14px;
-  color: #e2e8f0;
 }
 
 /* Input textarea */
@@ -74,250 +50,17 @@
   flex: 1;
   width: 100%;
   min-height: 60px;
-  max-height: 200px;
-  padding: 12px;
-  background: #1e1e1e;
-  border: 1px solid #3a3c46;
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
   color: #ffffff;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   resize: none;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.starter-input:focus {
-  border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
 }
 
 .starter-input::placeholder {
   color: #6b7280;
-}
-
-/* Footer */
-.starter-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 12px;
-}
-
-.starter-hint {
-  font-size: 11px;
-  color: #6b7280;
-}
-
-.starter-submit {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #4a9eff 0%, #6b5ce7 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-weight: 500;
-  font-size: 13px;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
-}
-
-.starter-submit:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.starter-submit:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.starter-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* =====================
-   Conversation Mode
-   ===================== */
-
-.conversation-user,
-.conversation-assistant {
-  display: flex;
-  flex-direction: column;
-}
-
-.conversation-user {
-  margin-bottom: 0;
-}
-
-.conversation-divider {
-  height: 1px;
-  background: #3a3c46;
-  margin: 12px 0;
-}
-
-.conversation-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.conversation-label {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.user-label {
-  color: #ffffff;
-}
-
-.assistant-label {
-  color: #4a9eff;
-}
-
-.conversation-content {
-  font-size: 14px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.user-content {
-  color: #e2e8f0;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid #ffffff;
-}
-
-.assistant-content {
-  color: #ffffff;
-  padding: 10px 12px;
-  background: rgba(74, 158, 255, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid #4a9eff;
-  flex: 1;
-  overflow-y: auto;
-  max-height: 300px;
-  min-height: 60px;
-}
-
-/* Scrollbar styling for assistant content */
-.assistant-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.assistant-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.assistant-content::-webkit-scrollbar-thumb {
-  background: #4a5568;
-  border-radius: 3px;
-}
-
-.assistant-content::-webkit-scrollbar-thumb:hover {
-  background: #5a6578;
-}
-
-/* Generating indicator */
-.generating-indicator {
-  display: inline-flex;
-  gap: 2px;
-  margin-left: 4px;
-}
-
-.generating-indicator .dot {
-  animation: blink 1.4s infinite;
-  color: #4a9eff;
-}
-
-.generating-indicator .dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.generating-indicator .dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes blink {
-  0%, 20% {
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.2;
-  }
-}
-
-.waiting-text {
-  color: #6b7280;
-  font-style: italic;
-}
-
-.conversation-error {
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
-  color: #ef4444;
-  font-size: 13px;
-}
-
-/* Continue conversation section */
-.continue-section {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #3a3c46;
-}
-
-.continue-input {
-  flex: 1;
-  padding: 10px 12px;
-  background: #1e1e1e;
-  border: 1px solid #3a3c46;
-  border-radius: 8px;
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.5;
-  resize: none;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.continue-input:focus {
-  border-color: #4a9eff;
-}
-
-.continue-input::placeholder {
-  color: #6b7280;
-}
-
-.continue-submit {
-  padding: 10px 16px;
-  background: #4a9eff;
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-weight: 500;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.2s;
-  align-self: flex-end;
-}
-
-.continue-submit:hover:not(:disabled) {
-  background: #3a8eef;
-}
-
-.continue-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
