@@ -22,4 +22,6 @@ export {
   getHomeDir,
   fileExists,
   IDE_DATA_PATHS,
+  LoaderRegistry,
+  createLoaderRegistry,
 } from '@agent-orchestrator/shared';

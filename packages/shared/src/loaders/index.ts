@@ -35,3 +35,6 @@ export {
   fileExists,
   IDE_DATA_PATHS,
 } from './utilities.js';
+
+// Registry
+export { LoaderRegistry, createLoaderRegistry } from './registry.js';
