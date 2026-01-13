@@ -279,7 +279,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     // Create terminal instance
     const terminal = new Terminal({
       theme: {
-        background: '#1e1e1e',
+        background: '#2a2c36',
         foreground: '#d4d4d4',
         cursor: '#aeafad',
         black: '#000000',
@@ -300,7 +300,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         brightWhite: '#e5e5e5'
       },
       fontSize: 12,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
       cursorBlink: true,
       cursorStyle: 'block'
     });
