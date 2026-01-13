@@ -40,6 +40,7 @@ const database_1 = require("./database");
 const worktree_1 = require("./worktree");
 const ipc_1 = require("./worktree/ipc");
 const coding_agent_1 = require("./services/coding-agent");
+const llm_1 = require("./services/llm");
 // Map to store terminal instances by ID
 const terminalProcesses = new Map();
 // Database instance
@@ -445,12 +446,24 @@ electron_1.app.whenReady().then(async () => {
         console.error('[Main] Error initializing WorktreeManager', error);
         // Continue without worktree manager - app should still function
     }
+    // Initialize LLM Service
+    try {
+        llm_1.LLMServiceFactory.configure(llm_1.DEFAULT_LLM_CONFIG);
+        await llm_1.LLMServiceFactory.getService();
+        (0, llm_1.registerLLMIpcHandlers)();
+        console.log('[Main] LLM Service initialized successfully');
+    }
+    catch (error) {
+        console.error('[Main] Error initializing LLM Service', error);
+        // Continue without LLM service - app should still function
+    }
     createWindow();
 });
 // Clean up on app quit
 electron_1.app.on('will-quit', async () => {
-    console.log('[Main] App quitting, closing database, worktree manager, and coding agents');
+    console.log('[Main] App quitting, closing database, worktree manager, coding agents, and LLM service');
     database_1.DatabaseFactory.closeDatabase();
     worktree_1.WorktreeManagerFactory.closeManager();
     await coding_agent_1.CodingAgentFactory.disposeAll();
+    await llm_1.LLMServiceFactory.dispose();
 });

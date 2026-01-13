@@ -77,3 +77,40 @@ electron_1.contextBridge.exposeInMainWorld('codingAgentAPI', {
     getCapabilities: (agentType) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:get-capabilities', agentType)),
     isAgentAvailable: (agentType) => unwrapResponse(electron_1.ipcRenderer.invoke('coding-agent:is-available', agentType)),
 });
+// Expose LLM API
+electron_1.contextBridge.exposeInMainWorld('llmAPI', {
+    chat: (request) => unwrapResponse(electron_1.ipcRenderer.invoke('llm:chat', request)),
+    chatStream: async (requestId, request, onChunk) => {
+        // Set up chunk listener
+        const handler = (_event, data) => {
+            if (data.requestId === requestId) {
+                onChunk(data.chunk);
+            }
+        };
+        electron_1.ipcRenderer.on('llm:stream-chunk', handler);
+        try {
+            return await unwrapResponse(electron_1.ipcRenderer.invoke('llm:chat-stream', requestId, request));
+        }
+        finally {
+            electron_1.ipcRenderer.removeListener('llm:stream-chunk', handler);
+        }
+    },
+    chatWithTools: (request, maxIterations) => unwrapResponse(electron_1.ipcRenderer.invoke('llm:chat-with-tools', request, maxIterations)),
+    setApiKey: async (vendor, apiKey) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('llm:set-api-key', vendor, apiKey));
+    },
+    deleteApiKey: async (vendor) => {
+        await unwrapResponse(electron_1.ipcRenderer.invoke('llm:delete-api-key', vendor));
+    },
+    hasApiKey: (vendor) => unwrapResponse(electron_1.ipcRenderer.invoke('llm:has-api-key', vendor)),
+    listVendorsWithKeys: () => unwrapResponse(electron_1.ipcRenderer.invoke('llm:list-vendors-with-keys')),
+    getAvailableModels: () => unwrapResponse(electron_1.ipcRenderer.invoke('llm:get-available-models')),
+    isConfigured: () => unwrapResponse(electron_1.ipcRenderer.invoke('llm:is-configured')),
+    getCapabilities: () => unwrapResponse(electron_1.ipcRenderer.invoke('llm:get-capabilities')),
+    onStreamChunk: (callback) => {
+        const handler = (_event, data) => callback(data);
+        electron_1.ipcRenderer.on('llm:stream-chunk', handler);
+        // Return cleanup function
+        return () => electron_1.ipcRenderer.removeListener('llm:stream-chunk', handler);
+    },
+});
