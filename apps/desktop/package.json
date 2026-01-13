@@ -5,7 +5,7 @@
   "license": "MIT",
   "author": "Hai Dang",
   "type": "commonjs",
-  "main": "main.js",
+  "main": "dist/main/src/main/main.js",
   "scripts": {
     "postinstall": "electron-rebuild",
     "start": "npm run build && npm run build:main && electron .",

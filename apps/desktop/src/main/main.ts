@@ -82,7 +82,7 @@ const createWindow = (): void => {
     // Open DevTools in development
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, './dist/index.html'));
+    win.loadFile(path.join(__dirname, '../../../index.html'));
   }
 
   // Track terminals being created to prevent race conditions
