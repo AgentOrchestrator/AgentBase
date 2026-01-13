@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from './supabase.js';
 import { getDatabase } from './database.js';
+import type { IAuthProvider } from './interfaces/auth.js';
 
 interface AuthState {
   accessToken: string;
@@ -14,7 +14,7 @@ export class AuthManager {
   private deviceId: string;
   private db = getDatabase();
 
-  constructor() {
+  constructor(private authProvider: IAuthProvider) {
     this.deviceId = this.getOrCreateDeviceId();
     this.loadAuthState();
   }
@@ -88,22 +88,20 @@ export class AuthManager {
     }
 
     try {
-      const { data, error } = await supabase.auth.refreshSession({
-        refresh_token: this.authState.refreshToken,
-      });
+      const tokens = await this.authProvider.refreshTokens(this.authState.refreshToken);
 
-      if (error || !data.session) {
-        console.error('Error refreshing token:', error);
+      if (!tokens) {
+        console.error('Error refreshing token: no tokens returned');
         this.authState = null;
         this.saveAuthState();
         return false;
       }
 
       this.authState = {
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token,
-        userId: data.session.user.id,
-        expiresAt: data.session.expires_at! * 1000,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        userId: this.authState.userId, // Keep existing user ID
+        expiresAt: tokens.expiresAt,
       };
 
       this.saveAuthState();
@@ -169,42 +167,24 @@ export class AuthManager {
 
   private async checkAuthCompletion(): Promise<boolean> {
     try {
-      // Check if a session was created for this device
-      const { data, error } = await supabase
-        .from('daemon_auth_sessions')
-        .select('*')
-        .eq('device_id', this.deviceId)
-        .eq('consumed', false)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Poll for device auth session
+      const session = await this.authProvider.pollForDeviceAuth(this.deviceId);
 
-      if (error) {
-        // Only log if it's not a "no rows" error
-        if (error.code !== 'PGRST116') {
-          console.log('[Auth Check] Error:', error.message);
-        }
-        return false;
-      }
-
-      if (!data) {
+      if (!session) {
         return false;
       }
 
       console.log('[Auth Check] Found auth session!');
 
       // Mark session as consumed
-      await supabase
-        .from('daemon_auth_sessions')
-        .update({ consumed: true })
-        .eq('id', data.id);
+      await this.authProvider.markDeviceAuthConsumed(session.id);
 
       // Store the auth state
       this.authState = {
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        userId: data.user_id,
-        expiresAt: new Date(data.expires_at).getTime(),
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        userId: session.userId,
+        expiresAt: new Date(session.expiresAt).getTime(),
       };
 
       this.saveAuthState();

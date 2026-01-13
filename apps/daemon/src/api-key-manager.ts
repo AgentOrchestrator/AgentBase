@@ -1,55 +1,23 @@
-import { type AuthenticatedContext } from './supabase.js';
-
-interface LLMApiKey {
-  id: string;
-  account_id: string;
-  provider: string;
-  api_key: string;
-  is_active: boolean;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { IApiKeyRepository } from './interfaces/repositories.js';
 
 /**
- * Fetch API key from the database for a specific user and provider
- * @param auth - Authenticated context
+ * Get API key from the database for a specific user and provider
+ * @param apiKeyRepo - API key repository
+ * @param userId - User ID
  * @param provider - The LLM provider (openai, anthropic, google, etc.)
  * @returns The API key string if found and active, null otherwise
  */
 export async function getApiKeyFromDatabase(
-  auth: AuthenticatedContext,
+  apiKeyRepo: IApiKeyRepository,
+  userId: string,
   provider: string
 ): Promise<string | null> {
-  try {
-    const { data, error } = await auth.client
-      .from('llm_api_keys')
-      .select('*')
-      .eq('account_id', auth.accountId)
-      .eq('provider', provider)
-      .eq('is_active', true)
-      .single();
-
-    if (error) {
-      // If no key found, return null (not an error, just no key configured)
-      if (error.code === 'PGRST116') {
-        return null;
-      }
-
-      console.error(`[API Key Manager] Error fetching ${provider} API key from database:`, error);
-      return null;
-    }
-
-    if (!data || !data.api_key) {
-      return null;
-    }
-
-    console.log(`[API Key Manager] Found ${provider} API key in database for user ${auth.accountId}`);
-    return data.api_key;
-  } catch (error) {
-    console.error('[API Key Manager] Unexpected error fetching API key:', error);
-    return null;
+  const result = await apiKeyRepo.findActiveKey(userId, provider.toLowerCase());
+  if (result) {
+    console.log(`[API Key Manager] Found ${provider} API key in database for user ${userId}`);
+    return result.key;
   }
+  return null;
 }
 
 /**
@@ -59,12 +27,14 @@ export async function getApiKeyFromDatabase(
  * 3. null (will use mock/fallback generation)
  *
  * @param provider - The LLM provider (openai, anthropic, google, groq, etc.)
- * @param auth - Authenticated context (optional, required for database lookup)
+ * @param apiKeyRepo - API key repository (optional, required for database lookup)
+ * @param userId - User ID (required if apiKeyRepo is provided)
  * @returns The API key string if found, null otherwise
  */
 export async function getApiKey(
   provider: string,
-  auth?: AuthenticatedContext | null
+  apiKeyRepo?: IApiKeyRepository | null,
+  userId?: string | null
 ): Promise<string | null> {
   // Map provider names to environment variable names
   const envVarMap: Record<string, string> = {
@@ -84,9 +54,9 @@ export async function getApiKey(
     return process.env[envVarName] || null;
   }
 
-  // Priority 2: Check database (if authenticated context provided)
-  if (auth) {
-    const dbApiKey = await getApiKeyFromDatabase(auth, provider.toLowerCase());
+  // Priority 2: Check database (if repository and userId provided)
+  if (apiKeyRepo && userId) {
+    const dbApiKey = await getApiKeyFromDatabase(apiKeyRepo, userId, provider.toLowerCase());
     if (dbApiKey) {
       return dbApiKey;
     }
@@ -99,28 +69,13 @@ export async function getApiKey(
 
 /**
  * Get the default LLM provider for a user from their preferences
- * @param auth - Authenticated context
+ * @param apiKeyRepo - API key repository
+ * @param userId - User ID
  * @returns The default provider name or null if not set
  */
 export async function getDefaultProvider(
-  auth: AuthenticatedContext
+  apiKeyRepo: IApiKeyRepository,
+  userId: string
 ): Promise<string | null> {
-  try {
-    const { data, error } = await auth.client
-      .from('llm_api_keys')
-      .select('provider')
-      .eq('account_id', auth.accountId)
-      .eq('is_default', true)
-      .eq('is_active', true)
-      .single();
-
-    if (error || !data) {
-      return null;
-    }
-
-    return data.provider;
-  } catch (error) {
-    console.error('[API Key Manager] Error fetching default provider:', error);
-    return null;
-  }
+  return apiKeyRepo.findDefaultProvider(userId);
 }

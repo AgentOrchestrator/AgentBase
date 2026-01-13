@@ -1,6 +1,12 @@
 import { generateMockSummary, generateMockKeywords } from './mock-summarizer.js';
-import { type AuthenticatedContext, createAuthenticatedClient } from './supabase.js';
 import { getUserLLMConfig, generateLLMText, type LLMConfig, getUserPreferences } from './llm-client.js';
+import type {
+  IChatHistoryRepository,
+  IUserPreferencesRepository,
+  IApiKeyRepository,
+  IRepositoryFactory,
+  ChatHistoryRecord,
+} from './interfaces/repositories.js';
 
 // Check if we're in development mode
 const isDevelopment = process.env.DEVELOPMENT === 'true';
@@ -16,26 +22,20 @@ interface StructuredSummary {
   progress: 'looping' | 'smooth';
 }
 
-interface ChatHistory {
-  id: string;
-  messages: Message[];
-  metadata?: any;
-  account_id?: string | null;
-  ai_summary?: string | null;
-  ai_summary_generated_at?: string | null;
-  ai_summary_message_count?: number | null;
-  ai_keywords_type?: string[] | null;
-  ai_keywords_topic?: string[] | null;
-  ai_keywords_generated_at?: string | null;
-  ai_keywords_message_count?: number | null;
-  ai_title?: string | null;
-  ai_title_generated_at?: string | null;
-  updated_at: string;
-}
-
 interface KeywordClassification {
   type: string[];
   topic: string[];
+}
+
+/**
+ * Context for summarizer operations
+ * Contains all repositories needed for AI processing
+ */
+export interface SummarizerContext {
+  userId: string;
+  chatHistories: IChatHistoryRepository;
+  userPreferences: IUserPreferencesRepository;
+  apiKeys: IApiKeyRepository;
 }
 
 async function generateSessionSummary(
@@ -328,81 +328,55 @@ Provide ONLY the title, nothing else:`;
 
 /**
  * Fetches sessions that need summary updates.
- * Returns sessions that:
- * 1. Were created within the specified time window (default 24 hours)
- * 2. Either have no summary OR meet the update thresholds:
- *    - At least 10 new messages since last summary, AND
- *    - At least 30 minutes since last summary generation
- * 3. User has AI summaries enabled in preferences
  */
 export async function getSessionsNeedingSummaryUpdate(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   withinHours: number = 24
-): Promise<ChatHistory[]> {
+): Promise<ChatHistoryRecord[]> {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - withinHours);
 
   // Cost-saving thresholds
-  const MESSAGE_THRESHOLD = 10; // Only update after 10 new messages
-  const TIME_THROTTLE_MINUTES = 30; // Wait at least 30 minutes between updates
+  const MESSAGE_THRESHOLD = 10;
+  const TIME_THROTTLE_MINUTES = 30;
 
   console.log(`[Summary Updater] Fetching sessions needing summary update...`);
   console.log(`[Summary Updater] Cutoff time: ${cutoffTime.toISOString()}`);
   console.log(`[Summary Updater] Thresholds: ${MESSAGE_THRESHOLD} messages, ${TIME_THROTTLE_MINUTES} minutes`);
 
-  const { data, error } = await auth.client
-    .from('chat_histories')
-    .select('*')
-    .eq('account_id', auth.accountId)
-    .gte('latest_message_timestamp', cutoffTime.toISOString())
-    .order('latest_message_timestamp', { ascending: false });
+  const sessions = await ctx.chatHistories.findRecentByUser(ctx.userId, cutoffTime);
 
-  if (error) {
-    console.error('Error fetching sessions for summary update:', error);
+  if (sessions.length === 0) {
     return [];
   }
 
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  const preferences = await getUserPreferences(auth);
+  const preferences = await getUserPreferences(ctx.userPreferences, ctx.userId);
 
   // Filter sessions based on user preferences and update needs
-  const needsUpdate: ChatHistory[] = [];
-
-  // Cast database rows to ChatHistory type
-  const sessions = data as unknown as ChatHistory[];
+  const needsUpdate: ChatHistoryRecord[] = [];
 
   for (const session of sessions) {
     const currentMessageCount = Array.isArray(session.messages)
       ? session.messages.length
       : 0;
 
-    // Skip sessions with no messages
     if (currentMessageCount === 0) {
       continue;
     }
 
-    // Check user preferences from cache
-    if (!preferences || !preferences.ai_summary_enabled) {
+    if (!preferences || !preferences.aiSummaryEnabled) {
       continue;
     }
 
-    // Always update if no summary exists
-    if (!session.ai_summary || !session.ai_summary_generated_at) {
+    if (!session.aiSummary || !session.aiSummaryGeneratedAt) {
       needsUpdate.push(session);
       continue;
     }
 
-    // Calculate messages since last summary
-    const messagesSinceLastSummary = currentMessageCount - (session.ai_summary_message_count || 0);
-
-    // Calculate time since last summary
-    const lastSummaryTime = new Date(session.ai_summary_generated_at);
+    const messagesSinceLastSummary = currentMessageCount - (session.aiSummaryMessageCount || 0);
+    const lastSummaryTime = new Date(session.aiSummaryGeneratedAt);
     const minutesSinceLastSummary = (Date.now() - lastSummaryTime.getTime()) / 1000 / 60;
 
-    // Only update if BOTH thresholds are met (cost-effective approach)
     if (
       messagesSinceLastSummary >= MESSAGE_THRESHOLD &&
       minutesSinceLastSummary >= TIME_THROTTLE_MINUTES
@@ -416,81 +390,51 @@ export async function getSessionsNeedingSummaryUpdate(
 
 /**
  * Fetches sessions that need keyword updates.
- * Returns sessions that:
- * 1. Were created within the specified time window (default 24 hours)
- * 2. Either have no keywords OR meet the update thresholds:
- *    - At least 10 new messages since last keyword generation, AND
- *    - At least 30 minutes since last keyword generation
- * 3. User has AI summaries enabled in preferences
  */
 export async function getSessionsNeedingKeywordUpdate(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   withinHours: number = 24
-): Promise<ChatHistory[]> {
+): Promise<ChatHistoryRecord[]> {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - withinHours);
 
-  // Cost-saving thresholds (same as summary updates)
-  const MESSAGE_THRESHOLD = 10; // Only update after 10 new messages
-  const TIME_THROTTLE_MINUTES = 30; // Wait at least 30 minutes between updates
+  const MESSAGE_THRESHOLD = 10;
+  const TIME_THROTTLE_MINUTES = 30;
 
   console.log(`[Keyword Updater] Fetching sessions needing keyword update...`);
-  console.log(`[Keyword Updater] Cutoff time: ${cutoffTime.toISOString()}`);
-  console.log(`[Keyword Updater] Thresholds: ${MESSAGE_THRESHOLD} messages, ${TIME_THROTTLE_MINUTES} minutes`);
 
-  const { data, error } = await auth.client
-    .from('chat_histories')
-    .select('*')
-    .eq('account_id', auth.accountId)
-    .gte('latest_message_timestamp', cutoffTime.toISOString())
-    .order('latest_message_timestamp', { ascending: false });
+  const sessions = await ctx.chatHistories.findRecentByUser(ctx.userId, cutoffTime);
 
-  if (error) {
-    console.error('Error fetching sessions for keyword update:', error);
+  if (sessions.length === 0) {
     return [];
   }
 
-  if (!data || data.length === 0) {
-    return [];
-  }
+  const preferences = await getUserPreferences(ctx.userPreferences, ctx.userId);
 
-  const preferences = await getUserPreferences(auth);
-
-  // Filter sessions based on user preferences and update needs
-  const needsUpdate: ChatHistory[] = [];
-
-  // Cast database rows to ChatHistory type
-  const sessions = data as unknown as ChatHistory[];
+  const needsUpdate: ChatHistoryRecord[] = [];
 
   for (const session of sessions) {
     const currentMessageCount = Array.isArray(session.messages)
       ? session.messages.length
       : 0;
 
-    // Skip sessions with no messages
     if (currentMessageCount === 0) {
       continue;
     }
 
-    // Check user preferences
-    if (!preferences || !preferences.ai_summary_enabled) {
+    if (!preferences || !preferences.aiSummaryEnabled) {
       continue;
     }
 
-    // Always update if no keywords exist
-    if (!session.ai_keywords_generated_at) {
+    if (!session.aiKeywordsGeneratedAt) {
       needsUpdate.push(session);
       continue;
     }
 
-    // Calculate messages since last keyword generation
-    const messagesSinceLastKeywords = currentMessageCount - (session.ai_keywords_message_count || 0);
-
-    // Calculate time since last keyword generation
-    const lastKeywordsTime = new Date(session.ai_keywords_generated_at);
+    const messagesSinceLastKeywords = currentMessageCount - (session.aiKeywordsMessageCount || 0);
+    const lastKeywordsTime = new Date(session.aiKeywordsGeneratedAt);
     const minutesSinceLastKeywords = (Date.now() - lastKeywordsTime.getTime()) / 1000 / 60;
 
-    // Only update if BOTH thresholds are met (cost-effective approach)
     if (
       messagesSinceLastKeywords >= MESSAGE_THRESHOLD &&
       minutesSinceLastKeywords >= TIME_THROTTLE_MINUTES
@@ -504,71 +448,45 @@ export async function getSessionsNeedingKeywordUpdate(
 
 /**
  * Fetches sessions that need title updates.
- * Returns sessions that:
- * 1. Were created within the specified time window (default 24 hours)
- * 2. Don't have an AI-generated title yet
- * 3. Don't already have a conversation name in metadata (e.g., from Cursor)
- * 4. User has AI titles enabled in preferences
  */
 export async function getSessionsNeedingTitleUpdate(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   withinHours: number = 24
-): Promise<ChatHistory[]> {
+): Promise<ChatHistoryRecord[]> {
   const cutoffTime = new Date();
   cutoffTime.setHours(cutoffTime.getHours() - withinHours);
 
-  const { data, error } = await auth.client
-    .from('chat_histories')
-    .select('*')
-    .eq('account_id', auth.accountId)
-    .gte('latest_message_timestamp', cutoffTime.toISOString())
-    .order('latest_message_timestamp', { ascending: false });
+  const sessions = await ctx.chatHistories.findRecentByUser(ctx.userId, cutoffTime);
 
-  if (error) {
-    console.error('Error fetching sessions for title update:', error);
+  if (sessions.length === 0) {
     return [];
   }
 
-  if (!data || data.length === 0) {
-    return [];
-  }
+  const preferences = await getUserPreferences(ctx.userPreferences, ctx.userId);
 
-  const preferences = await getUserPreferences(auth);
-
-  // Filter sessions that need title generation
-  const needsUpdate: ChatHistory[] = [];
-
-  // Cast database rows to ChatHistory type
-  const sessions = data as unknown as ChatHistory[];
+  const needsUpdate: ChatHistoryRecord[] = [];
 
   for (const session of sessions) {
     const currentMessageCount = Array.isArray(session.messages)
       ? session.messages.length
       : 0;
 
-    // Skip sessions with no messages
     if (currentMessageCount === 0) {
       continue;
     }
 
-    // Check user preferences
-    if (!preferences || !preferences.ai_title_enabled) {
+    if (!preferences || !preferences.aiTitleEnabled) {
       continue;
     }
 
-    // Skip if already has an AI-generated title
-    if (session.ai_title && session.ai_title_generated_at) {
+    if (session.aiTitle && session.aiTitleGeneratedAt) {
       continue;
     }
 
-    // Check if has a conversation name in metadata (e.g., from Cursor)
     const metadata = session.metadata as any;
     const conversationName = metadata?.conversationName || metadata?.conversation_name;
 
-    // Add to update list if:
-    // 1. Has conversation name but no ai_title (copy over the name), OR
-    // 2. Has no conversation name and no ai_title (generate new title)
-    if (conversationName || !session.ai_title) {
+    if (conversationName || !session.aiTitle) {
       needsUpdate.push(session);
     }
   }
@@ -580,19 +498,13 @@ export async function getSessionsNeedingTitleUpdate(
  * Generate and save summary for a single session
  */
 export async function updateSessionSummary(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   sessionId: string
 ): Promise<{ success: boolean; summary?: string; error?: string }> {
   try {
-    // Fetch the session
-    const { data: session, error: fetchError } = await auth.client
-      .from('chat_histories')
-      .select('*')
-      .eq('id', sessionId)
-      .eq('account_id', auth.accountId)
-      .single();
+    const session = await ctx.chatHistories.findById(sessionId, ctx.userId);
 
-    if (fetchError || !session) {
+    if (!session) {
       return { success: false, error: 'Session not found' };
     }
 
@@ -603,23 +515,13 @@ export async function updateSessionSummary(
       return { success: false, error: 'No messages to summarize' };
     }
 
-    const llmConfig = await getUserLLMConfig(auth);
+    const llmConfig = await getUserLLMConfig(ctx.userPreferences, ctx.apiKeys, ctx.userId);
 
-    // Generate summary
     const summary = await generateSessionSummary(messages as unknown as Message[], llmConfig);
 
-    // Update database
-    const { error: updateError } = await auth.client
-      .from('chat_histories')
-      .update({
-        ai_summary: summary,
-        ai_summary_generated_at: new Date().toISOString(),
-        ai_summary_message_count: messageCount,
-      })
-      .eq('id', sessionId);
+    const success = await ctx.chatHistories.updateAiSummary(sessionId, summary, messageCount);
 
-    if (updateError) {
-      console.error('Error updating summary in database:', updateError);
+    if (!success) {
       return { success: false, error: 'Failed to save summary' };
     }
 
@@ -634,19 +536,13 @@ export async function updateSessionSummary(
  * Generate and save keywords for a single session
  */
 export async function updateSessionKeywords(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   sessionId: string
 ): Promise<{ success: boolean; keywords?: KeywordClassification; error?: string }> {
   try {
-    // Fetch the session
-    const { data: session, error: fetchError } = await auth.client
-      .from('chat_histories')
-      .select('*')
-      .eq('id', sessionId)
-      .eq('account_id', auth.accountId)
-      .single();
+    const session = await ctx.chatHistories.findById(sessionId, ctx.userId);
 
-    if (fetchError || !session) {
+    if (!session) {
       return { success: false, error: 'Session not found' };
     }
 
@@ -657,24 +553,13 @@ export async function updateSessionKeywords(
       return { success: false, error: 'No messages to classify' };
     }
 
-    const llmConfig = await getUserLLMConfig(auth);
+    const llmConfig = await getUserLLMConfig(ctx.userPreferences, ctx.apiKeys, ctx.userId);
 
-    // Generate keywords
     const keywords = await generateKeywordClassification(messages as unknown as Message[], llmConfig);
 
-    // Update database
-    const { error: updateError } = await auth.client
-      .from('chat_histories')
-      .update({
-        ai_keywords_type: keywords.type,
-        ai_keywords_topic: keywords.topic,
-        ai_keywords_generated_at: new Date().toISOString(),
-        ai_keywords_message_count: messageCount,
-      })
-      .eq('id', sessionId);
+    const success = await ctx.chatHistories.updateAiKeywords(sessionId, keywords, messageCount);
 
-    if (updateError) {
-      console.error('Error updating keywords in database:', updateError);
+    if (!success) {
       return { success: false, error: 'Failed to save keywords' };
     }
 
@@ -689,19 +574,13 @@ export async function updateSessionKeywords(
  * Generate and save title for a single session
  */
 export async function updateSessionTitle(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   sessionId: string
 ): Promise<{ success: boolean; title?: string; error?: string }> {
   try {
-    // Fetch the session
-    const { data: session, error: fetchError } = await auth.client
-      .from('chat_histories')
-      .select('*')
-      .eq('id', sessionId)
-      .eq('account_id', auth.accountId)
-      .single();
+    const session = await ctx.chatHistories.findById(sessionId, ctx.userId);
 
-    if (fetchError || !session) {
+    if (!session) {
       return { success: false, error: 'Session not found' };
     }
 
@@ -711,34 +590,21 @@ export async function updateSessionTitle(
       return { success: false, error: 'No messages to generate title from' };
     }
 
-    // Check if has a conversation name in metadata
     const metadata = session.metadata as any;
     const conversationName = metadata?.conversationName || metadata?.conversation_name;
 
     let title: string;
 
     if (conversationName) {
-      // Use conversation name from metadata as the title
       title = conversationName;
     } else {
-      // Get user's LLM configuration
-      const llmConfig = await getUserLLMConfig(auth);
-
-      // Generate title from messages
+      const llmConfig = await getUserLLMConfig(ctx.userPreferences, ctx.apiKeys, ctx.userId);
       title = await generateSessionTitle(messages as unknown as Message[], llmConfig);
     }
 
-    // Update database
-    const { error: updateError } = await auth.client
-      .from('chat_histories')
-      .update({
-        ai_title: title,
-        ai_title_generated_at: new Date().toISOString(),
-      })
-      .eq('id', sessionId);
+    const success = await ctx.chatHistories.updateAiTitle(sessionId, title);
 
-    if (updateError) {
-      console.error('Error updating title in database:', updateError);
+    if (!success) {
       return { success: false, error: 'Failed to save title' };
     }
 
@@ -750,11 +616,10 @@ export async function updateSessionTitle(
 }
 
 /**
- * Batch update summaries for multiple sessions with rate limit handling
- * Processes sessions sequentially with delays to avoid rate limits
+ * Batch update summaries for multiple sessions
  */
 export async function batchUpdateSessionSummaries(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   sessionIds: string[],
   delayBetweenRequests: number = 100
 ): Promise<{
@@ -765,17 +630,15 @@ export async function batchUpdateSessionSummaries(
 }> {
   const results: any[] = [];
 
-  // Process sequentially to avoid overwhelming rate limits
   for (let i = 0; i < sessionIds.length; i++) {
     const sessionId = sessionIds[i];
 
     if (!sessionId) continue;
 
     try {
-      const result = await updateSessionSummary(auth, sessionId);
+      const result = await updateSessionSummary(ctx, sessionId);
       results.push({ sessionId, ...result });
 
-      // Add delay between requests (except for last one)
       if (i < sessionIds.length - 1 && result.success) {
         await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
       }
@@ -790,18 +653,17 @@ export async function batchUpdateSessionSummaries(
 
   return {
     updated: results.filter((r) => r.success).length,
-    cached: 0, // Not using cache in daemon version
+    cached: 0,
     errors: results.filter((r) => !r.success).length,
     results,
   };
 }
 
 /**
- * Batch update keywords for multiple sessions with rate limit handling
- * Processes sessions sequentially with delays to avoid rate limits
+ * Batch update keywords for multiple sessions
  */
 export async function batchUpdateSessionKeywords(
-  auth: AuthenticatedContext,
+  ctx: SummarizerContext,
   sessionIds: string[],
   delayBetweenRequests: number = 100
 ): Promise<{
@@ -812,17 +674,15 @@ export async function batchUpdateSessionKeywords(
 }> {
   const results: any[] = [];
 
-  // Process sequentially to avoid overwhelming rate limits
   for (let i = 0; i < sessionIds.length; i++) {
     const sessionId = sessionIds[i];
 
     if (!sessionId) continue;
 
     try {
-      const result = await updateSessionKeywords(auth, sessionId);
+      const result = await updateSessionKeywords(ctx, sessionId);
       results.push({ sessionId, ...result });
 
-      // Add delay between requests (except for last one)
       if (i < sessionIds.length - 1 && result.success) {
         await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
       }
@@ -837,26 +697,77 @@ export async function batchUpdateSessionKeywords(
 
   return {
     updated: results.filter((r) => r.success).length,
-    cached: 0, // Not using cache in daemon version
+    cached: 0,
     errors: results.filter((r) => !r.success).length,
     results,
   };
 }
+
+/**
+ * Batch update titles for multiple sessions
+ */
+export async function batchUpdateSessionTitles(
+  ctx: SummarizerContext,
+  sessionIds: string[],
+  delayBetweenRequests: number = 100
+): Promise<{
+  updated: number;
+  cached: number;
+  errors: number;
+  results: any[];
+}> {
+  const results: any[] = [];
+
+  for (let i = 0; i < sessionIds.length; i++) {
+    const sessionId = sessionIds[i];
+
+    if (!sessionId) continue;
+
+    try {
+      const result = await updateSessionTitle(ctx, sessionId);
+      results.push({ sessionId, ...result });
+
+      if (i < sessionIds.length - 1 && result.success) {
+        await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
+      }
+    } catch (error) {
+      results.push({
+        sessionId,
+        success: false,
+        error: String(error),
+      });
+    }
+  }
+
+  return {
+    updated: results.filter((r) => r.success).length,
+    cached: 0,
+    errors: results.filter((r) => !r.success).length,
+    results,
+  };
+}
+
+// ============================================================================
+// Entry point functions that create repositories from tokens
+// ============================================================================
 
 /**
  * Main function to run periodic summary updates
- * Should be called every 5 minutes
- * Only processes sessions updated within the last 24 hours
  */
-export async function runPeriodicSummaryUpdate(accessToken: string, refreshToken: string): Promise<void> {
+export async function runPeriodicSummaryUpdate(
+  accessToken: string,
+  refreshToken: string,
+  repositoryFactory: IRepositoryFactory
+): Promise<void> {
   console.log('[Summary Updater] Starting periodic summary update...');
 
   try {
-    // Create authenticated context
-    const auth = await createAuthenticatedClient(accessToken, refreshToken);
+    const { userId, chatHistories, userPreferences, apiKeys } =
+      await repositoryFactory.createRepositories(accessToken, refreshToken);
 
-    // Get sessions from the last 24 hours that need updates
-    const sessions = await getSessionsNeedingSummaryUpdate(auth);
+    const ctx: SummarizerContext = { userId, chatHistories, userPreferences, apiKeys };
+
+    const sessions = await getSessionsNeedingSummaryUpdate(ctx);
 
     if (sessions.length === 0) {
       console.log('[Summary Updater] No sessions need updating');
@@ -865,9 +776,8 @@ export async function runPeriodicSummaryUpdate(accessToken: string, refreshToken
 
     console.log(`[Summary Updater] Found ${sessions.length} sessions needing summary updates`);
 
-    // Batch update all sessions
     const sessionIds = sessions.map((s) => s.id);
-    const result = await batchUpdateSessionSummaries(auth, sessionIds);
+    const result = await batchUpdateSessionSummaries(ctx, sessionIds);
 
     console.log('[Summary Updater] Update complete:', {
       total: sessionIds.length,
@@ -881,18 +791,21 @@ export async function runPeriodicSummaryUpdate(accessToken: string, refreshToken
 
 /**
  * Main function to run periodic keyword updates
- * Should be called every 5 minutes (same schedule as summary updates)
- * Only processes sessions updated within the last 24 hours
  */
-export async function runPeriodicKeywordUpdate(accessToken: string, refreshToken: string): Promise<void> {
+export async function runPeriodicKeywordUpdate(
+  accessToken: string,
+  refreshToken: string,
+  repositoryFactory: IRepositoryFactory
+): Promise<void> {
   console.log('[Keyword Updater] Starting periodic keyword update...');
 
   try {
-    // Create authenticated context
-    const auth = await createAuthenticatedClient(accessToken, refreshToken);
+    const { userId, chatHistories, userPreferences, apiKeys } =
+      await repositoryFactory.createRepositories(accessToken, refreshToken);
 
-    // Get sessions from the last 24 hours that need keyword updates
-    const sessions = await getSessionsNeedingKeywordUpdate(auth);
+    const ctx: SummarizerContext = { userId, chatHistories, userPreferences, apiKeys };
+
+    const sessions = await getSessionsNeedingKeywordUpdate(ctx);
 
     if (sessions.length === 0) {
       console.log('[Keyword Updater] No sessions need updating');
@@ -901,9 +814,8 @@ export async function runPeriodicKeywordUpdate(accessToken: string, refreshToken
 
     console.log(`[Keyword Updater] Found ${sessions.length} sessions needing keyword updates`);
 
-    // Batch update all sessions
     const sessionIds = sessions.map((s) => s.id);
-    const result = await batchUpdateSessionKeywords(auth, sessionIds);
+    const result = await batchUpdateSessionKeywords(ctx, sessionIds);
 
     console.log('[Keyword Updater] Update complete:', {
       total: sessionIds.length,
@@ -916,66 +828,22 @@ export async function runPeriodicKeywordUpdate(accessToken: string, refreshToken
 }
 
 /**
- * Batch update titles for multiple sessions with rate limit handling
- * Processes sessions sequentially with delays to avoid rate limits
- */
-export async function batchUpdateSessionTitles(
-  auth: AuthenticatedContext,
-  sessionIds: string[],
-  delayBetweenRequests: number = 100
-): Promise<{
-  updated: number;
-  cached: number;
-  errors: number;
-  results: any[];
-}> {
-  const results: any[] = [];
-
-  // Process sequentially to avoid overwhelming rate limits
-  for (let i = 0; i < sessionIds.length; i++) {
-    const sessionId = sessionIds[i];
-
-    if (!sessionId) continue;
-
-    try {
-      const result = await updateSessionTitle(auth, sessionId);
-      results.push({ sessionId, ...result });
-
-      // Add delay between requests (except for last one)
-      if (i < sessionIds.length - 1 && result.success) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
-      }
-    } catch (error) {
-      results.push({
-        sessionId,
-        success: false,
-        error: String(error),
-      });
-    }
-  }
-
-  return {
-    updated: results.filter((r) => r.success).length,
-    cached: 0, // Not using cache in daemon version
-    errors: results.filter((r) => !r.success).length,
-    results,
-  };
-}
-
-/**
  * Main function to run periodic title updates
- * Should be called every 5 minutes (same schedule as summary updates)
- * Only processes sessions updated within the last 24 hours
  */
-export async function runPeriodicTitleUpdate(accessToken: string, refreshToken: string): Promise<void> {
+export async function runPeriodicTitleUpdate(
+  accessToken: string,
+  refreshToken: string,
+  repositoryFactory: IRepositoryFactory
+): Promise<void> {
   console.log('[Title Updater] Starting periodic title update...');
 
   try {
-    // Create authenticated context
-    const auth = await createAuthenticatedClient(accessToken, refreshToken);
+    const { userId, chatHistories, userPreferences, apiKeys } =
+      await repositoryFactory.createRepositories(accessToken, refreshToken);
 
-    // Get sessions from the last 24 hours that need title updates
-    const sessions = await getSessionsNeedingTitleUpdate(auth);
+    const ctx: SummarizerContext = { userId, chatHistories, userPreferences, apiKeys };
+
+    const sessions = await getSessionsNeedingTitleUpdate(ctx);
 
     if (sessions.length === 0) {
       console.log('[Title Updater] No sessions need updating');
@@ -984,9 +852,8 @@ export async function runPeriodicTitleUpdate(accessToken: string, refreshToken: 
 
     console.log(`[Title Updater] Found ${sessions.length} sessions needing title updates`);
 
-    // Batch update all sessions
     const sessionIds = sessions.map((s) => s.id);
-    const result = await batchUpdateSessionTitles(auth, sessionIds);
+    const result = await batchUpdateSessionTitles(ctx, sessionIds);
 
     console.log('[Title Updater] Update complete:', {
       total: sessionIds.length,
