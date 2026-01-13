@@ -656,10 +656,7 @@ function CanvasFlow() {
       });
     }
 
-    // Get first mock agent from store for demo purposes
-    const mockAgents = agentStore.getAllAgents();
-    const mockAgent = mockAgents[0];
-
+    // Always generate unique IDs for each new node
     const agentId = `agent-${crypto.randomUUID()}`;
     const terminalId = `terminal-${crypto.randomUUID()}`;
 
@@ -667,7 +664,7 @@ function CanvasFlow() {
       id: `node-${Date.now()}`,
       type: 'agent',
       position: nodePosition,
-      data: mockAgent || {
+      data: {
         agentId,
         terminalId,
         agentType: 'claude_code',
