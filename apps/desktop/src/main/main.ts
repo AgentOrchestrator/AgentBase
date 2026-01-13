@@ -121,9 +121,9 @@ const createWindow = (): void => {
     terminalCreationTimes.set(terminalId, callTime);
 
     const shell = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash';
-    // Don't use -i (interactive) or -l (login) flags as they can cause immediate exits
-    // Just spawn the shell normally - node-pty handles the TTY connection
-    const shellArgs: string[] = [];
+    // Use login shell (-l) to ensure user's PATH is loaded from shell profile
+    // This is needed for commands like 'claude' that are installed in user-specific locations
+    const shellArgs: string[] = process.platform === 'win32' ? [] : ['-l'];
 
     const ptyProcess = pty.spawn(
       shell,
@@ -185,13 +185,18 @@ const createWindow = (): void => {
   ipcMain.on('terminal-resize', (_event, { terminalId, cols, rows }: { terminalId: string; cols: number; rows: number }) => {
     const ptyProcess = terminalProcesses.get(terminalId);
     if (ptyProcess) {
+      // Validate dimensions are positive (node-pty requires this)
+      if (cols <= 0 || rows <= 0) {
+        return;
+      }
+
       // Only log resize if it's been more than 2000ms since last log OR dimensions changed significantly (>5 cols or >1 row)
       const lastLog = lastResizeLog[terminalId];
       const now = Date.now();
       const dimensionChanged = !lastLog || lastLog.cols !== cols || lastLog.rows !== rows;
       const significantChange = lastLog && (Math.abs(lastLog.cols - cols) > 5 || Math.abs(lastLog.rows - rows) > 1);
       const timeThreshold = !lastLog || (now - lastLog.time > 2000);
-      
+
       if (timeThreshold || (dimensionChanged && significantChange)) {
         console.log('[Main] Terminal resize', { terminalId, cols, rows });
         lastResizeLog[terminalId] = { cols, rows, time: now };
