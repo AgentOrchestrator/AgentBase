@@ -1,8 +1,4 @@
-import type { ProjectInfo as CursorProjectInfo } from './cursor-reader.js';
-import type { ProjectInfo as ClaudeCodeProjectInfo } from './claude-code-reader.js';
-import type { ProjectInfo as VSCodeProjectInfo } from './vscode-reader.js';
-import type { ProjectInfo as FactoryProjectInfo } from './factory-reader.js';
-import type { ProjectInfo as CodexProjectInfo } from './codex-reader.js';
+import type { ProjectInfo } from '@agent-orchestrator/shared';
 
 /**
  * Unified project information combining data from all sources
@@ -14,23 +10,22 @@ export interface UnifiedProjectInfo {
   composerCount: number;
   copilotSessionCount: number;
   claudeCodeSessionCount: number;
-  vscodeChatCount: number;
-  vscodeInlineChatCount: number;
+  vscodeSessionCount: number;
   factorySessionCount: number;
   codexSessionCount: number;
   lastActivity: string;
 }
 
 /**
- * Merge projects from Cursor, Claude Code, VSCode, Factory, and Codex into a unified list
+ * Merge projects from all loaders into a unified list
  * Projects with the same path are merged together
  */
 export function mergeProjects(
-  cursorProjects: CursorProjectInfo[],
-  claudeCodeProjects: ClaudeCodeProjectInfo[],
-  vscodeProjects: VSCodeProjectInfo[] = [],
-  factoryProjects: FactoryProjectInfo[] = [],
-  codexProjects: CodexProjectInfo[] = []
+  cursorProjects: ProjectInfo[],
+  claudeCodeProjects: ProjectInfo[],
+  vscodeProjects: ProjectInfo[] = [],
+  factoryProjects: ProjectInfo[] = [],
+  codexProjects: ProjectInfo[] = []
 ): UnifiedProjectInfo[] {
   const projectsMap = new Map<string, UnifiedProjectInfo>();
 
@@ -40,11 +35,10 @@ export function mergeProjects(
       name: project.name,
       path: project.path,
       workspaceIds: project.workspaceIds,
-      composerCount: project.composerCount,
-      copilotSessionCount: project.copilotSessionCount,
+      composerCount: project.composerCount || 0,
+      copilotSessionCount: project.copilotSessionCount || 0,
       claudeCodeSessionCount: 0,
-      vscodeChatCount: 0,
-      vscodeInlineChatCount: 0,
+      vscodeSessionCount: 0,
       factorySessionCount: 0,
       codexSessionCount: 0,
       lastActivity: project.lastActivity
@@ -56,24 +50,20 @@ export function mergeProjects(
     const existing = projectsMap.get(project.path);
 
     if (existing) {
-      // Merge with existing project
-      existing.claudeCodeSessionCount = project.claudeCodeSessionCount;
+      existing.claudeCodeSessionCount = project.claudeCodeSessionCount || 0;
 
-      // Update last activity if Claude Code activity is more recent
       if (project.lastActivity > existing.lastActivity) {
         existing.lastActivity = project.lastActivity;
       }
     } else {
-      // Add new project from Claude Code
       projectsMap.set(project.path, {
         name: project.name,
         path: project.path,
         workspaceIds: [],
         composerCount: 0,
         copilotSessionCount: 0,
-        claudeCodeSessionCount: project.claudeCodeSessionCount,
-        vscodeChatCount: 0,
-        vscodeInlineChatCount: 0,
+        claudeCodeSessionCount: project.claudeCodeSessionCount || 0,
+        vscodeSessionCount: 0,
         factorySessionCount: 0,
         codexSessionCount: 0,
         lastActivity: project.lastActivity
@@ -86,23 +76,18 @@ export function mergeProjects(
     const existing = projectsMap.get(project.path);
 
     if (existing) {
-      // Merge with existing project
-      existing.vscodeChatCount = project.chatCount;
-      existing.vscodeInlineChatCount = project.inlineChatCount;
+      existing.vscodeSessionCount = project.vscodeSessionCount || 0;
 
-      // Merge workspace IDs
       for (const workspaceId of project.workspaceIds) {
         if (!existing.workspaceIds.includes(workspaceId)) {
           existing.workspaceIds.push(workspaceId);
         }
       }
 
-      // Update last activity if VSCode activity is more recent
       if (project.lastActivity > existing.lastActivity) {
         existing.lastActivity = project.lastActivity;
       }
     } else {
-      // Add new project from VSCode
       projectsMap.set(project.path, {
         name: project.name,
         path: project.path,
@@ -110,8 +95,7 @@ export function mergeProjects(
         composerCount: 0,
         copilotSessionCount: 0,
         claudeCodeSessionCount: 0,
-        vscodeChatCount: project.chatCount,
-        vscodeInlineChatCount: project.inlineChatCount,
+        vscodeSessionCount: project.vscodeSessionCount || 0,
         factorySessionCount: 0,
         codexSessionCount: 0,
         lastActivity: project.lastActivity
@@ -124,15 +108,12 @@ export function mergeProjects(
     const existing = projectsMap.get(project.path);
 
     if (existing) {
-      // Merge with existing project
-      existing.factorySessionCount = project.sessionCount;
+      existing.factorySessionCount = project.factorySessionCount || 0;
 
-      // Update last activity if Factory activity is more recent
       if (project.lastActivity > existing.lastActivity) {
         existing.lastActivity = project.lastActivity;
       }
     } else {
-      // Add new project from Factory
       projectsMap.set(project.path, {
         name: project.name,
         path: project.path,
@@ -140,9 +121,8 @@ export function mergeProjects(
         composerCount: 0,
         copilotSessionCount: 0,
         claudeCodeSessionCount: 0,
-        vscodeChatCount: 0,
-        vscodeInlineChatCount: 0,
-        factorySessionCount: project.sessionCount,
+        vscodeSessionCount: 0,
+        factorySessionCount: project.factorySessionCount || 0,
         codexSessionCount: 0,
         lastActivity: project.lastActivity
       });
@@ -154,15 +134,12 @@ export function mergeProjects(
     const existing = projectsMap.get(project.path);
 
     if (existing) {
-      // Merge with existing project
-      existing.codexSessionCount = project.sessionCount;
+      existing.codexSessionCount = project.codexSessionCount || 0;
 
-      // Update last activity if Codex activity is more recent
       if (project.lastActivity > existing.lastActivity) {
         existing.lastActivity = project.lastActivity;
       }
     } else {
-      // Add new project from Codex
       projectsMap.set(project.path, {
         name: project.name,
         path: project.path,
@@ -170,10 +147,9 @@ export function mergeProjects(
         composerCount: 0,
         copilotSessionCount: 0,
         claudeCodeSessionCount: 0,
-        vscodeChatCount: 0,
-        vscodeInlineChatCount: 0,
+        vscodeSessionCount: 0,
         factorySessionCount: 0,
-        codexSessionCount: project.sessionCount,
+        codexSessionCount: project.codexSessionCount || 0,
         lastActivity: project.lastActivity
       });
     }

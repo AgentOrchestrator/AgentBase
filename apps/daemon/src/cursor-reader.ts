@@ -1,10 +1,24 @@
 import Database from 'better-sqlite3';
-import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import { createHash } from 'crypto';
-import type { SessionMetadata } from './types.js';
+import type {
+  ChatHistory,
+  SessionMetadata,
+  ProjectInfo as SharedProjectInfo,
+  LoaderOptions,
+  IDatabaseLoader,
+} from '@agent-orchestrator/shared';
+import {
+  IDE_DATA_PATHS,
+  normalizeTimestamp,
+  extractProjectNameFromPath,
+  generateDeterministicUUID,
+  getHomeDir,
+} from '@agent-orchestrator/shared';
 import type { IChatHistoryRepository, IRepositoryFactory } from './interfaces/repositories.js';
+
+// Re-export types for backward compatibility
+export type { ChatHistory, SessionMetadata } from '@agent-orchestrator/shared';
 
 export interface CursorMessage {
   id: string;
@@ -22,7 +36,7 @@ export interface CursorConversation {
   timestamp: string;
   messages: CursorMessage[];
   conversationType: 'composer' | 'copilot';
-  metadata?: SessionMetadata;
+  metadata?: SessionMetadata | undefined;
 }
 
 export interface ProjectInfo {
@@ -78,29 +92,11 @@ interface ComposerData {
 }
 
 /**
- * Generate a deterministic UUID v4-compatible ID from a string
- * This ensures consistent IDs across runs for the same workspace/session
- */
-function generateDeterministicUUID(input: string): string {
-  const hash = createHash('md5').update(input).digest('hex');
-  // Format as UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-${hash.substring(16, 20)}-${hash.substring(20, 32)}`;
-}
-
-/**
  * Get the path to Cursor's state database
  */
 function getCursorStatePath(): string {
-  const homeDir = os.homedir();
-  return path.join(
-    homeDir,
-    'Library',
-    'Application Support',
-    'Cursor',
-    'User',
-    'globalStorage',
-    'state.vscdb'
-  );
+  const globalStoragePath = IDE_DATA_PATHS.cursor();
+  return path.join(globalStoragePath, 'state.vscdb');
 }
 
 // Repository for database lookups
@@ -220,125 +216,6 @@ function parseRichText(richText: string): string {
 }
 
 /**
- * Normalize timestamp to ISO 8601 format
- * Handles Unix timestamps (milliseconds), Unix timestamps (seconds), and ISO strings
- */
-function normalizeTimestamp(timestamp: string | number | undefined): string {
-  if (!timestamp) {
-    return new Date().toISOString();
-  }
-
-  // If it's already a string, check if it's ISO format or a numeric string
-  if (typeof timestamp === 'string') {
-    // Check if it's a numeric string (Unix timestamp)
-    const numericTimestamp = parseInt(timestamp, 10);
-    if (!isNaN(numericTimestamp) && numericTimestamp > 0) {
-      timestamp = numericTimestamp;
-    } else {
-      // Try parsing as ISO string
-      const date = new Date(timestamp);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-      return new Date().toISOString();
-    }
-  }
-
-  // Handle numeric timestamps
-  if (typeof timestamp === 'number') {
-    // If timestamp is in milliseconds (> year 2000 in seconds)
-    if (timestamp > 946684800000) {
-      return new Date(timestamp).toISOString();
-    }
-    // If timestamp is in seconds
-    if (timestamp > 946684800) {
-      return new Date(timestamp * 1000).toISOString();
-    }
-  }
-
-  return new Date().toISOString();
-}
-
-/**
- * Extract project name from a folder or file path
- * Handles both local and remote paths, extracting the project directory name
- *
- * Strategy:
- * 1. Clean up URI schemes (file://, vscode-remote://)
- * 2. Find common project root indicators (Developer, projects, home, etc.)
- * 3. Extract the directory name after the root indicator
- * 4. Fallback: Use the last directory segment (not filename)
- */
-function extractProjectNameFromPath(folderPath: string): string | undefined {
-  // Remove URI scheme if present (file://, vscode-remote://, etc.)
-  let cleanPath = folderPath;
-
-  // Handle file:// URIs
-  if (cleanPath.startsWith('file://')) {
-    cleanPath = cleanPath.replace('file://', '');
-  }
-
-  // Handle vscode-remote URIs (e.g., vscode-remote://ssh-remote%2Bserver/path)
-  if (cleanPath.startsWith('vscode-remote://')) {
-    const match = cleanPath.match(/vscode-remote:\/\/[^/]+(.+)/);
-    if (match && match[1]) {
-      cleanPath = match[1];
-    }
-  }
-
-  // Decode URL encoding (e.g., %2B -> +)
-  try {
-    cleanPath = decodeURIComponent(cleanPath);
-  } catch (e) {
-    // If decoding fails, use as-is
-  }
-
-  // Split by / and filter empty segments
-  const parts = cleanPath.split('/').filter(p => p.trim() !== '');
-  if (parts.length === 0) {
-    return undefined;
-  }
-
-  // Common project root indicators (in priority order)
-  const rootIndicators = ['Developer', 'projects', 'workspace', 'repos', 'code', 'work'];
-
-  // Try to find a root indicator and get the directory after it
-  for (const indicator of rootIndicators) {
-    const index = parts.indexOf(indicator);
-    if (index >= 0 && index + 1 < parts.length) {
-      // Return the first directory after the root indicator
-      // This should be the project name
-      return parts[index + 1];
-    }
-  }
-
-  // Special case for 'home' - skip username and get the next directory
-  // e.g., /home/username/project -> project
-  const homeIndex = parts.indexOf('home');
-  if (homeIndex >= 0 && homeIndex + 2 < parts.length) {
-    return parts[homeIndex + 2]; // Skip 'home' and username
-  }
-
-  // Fallback: Assume the path might be pointing to a file
-  // Go up until we find what looks like a project root
-  // Skip the last part if it looks like a filename (has extension)
-  const lastPart = parts[parts.length - 1];
-  if (!lastPart) {
-    return undefined;
-  }
-
-  const hasExtension = lastPart.includes('.');
-
-  if (hasExtension && parts.length > 1) {
-    // It's likely a file, use the parent directory
-    return parts[parts.length - 2];
-  }
-
-  // Otherwise use the last segment (it's likely a directory)
-  return lastPart;
-}
-
-/**
  * Extract project information from composer data
  * Uses workspace ID to look up the actual workspace folder from workspace storage
  */
@@ -409,15 +286,13 @@ function extractProjectInfo(composerData: ComposerData, workspaceMap: Map<string
  * Get the path to Cursor's workspace storage
  */
 function getCursorWorkspaceStoragePath(): string {
-  const homeDir = os.homedir();
-  return path.join(
-    homeDir,
-    'Library',
-    'Application Support',
-    'Cursor',
-    'User',
-    'workspaceStorage'
-  );
+  const home = getHomeDir();
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'Cursor', 'User', 'workspaceStorage');
+  } else if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || '', 'Cursor', 'User', 'workspaceStorage');
+  }
+  return path.join(home, '.config', 'Cursor', 'User', 'workspaceStorage');
 }
 
 /**
@@ -1237,20 +1112,9 @@ export async function readCursorHistories(
  */
 export function convertCursorToStandardFormat(
   conversations: CursorConversation[]
-): Array<{
-  id: string;
-  timestamp: string;
-  messages: Array<{
-    display: string;
-    pastedContents: Record<string, any>;
-    role?: 'user' | 'assistant';
-    timestamp?: string;
-  }>;
-  agent_type: 'cursor';
-  metadata?: Record<string, any>;
-}> {
+): ChatHistory[] {
   return conversations.map(conv => ({
-    id: conv.id, // Use the original UUID without prefix
+    id: conv.id,
     timestamp: conv.timestamp,
     agent_type: 'cursor' as const,
     messages: conv.messages.map(msg => ({
@@ -1265,3 +1129,74 @@ export function convertCursorToStandardFormat(
     }
   }));
 }
+
+/**
+ * Cursor Loader - implements IDatabaseLoader interface
+ */
+export class CursorLoader implements IDatabaseLoader {
+  readonly agentType = 'cursor' as const;
+  readonly name = 'Cursor';
+  readonly databasePath: string;
+
+  private repositoryFactory?: IRepositoryFactory | undefined;
+  private accessToken?: string | undefined;
+  private refreshToken?: string | undefined;
+
+  constructor(options?: {
+    repositoryFactory?: IRepositoryFactory;
+    accessToken?: string;
+    refreshToken?: string;
+  }) {
+    this.databasePath = getCursorStatePath();
+    this.repositoryFactory = options?.repositoryFactory;
+    this.accessToken = options?.accessToken;
+    this.refreshToken = options?.refreshToken;
+  }
+
+  async readHistories(options?: LoaderOptions): Promise<ChatHistory[]> {
+    const conversations = await readCursorHistories(
+      options?.lookbackDays,
+      this.accessToken,
+      this.refreshToken,
+      options?.sinceTimestamp,
+      this.repositoryFactory
+    );
+    return convertCursorToStandardFormat(conversations);
+  }
+
+  extractProjects(histories: ChatHistory[]): SharedProjectInfo[] {
+    // Convert back to CursorConversation format for project extraction
+    const conversations: CursorConversation[] = histories.map(h => ({
+      id: h.id,
+      timestamp: h.timestamp,
+      messages: h.messages.map((m, i) => ({
+        id: `${h.id}-${i}`,
+        role: m.role || 'user',
+        content: m.display,
+        timestamp: m.timestamp || h.timestamp
+      })),
+      conversationType: (h.metadata?.conversationType as 'composer' | 'copilot') || 'composer',
+      metadata: h.metadata
+    }));
+    return extractProjectsFromConversations(conversations);
+  }
+
+  isAvailable(): boolean {
+    return fs.existsSync(this.databasePath);
+  }
+
+  isDatabaseAccessible(): boolean {
+    if (!fs.existsSync(this.databasePath)) {
+      return false;
+    }
+    try {
+      const db = new Database(this.databasePath, { readonly: true });
+      db.close();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export const cursorLoader = new CursorLoader();
