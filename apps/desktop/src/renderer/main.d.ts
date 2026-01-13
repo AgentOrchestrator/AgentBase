@@ -1,4 +1,14 @@
 import type { CanvasState, CanvasMetadata } from '../main/types/database';
+import type {
+  CodingAgentType,
+  AgentCapabilities,
+  GenerateRequest,
+  GenerateResponse,
+  SessionIdentifier,
+  SessionInfo,
+  ForkOptions,
+  ContinueOptions,
+} from '../main/services/coding-agent';
 
 export interface ElectronAPI {
   createTerminal: (terminalId: string) => void;
@@ -19,10 +29,43 @@ export interface CanvasAPI {
   setCurrentCanvasId: (canvasId: string) => Promise<void>;
 }
 
+export interface CodingAgentAPI {
+  /** Generate a one-off response */
+  generate: (
+    agentType: CodingAgentType,
+    request: GenerateRequest
+  ) => Promise<GenerateResponse>;
+
+  /** Continue an existing session */
+  continueSession: (
+    agentType: CodingAgentType,
+    identifier: SessionIdentifier,
+    prompt: string,
+    options?: ContinueOptions
+  ) => Promise<GenerateResponse>;
+
+  /** Fork an existing session */
+  forkSession: (
+    agentType: CodingAgentType,
+    parentIdentifier: SessionIdentifier,
+    options?: ForkOptions
+  ) => Promise<SessionInfo>;
+
+  /** Get list of available agent types */
+  getAvailableAgents: () => Promise<CodingAgentType[]>;
+
+  /** Get capabilities for a specific agent type */
+  getCapabilities: (agentType: CodingAgentType) => Promise<AgentCapabilities>;
+
+  /** Check if a specific agent is available */
+  isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
+}
+
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
     canvasAPI?: CanvasAPI;
+    codingAgentAPI?: CodingAgentAPI;
   }
 }
 

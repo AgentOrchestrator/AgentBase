@@ -7,7 +7,7 @@ first, and if not found, falls back to querying the Supabase database.
 
 import os
 import structlog
-from typing import Optional
+from typing import Dict, Optional
 from supabase import create_client, Client as SupabaseClient
 
 logger = structlog.get_logger(__name__)
@@ -27,7 +27,7 @@ class APIKeyManager:
         self._supabase: Optional[SupabaseClient] = None
         self._supabase_url = supabase_url
         self._supabase_service_key = supabase_service_key
-        self._cache: dict[str, str] = {}
+        self._cache: Dict[str, str] = {}
 
     @property
     def supabase(self) -> SupabaseClient:

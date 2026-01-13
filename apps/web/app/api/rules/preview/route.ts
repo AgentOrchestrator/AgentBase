@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { getApprovedRules } from '@/lib/rules/rules-queries';
+import type { RuleWithApproval } from '@/lib/rules/types';
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Group by category for better preview
-    const byCategory = rules.reduce((acc: any, rule) => {
+    const byCategory = rules.reduce((acc: Record<string, Array<{ id: string; text: string; confidence: number }>>, rule: RuleWithApproval) => {
       const category = rule.rule_category || 'uncategorized';
       if (!acc[category]) {
         acc[category] = [];
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
     }, {});
 
     return NextResponse.json({
-      rules: rules.map(r => ({
+      rules: rules.map((r: RuleWithApproval) => ({
         id: r.id,
         text: r.rule_text,
         category: r.rule_category,

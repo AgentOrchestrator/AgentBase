@@ -10,6 +10,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCategory, getCategoryColor, formatDate, formatConfidence, getConfidenceColor } from '@/lib/rules/rules-formatter';
+import type { RuleWithApproval } from '@/lib/rules/types';
 
 export default async function ApprovedRulesPage() {
   // Verify authentication
@@ -24,13 +25,12 @@ export default async function ApprovedRulesPage() {
   }
 
   // Fetch approved rules
-  let approvedRules;
+  let approvedRules: RuleWithApproval[] = [];
   try {
     const result = await getRules({ status: 'approved', limit: 100 });
     approvedRules = result.rules;
   } catch (error) {
     console.error('Error fetching approved rules:', error);
-    approvedRules = [];
   }
 
   return (

@@ -7,6 +7,28 @@ import path from 'path';
 
 const execAsync = promisify(exec);
 
+/**
+ * Detect the package manager being used.
+ * Priority: npm_execpath env var > lockfile detection > fallback to npm
+ */
+function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | 'bun' {
+	// Check if we're being run via a specific package manager
+	const execPath = process.env.npm_execpath || '';
+	if (execPath.includes('pnpm')) return 'pnpm';
+	if (execPath.includes('yarn')) return 'yarn';
+	if (execPath.includes('bun')) return 'bun';
+
+	// Check for lockfiles in root directory
+	const rootPath = path.join(process.cwd(), '..', '..');
+	if (fs.existsSync(path.join(rootPath, 'pnpm-lock.yaml'))) return 'pnpm';
+	if (fs.existsSync(path.join(rootPath, 'yarn.lock'))) return 'yarn';
+	if (fs.existsSync(path.join(rootPath, 'bun.lockb'))) return 'bun';
+	if (fs.existsSync(path.join(rootPath, 'package-lock.json'))) return 'npm';
+
+	// Default to npm
+	return 'npm';
+}
+
 interface InstallOptions {
 	supabaseUrl?: string;
 	supabaseAnonKey?: string;
@@ -77,6 +99,8 @@ async function install(options: InstallOptions = {}) {
 		const supabaseAnonKey = options.supabaseAnonKey || '';
 
 		if (!supabaseUrl || !supabaseAnonKey) {
+			const pm = detectPackageManager();
+			const runCmd = pm === 'npm' ? 'npm run' : pm;
 			throw new Error(`
 Supabase credentials are required.
 
@@ -91,13 +115,13 @@ For LOCAL Supabase:
 
 3. Get credentials: supabase status
    Then run setup with:
-   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> pnpm run setup --non-interactive
+   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> ${runCmd} setup --non-interactive
 
 For REMOTE Supabase:
 1. Create project at https://supabase.com
 2. Get credentials from Project Settings → API
 3. Run setup with:
-   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> pnpm run setup --non-interactive
+   SUPABASE_URL=<url> SUPABASE_ANON_KEY=<key> ${runCmd} setup --non-interactive
 			`);
 		}
 
@@ -162,15 +186,17 @@ For REMOTE Supabase:
 
 		// Step 4: Install dependencies (skip if already in postinstall)
 		if (process.env.npm_lifecycle_event !== 'install') {
-			log('Installing monorepo dependencies with pnpm...', 'running');
+			const packageManager = detectPackageManager();
+			log(`Installing monorepo dependencies with ${packageManager}...`, 'running');
 			const rootPath = path.join(process.cwd(), '..', '..');
-			await execAsync('pnpm install', {
+			await execAsync(`${packageManager} install`, {
 				cwd: rootPath,
 				maxBuffer: 1024 * 1024 * 10,
 			});
 			log('Dependencies installed', 'success');
 		} else {
-			log('Skipping dependency installation (already running as part of pnpm install)', 'info');
+			const packageManager = detectPackageManager();
+			log(`Skipping dependency installation (already running as part of ${packageManager} install)`, 'info');
 		}
 
 		// Step 5: Install Python dependencies for memory service
@@ -233,10 +259,12 @@ LOG_LEVEL=INFO
 		}
 
 		// Completion message
+		const pm = detectPackageManager();
+		const runCmd = pm === 'npm' ? 'npm run' : pm;
 		console.log('\n✨ Installation Complete!\n');
 		console.log('Next steps:');
-		console.log('  1. Run pnpm run dev to start all services');
-		console.log('     Or use pnpm run dev:daemon and pnpm run dev:web separately');
+		console.log(`  1. Run ${runCmd} dev to start all services`);
+		console.log(`     Or use ${runCmd} dev:daemon and ${runCmd} dev:web separately`);
 		console.log('  2. Access the web app at http://localhost:3000\n');
 		console.log('To stop services: Press Ctrl+C');
 
@@ -390,16 +418,17 @@ Setup Instructions:
 
 Examples:
   # Using env file (recommended for CI/CD)
-  pnpm run setup --non-interactive -e .env.production
+  npm run setup -- --non-interactive -e .env.production
+  pnpm setup --non-interactive -e .env.production
 
   # Using environment variables (recommended)
   SUPABASE_URL=https://xxx.supabase.co \\
   SUPABASE_ANON_KEY=eyJh... \\
   OPENAI_API_KEY=sk-xxx \\
-  pnpm run setup --non-interactive
+  npm run setup -- --non-interactive
 
   # Using CLI args (less secure - visible in process list)
-  pnpm run setup --non-interactive \\
+  npm run setup -- --non-interactive \\
     --supabase-url https://xxx.supabase.co \\
     --supabase-anon-key eyJh... \\
     --openai-key sk-xxx

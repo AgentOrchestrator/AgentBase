@@ -1,18 +1,59 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as pty from 'node-pty';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { DatabaseFactory } from './database';
 import { IDatabase } from './database/IDatabase';
 import { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import {
+  CodingAgentFactory,
+  isSessionResumable,
+  isSessionForkable,
+} from './services/coding-agent';
+import type {
+  CodingAgentType,
+  GenerateRequest,
+  SessionIdentifier,
+  ForkOptions,
+  ContinueOptions,
+} from './services/coding-agent';
+import {
+  RepresentationService,
+  type RepresentationInput,
+  type ImageTransformOptions,
+  type SummaryTransformOptions,
+  type AudioTransformOptions,
+  type ILogger,
+  type IIdGenerator,
+} from './services/representation';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
 
 // Database instance
 let database: IDatabase;
+
+// RepresentationService instance and dependencies
+const representationLogger: ILogger = {
+  info: (message: string, context?: Record<string, unknown>) =>
+    console.log(`[Representation] ${message}`, context || ''),
+  warn: (message: string, context?: Record<string, unknown>) =>
+    console.warn(`[Representation] ${message}`, context || ''),
+  error: (message: string, context?: Record<string, unknown>) =>
+    console.error(`[Representation] ${message}`, context || ''),
+};
+
+const representationIdGenerator: IIdGenerator = {
+  generate: () => crypto.randomUUID(),
+};
+
+const representationService = new RepresentationService(
+  { defaultTimeout: 30000, initializeProvidersOnStart: true },
+  { logger: representationLogger, idGenerator: representationIdGenerator }
+);
 
 const createWindow = (): void => {
   const win = new BrowserWindow({
@@ -311,6 +352,245 @@ ipcMain.handle('agent-status:load-all', async () => {
   }
 });
 
+// ============================================
+// Coding Agent IPC Handlers
+// ============================================
+
+ipcMain.handle(
+  'coding-agent:generate',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    request: GenerateRequest
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        console.error('[Main] Error getting coding agent', { agentType, error: agentResult.error });
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const result = await agentResult.data.generate(request);
+      if (result.success === false) {
+        console.error('[Main] Error generating response', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Generated response', { agentType, contentLength: result.data.content.length });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:generate', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:continue-session',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    identifier: SessionIdentifier,
+    prompt: string,
+    options?: ContinueOptions
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isSessionResumable(agent)) {
+        return { success: false, error: `${agentType} does not support session resumption` };
+      }
+
+      const result = await agent.continueSession(identifier, prompt, options);
+      if (result.success === false) {
+        console.error('[Main] Error continuing session', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Continued session', { agentType, identifier });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:continue-session', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:fork-session',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    parentIdentifier: SessionIdentifier,
+    options?: ForkOptions
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isSessionForkable(agent)) {
+        return { success: false, error: `${agentType} does not support session forking` };
+      }
+
+      const result = await agent.forkSession(parentIdentifier, options);
+      if (result.success === false) {
+        console.error('[Main] Error forking session', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Forked session', { agentType, newSessionId: result.data.id });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:fork-session', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('coding-agent:get-available', async () => {
+  try {
+    const available = await CodingAgentFactory.getAvailableAgents();
+    console.log('[Main] Available coding agents', { agents: available });
+    return { success: true, data: available };
+  } catch (error) {
+    console.error('[Main] Error getting available agents', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle(
+  'coding-agent:get-capabilities',
+  async (_event, agentType: CodingAgentType) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const capabilities = agentResult.data.getCapabilities();
+      console.log('[Main] Agent capabilities', { agentType, capabilities });
+      return { success: true, data: capabilities };
+    } catch (error) {
+      console.error('[Main] Error getting capabilities', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:is-available',
+  async (_event, agentType: CodingAgentType) => {
+    try {
+      const available = await CodingAgentFactory.isAgentAvailable(agentType);
+      return { success: true, data: available };
+    } catch (error) {
+      console.error('[Main] Error checking agent availability', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+// ============================================
+// Representation Service IPC Handlers
+// ============================================
+
+ipcMain.handle('representation:get-available-types', async () => {
+  try {
+    const types = representationService.getAvailableTypes();
+    console.log('[Main] Available representation types', { types });
+    return { success: true, data: types };
+  } catch (error) {
+    console.error('[Main] Error getting available types', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle(
+  'representation:transform',
+  async (_event, providerId: string, input: RepresentationInput) => {
+    try {
+      const result = await representationService.transform(providerId, input);
+      if (!result.success) {
+        return { success: false, error: result.error.message };
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in representation:transform', { providerId, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'representation:transform-to-image',
+  async (_event, input: RepresentationInput, options?: ImageTransformOptions) => {
+    try {
+      const result = await representationService.transformToImage(input, options);
+      if (!result.success) {
+        return { success: false, error: result.error.message };
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in representation:transform-to-image', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'representation:transform-to-summary',
+  async (_event, input: RepresentationInput, options?: SummaryTransformOptions) => {
+    try {
+      const result = await representationService.transformToSummary(input, options);
+      if (!result.success) {
+        return { success: false, error: result.error.message };
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in representation:transform-to-summary', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'representation:transform-to-audio',
+  async (_event, input: RepresentationInput, options?: AudioTransformOptions) => {
+    try {
+      const result = await representationService.transformToAudio(input, options);
+      if (!result.success) {
+        return { success: false, error: result.error.message };
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in representation:transform-to-audio', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('representation:get-all-providers', async () => {
+  try {
+    const providers = representationService.getAllProviders().map((p) => ({
+      providerId: p.providerId,
+      providerName: p.providerName,
+      representationType: p.representationType,
+      capabilities: p.getCapabilities(),
+    }));
+    return { success: true, data: providers };
+  } catch (error) {
+    console.error('[Main] Error getting all providers', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
@@ -337,13 +617,28 @@ app.whenReady().then(async () => {
     // Continue without worktree manager - app should still function
   }
 
+  // Initialize RepresentationService
+  try {
+    const initResult = await representationService.initialize();
+    if (initResult.success) {
+      console.log('[Main] RepresentationService initialized successfully');
+    } else {
+      console.error('[Main] Error initializing RepresentationService', initResult.error);
+    }
+  } catch (error) {
+    console.error('[Main] Error initializing RepresentationService', error);
+    // Continue without representation service - app should still function
+  }
+
   createWindow();
 });
 
 // Clean up on app quit
-app.on('will-quit', () => {
-  console.log('[Main] App quitting, closing database and worktree manager');
+app.on('will-quit', async () => {
+  console.log('[Main] App quitting, closing database, worktree manager, coding agents, and representation service');
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
+  await CodingAgentFactory.disposeAll();
+  await representationService.dispose();
 });
 

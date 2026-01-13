@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Creates an authenticated Supabase client for system admin operations.
@@ -62,7 +62,7 @@ export async function getAdminClient() {
  * ```
  */
 export async function withAdminClient<T>(
-  callback: (client: ReturnType<typeof createClient>) => Promise<T>
+  callback: (client: SupabaseClient) => Promise<T>
 ): Promise<T> {
   const client = await getAdminClient();
   try {

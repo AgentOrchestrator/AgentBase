@@ -1,6 +1,6 @@
-import React from 'react';
 import {
   TerminalAttachment,
+  BaseAttachment,
   isLinearIssueAttachment,
   isWorkspaceMetadataAttachment,
 } from './types/attachments';
@@ -88,7 +88,7 @@ export default function AttachmentHeader({ attachment, onDetailsClick }: Attachm
   // Fallback for unknown attachment types
   return (
     <div className="terminal-node-header unknown-attachment">
-      <span>Unknown attachment type: {attachment.type}</span>
+      <span>Unknown attachment type: {(attachment as BaseAttachment).type}</span>
     </div>
   );
 }

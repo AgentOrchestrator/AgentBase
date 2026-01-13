@@ -8,9 +8,11 @@ import { createClient } from '@/lib/supabase-server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { workspace_id: string } }
+  { params }: { params: Promise<{ workspace_id: string }> }
 ) {
   try {
+    const { workspace_id } = await params;
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -20,8 +22,6 @@ export async function GET(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const { workspace_id } = params;
 
     if (!workspace_id) {
       return NextResponse.json({ error: 'workspace_id is required' }, { status: 400 });

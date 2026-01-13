@@ -76,8 +76,7 @@ export function DatePicker({
             day_hidden: "invisible",
           }}
           components={{
-            IconLeft: ({ ...props }) => <CalendarIcon className="h-4 w-4" />,
-            IconRight: ({ ...props }) => <CalendarIcon className="h-4 w-4" />,
+            Chevron: () => <CalendarIcon className="h-4 w-4" />,
           }}
         />
       </PopoverContent>
