@@ -15,13 +15,16 @@ import {
   Handle,
   Position,
   useReactFlow,
+  OnConnectStartParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
 import AgentNode from './AgentNode';
+import ForkGhostNode from './ForkGhostNode';
 import './Canvas.css';
-import { agentStore } from './stores';
+import { agentStore, forkStore } from './stores';
+import { worktreeService } from './services';
 import { createDefaultAgentTitle } from './types/agent-node';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
@@ -554,6 +557,109 @@ function CanvasFlow() {
     [setEdges]
   );
 
+  // Fork handling: track when user starts dragging from a handle
+  const onConnectStart = useCallback(
+    (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
+      if (params.nodeId && params.handleType) {
+        forkStore.startDrag(params.nodeId, params.handleType);
+      }
+    },
+    []
+  );
+
+  // Create a forked node at the given position (defined before onConnectEnd to avoid hoisting issues)
+  const handleForkCreate = useCallback(
+    async (sourceNodeId: string, position: { x: number; y: number }) => {
+      // Find the source node
+      const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found for fork:', sourceNodeId);
+        return;
+      }
+
+      // Generate new IDs for the forked node
+      const newNodeId = `node-${Date.now()}`;
+      const newAgentId = `agent-${crypto.randomUUID()}`;
+      const newTerminalId = `terminal-${crypto.randomUUID()}`;
+
+      // Clone the source node data with new IDs
+      const sourceData = sourceNode.data as Record<string, unknown>;
+      const forkedData = {
+        ...sourceData,
+        agentId: newAgentId,
+        terminalId: newTerminalId,
+        title: createDefaultAgentTitle('Forked Agent'),
+      };
+
+      // Create the new forked node
+      const forkedNode: Node = {
+        id: newNodeId,
+        type: sourceNode.type,
+        position,
+        data: forkedData,
+        style: sourceNode.style,
+      };
+
+      // Create edge from source to forked node
+      const newEdgeId = `edge-${Date.now()}`;
+      const newEdge: Edge = {
+        id: newEdgeId,
+        source: sourceNodeId,
+        target: newNodeId,
+        sourceHandle: null,
+        targetHandle: null,
+      };
+
+      // Add the new node and edge
+      setNodes((nds) => [...nds, forkedNode]);
+      setEdges((eds) => [...eds, newEdge]);
+
+      // Trigger worktree creation (stub for now)
+      const workspacePath = (sourceData.workspacePath as string) || '/tmp/workspace';
+      const branchName = `fork-${Date.now()}`;
+
+      try {
+        const result = await worktreeService.createWorktree(workspacePath, branchName);
+        console.log('[Canvas] Fork created:', {
+          newNodeId,
+          edgeId: newEdgeId,
+          worktree: result,
+        });
+      } catch (error) {
+        console.error('[Canvas] Failed to create worktree:', error);
+      }
+    },
+    [nodes, setNodes, setEdges]
+  );
+
+  // Fork handling: detect when drag ends on empty canvas (not on a handle)
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const state = forkStore.getState();
+
+      if (!state.isDragging || !state.sourceNodeId) {
+        forkStore.cancelDrag();
+        return;
+      }
+
+      // Check if the drop target is a handle (normal connection) or empty canvas (fork)
+      const target = event.target as HTMLElement;
+      const isDropOnHandle = target.classList.contains('react-flow__handle');
+
+      if (!isDropOnHandle) {
+        // Dropped on canvas - create fork
+        const clientX = 'clientX' in event ? event.clientX : event.touches?.[0]?.clientX ?? 0;
+        const clientY = 'clientY' in event ? event.clientY : event.touches?.[0]?.clientY ?? 0;
+
+        const position = screenToFlowPosition({ x: clientX, y: clientY });
+        handleForkCreate(state.sourceNodeId, position);
+      }
+
+      forkStore.cancelDrag();
+    },
+    [screenToFlowPosition, handleForkCreate]
+  );
+
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({
@@ -788,6 +894,8 @@ function CanvasFlow() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={onPaneClick}
         onDragOver={handleCanvasDragOver}
@@ -803,13 +911,14 @@ function CanvasFlow() {
         panOnDrag={isNodeDragEnabled}
         zoomOnPinch={true}
         nodesDraggable={isNodeDragEnabled}
-        nodesConnectable={isNodeDragEnabled}
+        nodesConnectable={true}
         elementsSelectable={true}
         nodesFocusable={true}
       >
         <Controls />
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <ForkGhostNode />
       </ReactFlow>
       
       {contextMenu && (
