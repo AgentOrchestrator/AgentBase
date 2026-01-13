@@ -22,11 +22,17 @@ import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
 import AgentNode from './AgentNode';
 import ForkGhostNode from './ForkGhostNode';
+import ForkSessionModal from './ForkSessionModal';
 import './Canvas.css';
 import { agentStore, forkStore } from './stores';
-import { worktreeService } from './services';
+import { forkService } from './services';
 import { createDefaultAgentTitle } from './types/agent-node';
-import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
+import type { AgentNodeData } from './types/agent-node';
+import {
+  createLinearIssueAttachment,
+  createWorkspaceMetadataAttachment,
+  isWorkspaceMetadataAttachment,
+} from './types/attachments';
 import { useCanvasPersistence } from './hooks';
 
 // Custom node component
@@ -165,6 +171,14 @@ function CanvasFlow() {
   const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [selectedMilestoneId, setSelectedMilestoneId] = useState('all');
   const [selectedStatusId, setSelectedStatusId] = useState('all');
+
+  // Fork modal state
+  const [forkModalData, setForkModalData] = useState<{
+    sourceNodeId: string;
+    position: { x: number; y: number };
+  } | null>(null);
+  const [isForkLoading, setIsForkLoading] = useState(false);
+  const [forkError, setForkError] = useState<string | null>(null);
 
   // Load Linear API key from localStorage on mount
   useEffect(() => {
@@ -567,9 +581,9 @@ function CanvasFlow() {
     []
   );
 
-  // Create a forked node at the given position (defined before onConnectEnd to avoid hoisting issues)
+  // Validate and show fork modal (defined before onConnectEnd to avoid hoisting issues)
   const handleForkCreate = useCallback(
-    async (sourceNodeId: string, position: { x: number; y: number }) => {
+    (sourceNodeId: string, position: { x: number; y: number }) => {
       // Find the source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) {
@@ -577,60 +591,141 @@ function CanvasFlow() {
         return;
       }
 
-      // Generate new IDs for the forked node
-      const newNodeId = `node-${Date.now()}`;
-      const newAgentId = `agent-${crypto.randomUUID()}`;
-      const newTerminalId = `terminal-${crypto.randomUUID()}`;
+      const sourceData = sourceNode.data as AgentNodeData;
 
-      // Clone the source node data with new IDs
-      const sourceData = sourceNode.data as Record<string, unknown>;
-      const forkedData = {
-        ...sourceData,
-        agentId: newAgentId,
-        terminalId: newTerminalId,
-        title: createDefaultAgentTitle('Forked Agent'),
-      };
+      // Get workspace path from attachments
+      const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
+      const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
 
-      // Create the new forked node
-      const forkedNode: Node = {
-        id: newNodeId,
-        type: sourceNode.type,
-        position,
-        data: forkedData,
-        style: sourceNode.style,
-      };
+      // Validate requirements
+      const validation = forkService.validateForkRequest(sourceData.sessionId, workspacePath);
+      if (!validation.valid) {
+        // Show error as a toast-like notification
+        console.warn('[Canvas] Fork validation failed:', validation.error);
+        setForkError(validation.error);
+        // Auto-dismiss error after 5 seconds
+        setTimeout(() => setForkError(null), 5000);
+        return;
+      }
 
-      // Create edge from source to forked node
-      const newEdgeId = `edge-${Date.now()}`;
-      const newEdge: Edge = {
-        id: newEdgeId,
-        source: sourceNodeId,
-        target: newNodeId,
-        sourceHandle: null,
-        targetHandle: null,
-      };
+      // Show fork modal
+      setForkModalData({ sourceNodeId, position });
+      setForkError(null);
+    },
+    [nodes]
+  );
 
-      // Add the new node and edge
-      setNodes((nds) => [...nds, forkedNode]);
-      setEdges((eds) => [...eds, newEdge]);
+  // Handle fork modal confirmation
+  const handleForkConfirm = useCallback(
+    async (forkTitle: string) => {
+      if (!forkModalData) return;
 
-      // Trigger worktree creation (stub for now)
-      const workspacePath = (sourceData.workspacePath as string) || '/tmp/workspace';
-      const branchName = `fork-${Date.now()}`;
+      const sourceNode = nodes.find((n) => n.id === forkModalData.sourceNodeId);
+      if (!sourceNode) {
+        setForkError('Source node not found');
+        return;
+      }
+
+      const sourceData = sourceNode.data as AgentNodeData;
+      const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
+      const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
+
+      if (!sourceData.sessionId || !workspacePath) {
+        setForkError('Missing session or workspace');
+        return;
+      }
+
+      setIsForkLoading(true);
+      setForkError(null);
 
       try {
-        const result = await worktreeService.createWorktree(workspacePath, branchName);
-        console.log('[Canvas] Fork created:', {
-          newNodeId,
-          edgeId: newEdgeId,
-          worktree: result,
+        // Call fork service to create worktree and fork session
+        const result = await forkService.forkAgent({
+          sourceAgentId: sourceData.agentId,
+          parentSessionId: sourceData.sessionId,
+          agentType: sourceData.agentType,
+          forkTitle,
+          repoPath: workspacePath,
         });
+
+        if (!result.success) {
+          setForkError(result.error.message);
+          setIsForkLoading(false);
+          return;
+        }
+
+        // Generate new IDs for the forked node
+        const newNodeId = `node-${Date.now()}`;
+        const newAgentId = `agent-${crypto.randomUUID()}`;
+        const newTerminalId = `terminal-${crypto.randomUUID()}`;
+
+        // Create forked node data with new session and worktree info
+        const forkedData: AgentNodeData = {
+          ...sourceData,
+          agentId: newAgentId,
+          terminalId: newTerminalId,
+          title: createDefaultAgentTitle(forkTitle),
+          sessionId: result.data.sessionInfo.id,
+          parentSessionId: sourceData.sessionId,
+          worktreeId: result.data.worktreeInfo.id,
+          workingDirectory: result.data.worktreeInfo.worktreePath,
+          // Update attachments to reflect new workspace
+          attachments: [
+            ...(sourceData.attachments?.filter((a) => !isWorkspaceMetadataAttachment(a)) || []),
+            createWorkspaceMetadataAttachment({
+              path: result.data.worktreeInfo.worktreePath,
+              name: forkTitle,
+            }),
+          ],
+        };
+
+        // Create the new forked node
+        const forkedNode: Node = {
+          id: newNodeId,
+          type: sourceNode.type,
+          position: forkModalData.position,
+          data: forkedData,
+          style: sourceNode.style,
+        };
+
+        // Create edge from source to forked node
+        const newEdgeId = `edge-${Date.now()}`;
+        const newEdge: Edge = {
+          id: newEdgeId,
+          source: forkModalData.sourceNodeId,
+          target: newNodeId,
+          sourceHandle: null,
+          targetHandle: null,
+        };
+
+        // Add the new node and edge
+        setNodes((nds) => [...nds, forkedNode]);
+        setEdges((eds) => [...eds, newEdge]);
+
+        console.log('[Canvas] Fork created successfully:', {
+          newNodeId,
+          sessionId: result.data.sessionInfo.id,
+          worktreePath: result.data.worktreeInfo.worktreePath,
+        });
+
+        // Close modal
+        setForkModalData(null);
       } catch (error) {
-        console.error('[Canvas] Failed to create worktree:', error);
+        console.error('[Canvas] Fork failed:', error);
+        setForkError(error instanceof Error ? error.message : 'Fork failed');
+      } finally {
+        setIsForkLoading(false);
       }
     },
-    [nodes, setNodes, setEdges]
+    [forkModalData, nodes, setNodes, setEdges]
   );
+
+  // Handle fork modal cancellation
+  const handleForkCancel = useCallback(() => {
+    setForkModalData(null);
+    setForkError(null);
+    setIsForkLoading(false);
+  }, []);
 
   // Fork handling: detect when drag ends on empty canvas (not on a handle)
   const onConnectEnd = useCallback(
@@ -920,7 +1015,32 @@ function CanvasFlow() {
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         <ForkGhostNode />
       </ReactFlow>
-      
+
+      {/* Fork Session Modal */}
+      {forkModalData && (
+        <ForkSessionModal
+          onConfirm={handleForkConfirm}
+          onCancel={handleForkCancel}
+          isLoading={isForkLoading}
+          error={forkError}
+        />
+      )}
+
+      {/* Fork Error Toast (shown when validation fails outside modal) */}
+      {forkError && !forkModalData && (
+        <div className="fork-error-toast">
+          <span className="fork-error-icon">!</span>
+          <span className="fork-error-message">{forkError}</span>
+          <button
+            className="fork-error-dismiss"
+            onClick={() => setForkError(null)}
+            aria-label="Dismiss"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {contextMenu && (
         <div
           ref={contextMenuRef}

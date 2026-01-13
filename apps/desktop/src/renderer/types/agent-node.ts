@@ -147,6 +147,18 @@ export interface AgentNodeData {
 
   /** Current active view */
   activeView?: AgentNodeView;
+
+  /** Vendor-specific session identifier for resume/fork operations */
+  sessionId?: string;
+
+  /** Parent session ID if this agent was forked */
+  parentSessionId?: string;
+
+  /** Worktree ID if agent runs in isolated worktree */
+  worktreeId?: string;
+
+  /** Working directory path (worktree path or original repo) */
+  workingDirectory?: string;
 }
 
 // =============================================================================
