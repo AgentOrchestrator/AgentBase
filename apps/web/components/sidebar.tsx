@@ -390,7 +390,7 @@ export function Sidebar() {
           label: displayName,
           icon: member.x_github_avatar_url || member.avatar_url ? (
             <img
-              src={member.x_github_avatar_url || member.avatar_url}
+              src={member.x_github_avatar_url || member.avatar_url || undefined}
               alt={displayName}
               className="h-4 w-4 rounded-full object-cover"
             />

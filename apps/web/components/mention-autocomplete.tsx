@@ -18,7 +18,7 @@ interface MentionAutocompleteProps {
   searchQuery: string;
   position: { top: number; left: number; showAbove?: boolean };
   onClose: () => void;
-  inputRef?: React.RefObject<HTMLInputElement>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function MentionAutocomplete({

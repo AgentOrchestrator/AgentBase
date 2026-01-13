@@ -95,7 +95,7 @@ export function useCanvasPersistence(
   // Current state refs (to avoid stale closures in debounce)
   const currentNodesRef = useRef<Node[]>([]);
   const currentEdgesRef = useRef<Edge[]>([]);
-  const currentViewportRef = useRef<Viewport | undefined>();
+  const currentViewportRef = useRef<Viewport | undefined>(undefined);
   const canvasIdRef = useRef<string | null>(null);
 
   // Keep canvasIdRef in sync

@@ -5,6 +5,7 @@ import {
   Controls,
   MiniMap,
   Background,
+  BackgroundVariant,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -550,7 +551,7 @@ function CanvasFlow() {
     [setEdges]
   );
 
-  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+  const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({
       x: event.clientX,
@@ -748,7 +749,7 @@ function CanvasFlow() {
       >
         <Controls />
         <MiniMap />
-        <Background variant="dots" gap={12} size={1} />
+        <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       </ReactFlow>
       
       {contextMenu && (

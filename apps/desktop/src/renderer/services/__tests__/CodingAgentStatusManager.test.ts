@@ -9,7 +9,6 @@ import type {
   ISummaryComputer,
   IStatusPersistence,
   CodingAgentState,
-  StatusChangeListener,
 } from '../../../../types/coding-agent-status';
 
 // =============================================================================

@@ -255,9 +255,7 @@ export function ChatInterface({
             inputRef={inputRef}
           />
         </>
-      ) : (
-        console.log('[@] showMentions is false, not rendering autocomplete')
-      )}
+      ) : null}
     </div>
   );
 }

@@ -387,7 +387,6 @@ export function ChatHistoriesList({
           filters={searchFilters}
           onFiltersChange={handleFiltersChange}
           agentTypes={uniqueAgentTypes}
-          userInfoMap={allUsers}
         />
       </div>
 

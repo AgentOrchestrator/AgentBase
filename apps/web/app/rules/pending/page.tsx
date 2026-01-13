@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase-server';
 import { getRules } from '@/lib/rules/rules-queries';
 import { PendingRulesTable } from '@/components/rules/pending-rules-table';
 import { redirect } from 'next/navigation';
+import type { RuleWithApproval } from '@/lib/rules/types';
 
 export default async function PendingRulesPage() {
   // Verify authentication
@@ -21,13 +22,12 @@ export default async function PendingRulesPage() {
   }
 
   // Fetch pending rules
-  let pendingRules;
+  let pendingRules: RuleWithApproval[] = [];
   try {
     const result = await getRules({ status: 'pending', limit: 100 });
     pendingRules = result.rules;
   } catch (error) {
     console.error('Error fetching pending rules:', error);
-    pendingRules = [];
   }
 
   return (

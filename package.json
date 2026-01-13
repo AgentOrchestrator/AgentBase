@@ -4,6 +4,10 @@
   "description": "Agent Orchestrator - A multi-agent orchestration system",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
+  "overrides": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19"
+  },
   "type": "module",
   "packageManager": "npm@10.2.4",
   "workspaces": [

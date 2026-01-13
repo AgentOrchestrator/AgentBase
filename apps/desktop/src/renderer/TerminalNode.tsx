@@ -359,7 +359,7 @@ function TerminalNode({ data, id }: NodeProps) {
         // Get buffer dimensions
         try {
           selectionInfo.bufferDimensions = {
-            base: buffer.base,
+            baseY: buffer.baseY,
             length: buffer.length,
             cursorX: buffer.cursorX,
             cursorY: buffer.cursorY
@@ -473,10 +473,9 @@ function TerminalNode({ data, id }: NodeProps) {
     });
 
     // Add logging to debug selection offset
-    const xtermElement = wrapper.querySelector('.xterm');
+    const xtermElement = wrapper.querySelector('.xterm') as HTMLElement | null;
     if (xtermElement) {
       let mouseDownPos = { x: 0, y: 0 };
-      let mouseMovePos = { x: 0, y: 0 };
 
       const handleDebugMouseDown = (e: MouseEvent) => {
         mouseDownPos = { x: e.clientX, y: e.clientY };
@@ -493,8 +492,8 @@ function TerminalNode({ data, id }: NodeProps) {
         });
       };
 
-      const handleDebugMouseMove = (e: MouseEvent) => {
-        mouseMovePos = { x: e.clientX, y: e.clientY };
+      const handleDebugMouseMove = (_e: MouseEvent) => {
+        // Event captured for future debugging if needed
       };
 
       const handleDebugMouseUp = (e: MouseEvent) => {
@@ -609,7 +608,7 @@ function TerminalNode({ data, id }: NodeProps) {
               // Reset the flag to allow recreation
               terminalProcessCreatedRef.current = false;
               console.log('[TerminalNode] Restarting terminal process', { terminalId });
-              window.electronAPI.createTerminal(terminalId);
+              window.electronAPI?.createTerminal(terminalId);
               terminalProcessCreatedRef.current = true;
             }, isImmediateExit ? 1000 : 100);
           }

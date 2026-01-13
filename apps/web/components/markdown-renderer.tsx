@@ -18,31 +18,31 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
     <div className={cn('prose prose-sm max-w-none dark:prose-invert text-muted-foreground', className)}>
       <ReactMarkdown
         components={{
-          code({ node, inline, className, children, ...props }) {
+          code({ node, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : '';
-            
-                if (!inline && language) {
+            const isInline = !node?.position?.start.line || node?.position?.start.line === node?.position?.end.line && !language;
+
+                if (!isInline && language) {
                   return (
                     <SyntaxHighlighter
-                      style={theme === 'dark' ? oneDark : oneLight}
+                      style={theme === 'dark' ? oneDark : oneLight as Record<string, React.CSSProperties>}
                       language={language}
                       PreTag="div"
                       className="rounded-md"
-                      {...props}
                     >
                       {String(children).replace(/\n$/, '')}
                     </SyntaxHighlighter>
                   );
                 }
-            
+
             return (
               <code
                 className={cn(
                   'relative rounded px-[0.3rem] py-[0.2rem] text-[0.7rem] font-normal',
                   'font-[ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",Menlo,monospace]',
-                  theme === 'dark' 
-                    ? 'bg-border text-muted-foreground' 
+                  theme === 'dark'
+                    ? 'bg-border text-muted-foreground'
                     : 'bg-muted text-muted-foreground',
                   className
                 )}
