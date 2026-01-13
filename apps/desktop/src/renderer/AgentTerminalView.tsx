@@ -182,7 +182,9 @@ export default function AgentTerminalView({ terminalId }: AgentTerminalViewProps
         try {
           fitAddonRef.current?.fit();
           const dimensions = fitAddonRef.current?.proposeDimensions();
-          if (dimensions && window.electronAPI) {
+          // Validate dimensions are positive (required by node-pty)
+          // This can be 0 when terminal is hidden via display:none
+          if (dimensions && dimensions.cols > 0 && dimensions.rows > 0 && window.electronAPI) {
             if (
               !lastResizeDimensions ||
               lastResizeDimensions.cols !== dimensions.cols ||

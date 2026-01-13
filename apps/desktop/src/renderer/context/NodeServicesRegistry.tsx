@@ -36,7 +36,8 @@ export interface ServiceFactories {
     nodeId: string,
     agentId: string,
     agentType: AgentType,
-    terminalService: ITerminalService
+    terminalService: ITerminalService,
+    workspacePath?: string
   ) => IAgentService;
 }
 
@@ -135,7 +136,7 @@ export function NodeServicesRegistryProvider({
 
           const terminal = factories.createTerminalService(nodeId, terminalId);
           const workspace = factories.createWorkspaceService(nodeId, config.workspacePath);
-          const agent = factories.createAgentService(nodeId, agentId, agentType, terminal);
+          const agent = factories.createAgentService(nodeId, agentId, agentType, terminal, config.workspacePath);
 
           // Configure auto-start if specified
           if (config.autoStartCli !== undefined) {

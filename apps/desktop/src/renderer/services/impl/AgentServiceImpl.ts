@@ -39,23 +39,56 @@ export class AgentServiceImpl implements IAgentService {
   private currentStatus: CodingAgentStatusInfo | null = null;
   private autoStartEnabled = false;
   private isStarted = false;
+  private workspacePath: string | null = null;
 
   constructor(
     nodeId: string,
     agentId: string,
     agentType: AgentType,
-    terminalService: ITerminalService
+    terminalService: ITerminalService,
+    workspacePath?: string
   ) {
     this.nodeId = nodeId;
     this.agentId = agentId;
     this.agentType = agentType;
     this.terminalService = terminalService;
+    this.workspacePath = workspacePath || null;
 
     // Initialize status
     this.currentStatus = {
       status: 'idle',
       startedAt: Date.now(),
     };
+  }
+
+  /**
+   * Set workspace and navigate terminal to it.
+   * If autoStartCli is true, also starts the CLI after navigation.
+   */
+  async setWorkspace(path: string, autoStartCli?: boolean): Promise<void> {
+    this.workspacePath = path;
+
+    // Ensure terminal is created and running
+    if (!this.terminalService.isRunning()) {
+      await this.terminalService.create();
+      // Wait for shell to initialize
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    // Navigate to workspace
+    this.terminalService.write(`cd "${path}"\n`);
+
+    // Start CLI if requested and not already started
+    if (autoStartCli && !this.isStarted) {
+      // Wait for cd to complete
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const cliCommand = this.getCliCommand();
+      if (cliCommand) {
+        this.terminalService.write(`${cliCommand}\n`);
+        this.isStarted = true;
+        this.updateStatus('running');
+      }
+    }
   }
 
   /**
@@ -97,8 +130,12 @@ export class AgentServiceImpl implements IAgentService {
     // Update status
     this.updateStatus('running');
 
-    // Write command to terminal
-    this.terminalService.write(`${cliCommand}\n`);
+    // Change to workspace directory if set
+    if (this.workspacePath) {
+      this.terminalService.write(`cd "${this.workspacePath}" && ${cliCommand}\n`);
+    } else {
+      this.terminalService.write(`${cliCommand}\n`);
+    }
     this.isStarted = true;
   }
 

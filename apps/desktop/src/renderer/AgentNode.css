@@ -220,3 +220,28 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* Inherited workspace styles */
+.agent-node .workspace-header.inherited {
+  border-left: 2px solid #007acc;
+}
+
+.agent-node .inherited-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #007acc33;
+  color: #007acc;
+  border-radius: 50%;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+/* Git dirty indicator */
+.agent-node .git-dirty {
+  color: #f0ad4e;
+  margin-left: 4px;
+  font-size: 12px;
+}

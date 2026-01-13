@@ -24,6 +24,7 @@ import {
   useWorkspaceService,
   useNodeInitialized,
 } from '../../context';
+import { useWorkspaceDisplay } from '../../hooks';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -170,10 +171,11 @@ export function AgentNodePresentation({
 
   const attachments = data.attachments || [];
 
-  // Extract workspace path from attachments
-  const workspacePath = attachments
-    .filter(isWorkspaceMetadataAttachment)
-    .map((a) => a.path)[0];
+  // Use workspace display hook for live git info and inheritance detection
+  const { workspacePath, source: workspaceSource, gitInfo } = useWorkspaceDisplay(
+    data.agentId,
+    attachments
+  );
 
   return (
     <div
@@ -217,12 +219,15 @@ export function AgentNodePresentation({
               ? () => handleAttachmentClick(attachment)
               : undefined
           }
+          isInherited={isWorkspaceMetadataAttachment(attachment) && workspaceSource === 'inherited'}
+          gitInfo={isWorkspaceMetadataAttachment(attachment) ? gitInfo : undefined}
         />
       ))}
 
-      {/* Content Area */}
+      {/* Content Area - Both views are always mounted, visibility controlled via CSS */}
+      {/* This preserves terminal session state when switching between tabs */}
       <div className="agent-node-content">
-        {activeView === 'overview' ? (
+        <div style={{ display: activeView === 'overview' ? 'contents' : 'none' }}>
           <AgentOverviewView
             agentId={data.agentId}
             title={data.title}
@@ -230,12 +235,13 @@ export function AgentNodePresentation({
             status={data.status}
             statusInfo={data.statusInfo}
             progress={data.progress}
-            workspacePath={workspacePath}
+            workspacePath={workspacePath ?? undefined}
             onTitleChange={handleTitleChange}
           />
-        ) : (
+        </div>
+        <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
           <AgentTerminalView terminalId={data.terminalId} />
-        )}
+        </div>
       </div>
 
       <Handle type="source" position={Position.Bottom} />

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as pty from 'node-pty';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -10,6 +10,7 @@ import { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import {
   CodingAgentFactory,
   isSessionResumable,
@@ -121,9 +122,9 @@ const createWindow = (): void => {
     terminalCreationTimes.set(terminalId, callTime);
 
     const shell = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash';
-    // Don't use -i (interactive) or -l (login) flags as they can cause immediate exits
-    // Just spawn the shell normally - node-pty handles the TTY connection
-    const shellArgs: string[] = [];
+    // Use login shell (-l) to ensure user's PATH is loaded from shell profile
+    // This is needed for commands like 'claude' that are installed in user-specific locations
+    const shellArgs: string[] = process.platform === 'win32' ? [] : ['-l'];
 
     const ptyProcess = pty.spawn(
       shell,
@@ -185,13 +186,18 @@ const createWindow = (): void => {
   ipcMain.on('terminal-resize', (_event, { terminalId, cols, rows }: { terminalId: string; cols: number; rows: number }) => {
     const ptyProcess = terminalProcesses.get(terminalId);
     if (ptyProcess) {
+      // Validate dimensions are positive (node-pty requires this)
+      if (cols <= 0 || rows <= 0) {
+        return;
+      }
+
       // Only log resize if it's been more than 2000ms since last log OR dimensions changed significantly (>5 cols or >1 row)
       const lastLog = lastResizeLog[terminalId];
       const now = Date.now();
       const dimensionChanged = !lastLog || lastLog.cols !== cols || lastLog.rows !== rows;
       const significantChange = lastLog && (Math.abs(lastLog.cols - cols) > 5 || Math.abs(lastLog.rows - rows) > 1);
       const timeThreshold = !lastLog || (now - lastLog.time > 2000);
-      
+
       if (timeThreshold || (dimensionChanged && significantChange)) {
         console.log('[Main] Terminal resize', { terminalId, cols, rows });
         lastResizeLog[terminalId] = { cols, rows, time: now };
@@ -718,6 +724,127 @@ ipcMain.handle('shell:show-in-folder', async (_event, filePath: string) => {
     return { success: true };
   } catch (error) {
     console.error('[Main] Error showing in folder', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('shell:open-directory-dialog', async (_event, options?: { title?: string; defaultPath?: string }) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: options?.title || 'Select Directory',
+      defaultPath: options?.defaultPath || process.env.HOME,
+      properties: ['openDirectory', 'createDirectory'],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, data: null };
+    }
+
+    return { success: true, data: result.filePaths[0] };
+  } catch (error) {
+    console.error('[Main] Error opening directory dialog', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// ============================================================================
+// Git API handlers
+// ============================================================================
+
+// Helper to run git commands
+function runGitCommand(cwd: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const git = spawn('git', args, { cwd });
+    let stdout = '';
+    let stderr = '';
+
+    git.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    git.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    git.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(stderr.trim() || `git command failed with code ${code}`));
+      }
+    });
+
+    git.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+ipcMain.handle('git:get-info', async (_event, workspacePath: string): Promise<{ success: boolean; data?: GitInfo; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Get current branch
+    let branch: string;
+    try {
+      branch = await runGitCommand(workspacePath, ['rev-parse', '--abbrev-ref', 'HEAD']);
+    } catch {
+      // Not a git repo or detached HEAD
+      return { success: false, error: 'Not a git repository' };
+    }
+
+    // Get remote (if any)
+    let remote: string | undefined;
+    try {
+      remote = await runGitCommand(workspacePath, ['config', '--get', `branch.${branch}.remote`]);
+    } catch {
+      // No remote configured
+      remote = undefined;
+    }
+
+    // Get status (clean/dirty)
+    let status: 'clean' | 'dirty' | 'unknown' = 'unknown';
+    try {
+      const statusOutput = await runGitCommand(workspacePath, ['status', '--porcelain']);
+      status = statusOutput.length === 0 ? 'clean' : 'dirty';
+    } catch {
+      status = 'unknown';
+    }
+
+    // Get ahead/behind counts
+    let ahead = 0;
+    let behind = 0;
+    if (remote) {
+      try {
+        const revList = await runGitCommand(workspacePath, [
+          'rev-list',
+          '--left-right',
+          '--count',
+          `${remote}/${branch}...HEAD`,
+        ]);
+        const [behindStr, aheadStr] = revList.split('\t');
+        behind = parseInt(behindStr, 10) || 0;
+        ahead = parseInt(aheadStr, 10) || 0;
+      } catch {
+        // Remote branch might not exist
+      }
+    }
+
+    const gitInfo: GitInfo = {
+      branch,
+      remote,
+      status,
+      ahead,
+      behind,
+    };
+
+    console.log('[Main] Git info retrieved', { workspacePath, gitInfo });
+    return { success: true, data: gitInfo };
+  } catch (error) {
+    console.error('[Main] Error getting git info', { workspacePath, error });
     return { success: false, error: (error as Error).message };
   }
 });

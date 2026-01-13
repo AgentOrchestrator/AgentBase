@@ -62,12 +62,29 @@ export interface CustomNodeData {
   [key: string]: unknown;
 }
 
-export type NodeData = TerminalNodeData | WorkspaceNodeData | CustomNodeData;
+// Agent node data (mirrors renderer/types/agent-node.ts)
+export interface AgentNodeData {
+  agentId: string;
+  terminalId: string;
+  agentType: string;
+  status: string;
+  statusInfo?: Record<string, unknown>;
+  title: {
+    value: string;
+    isManuallySet: boolean;
+  };
+  summary: string | null;
+  progress: Record<string, unknown> | null;
+  attachments?: TerminalAttachment[];
+  activeView?: 'overview' | 'terminal';
+}
+
+export type NodeData = TerminalNodeData | WorkspaceNodeData | CustomNodeData | AgentNodeData;
 
 // Canvas node definition
 export interface CanvasNode {
   id: string;
-  type: 'custom' | 'terminal' | 'workspace';
+  type: 'custom' | 'terminal' | 'workspace' | 'agent';
   position: {
     x: number;
     y: number;

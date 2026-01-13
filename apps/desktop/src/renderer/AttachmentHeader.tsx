@@ -4,10 +4,15 @@ import {
   isLinearIssueAttachment,
   isWorkspaceMetadataAttachment,
 } from './types/attachments';
+import type { GitInfo } from '../main/preload';
 
 interface AttachmentHeaderProps {
   attachment: TerminalAttachment;
   onDetailsClick?: () => void;
+  /** Whether this workspace is inherited from a parent node */
+  isInherited?: boolean;
+  /** Live git info (overrides attachment.git if provided) */
+  gitInfo?: GitInfo | null;
 }
 
 /**
@@ -47,20 +52,32 @@ function LinearIssueHeader({ attachment, onDetailsClick }: {
 /**
  * Renders a workspace metadata attachment in the terminal header
  */
-function WorkspaceMetadataHeader({ attachment }: {
+function WorkspaceMetadataHeader({ attachment, isInherited, gitInfo }: {
   attachment: Extract<TerminalAttachment, { type: 'workspace-metadata' }>;
+  isInherited?: boolean;
+  gitInfo?: GitInfo | null;
 }) {
+  // Use live gitInfo if provided, otherwise fall back to attachment.git
+  const branch = gitInfo?.branch || attachment.git?.branch;
+  const status = gitInfo?.status;
+
   return (
-    <div className="terminal-node-header workspace-header">
+    <div className={`terminal-node-header workspace-header ${isInherited ? 'inherited' : ''}`}>
       <div className="workspace-info">
         <span className="workspace-icon">📁</span>
         <span className="workspace-name">
           {attachment.name || attachment.path.split('/').pop() || 'Workspace'}
         </span>
-        {attachment.git?.branch && (
+        {isInherited && (
+          <span className="inherited-badge" title="Inherited from parent workspace">↑</span>
+        )}
+        {branch && (
           <span className="git-branch">
             <span className="git-icon">🌿</span>
-            {attachment.git.branch}
+            {branch}
+            {status === 'dirty' && (
+              <span className="git-dirty" title="Uncommitted changes">●</span>
+            )}
           </span>
         )}
       </div>
@@ -76,13 +93,13 @@ function WorkspaceMetadataHeader({ attachment }: {
 /**
  * Main attachment header component that renders the appropriate header based on attachment type
  */
-export default function AttachmentHeader({ attachment, onDetailsClick }: AttachmentHeaderProps) {
+export default function AttachmentHeader({ attachment, onDetailsClick, isInherited, gitInfo }: AttachmentHeaderProps) {
   if (isLinearIssueAttachment(attachment)) {
     return <LinearIssueHeader attachment={attachment} onDetailsClick={onDetailsClick} />;
   }
 
   if (isWorkspaceMetadataAttachment(attachment)) {
-    return <WorkspaceMetadataHeader attachment={attachment} />;
+    return <WorkspaceMetadataHeader attachment={attachment} isInherited={isInherited} gitInfo={gitInfo} />;
   }
 
   // Fallback for unknown attachment types
