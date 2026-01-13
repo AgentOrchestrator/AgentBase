@@ -1,6 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import InteractiveMarkdown from './InteractiveMarkdown';
 import './IssueDetailsModal.css';
 

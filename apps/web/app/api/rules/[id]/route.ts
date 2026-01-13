@@ -7,8 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { updateRule, getRuleById } from '@/lib/rules/rules-queries';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
+
     // Verify authentication
     const supabase = await createClient();
     const {
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rule = await getRuleById(params.id);
+    const rule = await getRuleById(id);
     return NextResponse.json(rule);
   } catch (error) {
     console.error('Error fetching rule:', error);
@@ -31,8 +33,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
+
     // Verify authentication
     const supabase = await createClient();
     const {
@@ -56,9 +60,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (rule_text) updates.rule_text = rule_text;
     if (rule_category) updates.rule_category = rule_category;
 
-    await updateRule(params.id, updates);
+    await updateRule(id, updates);
 
-    return NextResponse.json({ success: true, rule_id: params.id });
+    return NextResponse.json({ success: true, rule_id: id });
   } catch (error) {
     console.error('Error updating rule:', error);
     return NextResponse.json(

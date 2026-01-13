@@ -7,8 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { approveRule, rejectRule, updateRuleStatus } from '@/lib/rules/rules-queries';
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
+
     // Verify authentication
     const supabase = await createClient();
     const {
@@ -35,20 +37,20 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     // Use helper functions for approve/reject
     if (status === 'approved') {
-      await approveRule(params.id, user.id, notes);
+      await approveRule(id, user.id, notes);
     } else if (status === 'rejected') {
       if (!reason) {
         return NextResponse.json({ error: 'Rejection reason is required' }, { status: 400 });
       }
-      await rejectRule(params.id, user.id, reason, notes);
+      await rejectRule(id, user.id, reason, notes);
     } else {
       // For other statuses, use generic update
-      await updateRuleStatus(params.id, user.id, status, reason, notes);
+      await updateRuleStatus(id, user.id, status, reason, notes);
     }
 
     return NextResponse.json({
       success: true,
-      rule_id: params.id,
+      rule_id: id,
       new_status: status,
     });
   } catch (error) {

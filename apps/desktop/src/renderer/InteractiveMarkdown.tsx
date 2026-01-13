@@ -47,7 +47,7 @@ function InteractiveMarkdown({ content, onContentChange, className }: Interactiv
   };
 
   // Custom checkbox component that intercepts clicks
-  const CustomCheckbox = ({ checked, ...props }: any) => {
+  const CustomCheckbox = ({ checked }: { checked?: boolean }) => {
     const handleClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();

@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform members to workspace member format with recent conversations
-    const workspaceMembers: WorkspaceMember[] = await Promise.all(
-      members.map(async (member) => {
+    const workspaceMembersPromises = await Promise.all(
+      members.map(async (member): Promise<WorkspaceMember | null> => {
         const userDetails = users?.find(u => u.id === member.user_id);
 
         if (!userDetails) {
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Filter out null values (users that weren't found)
-    const filteredMembers = workspaceMembers.filter(m => m !== null) as WorkspaceMember[];
+    const filteredMembers = workspaceMembersPromises.filter((m): m is WorkspaceMember => m !== null);
 
     return NextResponse.json({ workspaceMembers: filteredMembers });
   } catch (error) {
