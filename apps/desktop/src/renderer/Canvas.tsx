@@ -140,7 +140,6 @@ function CanvasFlow() {
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
-  const terminalCounterRef = useRef(1);
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [linearApiKey, setLinearApiKey] = useState('');
@@ -510,7 +509,7 @@ function CanvasFlow() {
         y: e.clientY,
       });
 
-      const terminalId = `terminal-${terminalCounterRef.current++}`;
+      const terminalId = `terminal-${crypto.randomUUID()}`;
 
       // Create attachment based on type
       let attachment;
@@ -583,7 +582,7 @@ function CanvasFlow() {
       });
     }
 
-    const terminalId = `terminal-${terminalCounterRef.current++}`;
+    const terminalId = `terminal-${crypto.randomUUID()}`;
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type: 'terminal',
