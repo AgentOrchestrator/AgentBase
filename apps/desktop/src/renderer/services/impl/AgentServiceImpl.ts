@@ -39,23 +39,33 @@ export class AgentServiceImpl implements IAgentService {
   private currentStatus: CodingAgentStatusInfo | null = null;
   private autoStartEnabled = false;
   private isStarted = false;
+  private workspacePath: string | null = null;
 
   constructor(
     nodeId: string,
     agentId: string,
     agentType: AgentType,
-    terminalService: ITerminalService
+    terminalService: ITerminalService,
+    workspacePath?: string
   ) {
     this.nodeId = nodeId;
     this.agentId = agentId;
     this.agentType = agentType;
     this.terminalService = terminalService;
+    this.workspacePath = workspacePath || null;
 
     // Initialize status
     this.currentStatus = {
       status: 'idle',
       startedAt: Date.now(),
     };
+  }
+
+  /**
+   * Set the workspace path for the agent
+   */
+  setWorkspacePath(path: string): void {
+    this.workspacePath = path;
   }
 
   /**
@@ -97,8 +107,12 @@ export class AgentServiceImpl implements IAgentService {
     // Update status
     this.updateStatus('running');
 
-    // Write command to terminal
-    this.terminalService.write(`${cliCommand}\n`);
+    // Change to workspace directory if set
+    if (this.workspacePath) {
+      this.terminalService.write(`cd "${this.workspacePath}" && ${cliCommand}\n`);
+    } else {
+      this.terminalService.write(`${cliCommand}\n`);
+    }
     this.isStarted = true;
   }
 

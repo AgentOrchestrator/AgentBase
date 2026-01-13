@@ -11,6 +11,9 @@ import type { AgentNodeData } from '../../types/agent-node';
 import { NodeContextProvider } from '../../context';
 import { agentStore } from '../../stores';
 import { AgentNodePresentation } from './AgentNodePresentation';
+import { useWorkspaceInheritance } from '../../hooks';
+import { WorkspaceSelectionModal } from '../../components/WorkspaceSelectionModal';
+import { createWorkspaceMetadataAttachment } from '../../types/attachments';
 
 /**
  * AgentNode
@@ -25,6 +28,13 @@ function AgentNode({ data, id }: NodeProps) {
 
   // Subscribe to store updates for this agent
   const [agentData, setAgentData] = useState<AgentNodeData>(nodeData);
+
+  // Workspace selection modal state
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+
+  // Get inherited workspace from parent nodes
+  const { inheritedWorkspacePath } = useWorkspaceInheritance(id);
 
   useEffect(() => {
     // Try to get data from store first
@@ -59,10 +69,63 @@ function AgentNode({ data, id }: NodeProps) {
     [id, agentData]
   );
 
-  // Extract workspace path from attachments for context config
-  const workspacePath = agentData.attachments
+  // Extract workspace path from attachments
+  const attachmentWorkspacePath = agentData.attachments
     ?.filter((a) => a.type === 'workspace-metadata')
     .map((a) => (a as { path: string }).path)[0];
+
+  // Determine final workspace path (priority: attachment > selected > inherited)
+  const workspacePath = attachmentWorkspacePath || selectedWorkspace || inheritedWorkspacePath;
+
+  // Show modal if no workspace is available
+  useEffect(() => {
+    if (!workspacePath && !showWorkspaceModal) {
+      setShowWorkspaceModal(true);
+    }
+  }, [workspacePath, showWorkspaceModal]);
+
+  // Handler for workspace selection
+  const handleWorkspaceSelect = (path: string) => {
+    setSelectedWorkspace(path);
+    setShowWorkspaceModal(false);
+
+    // Create workspace attachment and update node data
+    const workspaceAttachment = createWorkspaceMetadataAttachment({
+      path,
+      name: path.split('/').pop() || 'Workspace',
+    });
+
+    const currentAttachments = agentData.attachments || [];
+    const updatedData = {
+      ...agentData,
+      attachments: [...currentAttachments, workspaceAttachment],
+    };
+
+    setAgentData(updatedData);
+
+    // Notify canvas of changes
+    window.dispatchEvent(
+      new CustomEvent('update-node', {
+        detail: { nodeId: id, data: updatedData },
+      })
+    );
+  };
+
+  const handleWorkspaceCancel = () => {
+    // Close modal - node will remain without workspace
+    setShowWorkspaceModal(false);
+  };
+
+  // If no workspace, show modal instead of node content
+  if (!workspacePath) {
+    return (
+      <WorkspaceSelectionModal
+        isOpen={showWorkspaceModal}
+        onSelect={handleWorkspaceSelect}
+        onCancel={handleWorkspaceCancel}
+      />
+    );
+  }
 
   return (
     <NodeContextProvider

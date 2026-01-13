@@ -105,7 +105,8 @@ function createMockAgentService(
   nodeId: string,
   agentId: string,
   agentType: AgentType,
-  _terminalService: ITerminalService
+  _terminalService: ITerminalService,
+  _workspacePath?: string
 ): IAgentService {
   let autoStart = false;
   let currentStatus: CodingAgentStatusInfo = {

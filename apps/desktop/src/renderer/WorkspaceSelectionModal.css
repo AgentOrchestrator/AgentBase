@@ -1,0 +1,145 @@
+.workspace-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.workspace-modal {
+  background: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #3c3c3c;
+  width: 400px;
+  max-width: 90vw;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.workspace-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.workspace-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.workspace-modal-header .close-button {
+  background: none;
+  border: none;
+  color: #808080;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-modal-header .close-button:hover {
+  color: #e0e0e0;
+}
+
+.workspace-modal-content {
+  padding: 16px;
+}
+
+.workspace-modal-content p {
+  margin: 0 0 16px 0;
+  color: #a0a0a0;
+  font-size: 14px;
+}
+
+.workspace-path-input {
+  display: flex;
+  gap: 8px;
+}
+
+.workspace-path-input input {
+  flex: 1;
+  padding: 8px 12px;
+  background: #2d2d2d;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.workspace-path-input input:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.workspace-path-input button {
+  padding: 8px 16px;
+  background: #3c3c3c;
+  border: 1px solid #4c4c4c;
+  border-radius: 4px;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.workspace-path-input button:hover:not(:disabled) {
+  background: #4c4c4c;
+}
+
+.workspace-path-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workspace-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid #3c3c3c;
+}
+
+.workspace-modal-footer button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.workspace-modal-footer .cancel-button {
+  background: transparent;
+  border: 1px solid #3c3c3c;
+  color: #a0a0a0;
+}
+
+.workspace-modal-footer .cancel-button:hover {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.workspace-modal-footer .confirm-button {
+  background: #007acc;
+  border: 1px solid #007acc;
+  color: white;
+}
+
+.workspace-modal-footer .confirm-button:hover:not(:disabled) {
+  background: #005a9e;
+}
+
+.workspace-modal-footer .confirm-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

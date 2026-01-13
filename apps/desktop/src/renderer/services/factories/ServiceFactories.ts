@@ -29,9 +29,10 @@ export function createServiceFactories(): ServiceFactories {
       nodeId: string,
       agentId: string,
       agentType: AgentType,
-      terminalService: ITerminalService
+      terminalService: ITerminalService,
+      workspacePath?: string
     ) => {
-      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService);
+      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, workspacePath);
     },
   };
 }
