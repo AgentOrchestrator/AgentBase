@@ -21,6 +21,16 @@
   box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
 }
 
+/* Hide React Flow's default selection border/outline and resize handles */
+.react-flow__node.userMessage.react-flow__node-selected {
+  outline: none !important;
+  border: none !important;
+}
+
+.react-flow__node.userMessage .react-flow__resize-control {
+  display: none !important;
+}
+
 .user-message-header {
   display: flex;
   justify-content: space-between;

@@ -21,7 +21,8 @@ export function conversationToNodesAndEdges(
   let currentY = startY;
   const fixedX = startX; // All nodes in the same column
 
-  for (const group of groups) {
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
     // Store position - all nodes in the same column
     nodePositions.set(group.uuid, { x: fixedX, y: currentY });
 
@@ -47,13 +48,15 @@ export function conversationToNodesAndEdges(
 
     nodes.push(node);
 
-    // Create edge to parent if exists
-    if (group.parentUuid && uuidMap.has(group.parentUuid)) {
+    // Create sequential edge from previous node to current node
+    // This ensures all messages in the conversation are connected in order
+    if (i > 0) {
+      const previousGroup = groups[i - 1];
       edges.push({
-        id: `edge-${group.parentUuid}-${group.uuid}`,
-        source: group.parentUuid,
+        id: `edge-${previousGroup.uuid}-${group.uuid}`,
+        source: previousGroup.uuid,
         target: group.uuid,
-        type: 'smoothstep',
+        type: 'smooth',
         animated: false,
         style: { stroke: '#4a5568', strokeWidth: 2 },
       });

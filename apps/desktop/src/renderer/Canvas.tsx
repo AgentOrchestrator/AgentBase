@@ -128,7 +128,7 @@ function CanvasFlow() {
 
     const loadDebugConversation = async () => {
       try {
-        const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/4d1822da-3c76-4691-adff-b1a3a5a8d336.jsonl';
+        const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/99f3429d-0826-4dce-82c5-1501c34fb004.jsonl';
         
         // Use Electron IPC to read the file
         if (!(window as any).fileAPI) {

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
+import { Handle, Position, NodeProps } from '@xyflow/react';
 import type { AssistantMessageGroup, MessageContent } from '../types/conversation';
 import './AssistantMessageNode.css';
 
@@ -11,6 +11,21 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
   const nodeData = data as unknown as AssistantMessageNodeData;
   const { messageGroup } = nodeData;
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on mount and when content changes
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+
+    // Use setTimeout to ensure DOM has updated
+    const scrollToBottom = () => {
+      contentElement.scrollTop = contentElement.scrollHeight;
+    };
+
+    // Small delay to ensure content is rendered
+    const timeoutId = setTimeout(scrollToBottom, 0);
+    return () => clearTimeout(timeoutId);
+  }, [messageGroup.entries]);
 
   // Handle scroll events when node is selected
   useEffect(() => {
@@ -45,7 +60,6 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
 
   return (
     <div className={`assistant-message-node ${selected ? 'selected' : ''}`}>
-      <NodeResizer minWidth={300} minHeight={150} />
       <Handle type="target" position={Position.Top} />
       
       <div className="assistant-message-header">

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
+import { Handle, Position, NodeProps } from '@xyflow/react';
 import type { UserMessageGroup } from '../types/conversation';
 import './UserMessageNode.css';
 
@@ -31,7 +31,6 @@ function UserMessageNode({ data, id, selected }: NodeProps) {
 
   return (
     <div className={`user-message-node ${selected ? 'selected' : ''}`}>
-      <NodeResizer minWidth={200} minHeight={100} />
       <Handle type="target" position={Position.Top} />
       
       <div className="user-message-header">

@@ -21,6 +21,16 @@
   box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
 }
 
+/* Hide React Flow's default selection border/outline and resize handles */
+.react-flow__node.assistantMessage.react-flow__node-selected {
+  outline: none !important;
+  border: none !important;
+}
+
+.react-flow__node.assistantMessage .react-flow__resize-control {
+  display: none !important;
+}
+
 .assistant-message-header {
   display: flex;
   justify-content: space-between;
@@ -88,8 +98,8 @@
 }
 
 .assistant-entry {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #1e293b;
 }
 
@@ -100,7 +110,7 @@
 }
 
 .assistant-text-content {
-  margin-bottom: 12px;
+  margin-bottom: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
 }
