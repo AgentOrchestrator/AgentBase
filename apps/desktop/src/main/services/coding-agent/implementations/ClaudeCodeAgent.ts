@@ -130,6 +130,7 @@ export class ClaudeCodeAgent
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: request.workingDirectory,
       timeout: request.timeout,
+      stdinInput: request.prompt, // Claude CLI expects prompt via stdin in --print mode
     });
 
     if (spawnResult.success === false) {
@@ -152,6 +153,7 @@ export class ClaudeCodeAgent
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: request.workingDirectory,
       timeout: request.timeout,
+      stdinInput: request.prompt, // Claude CLI expects prompt via stdin in --print mode
     });
 
     if (spawnResult.success === false) {
@@ -162,7 +164,8 @@ export class ClaudeCodeAgent
   }
 
   private buildGenerateArgs(request: GenerateRequest): string[] {
-    const args: string[] = ['-p', request.prompt];
+    // Use --print flag for non-interactive mode; prompt is sent via stdin
+    const args: string[] = ['-p'];
 
     if (request.systemPrompt) {
       args.push('--append-system-prompt', request.systemPrompt);
@@ -185,10 +188,11 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const args = this.buildContinueArgs(identifier, prompt);
+    const args = this.buildContinueArgs(identifier);
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: options?.workingDirectory,
       timeout: options?.timeout,
+      stdinInput: prompt, // Claude CLI expects prompt via stdin
     });
 
     if (spawnResult.success === false) {
@@ -209,10 +213,11 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const args = this.buildContinueArgs(identifier, prompt);
+    const args = this.buildContinueArgs(identifier);
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: options?.workingDirectory,
       timeout: options?.timeout,
+      stdinInput: prompt, // Claude CLI expects prompt via stdin
     });
 
     if (spawnResult.success === false) {
@@ -222,8 +227,9 @@ export class ClaudeCodeAgent
     return this.streamOutput(spawnResult.data, onChunk, options?.timeout);
   }
 
-  private buildContinueArgs(identifier: SessionIdentifier, prompt: string): string[] {
-    const args: string[] = [];
+  private buildContinueArgs(identifier: SessionIdentifier): string[] {
+    // Use --print flag; prompt is sent via stdin
+    const args: string[] = ['-p'];
 
     switch (identifier.type) {
       case 'latest':
@@ -235,7 +241,6 @@ export class ClaudeCodeAgent
         break;
     }
 
-    args.push('-p', prompt);
     return args;
   }
 
