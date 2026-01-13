@@ -19,6 +19,11 @@ import type {
   ForkOptions,
   ContinueOptions,
 } from './services/coding-agent';
+import {
+  LLMServiceFactory,
+  registerLLMIpcHandlers,
+  DEFAULT_LLM_CONFIG,
+} from './services/llm';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
@@ -494,14 +499,26 @@ app.whenReady().then(async () => {
     // Continue without worktree manager - app should still function
   }
 
+  // Initialize LLM Service
+  try {
+    LLMServiceFactory.configure(DEFAULT_LLM_CONFIG);
+    await LLMServiceFactory.getService();
+    registerLLMIpcHandlers();
+    console.log('[Main] LLM Service initialized successfully');
+  } catch (error) {
+    console.error('[Main] Error initializing LLM Service', error);
+    // Continue without LLM service - app should still function
+  }
+
   createWindow();
 });
 
 // Clean up on app quit
 app.on('will-quit', async () => {
-  console.log('[Main] App quitting, closing database, worktree manager, and coding agents');
+  console.log('[Main] App quitting, closing database, worktree manager, coding agents, and LLM service');
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
   await CodingAgentFactory.disposeAll();
+  await LLMServiceFactory.dispose();
 });
 

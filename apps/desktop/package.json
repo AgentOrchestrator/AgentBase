@@ -33,7 +33,12 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.40",
+    "@ai-sdk/google": "^2.0.26",
+    "@ai-sdk/openai": "^2.0.59",
     "@types/sqlite3": "^3.1.11",
+    "ai": "^5.0.86",
+    "keytar": "^7.9.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
@@ -43,6 +48,7 @@
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "zod": "^3.23.0"
   }
 }
