@@ -10,6 +10,7 @@ import { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import {
   CodingAgentFactory,
   isSessionResumable,
@@ -749,14 +750,6 @@ ipcMain.handle('shell:open-directory-dialog', async (_event, options?: { title?:
 // ============================================================================
 // Git API handlers
 // ============================================================================
-
-interface GitInfo {
-  branch: string;
-  remote?: string;
-  status: 'clean' | 'dirty' | 'unknown';
-  ahead: number;
-  behind: number;
-}
 
 // Helper to run git commands
 function runGitCommand(cwd: string, args: string[]): Promise<string> {

@@ -12,6 +12,10 @@ import type {
   CodingAgentStatusInfo,
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
+
+// Re-export for consumers
+export type { GitInfo };
 
 // =============================================================================
 // Node Types
@@ -81,17 +85,6 @@ export interface ITerminalService extends INodeService {
 // =============================================================================
 // Workspace Service
 // =============================================================================
-
-/**
- * Git repository information
- */
-export interface GitInfo {
-  branch: string;
-  remote?: string;
-  status: 'clean' | 'dirty' | 'unknown';
-  ahead: number;
-  behind: number;
-}
 
 /**
  * Workspace service - manages workspace metadata and worktrees.

@@ -77,7 +77,7 @@ function AgentNode({ data, id }: NodeProps) {
   // Determine final workspace path (priority: attachment > selected > inherited)
   const workspacePath = attachmentWorkspacePath || selectedWorkspace || inheritedWorkspacePath;
 
-  // Show modal if no workspace is available
+  // Show modal if no workspace is available (auto-open on mount)
   useEffect(() => {
     if (!workspacePath && !showWorkspaceModal) {
       setShowWorkspaceModal(true);
@@ -116,17 +116,8 @@ function AgentNode({ data, id }: NodeProps) {
     setShowWorkspaceModal(false);
   };
 
-  // If no workspace, show modal instead of node content
-  if (!workspacePath) {
-    return (
-      <WorkspaceSelectionModal
-        isOpen={showWorkspaceModal}
-        onSelect={handleWorkspaceSelect}
-        onCancel={handleWorkspaceCancel}
-      />
-    );
-  }
-
+  // Always render the node structure - modal is overlaid when needed
+  // Only auto-start CLI when workspace is available
   return (
     <NodeContextProvider
       nodeId={id}
@@ -135,11 +126,17 @@ function AgentNode({ data, id }: NodeProps) {
       agentId={agentData.agentId}
       agentType={agentData.agentType}
       workspacePath={workspacePath}
-      autoStartCli={true}
+      autoStartCli={!!workspacePath}
     >
       <AgentNodePresentation
         data={agentData}
         onDataChange={handleDataChange}
+      />
+      {/* Modal overlay - rendered inside node to maintain React tree */}
+      <WorkspaceSelectionModal
+        isOpen={showWorkspaceModal && !workspacePath}
+        onSelect={handleWorkspaceSelect}
+        onCancel={handleWorkspaceCancel}
       />
     </NodeContextProvider>
   );

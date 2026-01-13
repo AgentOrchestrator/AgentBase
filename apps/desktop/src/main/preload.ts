@@ -6,6 +6,7 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
   AgentCapabilities,
@@ -459,13 +460,8 @@ contextBridge.exposeInMainWorld('shellAPI', {
 } as ShellAPI);
 
 // Git info types
-export interface GitInfo {
-  branch: string;
-  remote?: string;
-  status: 'clean' | 'dirty' | 'unknown';
-  ahead: number;
-  behind: number;
-}
+// Re-export GitInfo from shared package for backward compatibility
+export type { GitInfo } from '@agent-orchestrator/shared';
 
 // Type definitions for the git API
 export interface GitAPI {
