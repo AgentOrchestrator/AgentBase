@@ -326,6 +326,20 @@ ipcMain.handle(
   }
 );
 
+// File reading API for debug mode
+ipcMain.handle('file:read', async (_event, filePath: string) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: `File does not exist: ${filePath}` };
+    }
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return { success: true, data: content };
+  } catch (error: any) {
+    console.error('[Main] Error reading file', { error, filePath });
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+});
+
 ipcMain.handle('agent-status:load', async (_event, agentId: string) => {
   try {
     const state = await database.loadAgentStatus(agentId);
@@ -499,6 +513,100 @@ ipcMain.handle(
       return { success: true, data: available };
     } catch (error) {
       console.error('[Main] Error checking agent availability', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+// Streaming generation handler
+ipcMain.handle(
+  'coding-agent:generate-streaming',
+  async (
+    event,
+    requestId: string,
+    agentType: CodingAgentType,
+    request: GenerateRequest
+  ) => {
+    const startTime = Date.now();
+    let chunksSent = 0;
+    let totalBytesSent = 0;
+
+    console.log('[Main] Starting streaming generation', {
+      requestId,
+      agentType,
+      promptPreview: request.prompt.slice(0, 100),
+      promptLength: request.prompt.length,
+      workingDirectory: request.workingDirectory,
+      timeout: request.timeout,
+    });
+
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        console.error('[Main] Error getting coding agent', {
+          requestId,
+          agentType,
+          error: agentResult.error,
+        });
+        return { success: false, error: agentResult.error.message };
+      }
+
+      console.log('[Main] Agent acquired, starting generation', {
+        requestId,
+        agentType,
+        timeSinceStart: `${Date.now() - startTime}ms`,
+      });
+
+      const result = await agentResult.data.generateStreaming(request, (chunk: string) => {
+        chunksSent++;
+        totalBytesSent += chunk.length;
+
+        if (chunksSent === 1) {
+          console.log('[Main] First chunk received from agent', {
+            requestId,
+            chunkLength: chunk.length,
+            timeSinceStart: `${Date.now() - startTime}ms`,
+          });
+        }
+
+        // Send chunk to renderer
+        event.sender.send('coding-agent:stream-chunk', { requestId, chunk });
+      });
+
+      const duration = Date.now() - startTime;
+
+      if (result.success === false) {
+        console.error('[Main] Error generating streaming response', {
+          requestId,
+          agentType,
+          error: result.error,
+          durationMs: duration,
+          chunksSent,
+          totalBytesSent,
+        });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Streaming generation complete', {
+        requestId,
+        agentType,
+        contentLength: result.data.content.length,
+        durationMs: duration,
+        chunksSent,
+        totalBytesSent,
+      });
+      return { success: true, data: result.data };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error('[Main] Error in coding-agent:generate-streaming', {
+        requestId,
+        agentType,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        durationMs: duration,
+        chunksSent,
+        totalBytesSent,
+      });
       return { success: false, error: (error as Error).message };
     }
   }

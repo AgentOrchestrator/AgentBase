@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import * as crypto from 'crypto';
 import type { CanvasState, CanvasMetadata } from './types/database';
 import type {
   WorktreeInfo,
@@ -130,6 +131,13 @@ export interface CodingAgentAPI {
     request: GenerateRequest
   ) => Promise<GenerateResponse>;
 
+  /** Generate a response with streaming */
+  generateStreaming: (
+    agentType: CodingAgentType,
+    request: GenerateRequest,
+    onChunk: (chunk: string) => void
+  ) => Promise<GenerateResponse>;
+
   /** Continue an existing session */
   continueSession: (
     agentType: CodingAgentType,
@@ -153,6 +161,11 @@ export interface CodingAgentAPI {
 
   /** Check if a specific agent is available */
   isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
+
+  /** Subscribe to stream chunks */
+  onStreamChunk: (
+    callback: (data: { requestId: string; chunk: string }) => void
+  ) => () => void;
 }
 
 // Type definitions for provider info returned by the API
@@ -298,6 +311,33 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
       ipcRenderer.invoke('coding-agent:generate', agentType, request)
     ),
 
+  generateStreaming: async (
+    agentType: CodingAgentType,
+    request: GenerateRequest,
+    onChunk: (chunk: string) => void
+  ) => {
+    const requestId = crypto.randomUUID();
+
+    // Set up chunk listener
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: string }
+    ) => {
+      if (data.requestId === requestId) {
+        onChunk(data.chunk);
+      }
+    };
+    ipcRenderer.on('coding-agent:stream-chunk', handler);
+
+    try {
+      return await unwrapResponse<GenerateResponse>(
+        ipcRenderer.invoke('coding-agent:generate-streaming', requestId, agentType, request)
+      );
+    } finally {
+      ipcRenderer.removeListener('coding-agent:stream-chunk', handler);
+    }
+  },
+
   continueSession: (
     agentType: CodingAgentType,
     identifier: SessionIdentifier,
@@ -327,6 +367,18 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
 
   isAgentAvailable: (agentType: CodingAgentType) =>
     unwrapResponse<boolean>(ipcRenderer.invoke('coding-agent:is-available', agentType)),
+
+  onStreamChunk: (
+    callback: (data: { requestId: string; chunk: string }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: string }
+    ) => callback(data);
+    ipcRenderer.on('coding-agent:stream-chunk', handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener('coding-agent:stream-chunk', handler);
+  },
 } as CodingAgentAPI);
 
 // Expose LLM API
@@ -453,3 +505,14 @@ contextBridge.exposeInMainWorld('shellAPI', {
     await unwrapResponse(ipcRenderer.invoke('shell:show-in-folder', path));
   },
 } as ShellAPI);
+
+// Type definitions for the file API
+export interface FileAPI {
+  readFile: (filePath: string) => Promise<string>;
+}
+
+// Expose file API for debug mode
+contextBridge.exposeInMainWorld('fileAPI', {
+  readFile: (filePath: string) =>
+    unwrapResponse<string>(ipcRenderer.invoke('file:read', filePath)),
+} as FileAPI);

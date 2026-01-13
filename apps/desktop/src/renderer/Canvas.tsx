@@ -2,8 +2,6 @@ import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
-  Controls,
-  MiniMap,
   Background,
   BackgroundVariant,
   useNodesState,
@@ -20,11 +18,17 @@ import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
 import { AgentNode } from './nodes/AgentNode';
+import UserMessageNode from './components/UserMessageNode';
+import AssistantMessageNode from './components/AssistantMessageNode';
+import ConsolidatedConversationNode from './components/ConsolidatedConversationNode';
+import StarterNode from './components/StarterNode';
 import './Canvas.css';
 import { agentStore } from './stores';
 import { createDefaultAgentTitle } from './types/agent-node';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
+import { parseConversationFile, groupConversationMessages } from './utils/conversationParser';
+import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 
 // Custom node component
 const CustomNode = ({ data }: { data: { label: string } }) => {
@@ -45,6 +49,10 @@ const nodeTypes = {
   terminal: TerminalNode,
   workspace: WorkspaceNode,
   agent: AgentNode,
+  userMessage: UserMessageNode,
+  assistantMessage: AssistantMessageNode,
+  consolidatedConversation: ConsolidatedConversationNode,
+  starter: StarterNode,
 };
 
 const defaultNodes: Node[] = [];
@@ -113,10 +121,57 @@ function CanvasFlow() {
 
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
+  const debugConversationLoaded = useRef(false);
+
+  // DEBUG MODE: Load conversation file on mount
+  useEffect(() => {
+    // Only load if we haven't loaded it yet and there are no initial nodes
+    if (debugConversationLoaded.current || initialNodes.length > 0) {
+      return;
+    }
+
+    const loadDebugConversation = async () => {
+      try {
+        const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/99f3429d-0826-4dce-82c5-1501c34fb004.jsonl';
+        
+        console.log('Loading debug conversation from:', conversationPath);
+        
+        // Use Electron IPC to read the file
+        if (!(window as any).fileAPI) {
+          console.log('File API not available, skipping debug conversation load');
+          return;
+        }
+
+        const fileContent = await (window as any).fileAPI.readFile(conversationPath);
+        console.log('Conversation file read, parsing...');
+        
+        const entries = parseConversationFile(fileContent);
+        console.log('Parsed entries:', entries.length);
+        
+        const groups = groupConversationMessages(entries);
+        console.log('Grouped messages:', groups.length);
+        
+        const { nodes: conversationNodes, edges: conversationEdges } = conversationToNodesAndEdges(groups);
+        
+        setNodes(conversationNodes);
+        setEdges(conversationEdges);
+        debugConversationLoaded.current = true;
+        console.log('✅ Debug conversation loaded successfully:', { 
+          nodes: conversationNodes.length, 
+          edges: conversationEdges.length,
+          nodeTypes: conversationNodes.map(n => n.type)
+        });
+      } catch (error) {
+        console.error('❌ Failed to load debug conversation:', error);
+      }
+    };
+
+    loadDebugConversation();
+  }, [setNodes, setEdges, initialNodes.length]);
 
   // Apply restored state when it becomes available
   useEffect(() => {
-    if (!isCanvasLoading && initialNodes.length > 0 && !initialStateApplied.current) {
+    if (!isCanvasLoading && initialNodes.length > 0 && !initialStateApplied.current && !debugConversationLoaded.current) {
       setNodes(initialNodes);
       setEdges(initialEdges);
       initialStateApplied.current = true;
@@ -688,6 +743,42 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
+  const addStarterNode = useCallback((position?: { x: number; y: number }) => {
+    let nodePosition = position;
+
+    // If no position provided and context menu is open, use context menu position
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    // If still no position, use center of viewport
+    if (!nodePosition) {
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'starter',
+      position: nodePosition,
+      data: {
+        placeholder: 'Ask Claude anything... (Enter to send)',
+      },
+      style: {
+        width: 500,
+        height: 180,
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition, setNodes]);
+
   // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -729,6 +820,12 @@ function CanvasFlow() {
         addAgentNode();
       }
 
+      // CMD+N / CTRL+N to add starter node (new conversation)
+      if (modifierKey && event.key === 'n') {
+        event.preventDefault();
+        addStarterNode();
+      }
+
       // Enable node drag mode while holding CMD (Mac) or CTRL (Windows/Linux)
       if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
         if (!isNodeDragEnabled) {
@@ -750,7 +847,7 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addTerminalNode, addWorkspaceNode, addAgentNode, isNodeDragEnabled]);
+  }, [addTerminalNode, addWorkspaceNode, addAgentNode, addStarterNode, isNodeDragEnabled]);
 
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
@@ -766,9 +863,18 @@ function CanvasFlow() {
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
-      {/* Save status indicator */}
-      <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
-        {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
+      {/* Top right toolbar */}
+      <div className="top-right-toolbar">
+        <div className={`toolbar-button save-button ${isSaving ? 'saving' : ''}`}>
+          {isSaving ? '💾' : '✓'}
+        </div>
+        <button
+          className="toolbar-button settings-button"
+          onClick={() => setIsSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
       </div>
 
       {/* Mode indicator */}
@@ -807,8 +913,6 @@ function CanvasFlow() {
         elementsSelectable={true}
         nodesFocusable={true}
       >
-        <Controls />
-        <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       </ReactFlow>
       
@@ -841,17 +945,15 @@ function CanvasFlow() {
               {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘A' : 'Ctrl+Shift+A'}
             </span>
           </div>
+          <div className="context-menu-divider" />
+          <div className="context-menu-item highlight" onClick={() => addStarterNode()}>
+            <span>New Conversation</span>
+            <span className="context-menu-shortcut">
+              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
+            </span>
+          </div>
         </div>
       )}
-
-      {/* Settings FAB */}
-      <button
-        className="settings-fab"
-        onClick={() => setIsSettingsOpen(true)}
-        aria-label="Settings"
-      >
-        ⚙️
-      </button>
 
       {/* Settings Modal */}
       {isSettingsOpen && (

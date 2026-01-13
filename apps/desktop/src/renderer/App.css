@@ -2,6 +2,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: 'SF UI Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 .app {
@@ -9,6 +10,7 @@
   height: 100vh;
   overflow: hidden;
   background: #1e1e1e;
+  display: flex;
 }
 
 .terminal-container {

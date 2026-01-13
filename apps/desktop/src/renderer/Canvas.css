@@ -1,5 +1,5 @@
 .canvas-container {
-  width: 100%;
+  flex: 1;
   height: 100vh;
   position: relative;
 }
@@ -171,6 +171,20 @@
   background: #3a3c46;
 }
 
+.context-menu-item.highlight {
+  color: #4a9eff;
+}
+
+.context-menu-item.highlight:hover {
+  background: rgba(74, 158, 255, 0.15);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: #3a3c46;
+  margin: 4px 8px;
+}
+
 .context-menu-shortcut {
   font-size: 12px;
   color: #888;
@@ -208,34 +222,52 @@
   background-color: #1e1e1e;
 }
 
-/* Settings FAB */
-.settings-fab {
+/* Top right toolbar */
+.top-right-toolbar {
   position: fixed;
   top: 20px;
   right: 20px;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
-  color: #d4d4d4;
-  font-size: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.toolbar-button {
+  width: 40px;
+  height: 40px;
+  background: rgba(42, 44, 54, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 157, 195, 0.1);
+  border-radius: 12px;
+  color: #888;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   transition: all 0.2s ease;
 }
 
-.settings-fab:hover {
-  background: #3a3c46;
-  transform: scale(1.05);
+.toolbar-button:hover {
+  background: rgba(58, 60, 70, 0.9);
+  border-color: rgba(139, 157, 195, 0.2);
 }
 
-.settings-fab:active {
+.toolbar-button:active {
   transform: scale(0.95);
+}
+
+.save-button {
+  cursor: default;
+}
+
+.save-button.saving {
+  color: #4a9eff;
+}
+
+.settings-button {
+  color: #d4d4d4;
 }
 
 /* Settings Modal */
@@ -846,27 +878,3 @@
   }
 }
 
-/* Save status indicator */
-.save-indicator {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background: rgba(42, 44, 54, 0.8);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(139, 157, 195, 0.1);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: #888;
-  z-index: 1000;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.save-indicator:not(:empty) {
-  opacity: 1;
-}
-
-.save-indicator.saving {
-  color: #4a9eff;
-}
