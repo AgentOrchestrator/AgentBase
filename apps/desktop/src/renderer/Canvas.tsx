@@ -20,6 +20,7 @@ import WorkspaceNode from './WorkspaceNode';
 import AgentNode from './AgentNode';
 import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
+import ConsolidatedConversationNode from './components/ConsolidatedConversationNode';
 import './Canvas.css';
 import { agentStore } from './stores';
 import { createDefaultAgentTitle } from './types/agent-node';
@@ -49,6 +50,7 @@ const nodeTypes = {
   agent: AgentNode,
   userMessage: UserMessageNode,
   assistantMessage: AssistantMessageNode,
+  consolidatedConversation: ConsolidatedConversationNode,
 };
 
 const defaultNodes: Node[] = [];

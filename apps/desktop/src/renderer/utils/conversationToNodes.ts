@@ -66,5 +66,23 @@ export function conversationToNodesAndEdges(
     currentY += nodeHeight + 20; // 20px spacing between nodes
   }
 
+  // Create consolidated conversation node (for debugging) - spawn next to individual nodes
+  const consolidatedNode: Node = {
+    id: `consolidated-${groups[0]?.uuid || 'conversation'}`,
+    type: 'consolidatedConversation',
+    position: { x: fixedX + 650, y: startY }, // 650px to the right (600px width + 50px spacing)
+    data: {
+      groups: groups,
+    },
+    style: {
+      width: 600,
+      height: 600, // 1.5x terminal height (400 * 1.5 = 600)
+    },
+    width: 600,
+    height: 600,
+  };
+
+  nodes.push(consolidatedNode);
+
   return { nodes, edges };
 }
