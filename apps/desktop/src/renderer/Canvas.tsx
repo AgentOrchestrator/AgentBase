@@ -2,7 +2,6 @@ import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
-  Controls,
   MiniMap,
   Background,
   BackgroundVariant,
@@ -17,9 +16,10 @@ import {
 import '@xyflow/react/dist/style.css';
 import './Canvas.css';
 import { createDefaultAgentTitle } from './types/agent-node';
-import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
+import { createLinearIssueAttachment, createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
 import { nodeRegistry } from './nodes/registry';
+import type { AgentNodeData } from './types/agent-node';
 
 // Use node types from the registry (single source of truth)
 const nodeTypes = nodeRegistry.reactFlowNodeTypes;
@@ -120,11 +120,17 @@ function CanvasFlow() {
 
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getEdges } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
+  const [workspaceGitInfo, setWorkspaceGitInfo] = useState<Record<string, { branch: string | null }>>({});
+  const [lockedFolderPath, setLockedFolderPath] = useState<string | null>(null);
+  const [hoveredFolderPath, setHoveredFolderPath] = useState<string | null>(null);
 
   // Issues pill state
   const [isPillExpanded, setIsPillExpanded] = useState(false);
@@ -196,9 +202,16 @@ function CanvasFlow() {
       );
     };
 
+    const handleDeleteNode = (event: CustomEvent) => {
+      const { nodeId } = event.detail;
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    };
+
     window.addEventListener('update-node', handleUpdateNode as EventListener);
+    window.addEventListener('delete-node', handleDeleteNode as EventListener);
     return () => {
       window.removeEventListener('update-node', handleUpdateNode as EventListener);
+      window.removeEventListener('delete-node', handleDeleteNode as EventListener);
     };
   }, [setNodes]);
 
@@ -411,6 +424,197 @@ function CanvasFlow() {
       return true;
     });
   }, [issues, selectedProjectId, selectedMilestoneId, selectedStatusId]);
+
+  // Helper function to extract final folder name from path
+  const getFolderName = (path: string): string => {
+    // Remove trailing slashes and get the last segment
+    const normalized = path.replace(/\/$/, '');
+    const parts = normalized.split(/[/\\]/);
+    return parts[parts.length - 1] || path;
+  };
+
+  // Organize agents hierarchically: Project > Branch > Agent
+  // Also create a mapping from folder name to full path
+  const { agentHierarchy, folderPathMap } = useMemo(() => {
+    const hierarchy: Record<string, Record<string, Array<{ nodeId: string; agentId: string; name: string }>>> = {};
+    const pathMap: Record<string, string> = {}; // Maps folder name to full path
+
+    // Get all agent nodes
+    const agentNodes = nodes.filter((node) => node.type === 'agent');
+
+    for (const node of agentNodes) {
+      const agentData = node.data as unknown as AgentNodeData;
+      
+      // Extract project path from workspace attachment or find connected workspace node
+      let projectPath: string | null = null;
+      let branch: string | null = null;
+
+      // Check for workspace metadata attachment
+      if (agentData.attachments) {
+        const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
+        if (workspaceAttachment) {
+          projectPath = workspaceAttachment.path;
+        }
+      }
+
+      // If no attachment, try to find connected workspace node
+      if (!projectPath) {
+        const edges = getEdges();
+        const connectedEdge = edges.find((e) => e.target === node.id || e.source === node.id);
+        if (connectedEdge) {
+          const connectedNodeId = connectedEdge.source === node.id ? connectedEdge.target : connectedEdge.source;
+          const connectedNode = nodes.find((n) => n.id === connectedNodeId);
+          if (connectedNode?.type === 'workspace' && connectedNode.data?.path) {
+            projectPath = connectedNode.data.path as string;
+          }
+        }
+      }
+
+      // Get branch from fetched git info (preferred) or fallback to attachment/workspace data
+      if (projectPath && workspaceGitInfo[projectPath]?.branch) {
+        branch = workspaceGitInfo[projectPath].branch;
+      } else if (agentData.attachments) {
+        const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
+        if (workspaceAttachment?.git?.branch) {
+          branch = workspaceAttachment.git.branch;
+        }
+      }
+
+      // Extract final folder name from project path
+      const project = projectPath ? getFolderName(projectPath) : 'Unknown Project';
+      // Store mapping from folder name to full path
+      if (projectPath) {
+        pathMap[project] = projectPath;
+      }
+      // Only use 'main' as fallback if we truly have no branch info
+      const branchName = branch || 'main';
+      const agentName = agentData.title?.value || agentData.agentId;
+
+      // Build hierarchy
+      if (!hierarchy[project]) {
+        hierarchy[project] = {};
+      }
+      if (!hierarchy[project][branchName]) {
+        hierarchy[project][branchName] = [];
+      }
+      hierarchy[project][branchName].push({
+        nodeId: node.id,
+        agentId: agentData.agentId,
+        name: agentName,
+      });
+    }
+
+    return { agentHierarchy: hierarchy, folderPathMap: pathMap };
+  }, [nodes, getEdges, workspaceGitInfo]);
+
+  // Auto-lock the first folder that appears, and clear lock if no folders exist
+  useEffect(() => {
+    const folderNames = Object.keys(agentHierarchy);
+    if (folderNames.length === 0) {
+      // Clear lock if no folders exist
+      setLockedFolderPath(null);
+    } else if (!lockedFolderPath) {
+      // Auto-lock first folder if none is locked
+      const firstFolderName = folderNames[0];
+      const firstFolderPath = folderPathMap[firstFolderName];
+      if (firstFolderPath) {
+        setLockedFolderPath(firstFolderPath);
+      }
+    } else {
+      // Validate that locked folder still exists
+      const lockedFolderName = Object.keys(folderPathMap).find(
+        (name) => folderPathMap[name] === lockedFolderPath
+      );
+      if (!lockedFolderName || !agentHierarchy[lockedFolderName]) {
+        // Locked folder no longer exists, clear it
+        setLockedFolderPath(null);
+      }
+    }
+  }, [agentHierarchy, folderPathMap, lockedFolderPath]);
+
+  // Check if there are any agents
+  const hasAgents = useMemo(() => {
+    return nodes.some((node) => node.type === 'agent');
+  }, [nodes]);
+
+  // Fetch git info for all unique workspace paths
+  useEffect(() => {
+    const workspacePaths = new Set<string>();
+    
+    // Collect all workspace paths from agent nodes
+    nodes.forEach((node) => {
+      if (node.type === 'agent') {
+        const agentData = node.data as unknown as AgentNodeData;
+        
+        // Check for workspace metadata attachment
+        if (agentData.attachments) {
+          const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
+          if (workspaceAttachment?.path) {
+            workspacePaths.add(workspaceAttachment.path);
+          }
+        }
+        
+        // Check for connected workspace node
+        const edges = getEdges();
+        const connectedEdge = edges.find((e) => e.target === node.id || e.source === node.id);
+        if (connectedEdge) {
+          const connectedNodeId = connectedEdge.source === node.id ? connectedEdge.target : connectedEdge.source;
+          const connectedNode = nodes.find((n) => n.id === connectedNodeId);
+          if (connectedNode?.type === 'workspace' && connectedNode.data?.path) {
+            workspacePaths.add(connectedNode.data.path as string);
+          }
+        }
+      }
+    });
+
+    // Fetch git info for each workspace path
+    const fetchGitInfo = async () => {
+      const gitInfoMap: Record<string, { branch: string | null }> = {};
+      
+      for (const path of workspacePaths) {
+        try {
+          const gitInfo = await window.gitAPI?.getInfo(path);
+          gitInfoMap[path] = {
+            branch: gitInfo?.branch || null,
+          };
+        } catch (error) {
+          gitInfoMap[path] = { branch: null };
+        }
+      }
+      
+      setWorkspaceGitInfo(gitInfoMap);
+    };
+
+    if (workspacePaths.size > 0) {
+      fetchGitInfo();
+    } else {
+      setWorkspaceGitInfo({});
+    }
+  }, [nodes, getEdges]);
+
+  const toggleProject = useCallback((projectPath: string) => {
+    setCollapsedProjects((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectPath)) {
+        newSet.delete(projectPath);
+      } else {
+        newSet.add(projectPath);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const toggleBranch = useCallback((branchKey: string) => {
+    setCollapsedBranches((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(branchKey)) {
+        newSet.delete(branchKey);
+      } else {
+        newSet.add(branchKey);
+      }
+      return newSet;
+    });
+  }, []);
 
   const togglePill = useCallback(() => {
     if (!isPillExpanded) {
@@ -637,6 +841,7 @@ function CanvasFlow() {
     const agentId = `agent-${crypto.randomUUID()}`;
     const terminalId = `terminal-${crypto.randomUUID()}`;
 
+    // Pre-fill with locked folder path (but don't create attachment yet - let modal show with it pre-filled)
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type: 'agent',
@@ -651,6 +856,8 @@ function CanvasFlow() {
         progress: null,
         attachments: [],
         activeView: 'overview',
+        // Add prefilled workspace path if locked folder exists
+        ...(lockedFolderPath && { prefilledWorkspacePath: lockedFolderPath }),
       },
       style: {
         width: 500,
@@ -660,7 +867,7 @@ function CanvasFlow() {
 
     setNodes((nds) => [...nds, newNode]);
     setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
+  }, [contextMenu, screenToFlowPosition, setNodes, lockedFolderPath]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -740,23 +947,137 @@ function CanvasFlow() {
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
-      {/* Save status indicator */}
-      <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
-        {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
+      {/* Sidebar Panel */}
+      <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <h2 className="sidebar-title">Canvas</h2>
+          <button
+            className="sidebar-toggle"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? '▶' : '◀'}
+          </button>
+        </div>
+        
+        {!isSidebarCollapsed && (
+          <div className="sidebar-content">
+            {hasAgents && (
+              <div className="sidebar-section">
+                {Object.entries(agentHierarchy).map(([projectName, branches]) => {
+                  const isProjectCollapsed = collapsedProjects.has(projectName);
+                  const projectPath = folderPathMap[projectName];
+                  const isLocked = lockedFolderPath === projectPath;
+                  const isHovered = hoveredFolderPath === projectPath;
+                  // Show lock if: this folder is locked (always visible), OR this folder is hovered and not locked (show open lock on hover)
+                  const showLock = isLocked || (isHovered && !isLocked);
+                  
+                  return (
+                    <div 
+                      key={projectName} 
+                      className="sidebar-folder"
+                      onMouseEnter={() => setHoveredFolderPath(projectPath || null)}
+                      onMouseLeave={() => setHoveredFolderPath(null)}
+                    >
+                      <div className="sidebar-folder-header-wrapper">
+                        <button
+                          className="sidebar-folder-header"
+                          onClick={() => toggleProject(projectName)}
+                        >
+                          <span className="sidebar-folder-icon">
+                            {isProjectCollapsed ? '▶' : '▼'}
+                          </span>
+                          <span className="sidebar-folder-name">{projectName}</span>
+                        </button>
+                        {showLock && projectPath && (
+                          <button
+                            type="button"
+                            className={`sidebar-folder-lock ${isLocked ? 'locked' : ''}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (isLocked) {
+                                setLockedFolderPath(null);
+                              } else {
+                                setLockedFolderPath(projectPath);
+                              }
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            title={isLocked ? 'Unlock folder' : 'Lock folder'}
+                          >
+                            {isLocked ? (
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M3 5V3C3 1.34315 4.34315 0 6 0C7.65685 0 9 1.34315 9 3V5H10C10.5523 5 11 5.44772 11 6V10C11 10.5523 10.5523 11 10 11H2C1.44772 11 1 10.5523 1 10V6C1 5.44772 1.44772 5 2 5H3ZM4 3V5H8V3C8 1.89543 7.10457 1 6 1C4.89543 1 4 1.89543 4 3Z" fill="currentColor"/>
+                              </svg>
+                            ) : (
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M3 5V3C3 1.34315 4.34315 0 6 0C7.65685 0 9 1.34315 9 3V5H10C10.5523 5 11 5.44772 11 6V10C11 10.5523 10.5523 11 10 11H2C1.44772 11 1 10.5523 1 10V6C1 5.44772 1.44772 5 2 5H3ZM4 3V5H8V3C8 1.89543 7.10457 1 6 1C4.89543 1 4 1.89543 4 3ZM2 6V10H10V6H2Z" fill="currentColor"/>
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      {!isProjectCollapsed && (
+                        <div className="sidebar-folder-content">
+                          {Object.entries(branches).map(([branchName, agents]) => {
+                            const branchKey = `${projectName}:${branchName}`;
+                            const isBranchCollapsed = collapsedBranches.has(branchKey);
+                            return (
+                              <div key={branchKey} className="sidebar-folder nested">
+                                <button
+                                  className="sidebar-folder-header"
+                                  onClick={() => toggleBranch(branchKey)}
+                                >
+                                  <span className="sidebar-folder-icon">
+                                    {isBranchCollapsed ? '▶' : '▼'}
+                                  </span>
+                                  <span className="sidebar-folder-name">{branchName}</span>
+                                </button>
+                                {!isBranchCollapsed && (
+                                  <div className="sidebar-folder-content">
+                                    {agents.map((agent) => (
+                                      <div key={agent.nodeId} className="sidebar-item">
+                                        <span>{agent.name}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Mode indicator */}
-      <div className={`mode-indicator ${isNodeDragEnabled ? 'drag-mode' : 'terminal-mode'}`}>
-        <span className="mode-icon">{isNodeDragEnabled ? '🔄' : '⌨️'}</span>
-        <span className="mode-text">
-          {isNodeDragEnabled ? 'Node Drag Mode' : 'Terminal Mode'}
-        </span>
-        <span className="mode-hint">
-          {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘ to drag nodes' : 'Hold Ctrl to drag nodes'}
-        </span>
-      </div>
+      {/* Canvas Content */}
+      <div className={`canvas-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        {/* Save status indicator */}
+        <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
+          {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
+        </div>
 
-      <ReactFlow
+        {/* Mode indicator */}
+        <div className={`mode-indicator ${isNodeDragEnabled ? 'drag-mode' : 'terminal-mode'}`}>
+          <span className="mode-icon">{isNodeDragEnabled ? '🔄' : '⌨️'}</span>
+          <span className="mode-text">
+            {isNodeDragEnabled ? 'Node Drag Mode' : 'Terminal Mode'}
+          </span>
+          <span className="mode-hint">
+            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘ to drag nodes' : 'Hold Ctrl to drag nodes'}
+          </span>
+        </div>
+
+        <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -781,7 +1102,6 @@ function CanvasFlow() {
         elementsSelectable={true}
         nodesFocusable={true}
       >
-        <Controls />
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       </ReactFlow>
@@ -818,16 +1138,16 @@ function CanvasFlow() {
         </div>
       )}
 
-      {/* Settings FAB */}
-      <button
-        className="settings-fab"
-        onClick={() => setIsSettingsOpen(true)}
-        aria-label="Settings"
-      >
-        ⚙️
-      </button>
+        {/* Settings FAB */}
+        <button
+          className="settings-fab"
+          onClick={() => setIsSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
 
-      {/* Settings Modal */}
+        {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
           <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
@@ -915,8 +1235,8 @@ function CanvasFlow() {
         </div>
       )}
 
-      {/* Issues Pill */}
-      {isLinearConnected && (
+        {/* Issues Pill */}
+        {isLinearConnected && (
         <div
           onClick={!isPillSquare ? togglePill : undefined}
           className={`issues-pill ${!isPillSquare ? 'cursor-pointer' : 'cursor-default'} ${
@@ -1061,7 +1381,8 @@ function CanvasFlow() {
             </div>
           ) : null}
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

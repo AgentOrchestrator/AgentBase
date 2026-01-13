@@ -6,8 +6,8 @@
 
 /* Agent Node Container */
 .agent-node {
-  background: #2a2c36;
-  border: none;
+  background: #1e1e1e;
+  border: 1px solid #d4d4d4;
   border-radius: 12px;
   overflow: hidden;
   width: 100%;
@@ -25,7 +25,7 @@
 }
 
 .agent-node.drag-over {
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
   transform: scale(1.01);
 }
 
@@ -33,7 +33,7 @@
 .agent-node-tabs {
   display: flex;
   background: #1e1e1e;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: none;
   padding: 0;
   flex-shrink: 0;
 }
@@ -41,7 +41,7 @@
 .agent-tab {
   flex: 1;
   padding: 10px 16px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.3);
   border: none;
   color: #888;
   font-size: 13px;
@@ -53,22 +53,14 @@
 
 .agent-tab:hover {
   color: #d4d4d4;
-  background: rgba(74, 158, 255, 0.05);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .agent-tab.active {
-  color: #4a9eff;
-  background: rgba(74, 158, 255, 0.1);
-}
-
-.agent-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #4a9eff;
+  color: #d4d4d4;
+  background: transparent;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
 /* Content Area */
@@ -82,14 +74,14 @@
 
 /* Handle styles */
 .agent-node .react-flow__handle {
-  background: #4a9eff;
+  background: #888;
   width: 10px;
   height: 10px;
-  border: 2px solid #2a2c36;
+  border: 2px solid #1e1e1e;
 }
 
 .agent-node .react-flow__handle:hover {
-  background: #6bb3ff;
+  background: #d4d4d4;
 }
 
 /* Resize handles */
@@ -132,7 +124,7 @@
 /* Attachment headers within agent node */
 .agent-node .terminal-node-header {
   background: #1e1e1e;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid #888;
   padding: 8px 12px;
   display: flex;
   align-items: center;
@@ -149,7 +141,7 @@
 }
 
 .agent-node .terminal-node-header .issue-id {
-  color: #4a9eff;
+  color: #d4d4d4;
   font-weight: 600;
   font-size: 12px;
   flex-shrink: 0;
@@ -174,13 +166,13 @@
 }
 
 .agent-node .terminal-node-header .issue-external-link-icon:hover {
-  color: #4a9eff;
-  background: rgba(74, 158, 255, 0.1);
+  color: #d4d4d4;
+  background: rgba(136, 136, 136, 0.15);
 }
 
 /* Workspace header styles */
 .agent-node .workspace-header {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+  background: rgba(136, 136, 136, 0.08);
 }
 
 .agent-node .workspace-info {
@@ -214,7 +206,7 @@
 .agent-node .project-type-badge {
   color: #888;
   font-size: 10px;
-  background: #3a3c46;
+  background: rgba(136, 136, 136, 0.2);
   padding: 2px 6px;
   border-radius: 3px;
   text-transform: uppercase;
@@ -223,7 +215,7 @@
 
 /* Inherited workspace styles */
 .agent-node .workspace-header.inherited {
-  border-left: 2px solid #007acc;
+  border-left: 2px solid #888;
 }
 
 .agent-node .inherited-badge {
@@ -232,8 +224,8 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  background: #007acc33;
-  color: #007acc;
+  background: rgba(136, 136, 136, 0.2);
+  color: #888;
   border-radius: 50%;
   font-size: 10px;
   margin-left: 4px;
@@ -241,7 +233,39 @@
 
 /* Git dirty indicator */
 .agent-node .git-dirty {
-  color: #f0ad4e;
+  color: #888;
   margin-left: 4px;
   font-size: 12px;
+}
+
+/* Minimal Footer */
+.agent-node-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  color: #888;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.agent-node-footer .footer-icon {
+  width: 14px;
+  height: 14px;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.agent-node-footer .footer-text {
+  color: #888;
+  font-size: 11px;
+}
+
+.agent-node-footer .footer-folder-name {
+  cursor: pointer;
+  transition: text-decoration 0.2s ease;
+}
+
+.agent-node-footer .footer-folder-name:hover {
+  text-decoration: underline;
 }

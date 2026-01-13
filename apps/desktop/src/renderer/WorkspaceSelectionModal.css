@@ -14,7 +14,7 @@
 .workspace-modal {
   background: #1e1e1e;
   border-radius: 8px;
-  border: 1px solid #3c3c3c;
+  border: 1px solid #d4d4d4;
   width: 400px;
   max-width: 90vw;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -25,20 +25,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: none;
 }
 
 .workspace-modal-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 500;
-  color: #e0e0e0;
+  color: #d4d4d4;
 }
 
 .workspace-modal-header .close-button {
   background: none;
   border: none;
-  color: #808080;
+  color: #888;
   font-size: 20px;
   cursor: pointer;
   padding: 0;
@@ -50,17 +50,11 @@
 }
 
 .workspace-modal-header .close-button:hover {
-  color: #e0e0e0;
+  color: #d4d4d4;
 }
 
 .workspace-modal-content {
   padding: 16px;
-}
-
-.workspace-modal-content p {
-  margin: 0 0 16px 0;
-  color: #a0a0a0;
-  font-size: 14px;
 }
 
 .workspace-path-input {
@@ -71,34 +65,40 @@
 .workspace-path-input input {
   flex: 1;
   padding: 8px 12px;
-  background: #2d2d2d;
-  border: 1px solid #3c3c3c;
+  background: transparent;
+  border: none;
   border-radius: 4px;
-  color: #e0e0e0;
+  color: #d4d4d4;
   font-size: 13px;
   font-family: monospace;
 }
 
 .workspace-path-input input:focus {
   outline: none;
-  border-color: #007acc;
 }
 
-.workspace-path-input button {
-  padding: 8px 16px;
-  background: #3c3c3c;
-  border: 1px solid #4c4c4c;
+.workspace-path-input input::placeholder {
+  color: #888;
+}
+
+.workspace-path-input .browse-button {
+  padding: 8px;
+  background: transparent;
+  border: none;
   border-radius: 4px;
-  color: #e0e0e0;
+  color: #888;
   cursor: pointer;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
 }
 
-.workspace-path-input button:hover:not(:disabled) {
-  background: #4c4c4c;
+.workspace-path-input .browse-button:hover:not(:disabled) {
+  color: #d4d4d4;
 }
 
-.workspace-path-input button:disabled {
+.workspace-path-input .browse-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -108,7 +108,7 @@
   justify-content: flex-end;
   gap: 8px;
   padding: 16px;
-  border-top: 1px solid #3c3c3c;
+  border-top: none;
 }
 
 .workspace-modal-footer button {
@@ -119,24 +119,24 @@
 }
 
 .workspace-modal-footer .cancel-button {
-  background: transparent;
-  border: 1px solid #3c3c3c;
-  color: #a0a0a0;
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  color: #888;
 }
 
 .workspace-modal-footer .cancel-button:hover {
-  background: #2d2d2d;
-  color: #e0e0e0;
+  background: rgba(0, 0, 0, 0.4);
+  color: #d4d4d4;
 }
 
 .workspace-modal-footer .confirm-button {
-  background: #007acc;
-  border: 1px solid #007acc;
-  color: white;
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  color: #d4d4d4;
 }
 
 .workspace-modal-footer .confirm-button:hover:not(:disabled) {
-  background: #005a9e;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .workspace-modal-footer .confirm-button:disabled {

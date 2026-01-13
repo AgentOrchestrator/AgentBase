@@ -40,15 +40,15 @@ const STATUS_CONFIG: Record<
   CodingAgentStatus,
   { label: string; color: string; icon: string }
 > = {
-  idle: { label: 'Idle', color: '#888888', icon: '○' },
-  running: { label: 'Running', color: '#4a9eff', icon: '●' },
-  thinking: { label: 'Thinking', color: '#f5a623', icon: '◐' },
-  streaming: { label: 'Streaming', color: '#7b61ff', icon: '◉' },
-  executing_tool: { label: 'Executing', color: '#0dbc79', icon: '⚡' },
-  awaiting_input: { label: 'Awaiting Input', color: '#e5e510', icon: '?' },
-  paused: { label: 'Paused', color: '#ff9800', icon: '⏸' },
-  completed: { label: 'Completed', color: '#4ade80', icon: '✓' },
-  error: { label: 'Error', color: '#ef4444', icon: '✕' },
+  idle: { label: 'Idle', color: '#888', icon: '○' },
+  running: { label: 'Running', color: '#888', icon: '●' },
+  thinking: { label: 'Thinking', color: '#888', icon: '◐' },
+  streaming: { label: 'Streaming', color: '#888', icon: '◉' },
+  executing_tool: { label: 'Executing', color: '#888', icon: '⚡' },
+  awaiting_input: { label: 'Awaiting Input', color: '#888', icon: '?' },
+  paused: { label: 'Paused', color: '#888', icon: '⏸' },
+  completed: { label: 'Completed', color: '#d4d4d4', icon: '✓' },
+  error: { label: 'Error', color: '#888', icon: '✕' },
 };
 
 /**
@@ -261,7 +261,7 @@ export default function AgentOverviewView({
       )}
 
       {/* Actions */}
-      {workspacePath && (
+      {/* {workspacePath && (
         <div className="overview-actions">
           <div className="open-with-container" ref={menuRef}>
             <button
@@ -292,12 +292,12 @@ export default function AgentOverviewView({
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Footer */}
-      <div className="overview-footer">
+      {/* <div className="overview-footer">
         <span className="agent-id-label">ID: {agentId}</span>
-      </div>
+      </div> */}
     </div>
   );
 }

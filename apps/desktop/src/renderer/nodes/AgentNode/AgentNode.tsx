@@ -78,11 +78,16 @@ function AgentNode({ data, id }: NodeProps) {
   ) as { path: string } | undefined;
   const attachmentWorkspacePath = workspaceAttachment?.path;
 
+  // Check for prefilled workspace path (from locked folder)
+  const prefilledWorkspacePath = (nodeData as any).prefilledWorkspacePath as string | undefined;
+
   // Determine final workspace path (priority: attachment > selected > inherited)
   const workspacePath = attachmentWorkspacePath || selectedWorkspace || inheritedWorkspacePath;
 
   // Show modal if no workspace is available (auto-open on mount)
+  // Also show if there's a prefilled path (so user can confirm/change it)
   useEffect(() => {
+    // Show modal if there's no workspace path, or if there's a prefilled path to show
     if (!workspacePath && !showWorkspaceModal) {
       setShowWorkspaceModal(true);
     }
@@ -109,8 +114,12 @@ function AgentNode({ data, id }: NodeProps) {
   );
 
   const handleWorkspaceCancel = () => {
-    // Close modal - node will remain without workspace
-    setShowWorkspaceModal(false);
+    // Remove the agent node from the canvas
+    window.dispatchEvent(
+      new CustomEvent('delete-node', {
+        detail: { nodeId: id },
+      })
+    );
   };
 
   // Always render the node structure - modal is overlaid when needed
@@ -134,6 +143,7 @@ function AgentNode({ data, id }: NodeProps) {
         isOpen={showWorkspaceModal && !workspacePath}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
+        initialPath={prefilledWorkspacePath || null}
       />
     </NodeContextProvider>
   );

@@ -99,7 +99,8 @@ export default function AttachmentHeader({ attachment, onDetailsClick, isInherit
   }
 
   if (isWorkspaceMetadataAttachment(attachment)) {
-    return <WorkspaceMetadataHeader attachment={attachment} isInherited={isInherited} gitInfo={gitInfo} />;
+    // Hide workspace header visualization - now shown in footer
+    return null;
   }
 
   // Fallback for unknown attachment types
