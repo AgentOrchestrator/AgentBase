@@ -128,6 +128,9 @@ export function NodeContextProvider({
     autoStartCli,
   };
 
+  // Track the previous workspace path to detect changes
+  const prevWorkspacePathRef = useRef<string | undefined>(undefined);
+
   // Initialize services on mount
   useEffect(() => {
     let mounted = true;
@@ -176,6 +179,66 @@ export function NodeContextProvider({
       }
     };
   }, [nodeId, nodeType, registry]);
+
+  // Handle workspace path changes after initialization
+  useEffect(() => {
+    // Skip if not initialized or no services
+    if (!isInitialized || !servicesRef.current) {
+      return;
+    }
+
+    // Skip if workspace path hasn't actually changed
+    if (workspacePath === prevWorkspacePathRef.current) {
+      return;
+    }
+
+    // Update the previous workspace path
+    const previousPath = prevWorkspacePathRef.current;
+    prevWorkspacePathRef.current = workspacePath;
+
+    // Skip if there's no new workspace path
+    if (!workspacePath) {
+      return;
+    }
+
+    console.log(`[NodeContext] Workspace path changed: ${previousPath} -> ${workspacePath}`);
+
+    const services = servicesRef.current;
+
+    // If we have a terminal service, change to the new workspace directory
+    if (hasTerminalService(services)) {
+      const terminal = services.terminal;
+
+      // Create terminal if not running
+      if (!terminal.isRunning()) {
+        terminal.create().then(() => {
+          // Small delay to let shell initialize, then cd to workspace
+          setTimeout(() => {
+            terminal.write(`cd "${workspacePath}"\n`);
+
+            // Start CLI if autoStartCli is enabled and we have an agent service
+            if (autoStartCli && hasAgentService(services)) {
+              // Small delay to let cd complete
+              setTimeout(() => {
+                terminal.write('claude\n');
+              }, 200);
+            }
+          }, 300);
+        });
+      } else {
+        // Terminal already running, just cd to workspace
+        terminal.write(`cd "${workspacePath}"\n`);
+
+        // Start CLI if autoStartCli is enabled and we have an agent service
+        if (autoStartCli && hasAgentService(services)) {
+          // Small delay to let cd complete
+          setTimeout(() => {
+            terminal.write('claude\n');
+          }, 200);
+        }
+      }
+    }
+  }, [isInitialized, workspacePath, autoStartCli]);
 
   // Build context value
   const contextValue: NodeContextValue | null = servicesRef.current
