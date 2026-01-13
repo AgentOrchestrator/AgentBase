@@ -617,7 +617,6 @@ export class ClaudeCodeAgent
       agentType: 'claude_code',
       createdAt: stats.birthtime.toISOString(),
       updatedAt: stats.mtime.toISOString(),
-      timestamp: lastTimestamp || stats.mtime.toISOString(),
       projectPath,
       messageCount: messages.length,
       metadata: {

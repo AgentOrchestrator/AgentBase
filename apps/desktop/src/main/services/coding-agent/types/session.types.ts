@@ -36,6 +36,8 @@ export interface SessionInfo {
  */
 export interface SessionContent extends SessionInfo {
   messages: ChatMessage[];
+  /** Session metadata */
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -43,6 +45,10 @@ export interface SessionContent extends SessionInfo {
  * Extends SessionInfo with preview and statistics fields
  */
 export interface SessionSummary extends SessionInfo {
+  /** ISO timestamp of last activity (for sorting) */
+  timestamp: string;
+  /** Project name (extracted from path) */
+  projectName?: string;
   /** First user message (for preview) */
   firstUserMessage?: string;
   /** Last assistant message (for preview) */

@@ -43,7 +43,7 @@ export async function createDefaultRegistry(
   // IChatHistoryProvider methods only need file system access, not the CLI.
   if (!agentFilter || agentFilter.includes('claude_code')) {
     try {
-      const claudeAgent = new ClaudeCodeAgent({});
+      const claudeAgent = new ClaudeCodeAgent({ type: 'claude_code' });
       // Initialize to check CLI, but register regardless for history reading
       const initResult = await claudeAgent.initialize();
 
