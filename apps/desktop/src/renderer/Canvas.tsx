@@ -2,8 +2,6 @@ import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
-  Controls,
-  MiniMap,
   Background,
   BackgroundVariant,
   useNodesState,
@@ -766,9 +764,18 @@ function CanvasFlow() {
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
-      {/* Save status indicator */}
-      <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
-        {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
+      {/* Top right toolbar */}
+      <div className="top-right-toolbar">
+        <div className={`toolbar-button save-button ${isSaving ? 'saving' : ''}`}>
+          {isSaving ? '💾' : '✓'}
+        </div>
+        <button
+          className="toolbar-button settings-button"
+          onClick={() => setIsSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
       </div>
 
       {/* Mode indicator */}
@@ -807,8 +814,6 @@ function CanvasFlow() {
         elementsSelectable={true}
         nodesFocusable={true}
       >
-        <Controls />
-        <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       </ReactFlow>
       
@@ -843,15 +848,6 @@ function CanvasFlow() {
           </div>
         </div>
       )}
-
-      {/* Settings FAB */}
-      <button
-        className="settings-fab"
-        onClick={() => setIsSettingsOpen(true)}
-        aria-label="Settings"
-      >
-        ⚙️
-      </button>
 
       {/* Settings Modal */}
       {isSettingsOpen && (

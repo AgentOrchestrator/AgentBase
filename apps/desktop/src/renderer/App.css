@@ -10,6 +10,7 @@
   height: 100vh;
   overflow: hidden;
   background: #1e1e1e;
+  display: flex;
 }
 
 .terminal-container {
