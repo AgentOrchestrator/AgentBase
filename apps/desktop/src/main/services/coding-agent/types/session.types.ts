@@ -1,6 +1,13 @@
 import type { CodingAgentType } from './agent.types';
 import type { ChatMessage } from './message.types';
 
+// Re-export filter options from shared
+export type {
+  MessageFilterOptions,
+  SessionFilterOptions,
+  SessionChange,
+} from '@agent-orchestrator/shared';
+
 /**
  * Session identifier - supports ID, name, or "latest" lookup
  */
@@ -29,6 +36,21 @@ export interface SessionInfo {
  */
 export interface SessionContent extends SessionInfo {
   messages: ChatMessage[];
+}
+
+/**
+ * Session summary for efficient listing (without full messages)
+ * Extends SessionInfo with preview and statistics fields
+ */
+export interface SessionSummary extends SessionInfo {
+  /** First user message (for preview) */
+  firstUserMessage?: string;
+  /** Last assistant message (for preview) */
+  lastAssistantMessage?: string;
+  /** Number of tool calls in session */
+  toolCallCount: number;
+  /** Whether session has thinking blocks */
+  hasThinking: boolean;
 }
 
 /**
