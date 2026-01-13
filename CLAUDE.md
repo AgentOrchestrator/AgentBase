@@ -23,6 +23,20 @@ supabase/
   migrations/       # Database migrations
 ```
 
+## Setup
+
+```bash
+npm install                 # Install all dependencies
+cp .env.example .env        # Copy and configure environment variables
+```
+
+For git worktrees, copy `.env` from the main worktree instead:
+```bash
+cp /path/to/main-worktree/.env .env
+```
+
+See `.env.example` for Supabase configuration options (local vs remote).
+
 ## Commands
 
 ```bash
