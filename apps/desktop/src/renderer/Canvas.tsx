@@ -19,7 +19,10 @@ import {
 import '@xyflow/react/dist/style.css';
 import TerminalNode from './TerminalNode';
 import WorkspaceNode from './WorkspaceNode';
+import AgentNode from './AgentNode';
 import './Canvas.css';
+import { agentStore } from './stores';
+import { createDefaultAgentTitle } from './types/agent-node';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
 
@@ -41,6 +44,7 @@ const nodeTypes = {
   custom: CustomNode,
   terminal: TerminalNode,
   workspace: WorkspaceNode,
+  agent: AgentNode,
 };
 
 const defaultNodes: Node[] = [];
@@ -633,6 +637,57 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
+  const addAgentNode = useCallback((position?: { x: number; y: number }) => {
+    let nodePosition = position;
+
+    // If no position provided and context menu is open, use context menu position
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    // If still no position, use center of viewport
+    if (!nodePosition) {
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    // Get first mock agent from store for demo purposes
+    const mockAgents = agentStore.getAllAgents();
+    const mockAgent = mockAgents[0];
+
+    const agentId = `agent-${crypto.randomUUID()}`;
+    const terminalId = `terminal-${crypto.randomUUID()}`;
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'agent',
+      position: nodePosition,
+      data: mockAgent || {
+        agentId,
+        terminalId,
+        agentType: 'claude_code',
+        status: 'idle',
+        title: createDefaultAgentTitle(),
+        summary: null,
+        progress: null,
+        attachments: [],
+        activeView: 'overview',
+      },
+      style: {
+        width: 500,
+        height: 450,
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition, setNodes]);
+
   // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -668,6 +723,12 @@ function CanvasFlow() {
         addWorkspaceNode();
       }
 
+      // CMD+Shift+A / CTRL+Shift+A to add agent
+      if (modifierKey && event.shiftKey && event.key === 'A') {
+        event.preventDefault();
+        addAgentNode();
+      }
+
       // Enable node drag mode while holding CMD (Mac) or CTRL (Windows/Linux)
       if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
         if (!isNodeDragEnabled) {
@@ -689,7 +750,7 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addTerminalNode, addWorkspaceNode, isNodeDragEnabled]);
+  }, [addTerminalNode, addWorkspaceNode, addAgentNode, isNodeDragEnabled]);
 
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
@@ -772,6 +833,12 @@ function CanvasFlow() {
             <span>Add Workspace</span>
             <span className="context-menu-shortcut">
               {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
+            </span>
+          </div>
+          <div className="context-menu-item" onClick={() => addAgentNode()}>
+            <span>Add Agent</span>
+            <span className="context-menu-shortcut">
+              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘A' : 'Ctrl+Shift+A'}
             </span>
           </div>
         </div>

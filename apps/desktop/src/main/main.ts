@@ -1,7 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as pty from 'node-pty';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { spawn } from 'child_process';
+import * as fs from 'fs';
 import { DatabaseFactory } from './database';
 import { IDatabase } from './database/IDatabase';
 import { CanvasState } from './types/database';
@@ -587,6 +589,130 @@ ipcMain.handle('representation:get-all-providers', async () => {
     return { success: true, data: providers };
   } catch (error) {
     console.error('[Main] Error getting all providers', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// ============================================================================
+// Shell API handlers
+// ============================================================================
+
+type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
+
+// Editor command configurations for macOS
+const EDITOR_COMMANDS: Record<EditorApp, { app?: string; command?: string; args: (dir: string) => string[] }> = {
+  vscode: { command: 'code', args: (dir) => [dir] },
+  cursor: { command: 'cursor', args: (dir) => [dir] },
+  zed: { command: 'zed', args: (dir) => [dir] },
+  sublime: { command: 'subl', args: (dir) => [dir] },
+  atom: { command: 'atom', args: (dir) => [dir] },
+  webstorm: { app: 'WebStorm', args: (dir) => [dir] },
+  finder: { command: 'open', args: (dir) => [dir] },
+};
+
+// Check if a command exists in PATH
+async function commandExists(command: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const which = spawn('which', [command]);
+    which.on('close', (code) => resolve(code === 0));
+    which.on('error', () => resolve(false));
+  });
+}
+
+// Check if a macOS app exists
+async function appExists(appName: string): Promise<boolean> {
+  const appPath = `/Applications/${appName}.app`;
+  return new Promise((resolve) => {
+    fs.access(appPath, fs.constants.F_OK, (err) => resolve(!err));
+  });
+}
+
+ipcMain.handle('shell:open-with-editor', async (_event, directoryPath: string, editor: EditorApp) => {
+  try {
+    console.log('[Main] Opening directory with editor', { directoryPath, editor });
+
+    // Verify directory exists
+    if (!fs.existsSync(directoryPath)) {
+      return { success: false, error: `Directory does not exist: ${directoryPath}` };
+    }
+
+    const config = EDITOR_COMMANDS[editor];
+    if (!config) {
+      return { success: false, error: `Unknown editor: ${editor}` };
+    }
+
+    // Special case for Finder
+    if (editor === 'finder') {
+      shell.openPath(directoryPath);
+      return { success: true };
+    }
+
+    // Try command-line tool first
+    if (config.command) {
+      const exists = await commandExists(config.command);
+      if (exists) {
+        spawn(config.command, config.args(directoryPath), { detached: true, stdio: 'ignore' }).unref();
+        return { success: true };
+      }
+    }
+
+    // Fall back to opening the app directly (macOS)
+    if (config.app) {
+      const exists = await appExists(config.app);
+      if (exists) {
+        spawn('open', ['-a', config.app, directoryPath], { detached: true, stdio: 'ignore' }).unref();
+        return { success: true };
+      }
+    }
+
+    return { success: false, error: `Editor ${editor} is not installed or not found in PATH` };
+  } catch (error) {
+    console.error('[Main] Error opening with editor', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('shell:get-available-editors', async () => {
+  try {
+    const available: EditorApp[] = [];
+
+    for (const [editor, config] of Object.entries(EDITOR_COMMANDS) as [EditorApp, typeof EDITOR_COMMANDS[EditorApp]][]) {
+      // Check command
+      if (config.command) {
+        const exists = await commandExists(config.command);
+        if (exists) {
+          available.push(editor);
+          continue;
+        }
+      }
+
+      // Check app (macOS)
+      if (config.app) {
+        const exists = await appExists(config.app);
+        if (exists) {
+          available.push(editor);
+        }
+      }
+    }
+
+    // Finder is always available on macOS
+    if (!available.includes('finder')) {
+      available.push('finder');
+    }
+
+    return { success: true, data: available };
+  } catch (error) {
+    console.error('[Main] Error getting available editors', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('shell:show-in-folder', async (_event, filePath: string) => {
+  try {
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Error showing in folder', { error });
     return { success: false, error: (error as Error).message };
   }
 });

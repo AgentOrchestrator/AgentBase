@@ -1,0 +1,354 @@
+/**
+ * Agent Overview View Styles
+ *
+ * Dark theme with #1e1e1e background, #4a9eff accent, #d4d4d4 text
+ */
+
+/* Overview Container */
+.agent-overview {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling */
+.agent-overview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.agent-overview::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-overview::-webkit-scrollbar-thumb {
+  background: #3a3c46;
+  border-radius: 4px;
+}
+
+.agent-overview::-webkit-scrollbar-thumb:hover {
+  background: #4a4c56;
+}
+
+/* Title Section */
+.overview-title-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-title {
+  margin: 0;
+  color: #d4d4d4;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-title:hover {
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.overview-title-input {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #4a9eff;
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: #d4d4d4;
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+}
+
+.overview-title-input:focus {
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+}
+
+.title-auto-badge {
+  font-size: 10px;
+  color: #888;
+  background: #3a3c46;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* Status Indicator */
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--status-color) 10%, transparent);
+  border-left: 3px solid var(--status-color);
+  border-radius: 0 6px 6px 0;
+}
+
+.status-icon {
+  font-size: 14px;
+  color: var(--status-color);
+}
+
+.status-label {
+  color: #d4d4d4;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Summary */
+.overview-summary {
+  color: #b0b0b0;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 12px;
+  background: #1e1e1e;
+  border-radius: 8px;
+}
+
+.overview-summary p {
+  margin: 0;
+}
+
+/* Progress Section */
+.overview-progress {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Progress - Percentage */
+.progress-percentage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-bar-container {
+  height: 8px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a9eff, #7b61ff);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-value {
+  color: #4a9eff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Menlo', 'Monaco', monospace;
+}
+
+.progress-label {
+  color: #888;
+  font-size: 12px;
+}
+
+/* Progress - Todo List */
+.progress-todolist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todolist-title {
+  color: #d4d4d4;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.todolist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.todolist-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.todolist-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.todolist-items::-webkit-scrollbar-thumb {
+  background: #3a3c46;
+  border-radius: 3px;
+}
+
+.todolist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #1e1e1e;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.todolist-item.completed {
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.todo-checkbox {
+  font-size: 14px;
+  color: #888;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.todolist-item.completed .todo-checkbox {
+  color: #4ade80;
+}
+
+.todo-content {
+  color: #d4d4d4;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.todolist-item.completed .todo-content {
+  color: #888;
+  text-decoration: line-through;
+}
+
+.todolist-summary {
+  color: #888;
+  font-size: 11px;
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* Actions */
+.overview-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.open-with-container {
+  position: relative;
+}
+
+.open-with-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #3a3c46;
+  border: none;
+  border-radius: 6px;
+  color: #d4d4d4;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.open-with-button:hover {
+  background: #4a4c56;
+}
+
+.open-with-button:active {
+  background: #5a5c66;
+}
+
+.button-icon {
+  font-size: 14px;
+}
+
+.editor-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  background: #2a2c36;
+  border: 1px solid #3a3c46;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  min-width: 150px;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.editor-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: #d4d4d4;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.editor-menu-item:hover {
+  background: rgba(74, 158, 255, 0.15);
+  color: #4a9eff;
+}
+
+.editor-menu-item:active {
+  background: rgba(74, 158, 255, 0.25);
+}
+
+.editor-menu-item:first-child {
+  border-radius: 7px 7px 0 0;
+}
+
+.editor-menu-item:last-child {
+  border-radius: 0 0 7px 7px;
+}
+
+.editor-menu-item:only-child {
+  border-radius: 7px;
+}
+
+.editor-menu-loading,
+.editor-menu-empty {
+  padding: 12px 14px;
+  color: #888;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Footer */
+.overview-footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #3a3c46;
+}
+
+.agent-id-label {
+  color: #666;
+  font-size: 10px;
+  font-family: 'Menlo', 'Monaco', monospace;
+}

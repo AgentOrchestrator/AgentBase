@@ -305,3 +305,28 @@ contextBridge.exposeInMainWorld('representationAPI', {
   getAllProviders: () =>
     unwrapResponse<ProviderInfo[]>(ipcRenderer.invoke('representation:get-all-providers')),
 } as RepresentationAPI);
+
+// Editor application identifiers
+export type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
+
+// Type definitions for the shell API
+export interface ShellAPI {
+  /** Open a directory with a specific editor application */
+  openWithEditor: (directoryPath: string, editor: EditorApp) => Promise<void>;
+  /** Get list of available editors on this system */
+  getAvailableEditors: () => Promise<EditorApp[]>;
+  /** Open a path in the system file manager */
+  showInFolder: (path: string) => Promise<void>;
+}
+
+// Expose shell API
+contextBridge.exposeInMainWorld('shellAPI', {
+  openWithEditor: async (directoryPath: string, editor: EditorApp) => {
+    await unwrapResponse(ipcRenderer.invoke('shell:open-with-editor', directoryPath, editor));
+  },
+  getAvailableEditors: () =>
+    unwrapResponse<EditorApp[]>(ipcRenderer.invoke('shell:get-available-editors')),
+  showInFolder: async (path: string) => {
+    await unwrapResponse(ipcRenderer.invoke('shell:show-in-folder', path));
+  },
+} as ShellAPI);

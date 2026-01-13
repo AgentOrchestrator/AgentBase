@@ -61,11 +61,23 @@ export interface CodingAgentAPI {
   isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
 }
 
+export type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
+
+export interface ShellAPI {
+  /** Open a directory with a specific editor application */
+  openWithEditor: (directoryPath: string, editor: EditorApp) => Promise<void>;
+  /** Get list of available editors on this system */
+  getAvailableEditors: () => Promise<EditorApp[]>;
+  /** Open a path in the system file manager */
+  showInFolder: (path: string) => Promise<void>;
+}
+
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
     canvasAPI?: CanvasAPI;
     codingAgentAPI?: CodingAgentAPI;
+    shellAPI?: ShellAPI;
   }
 }
 
