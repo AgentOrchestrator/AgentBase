@@ -3,7 +3,18 @@
  * Implementations can be sync or async depending on their data source
  */
 
-import type { ChatHistory, ProjectInfo, LoaderOptions, AgentType } from './types.js';
+import type {
+  ChatHistory,
+  ChatMessage,
+  ProjectInfo,
+  LoaderOptions,
+  AgentType,
+  SessionSummary,
+  SessionContent,
+  SessionChange,
+  SessionFilterOptions,
+  MessageFilterOptions,
+} from './types.js';
 
 /**
  * Base interface for all chat history loaders
@@ -101,4 +112,79 @@ export interface ILoaderRegistry {
    * Get a specific loader by agent type
    */
   getByType(agentType: AgentType): IChatHistoryLoader | undefined;
+}
+
+// =============================================================================
+// Chat History Provider (Extended interface with sync capabilities)
+// =============================================================================
+
+/**
+ * Extended interface for chat history providers with sync, filtering, and streaming
+ *
+ * This interface extends IChatHistoryLoader with:
+ * - Efficient listing without loading all messages
+ * - Change detection for incremental sync
+ * - Watch capabilities for real-time updates
+ * - Streaming for large sessions
+ * - Filtering by message type
+ */
+export interface IChatHistoryProvider extends IChatHistoryLoader {
+  /**
+   * Get modification times for incremental sync detection
+   *
+   * @param filter - Optional filter options
+   * @returns Map of session ID to last modification timestamp (Unix ms)
+   */
+  getSessionModificationTimes(
+    filter?: SessionFilterOptions
+  ): Promise<Map<string, number>>;
+
+  /**
+   * List sessions with summaries (without full messages)
+   * More efficient than readHistories() for listing views
+   *
+   * @param filter - Optional filter options
+   * @returns Array of session summaries
+   */
+  listSessionSummaries(filter?: SessionFilterOptions): Promise<SessionSummary[]>;
+
+  /**
+   * Get full session content with optional message filtering
+   *
+   * @param sessionId - Session ID to retrieve
+   * @param filter - Optional message filter options
+   * @returns Session content or null if not found
+   */
+  getFilteredSession(
+    sessionId: string,
+    filter?: MessageFilterOptions
+  ): Promise<SessionContent | null>;
+
+  /**
+   * Stream messages one at a time (memory efficient for large sessions)
+   *
+   * @param sessionId - Session ID to stream
+   * @param filter - Optional message filter options
+   * @yields ChatMessage objects one at a time
+   */
+  streamSessionMessages?(
+    sessionId: string,
+    filter?: MessageFilterOptions
+  ): AsyncGenerator<ChatMessage, void, unknown>;
+
+  /**
+   * Watch for session changes (file modifications, new sessions, deletions)
+   *
+   * @param callback - Function called when a session changes
+   * @returns Unsubscribe function to stop watching
+   */
+  watchSessions?(callback: (change: SessionChange) => void): () => void;
+
+  /**
+   * Get data source paths for this provider
+   * Used for file watching and debugging
+   *
+   * @returns Array of paths where this provider reads data from
+   */
+  getDataPaths(): string[];
 }
