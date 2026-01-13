@@ -1,81 +1,105 @@
+/**
+ * AgentNodePresentation
+ *
+ * Presentation component for AgentNode that uses context hooks for services.
+ * Handles UI rendering, status display, and user interactions.
+ */
+
 import React, { useState, useCallback, useEffect } from 'react';
-import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
-import './AgentNode.css';
-import AgentOverviewView from './AgentOverviewView';
-import AgentTerminalView from './AgentTerminalView';
-import AttachmentHeader from './AttachmentHeader';
-import IssueDetailsModal from './IssueDetailsModal';
+import { Handle, Position, NodeResizer } from '@xyflow/react';
+import AgentOverviewView from '../../AgentOverviewView';
+import AgentTerminalView from '../../AgentTerminalView';
+import AttachmentHeader from '../../AttachmentHeader';
+import IssueDetailsModal from '../../IssueDetailsModal';
 import {
   isLinearIssueAttachment,
   isWorkspaceMetadataAttachment,
   createLinearIssueAttachment,
   createWorkspaceMetadataAttachment,
   TerminalAttachment,
-} from './types/attachments';
-import type { AgentNodeData, AgentNodeView } from './types/agent-node';
-import { agentStore } from './stores';
+} from '../../types/attachments';
+import type { AgentNodeData, AgentNodeView } from '../../types/agent-node';
+import {
+  useAgentService,
+  useWorkspaceService,
+  useNodeInitialized,
+} from '../../context';
+import '../../AgentNode.css';
+
+export interface AgentNodePresentationProps {
+  /** Agent node data */
+  data: AgentNodeData;
+  /** Callback when node data changes */
+  onDataChange: (data: Partial<AgentNodeData>) => void;
+}
 
 /**
- * Agent Node
+ * AgentNodePresentation
  *
- * Wrapper component that contains both AgentOverviewView and AgentTerminalView
- * with tab switching capability. Uses React Flow NodeProps pattern.
+ * Renders the agent node UI with overview/terminal tabs,
+ * attachments, and status display.
  */
-function AgentNode({ data, id }: NodeProps) {
-  const nodeData = data as unknown as AgentNodeData;
+export function AgentNodePresentation({
+  data,
+  onDataChange,
+}: AgentNodePresentationProps) {
+  const agent = useAgentService();
+  const workspace = useWorkspaceService();
+  const isInitialized = useNodeInitialized();
+
   const [activeView, setActiveView] = useState<AgentNodeView>(
-    nodeData.activeView || 'overview'
+    data.activeView || 'overview'
   );
   const [isDragOver, setIsDragOver] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
-  // Subscribe to store updates for this agent
-  const [agentData, setAgentData] = useState<AgentNodeData>(nodeData);
-
+  // Auto-start CLI when initialized (if enabled)
   useEffect(() => {
-    // Try to get data from store first
-    const storeData = agentStore.getAgent(nodeData.agentId);
-    if (storeData) {
-      setAgentData(storeData);
+    if (isInitialized && agent.isAutoStartEnabled()) {
+      agent.start().catch((err) => {
+        console.error('[AgentNode] Failed to auto-start agent:', err);
+      });
     }
 
-    // Subscribe to updates
-    const unsubscribe = agentStore.subscribe(nodeData.agentId, (updatedAgent) => {
-      setAgentData(updatedAgent);
+    return () => {
+      // Stop agent on unmount
+      agent.stop().catch((err) => {
+        console.error('[AgentNode] Failed to stop agent:', err);
+      });
+    };
+  }, [isInitialized, agent]);
+
+  // Subscribe to status changes
+  useEffect(() => {
+    const unsubscribe = agent.onStatusChange((_agentId, _oldStatus, newStatus) => {
+      // Update node data with new status
+      onDataChange({
+        status: newStatus.status,
+        statusInfo: newStatus,
+      });
     });
 
     return unsubscribe;
-  }, [nodeData.agentId]);
+  }, [agent, onDataChange]);
 
   // Handle view change
   const handleViewChange = useCallback(
     (view: AgentNodeView) => {
       setActiveView(view);
-      // Notify canvas of view change
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: { ...agentData, activeView: view } },
-        })
-      );
+      onDataChange({ activeView: view });
     },
-    [id, agentData]
+    [onDataChange]
   );
 
   // Handle title change
   const handleTitleChange = useCallback(
     (newTitle: string) => {
-      const updatedData = {
-        ...agentData,
+      onDataChange({
         title: { value: newTitle, isManuallySet: true },
-      };
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: updatedData },
-        })
-      );
+      });
     },
-    [id, agentData]
+    [onDataChange]
   );
 
   // Handle attachment details click
@@ -118,34 +142,33 @@ function AgentNode({ data, id }: NodeProps) {
           newAttachment = createLinearIssueAttachment(droppedData);
         } else if (attachmentType === 'workspace-metadata' || droppedData.path) {
           newAttachment = createWorkspaceMetadataAttachment(droppedData);
+
+          // Update workspace service with the dropped path
+          if (droppedData.path) {
+            workspace.setWorkspacePath(droppedData.path);
+          }
         }
 
         if (newAttachment) {
-          const currentAttachments = agentData.attachments || [];
+          const currentAttachments = data.attachments || [];
           const isDuplicate = currentAttachments.some(
             (a) => a.type === newAttachment!.type && a.id === newAttachment!.id
           );
 
           if (!isDuplicate) {
-            const updatedData = {
-              ...agentData,
+            onDataChange({
               attachments: [...currentAttachments, newAttachment],
-            };
-            window.dispatchEvent(
-              new CustomEvent('update-node', {
-                detail: { nodeId: id, data: updatedData },
-              })
-            );
+            });
           }
         }
       } catch (error) {
         console.error('[AgentNode] Error parsing dropped data', error);
       }
     },
-    [id, agentData]
+    [data.attachments, onDataChange, workspace]
   );
 
-  const attachments = agentData.attachments || [];
+  const attachments = data.attachments || [];
 
   // Extract workspace path from attachments
   const workspacePath = attachments
@@ -201,17 +224,17 @@ function AgentNode({ data, id }: NodeProps) {
       <div className="agent-node-content">
         {activeView === 'overview' ? (
           <AgentOverviewView
-            agentId={agentData.agentId}
-            title={agentData.title}
-            summary={agentData.summary}
-            status={agentData.status}
-            statusInfo={agentData.statusInfo}
-            progress={agentData.progress}
+            agentId={data.agentId}
+            title={data.title}
+            summary={data.summary}
+            status={data.status}
+            statusInfo={data.statusInfo}
+            progress={data.progress}
             workspacePath={workspacePath}
             onTitleChange={handleTitleChange}
           />
         ) : (
-          <AgentTerminalView terminalId={agentData.terminalId} />
+          <AgentTerminalView terminalId={data.terminalId} />
         )}
       </div>
 
@@ -230,5 +253,3 @@ function AgentNode({ data, id }: NodeProps) {
     </div>
   );
 }
-
-export default AgentNode;

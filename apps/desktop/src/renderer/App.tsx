@@ -1,11 +1,19 @@
+import { useMemo } from 'react';
 import Canvas from './Canvas';
+import { NodeServicesRegistryProvider } from './context';
+import { createServiceFactories } from './services';
 import './App.css';
 
 function App() {
+  // Create service factories once
+  const factories = useMemo(() => createServiceFactories(), []);
+
   return (
-    <div className="app">
-      <Canvas />
-    </div>
+    <NodeServicesRegistryProvider factories={factories}>
+      <div className="app">
+        <Canvas />
+      </div>
+    </NodeServicesRegistryProvider>
   );
 }
 
