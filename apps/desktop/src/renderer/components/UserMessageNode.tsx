@@ -35,9 +35,6 @@ function UserMessageNode({ data, id, selected }: NodeProps) {
       
       <div className="user-message-header">
         <span className="user-message-label">User</span>
-        <span className="user-message-timestamp">
-          {new Date(messageGroup.timestamp).toLocaleTimeString()}
-        </span>
       </div>
       
       <div 

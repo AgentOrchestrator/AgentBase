@@ -1,5 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { AssistantMessageGroup, MessageContent } from '../types/conversation';
 import './AssistantMessageNode.css';
 
@@ -49,7 +51,9 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
     if (content.type === 'text') {
       return (
         <div key={`text-${entryIndex}`} className="assistant-text-content">
-          {content.text}
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {content.text}
+          </ReactMarkdown>
         </div>
       );
     }
@@ -64,12 +68,6 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
       
       <div className="assistant-message-header">
         <span className="assistant-message-label">Assistant</span>
-        {messageGroup.model && (
-          <span className="assistant-model">{messageGroup.model}</span>
-        )}
-        <span className="assistant-message-timestamp">
-          {new Date(messageGroup.timestamp).toLocaleTimeString()}
-        </span>
       </div>
       
       <div 
