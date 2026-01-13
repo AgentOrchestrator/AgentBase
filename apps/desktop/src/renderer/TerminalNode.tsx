@@ -26,7 +26,7 @@ interface TerminalNodeData {
   };
 }
 
-function TerminalNode({ data, id }: NodeProps) {
+function TerminalNode({ data, id, selected }: NodeProps) {
   const nodeData = data as unknown as TerminalNodeData;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -40,6 +40,32 @@ function TerminalNode({ data, id }: NodeProps) {
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // Handle wheel events when node is selected - prevent canvas scrolling
+  useEffect(() => {
+    const contentElement = terminalRef.current;
+    if (!contentElement || !selected) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Always prevent canvas scrolling when node is selected
+      e.stopPropagation();
+    };
+
+    contentElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      contentElement.removeEventListener('wheel', handleWheel);
+    };
+  }, [selected]);
+
+  // Focus/blur terminal based on selection state
+  useEffect(() => {
+    if (terminalInstanceRef.current) {
+      if (selected) {
+        terminalInstanceRef.current.focus();
+      } else {
+        terminalInstanceRef.current.blur();
+      }
+    }
+  }, [selected]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -892,7 +918,7 @@ function TerminalNode({ data, id }: NodeProps) {
 
   return (
     <div
-      className={`terminal-node ${isDragOver ? 'drag-over' : ''}`}
+      className={`terminal-node ${isDragOver ? 'drag-over' : ''} ${selected ? 'selected' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -925,8 +951,8 @@ function TerminalNode({ data, id }: NodeProps) {
 
       <div
         ref={terminalRef}
-        className="terminal-node-content"
-        onClick={() => terminalInstanceRef.current?.focus()}
+        className={`terminal-node-content ${selected ? 'active' : ''}`}
+        style={{ pointerEvents: selected ? 'auto' : 'none' }}
       />
       <Handle type="source" position={Position.Bottom} />
 
