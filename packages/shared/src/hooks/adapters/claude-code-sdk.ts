@@ -188,7 +188,7 @@ function buildDelegationEndPayload(input: SubagentStopHookInput): DelegationPayl
 /**
  * Build vendor-agnostic payload from SDK PreCompact input
  */
-function buildContextPayload(input: PreCompactHookInput): ContextPayload {
+function buildContextPayload(_input: PreCompactHookInput): ContextPayload {
   return {
     operation: 'compact',
     // Token counts not available in SDK input
@@ -330,7 +330,7 @@ export function createSDKHookBridge(
     eventType: AgentEventType,
     payloadBuilder: (input: T) => unknown
   ): HookCallback {
-    return async (input, toolUseId, context): Promise<HookJSONOutput> => {
+    return async (input, _toolUseId, _context): Promise<HookJSONOutput> => {
       // Build vendor-agnostic event
       const event: AgentEvent = {
         id: randomUUID(),

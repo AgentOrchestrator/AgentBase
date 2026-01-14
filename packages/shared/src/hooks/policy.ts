@@ -330,7 +330,7 @@ export const POLICY_CONFIG_FILENAME = '.agent-base/permissions.json';
  * @returns Loaded or default permission policy
  */
 export async function loadPermissionPolicy(
-  workspacePath: string
+  _workspacePath: string
 ): Promise<PermissionPolicy> {
   // This is a placeholder - actual file loading would be done in the consumer
   // (e.g., desktop app) since we don't want to add fs dependencies to shared

@@ -2,14 +2,13 @@ import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { query, type Query, type SDKMessage, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { BaseCliAgent } from './BaseCliAgent';
 import {
   createEventRegistry,
-  createEvent,
+  createSDKHookBridge,
   type EventRegistry,
-  type SessionPayload,
-  type UserInputPayload,
-  type SystemPayload,
+  type SDKHookBridge,
 } from '@agent-orchestrator/shared';
 import type {
   ICodingAgentProvider,
@@ -35,30 +34,32 @@ import type {
   ContinueOptions,
   ForkOptions,
   ChatMessage,
-  MessageType,
   ToolCategory,
   AgentConfig,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
 
 /**
- * Claude Code CLI agent implementation
+ * Claude Code Agent Implementation
+ *
+ * Hybrid implementation using:
+ * - SDK (@anthropic-ai/claude-agent-sdk) for generation with native hook support
+ * - Filesystem for session listing and chat history access
+ * - CLI for session forking and availability checks
  *
  * Implements:
- * - ICodingAgentProvider: Core generation via `claude -p`
- * - ISessionResumable: Resume via `--resume` and `--continue`
- * - ISessionForkable: Fork via `--fork-session`
+ * - ICodingAgentProvider: Core generation via SDK query()
+ * - ISessionResumable: Resume via SDK options
+ * - ISessionForkable: Fork via CLI --fork-session
  * - IProcessLifecycle: Lifecycle management (inherited from BaseCliAgent)
+ * - IChatHistoryProvider: Session listing via filesystem (~/.claude/projects)
  *
- * Does NOT implement ISessionManager since Claude Code CLI
- * doesn't expose session listing commands (CLI-only approach).
- *
- * CLI Commands Used:
- * - `claude -p "prompt"` - One-off generation
- * - `claude --resume <id> -p "prompt"` - Resume by ID/name
- * - `claude --continue -p "prompt"` - Resume latest session
- * - `claude --fork-session --session-id <parent>` - Fork session
- * - `claude --version` - Verify availability
+ * SDK Hooks (automatically triggered):
+ * - PreToolUse, PostToolUse, PostToolUseFailure
+ * - SessionStart, SessionEnd, Stop
+ * - UserPromptSubmit, PermissionRequest
+ * - SubagentStart, SubagentStop
+ * - PreCompact, Notification
  */
 /**
  * JSONL line structure from Claude Code session files
@@ -88,13 +89,19 @@ export class ClaudeCodeAgent
 {
   private static readonly DEFAULT_EXECUTABLE = 'claude';
   private readonly eventRegistry: EventRegistry;
-  private currentSessionId: string | null = null;
+  private readonly hookBridge: SDKHookBridge;
+  private currentQuery: Query | null = null;
   private readonly debugHooks: boolean;
 
   constructor(config: ClaudeCodeAgentConfig) {
     super(config);
-    this.eventRegistry = createEventRegistry();
     this.debugHooks = config.debugHooks ?? false;
+
+    // Create event registry and SDK hook bridge for native hook support
+    this.eventRegistry = createEventRegistry();
+    this.hookBridge = createSDKHookBridge(this.eventRegistry, {
+      debug: this.debugHooks,
+    });
   }
 
   /**
@@ -159,7 +166,7 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // ICodingAgentProvider Implementation
+  // ICodingAgentProvider Implementation (SDK-based)
   // ============================================
 
   async generate(request: GenerateRequest): Promise<Result<GenerateResponse, AgentError>> {
@@ -168,37 +175,41 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    // Generate session ID for this request
-    this.currentSessionId = crypto.randomUUID();
+    try {
+      const options = this.buildSDKOptions(request);
+      let fullContent = '';
+      let messageId = '';
 
-    // Emit session:start event
-    await this.emitSessionStart(request.workingDirectory);
+      // Run query and collect all output - SDK hooks fire automatically
+      const queryInstance = query({ prompt: request.prompt, options });
+      this.currentQuery = queryInstance;
 
-    // Emit user_input:complete event
-    await this.emitUserInput(request.prompt);
+      for await (const message of queryInstance) {
+        if (message.type === 'assistant') {
+          const content = this.extractTextContent(message);
+          fullContent += content;
+          messageId = message.uuid;
+        } else if (message.type === 'result') {
+          break;
+        }
+      }
 
-    const args = this.buildGenerateArgs(request);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: request.workingDirectory,
-      timeout: request.timeout,
-      stdinInput: request.prompt, // Claude CLI expects prompt via stdin in --print mode
-    });
+      this.currentQuery = null;
 
-    if (spawnResult.success === false) {
-      await this.emitSessionEnd('error', spawnResult.error.message);
-      return { success: false, error: spawnResult.error };
+      return ok({
+        content: fullContent.trim(),
+        messageId: messageId || crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.currentQuery = null;
+      return err(
+        agentError(
+          AgentErrorCode.UNKNOWN_ERROR,
+          `SDK query failed: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
     }
-
-    const result = await this.collectOutput(spawnResult.data, request.timeout);
-
-    // Emit session:end event
-    if (result.success) {
-      await this.emitSessionEnd('completed');
-    } else {
-      await this.emitSessionEnd('error', result.error.message);
-    }
-
-    return result;
   }
 
   async generateStreaming(
@@ -210,52 +221,102 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    // Generate session ID for this request
-    this.currentSessionId = crypto.randomUUID();
+    try {
+      const options = this.buildSDKOptions(request);
+      options.includePartialMessages = true; // Enable streaming deltas
 
-    // Emit session:start event
-    await this.emitSessionStart(request.workingDirectory);
+      let fullContent = '';
+      let messageId = '';
 
-    // Emit user_input:complete event
-    await this.emitUserInput(request.prompt);
+      const queryInstance = query({ prompt: request.prompt, options });
+      this.currentQuery = queryInstance;
 
-    const args = this.buildGenerateArgs(request);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: request.workingDirectory,
-      timeout: request.timeout,
-      stdinInput: request.prompt, // Claude CLI expects prompt via stdin in --print mode
-    });
+      for await (const message of queryInstance) {
+        if (message.type === 'stream_event') {
+          const delta = this.extractStreamDelta(message);
+          if (delta) {
+            fullContent += delta;
+            onChunk(delta);
+          }
+        } else if (message.type === 'assistant') {
+          messageId = message.uuid;
+        } else if (message.type === 'result') {
+          break;
+        }
+      }
 
-    if (spawnResult.success === false) {
-      await this.emitSessionEnd('error', spawnResult.error.message);
-      return { success: false, error: spawnResult.error };
+      this.currentQuery = null;
+
+      return ok({
+        content: fullContent.trim(),
+        messageId: messageId || crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.currentQuery = null;
+      return err(
+        agentError(
+          AgentErrorCode.UNKNOWN_ERROR,
+          `SDK streaming query failed: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
     }
-
-    const result = await this.streamOutput(spawnResult.data, onChunk, request.timeout);
-
-    // Emit session:end event
-    if (result.success) {
-      await this.emitSessionEnd('completed');
-    } else {
-      await this.emitSessionEnd('error', result.error.message);
-    }
-
-    return result;
   }
 
-  private buildGenerateArgs(request: GenerateRequest): string[] {
-    // Use --print flag for non-interactive mode; prompt is sent via stdin
-    const args: string[] = ['-p'];
+  private buildSDKOptions(request: Partial<GenerateRequest>): Options {
+    return {
+      // Include hook bridge for native SDK hooks
+      hooks: this.hookBridge.hooks,
 
-    if (request.systemPrompt) {
-      args.push('--append-system-prompt', request.systemPrompt);
+      // Use Claude Code's preset system prompt and tools
+      systemPrompt: request.systemPrompt
+        ? { type: 'preset', preset: 'claude_code', append: request.systemPrompt }
+        : { type: 'preset', preset: 'claude_code' },
+      tools: { type: 'preset', preset: 'claude_code' },
+
+      // Set working directory
+      cwd: request.workingDirectory ?? process.cwd(),
+    };
+  }
+
+  private extractTextContent(message: SDKMessage): string {
+    if (message.type !== 'assistant') return '';
+
+    const apiMessage = message.message;
+    if (!apiMessage.content) return '';
+
+    if (typeof apiMessage.content === 'string') {
+      return apiMessage.content;
     }
 
-    return args;
+    // Handle content array
+    return apiMessage.content
+      .filter(
+        (block: { type: string }): block is { type: 'text'; text: string } => block.type === 'text'
+      )
+      .map((block: { type: 'text'; text: string }) => block.text)
+      .join('');
+  }
+
+  private extractStreamDelta(message: SDKMessage): string | null {
+    if (message.type !== 'stream_event') return null;
+
+    const event = message.event;
+    if (
+      event.type === 'content_block_delta' &&
+      event.delta &&
+      'type' in event.delta &&
+      event.delta.type === 'text_delta' &&
+      'text' in event.delta
+    ) {
+      return (event.delta as { type: 'text_delta'; text: string }).text;
+    }
+
+    return null;
   }
 
   // ============================================
-  // ISessionResumable Implementation
+  // ISessionResumable Implementation (SDK-based)
   // ============================================
 
   async continueSession(
@@ -268,40 +329,51 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    // Set session ID from identifier or generate new
-    this.currentSessionId =
-      identifier.type === 'id' || identifier.type === 'name'
-        ? identifier.value
-        : crypto.randomUUID();
+    try {
+      const sdkOptions = this.buildSDKOptions({
+        prompt,
+        workingDirectory: options?.workingDirectory,
+      });
 
-    // Emit session:start event (resume)
-    await this.emitSessionStart(options?.workingDirectory, 'resume');
+      // Add resume option based on identifier
+      if (identifier.type === 'latest') {
+        sdkOptions.continue = true;
+      } else if (identifier.type === 'id' || identifier.type === 'name') {
+        sdkOptions.resume = identifier.value;
+      }
 
-    // Emit user_input:complete event
-    await this.emitUserInput(prompt);
+      let fullContent = '';
+      let messageId = '';
 
-    const args = this.buildContinueArgs(identifier);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: options?.workingDirectory,
-      timeout: options?.timeout,
-      stdinInput: prompt, // Claude CLI expects prompt via stdin
-    });
+      const queryInstance = query({ prompt, options: sdkOptions });
+      this.currentQuery = queryInstance;
 
-    if (spawnResult.success === false) {
-      await this.emitSessionEnd('error', spawnResult.error.message);
-      return { success: false, error: spawnResult.error };
+      for await (const message of queryInstance) {
+        if (message.type === 'assistant') {
+          const content = this.extractTextContent(message);
+          fullContent += content;
+          messageId = message.uuid;
+        } else if (message.type === 'result') {
+          break;
+        }
+      }
+
+      this.currentQuery = null;
+
+      return ok({
+        content: fullContent.trim(),
+        messageId: messageId || crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.currentQuery = null;
+      return err(
+        agentError(
+          AgentErrorCode.SESSION_INVALID,
+          `Failed to continue session: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
     }
-
-    const result = await this.collectOutput(spawnResult.data, options?.timeout);
-
-    // Emit session:end event
-    if (result.success) {
-      await this.emitSessionEnd('completed');
-    } else {
-      await this.emitSessionEnd('error', result.error.message);
-    }
-
-    return result;
   }
 
   async continueSessionStreaming(
@@ -315,57 +387,56 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    // Set session ID from identifier or generate new
-    this.currentSessionId =
-      identifier.type === 'id' || identifier.type === 'name'
-        ? identifier.value
-        : crypto.randomUUID();
+    try {
+      const sdkOptions = this.buildSDKOptions({
+        prompt,
+        workingDirectory: options?.workingDirectory,
+      });
 
-    // Emit session:start event (resume)
-    await this.emitSessionStart(options?.workingDirectory, 'resume');
+      sdkOptions.includePartialMessages = true;
 
-    // Emit user_input:complete event
-    await this.emitUserInput(prompt);
+      if (identifier.type === 'latest') {
+        sdkOptions.continue = true;
+      } else if (identifier.type === 'id' || identifier.type === 'name') {
+        sdkOptions.resume = identifier.value;
+      }
 
-    const args = this.buildContinueArgs(identifier);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: options?.workingDirectory,
-      timeout: options?.timeout,
-      stdinInput: prompt, // Claude CLI expects prompt via stdin
-    });
+      let fullContent = '';
+      let messageId = '';
 
-    if (spawnResult.success === false) {
-      await this.emitSessionEnd('error', spawnResult.error.message);
-      return { success: false, error: spawnResult.error };
+      const queryInstance = query({ prompt, options: sdkOptions });
+      this.currentQuery = queryInstance;
+
+      for await (const message of queryInstance) {
+        if (message.type === 'stream_event') {
+          const delta = this.extractStreamDelta(message);
+          if (delta) {
+            fullContent += delta;
+            onChunk(delta);
+          }
+        } else if (message.type === 'assistant') {
+          messageId = message.uuid;
+        } else if (message.type === 'result') {
+          break;
+        }
+      }
+
+      this.currentQuery = null;
+
+      return ok({
+        content: fullContent.trim(),
+        messageId: messageId || crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.currentQuery = null;
+      return err(
+        agentError(
+          AgentErrorCode.SESSION_INVALID,
+          `Failed to continue session streaming: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
     }
-
-    const result = await this.streamOutput(spawnResult.data, onChunk, options?.timeout);
-
-    // Emit session:end event
-    if (result.success) {
-      await this.emitSessionEnd('completed');
-    } else {
-      await this.emitSessionEnd('error', result.error.message);
-    }
-
-    return result;
-  }
-
-  private buildContinueArgs(identifier: SessionIdentifier): string[] {
-    // Use --print flag; prompt is sent via stdin
-    const args: string[] = ['-p'];
-
-    switch (identifier.type) {
-      case 'latest':
-        args.push('--continue');
-        break;
-      case 'id':
-      case 'name':
-        args.push('--resume', identifier.value);
-        break;
-    }
-
-    return args;
   }
 
   // ============================================
@@ -706,7 +777,6 @@ export class ClaudeCodeAgent
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(line => line.trim());
     const messages: ChatMessage[] = [];
-    let lastTimestamp: string | undefined;
 
     for (const line of lines) {
       try {
@@ -726,7 +796,6 @@ export class ClaudeCodeAgent
           }
 
           messages.push(msg);
-          if (msg.timestamp) lastTimestamp = msg.timestamp;
         }
       } catch {
         // Skip malformed lines
@@ -984,110 +1053,30 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // Hook Event Emission Helpers
+  // SDK Query Management
   // ============================================
 
   /**
-   * Emit session:start event
+   * Cancel any running SDK query
    */
-  private async emitSessionStart(
-    workspacePath?: string,
-    source: string = 'cli'
-  ): Promise<void> {
-    const event = createEvent<SessionPayload>(
-      'session:start',
-      'claude_code',
-      {
-        sessionId: this.currentSessionId ?? '',
-        workspacePath,
-        reason: source,
-      },
-      {
-        sessionId: this.currentSessionId ?? undefined,
-        workspacePath,
+  async cancelCurrentQuery(): Promise<void> {
+    if (this.currentQuery) {
+      try {
+        await this.currentQuery.interrupt();
+      } catch {
+        // Ignore interrupt errors
       }
-    );
-
-    if (this.debugHooks) {
-      console.log('[ClaudeCodeAgent] session:start', event.payload);
+      this.currentQuery = null;
     }
-
-    await this.eventRegistry.emit(event);
   }
 
   /**
-   * Emit session:end event
+   * Cleanup resources on dispose
    */
-  private async emitSessionEnd(
-    reason: string,
-    errorMessage?: string
-  ): Promise<void> {
-    const event = createEvent<SessionPayload>(
-      'session:end',
-      'claude_code',
-      {
-        sessionId: this.currentSessionId ?? '',
-        reason: errorMessage ? `${reason}: ${errorMessage}` : reason,
-      },
-      {
-        sessionId: this.currentSessionId ?? undefined,
-      }
-    );
-
-    if (this.debugHooks) {
-      console.log('[ClaudeCodeAgent] session:end', event.payload);
-    }
-
-    await this.eventRegistry.emit(event);
-    this.currentSessionId = null;
-  }
-
-  /**
-   * Emit user_input:complete event
-   */
-  private async emitUserInput(prompt: string): Promise<void> {
-    const event = createEvent<UserInputPayload>(
-      'user_input:complete',
-      'claude_code',
-      {
-        content: prompt,
-        hasFiles: false,
-      },
-      {
-        sessionId: this.currentSessionId ?? undefined,
-      }
-    );
-
-    if (this.debugHooks) {
-      console.log('[ClaudeCodeAgent] user_input:complete', {
-        contentLength: prompt.length,
-      });
-    }
-
-    await this.eventRegistry.emit(event);
-  }
-
-  /**
-   * Emit system:error event
-   */
-  private async emitSystemError(message: string, code?: string): Promise<void> {
-    const event = createEvent<SystemPayload>(
-      'system:error',
-      'claude_code',
-      {
-        level: 'error',
-        message,
-        code,
-      },
-      {
-        sessionId: this.currentSessionId ?? undefined,
-      }
-    );
-
-    if (this.debugHooks) {
-      console.log('[ClaudeCodeAgent] system:error', event.payload);
-    }
-
-    await this.eventRegistry.emit(event);
+  async dispose(): Promise<void> {
+    await this.cancelCurrentQuery();
+    this.hookBridge.cleanup();
+    this.eventRegistry.clear();
+    await super.dispose();
   }
 }
