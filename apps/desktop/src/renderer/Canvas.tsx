@@ -2,7 +2,6 @@ import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
-  MiniMap,
   Background,
   BackgroundVariant,
   useNodesState,
@@ -211,6 +210,13 @@ function CanvasFlow() {
   const [showPillContent, setShowPillContent] = useState(false);
   const [isContentVisible, setIsContentVisible] = useState(false);
   const [isTextVisible, setIsTextVisible] = useState(true);
+
+  // Empty pill copy state
+  const [isPillCopyExpanded, setIsPillCopyExpanded] = useState(false);
+  const [isPillCopySquare, setIsPillCopySquare] = useState(false);
+  const [showPillCopyContent, setShowPillCopyContent] = useState(false);
+  const [isPillCopyContentVisible, setIsPillCopyContentVisible] = useState(false);
+  const [isPillCopyTextVisible, setIsPillCopyTextVisible] = useState(true);
   const [issues, setIssues] = useState<LinearIssue[]>([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
   const [linearWorkspaceName, setLinearWorkspaceName] = useState('');
@@ -796,6 +802,53 @@ function CanvasFlow() {
     }, 50);
   }, []);
 
+  // Empty pill copy toggle and collapse functions
+  const togglePillCopy = useCallback(() => {
+    if (!isPillCopyExpanded) {
+      // Hide text immediately when expanding
+      setIsPillCopyTextVisible(false);
+      // Both phases start simultaneously
+      setIsPillCopyExpanded(true);
+      setIsPillCopySquare(true);
+      // Show pill content after expansion completes (300ms) + 50ms delay
+      setTimeout(() => {
+        setShowPillCopyContent(true);
+        // Start content animation after pill content is shown
+        setTimeout(() => {
+          setIsPillCopyContentVisible(true);
+        }, 100);
+      }, 350);
+    } else {
+      // Hide animations immediately when collapsing
+      setIsPillCopyContentVisible(false);
+      // Hide pill content immediately when collapsing
+      setShowPillCopyContent(false);
+      // Both phases collapse simultaneously
+      setIsPillCopySquare(false);
+      setIsPillCopyExpanded(false);
+      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
+      setTimeout(() => {
+        setIsPillCopyTextVisible(true);
+      }, 350);
+    }
+  }, [isPillCopyExpanded]);
+
+  const collapsePillCopy = useCallback(() => {
+    // First hide animations immediately
+    setIsPillCopyContentVisible(false);
+    // First hide content with 50ms delay
+    setShowPillCopyContent(false);
+    setTimeout(() => {
+      // Then collapse the pill
+      setIsPillCopySquare(false);
+      setIsPillCopyExpanded(false);
+      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
+      setTimeout(() => {
+        setIsPillCopyTextVisible(true);
+      }, 350);
+    }, 50);
+  }, []);
+
   // Drag and drop handlers for issue cards
   const handleIssueDragStart = useCallback((e: React.DragEvent, issue: LinearIssue) => {
     e.dataTransfer.effectAllowed = 'copy';
@@ -1249,33 +1302,61 @@ function CanvasFlow() {
                           className="sidebar-folder-header"
                           onClick={() => toggleProject(projectName)}
                         >
-                          <span className="sidebar-folder-icon">
-                            {isProjectCollapsed ? '▶' : '▼'}
+                          <span className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="15 18 9 12 15 6" />
+                            </svg>
                           </span>
-                          <svg
-                            className="sidebar-folder-svg"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 512 512"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
+                          {isProjectCollapsed ? (
+                            <svg
+                              className="sidebar-folder-svg"
+                              width="14"
+                              height="14"
+                              viewBox="0 0 800 800"
                               fill="none"
-                              stroke="currentColor"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="32"
-                            />
-                            <path
-                              d="M479.9,226.55,463.68,392a40,40,0,0,1-39.93,40H88.25a40,40,0,0,1-39.93-40L32.1,226.55A32,32,0,0,1,64,192h384.1A32,32,0,0,1,479.9,226.55Z"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="32"
-                            />
-                          </svg>
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M100 304L100.001 187.5C100.001 170.924 106.586 155.027 118.307 143.306C130.028 131.585 145.925 125 162.501 125H281.079C293.42 125 305.484 128.654 315.751 135.5L359.251 164.5C369.519 171.346 381.583 175 393.923 175H637.501C654.077 175 669.974 181.585 681.695 193.306C693.417 205.027 700.001 220.924 700.001 237.5V304"
+                                stroke="currentColor"
+                                strokeWidth="50"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M727.072 353.984L724.499 612.5C724.499 629.057 717.929 644.938 706.232 656.656C694.535 668.373 678.666 674.971 662.109 675H137.893C121.336 674.971 105.467 668.373 93.7692 656.656C82.0718 644.938 75.5021 629.057 75.5021 612.5L74.0028 353.984C73.4527 347.104 74.3332 340.185 76.5886 333.662C78.844 327.138 82.4255 321.153 87.1077 316.082C91.7898 311.01 97.4712 306.964 103.794 304.196C110.117 301.428 116.944 300 123.847 300L677.385 300C684.274 300.021 691.084 301.466 697.388 304.243C703.692 307.02 709.355 311.07 714.02 316.139C718.686 321.208 722.253 327.186 724.499 333.698C726.745 340.211 727.621 347.117 727.072 353.984Z"
+                                stroke="currentColor"
+                                strokeWidth="50"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="sidebar-folder-svg"
+                              width="14"
+                              height="14"
+                              viewBox="0 0 512 512"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="32"
+                              />
+                              <path
+                                d="M479.9,226.55,463.68,392a40,40,0,0,1-39.93,40H88.25a40,40,0,0,1-39.93-40L32.1,226.55A32,32,0,0,1,64,192h384.1A32,32,0,0,1,479.9,226.55Z"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="32"
+                              />
+                            </svg>
+                          )}
                           <span className="sidebar-folder-name">{projectName}</span>
                         </button>
                         {showLock && projectPath && (
@@ -1320,8 +1401,10 @@ function CanvasFlow() {
                                   className="sidebar-folder-header"
                                   onClick={() => toggleBranch(branchKey)}
                                 >
-                                  <span className="sidebar-folder-icon">
-                                    {isBranchCollapsed ? '▶' : '▼'}
+                                  <span className={`sidebar-folder-icon ${isBranchCollapsed ? 'collapsed' : 'expanded'}`}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="15 18 9 12 15 6" />
+                                    </svg>
                                   </span>
                                   <svg
                                     className="sidebar-branch-svg"
@@ -1461,7 +1544,6 @@ function CanvasFlow() {
         elementsSelectable={true}
         nodesFocusable={true}
       >
-        <MiniMap />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       </ReactFlow>
       
@@ -1607,8 +1689,8 @@ function CanvasFlow() {
         </div>
       )}
 
-        {/* Issues Pill */}
-        {isLinearConnected && (
+        {/* Issues Pill - COMMENTED OUT */}
+        {false && isLinearConnected && (
         <div
           onClick={!isPillSquare ? togglePill : undefined}
           className={`issues-pill ${!isPillSquare ? 'cursor-pointer' : 'cursor-default'} ${
@@ -1754,6 +1836,37 @@ function CanvasFlow() {
           ) : null}
         </div>
         )}
+
+        {/* Empty Pill Copy */}
+        <div
+          onClick={!isPillCopySquare ? togglePillCopy : undefined}
+          className={`issues-pill ${!isPillCopySquare ? 'cursor-pointer' : 'cursor-default'} ${
+            isPillCopyExpanded ? 'expanded' : ''
+          } ${isPillCopySquare ? 'square' : ''}`}
+          style={{
+            borderRadius: isPillCopySquare ? '24px' : '20px'
+          }}
+        >
+          {!isPillCopySquare ? (
+            <div className={`pill-text ${isPillCopyTextVisible ? 'visible' : ''}`}>
+              {/* Empty - no text */}
+            </div>
+          ) : showPillCopyContent ? (
+            <div className="pill-content-wrapper" onClick={(e) => e.stopPropagation()}>
+              {/* Collapse nozzle at top */}
+              <div
+                className={`collapse-nozzle ${isPillCopyContentVisible ? 'visible' : ''}`}
+                onClick={collapsePillCopy}
+                title="Collapse"
+              />
+
+              {/* Empty content area */}
+              <div className={`issues-list ${isPillCopyContentVisible ? 'visible' : ''}`}>
+                {/* Empty - no content */}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

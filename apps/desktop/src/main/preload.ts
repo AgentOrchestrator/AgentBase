@@ -571,3 +571,19 @@ contextBridge.exposeInMainWorld('gitAPI', {
     }
   },
 } as GitAPI);
+
+// Type definitions for the window API (custom titlebar controls)
+export interface WindowAPI {
+  minimize: () => void;
+  maximize: () => void;
+  close: () => void;
+  isMaximized: () => Promise<boolean>;
+}
+
+// Expose window control API for custom titlebar
+contextBridge.exposeInMainWorld('windowAPI', {
+  minimize: () => ipcRenderer.send('window-minimize'),
+  maximize: () => ipcRenderer.send('window-maximize'),
+  close: () => ipcRenderer.send('window-close'),
+  isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+} as WindowAPI);

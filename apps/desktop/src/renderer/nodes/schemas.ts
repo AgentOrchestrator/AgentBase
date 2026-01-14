@@ -139,9 +139,9 @@ export const ConversationNodeDataSchema = z.object({
   sessionId: z.string(),
   agentType: z.string(),
   title: z.string(),
-  projectName: z.string(),
-  messageCount: z.number(),
-  timestamp: z.string(),
+  projectName: z.string().optional(),
+  messageCount: z.number().optional(),
+  timestamp: z.string().optional(),
   isExpanded: z.boolean().optional(),
 });
 

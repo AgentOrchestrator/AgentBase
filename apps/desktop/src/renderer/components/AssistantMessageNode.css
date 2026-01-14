@@ -325,3 +325,42 @@
   color: #64748b;
   font-style: italic;
 }
+
+/* Tool Summary - compact gray text */
+.assistant-tool-summary {
+  color: #888;
+  font-size: 11px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Add space before text content when it follows something else */
+.assistant-tool-summary + .assistant-text-content,
+.assistant-text-content + .assistant-text-content {
+  margin-top: 8px;
+}
+
+/* Debug: Thinking Content - Orange text */
+.assistant-thinking-content {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 6px;
+  color: #fb923c;
+}
+
+.assistant-thinking-content .thinking-label {
+  display: block;
+  font-weight: 600;
+  color: #f97316;
+  margin-bottom: 4px;
+}
+
+.assistant-thinking-content .thinking-text {
+  display: block;
+  font-size: 12px;
+  color: #fdba74;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}

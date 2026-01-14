@@ -113,20 +113,6 @@
   background: #2D2D2D;
 }
 
-.consolidated-user-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #232323;
-}
-
-.consolidated-user-label {
-  font-weight: 700;
-  color: #d4d4d4;
-  font-size: 14px;
-}
-
 .consolidated-user-content {
   color: #d4d4d4;
   font-size: 13px;
@@ -142,20 +128,6 @@
   border-radius: 6px;
   padding: 8px;
   background: #1e1e1e;
-}
-
-.consolidated-assistant-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #232323;
-}
-
-.consolidated-assistant-label {
-  font-weight: 700;
-  color: #d4d4d4;
-  font-size: 14px;
 }
 
 .consolidated-assistant-content {
@@ -301,4 +273,43 @@
 
 .consolidated-assistant-text-content > *:last-child {
   margin-bottom: 0;
+}
+
+/* Tool Summary - compact gray text */
+.consolidated-tool-summary {
+  color: #888;
+  font-size: 11px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Add space before text content when it follows something else */
+.consolidated-tool-summary + .consolidated-assistant-text-content,
+.consolidated-assistant-text-content + .consolidated-assistant-text-content {
+  margin-top: 8px;
+}
+
+/* Thinking Content - Orange text */
+.consolidated-thinking-content {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 6px;
+  color: #fb923c;
+}
+
+.consolidated-thinking-content .thinking-label {
+  display: block;
+  font-weight: 600;
+  color: #f97316;
+  margin-bottom: 4px;
+}
+
+.consolidated-thinking-content .thinking-text {
+  display: block;
+  font-size: 12px;
+  color: #fdba74;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }

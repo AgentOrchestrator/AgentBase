@@ -22,7 +22,13 @@ export interface ToolResultContent {
   content: string | Array<TextContent>;
 }
 
-export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
+export interface ThinkingContent {
+  type: 'thinking';
+  thinking: string;
+  signature: string;
+}
+
+export type MessageContent = TextContent | ToolUseContent | ToolResultContent | ThinkingContent;
 
 // Message structure
 export interface ClaudeMessage {
