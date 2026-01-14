@@ -218,9 +218,17 @@ function CanvasFlow() {
       // Create a new terminal and agent node below the starter
       const terminalId = `terminal-${crypto.randomUUID()}`;
       const agentId = `agent-${Date.now()}`;
+      const createdAt = Date.now();
+
+      console.log('[Canvas] Creating agent node from starter', {
+        agentId,
+        terminalId,
+        createdAt: new Date(createdAt).toISOString(),
+        workingDirectory,
+      });
 
       const agentNode = {
-        id: `node-${Date.now()}`,
+        id: `node-${createdAt}`,
         type: 'agent',
         position: {
           x: starterNode.position.x,
@@ -236,6 +244,7 @@ function CanvasFlow() {
           progress: null,
           initialPrompt: message,
           workingDirectory,
+          createdAt,
         },
         style: { width: 600 },
       };
@@ -684,9 +693,16 @@ function CanvasFlow() {
     // Always generate unique IDs for each new node
     const agentId = `agent-${crypto.randomUUID()}`;
     const terminalId = `terminal-${crypto.randomUUID()}`;
+    const createdAt = Date.now();
+
+    console.log('[Canvas] Creating agent node', {
+      agentId,
+      terminalId,
+      createdAt: new Date(createdAt).toISOString(),
+    });
 
     const newNode: Node = {
-      id: `node-${Date.now()}`,
+      id: `node-${createdAt}`,
       type: 'agent',
       position: nodePosition,
       data: {
@@ -699,6 +715,7 @@ function CanvasFlow() {
         progress: null,
         attachments: [],
         activeView: 'overview',
+        createdAt,
       },
       style: {
         width: 500,

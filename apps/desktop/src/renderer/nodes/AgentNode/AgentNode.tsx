@@ -11,7 +11,7 @@ import type { AgentNodeData } from '../../types/agent-node';
 import { NodeContextProvider } from '../../context';
 import { agentStore } from '../../stores';
 import { AgentNodePresentation } from './AgentNodePresentation';
-import { useWorkspaceInheritance } from '../../hooks';
+import { useWorkspaceInheritance, useSessionIdMatcher } from '../../hooks';
 import { WorkspaceSelectionModal } from '../../components/WorkspaceSelectionModal';
 import { createWorkspaceMetadataAttachment } from '../../types/attachments';
 
@@ -80,6 +80,38 @@ function AgentNode({ data, id }: NodeProps) {
 
   // Determine final workspace path (priority: attachment > selected > inherited)
   const workspacePath = attachmentWorkspacePath || selectedWorkspace || inheritedWorkspacePath;
+
+  // Log workspace path changes
+  useEffect(() => {
+    console.log('[AgentNode] Workspace path updated', {
+      agentId: agentData.agentId,
+      workspacePath,
+      attachmentWorkspacePath,
+      selectedWorkspace,
+      inheritedWorkspacePath,
+      hasSessionId: !!agentData.sessionId,
+      createdAt: agentData.createdAt ? new Date(agentData.createdAt).toISOString() : undefined,
+    });
+  }, [workspacePath, agentData.agentId, agentData.sessionId, agentData.createdAt, attachmentWorkspacePath, selectedWorkspace, inheritedWorkspacePath]);
+
+  // Match session ID when workspace is available
+  useSessionIdMatcher({
+    createdAt: agentData.createdAt,
+    workspacePath: workspacePath || undefined,
+    agentId: agentData.agentId,
+    enabled: !!workspacePath && !agentData.sessionId, // Only match if workspace is set and not already matched
+    onSessionIdFound: useCallback(
+      (sessionId: string) => {
+        console.log('[AgentNode] Session ID found!', {
+          agentId: agentData.agentId,
+          sessionId,
+          workspacePath,
+        });
+        dispatchNodeUpdate({ ...agentData, sessionId });
+      },
+      [agentData, dispatchNodeUpdate, workspacePath]
+    ),
+  });
 
   // Show modal if no workspace is available (auto-open on mount)
   useEffect(() => {

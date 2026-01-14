@@ -147,6 +147,12 @@ export interface AgentNodeData {
 
   /** Current active view */
   activeView?: AgentNodeView;
+
+  /** Timestamp when agent node was created (for matching to conversation files) */
+  createdAt?: number;
+
+  /** Session ID from the conversation JSON file (matched after workspace selection) */
+  sessionId?: string;
 }
 
 // =============================================================================

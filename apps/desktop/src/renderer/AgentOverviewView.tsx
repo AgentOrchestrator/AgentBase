@@ -17,6 +17,7 @@ interface AgentOverviewViewProps {
   statusInfo?: CodingAgentStatusInfo;
   progress: AgentProgress | null;
   workspacePath?: string;
+  sessionId?: string;
   onTitleChange?: (newTitle: string) => void;
 }
 
@@ -142,6 +143,7 @@ export default function AgentOverviewView({
   statusInfo,
   progress,
   workspacePath,
+  sessionId,
   onTitleChange,
 }: AgentOverviewViewProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -297,6 +299,11 @@ export default function AgentOverviewView({
       {/* Footer */}
       <div className="overview-footer">
         <span className="agent-id-label">ID: {agentId}</span>
+        {sessionId && (
+          <span className="session-id-label" title="Conversation Session ID">
+            Session: {sessionId.slice(0, 8)}...
+          </span>
+        )}
       </div>
     </div>
   );

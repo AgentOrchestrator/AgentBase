@@ -236,6 +236,7 @@ export function AgentNodePresentation({
             statusInfo={data.statusInfo}
             progress={data.progress}
             workspacePath={workspacePath ?? undefined}
+            sessionId={data.sessionId}
             onTitleChange={handleTitleChange}
           />
         </div>

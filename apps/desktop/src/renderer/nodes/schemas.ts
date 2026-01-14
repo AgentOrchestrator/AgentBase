@@ -104,6 +104,8 @@ export const AgentNodeDataSchema = z.object({
   progress: z.record(z.unknown()).nullable(),
   attachments: z.array(TerminalAttachmentSchema).optional(),
   activeView: z.enum(['overview', 'terminal']).optional(),
+  createdAt: z.number().optional(),
+  sessionId: z.string().optional(),
 });
 
 /**
