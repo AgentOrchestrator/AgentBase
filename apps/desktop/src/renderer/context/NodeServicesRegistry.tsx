@@ -12,11 +12,13 @@ import type {
   ITerminalService,
   IWorkspaceService,
   IAgentService,
+  IConversationService,
   NodeServices,
   TerminalNodeServices,
   AgentNodeServices,
   WorkspaceNodeServices,
   CustomNodeServices,
+  ConversationNodeServices,
 } from './node-services';
 
 // =============================================================================
@@ -39,6 +41,12 @@ export interface ServiceFactories {
     terminalService: ITerminalService,
     workspacePath?: string
   ) => IAgentService;
+  /** Create a conversation service */
+  createConversationService: (
+    nodeId: string,
+    sessionId: string,
+    agentType: string
+  ) => IConversationService;
 }
 
 /**
@@ -50,6 +58,8 @@ export interface NodeServiceConfig {
   agentType?: AgentType;
   workspacePath?: string;
   autoStartCli?: boolean;
+  /** Session ID for conversation nodes */
+  sessionId?: string;
 }
 
 // =============================================================================
@@ -162,6 +172,19 @@ export function NodeServicesRegistryProvider({
           break;
         }
 
+        case 'conversation': {
+          const sessionId = config.sessionId || '';
+          const agentType = config.agentType || 'claude_code';
+
+          const conversation = factories.createConversationService(nodeId, sessionId, agentType);
+
+          services = {
+            type: 'conversation',
+            conversation,
+          } as ConversationNodeServices;
+          break;
+        }
+
         case 'custom':
         default: {
           services = { type: 'custom' } as CustomNodeServices;
@@ -194,6 +217,9 @@ export function NodeServicesRegistryProvider({
     }
     if ('agent' in services && services.agent) {
       disposePromises.push(services.agent.dispose());
+    }
+    if ('conversation' in services && services.conversation) {
+      disposePromises.push(services.conversation.dispose());
     }
 
     await Promise.all(disposePromises);
