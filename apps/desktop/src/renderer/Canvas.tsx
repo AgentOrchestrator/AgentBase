@@ -772,6 +772,45 @@ function CanvasFlow() {
     [screenToFlowPosition, handleForkCreate]
   );
 
+  // Keyboard shortcut: Shift+Cmd+S (Mac) / Shift+Ctrl+S (Windows/Linux) to fork selected node
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Shift+Cmd+S (Mac) or Shift+Ctrl+S (Windows/Linux)
+      const isForkShortcut =
+        event.shiftKey &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 's';
+
+      if (!isForkShortcut) return;
+
+      event.preventDefault();
+
+      // Find selected AgentNode
+      const selectedNode = nodes.find(
+        (n) => n.selected && n.type === 'agentNode'
+      );
+
+      if (!selectedNode) {
+        console.log('[Canvas] No AgentNode selected for fork shortcut');
+        setForkError('Select an agent node to fork');
+        setTimeout(() => setForkError(null), 3000);
+        return;
+      }
+
+      // Calculate position for the forked node (offset to the right)
+      const forkPosition = {
+        x: (selectedNode.position?.x ?? 0) + 350,
+        y: (selectedNode.position?.y ?? 0) + 50,
+      };
+
+      console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
+      handleForkCreate(selectedNode.id, forkPosition);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, handleForkCreate]);
+
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({
