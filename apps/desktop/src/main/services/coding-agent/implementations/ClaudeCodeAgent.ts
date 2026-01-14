@@ -71,6 +71,18 @@ export class ClaudeCodeAgent
 {
   private static readonly DEFAULT_EXECUTABLE = 'claude';
 
+  /**
+   * Common installation paths for Claude CLI
+   */
+  private static readonly COMMON_PATHS = [
+    path.join(os.homedir(), '.claude', 'local', 'claude'),
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+  ];
+
+  /** Cached resolved executable path */
+  private resolvedExecutablePath: string | null = null;
+
   get agentType(): CodingAgentType {
     return 'claude_code';
   }
@@ -86,7 +98,29 @@ export class ClaudeCodeAgent
   }
 
   protected getExecutablePath(): string {
-    return this.config.executablePath ?? ClaudeCodeAgent.DEFAULT_EXECUTABLE;
+    // Return cached path if already resolved
+    if (this.resolvedExecutablePath) {
+      return this.resolvedExecutablePath;
+    }
+
+    // Use configured path if provided
+    if (this.config.executablePath) {
+      this.resolvedExecutablePath = this.config.executablePath;
+      return this.resolvedExecutablePath;
+    }
+
+    // Check common installation paths
+    for (const execPath of ClaudeCodeAgent.COMMON_PATHS) {
+      if (fs.existsSync(execPath)) {
+        console.log('[ClaudeCodeAgent] Found CLI at:', execPath);
+        this.resolvedExecutablePath = execPath;
+        return this.resolvedExecutablePath;
+      }
+    }
+
+    // Fallback to default (rely on PATH)
+    this.resolvedExecutablePath = ClaudeCodeAgent.DEFAULT_EXECUTABLE;
+    return this.resolvedExecutablePath;
   }
 
   protected async verifyExecutable(): Promise<boolean> {
