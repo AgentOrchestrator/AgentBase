@@ -1,4 +1,4 @@
-import type { ICodingAgentProvider, ISessionManager, ISessionResumable, ISessionForkable } from '../interfaces';
+import type { ICodingAgentProvider, ISessionManager, ISessionResumable, ISessionForkable, IChatHistoryProvider } from '../interfaces';
 import type { AgentCapabilities } from '../types';
 
 /**
@@ -40,6 +40,21 @@ export function hasSessionManager(
  */
 export function supportsStreaming(agent: ICodingAgentProvider): boolean {
   return agent.getCapabilities().supportsStreaming;
+}
+
+/**
+ * Type guard to check if an agent provides chat history access
+ */
+export function isChatHistoryProvider(
+  agent: ICodingAgentProvider
+): agent is ICodingAgentProvider & IChatHistoryProvider {
+  const maybeProvider = agent as unknown as IChatHistoryProvider;
+  return (
+    'listSessionSummaries' in agent &&
+    typeof maybeProvider.listSessionSummaries === 'function' &&
+    'getFilteredSession' in agent &&
+    typeof maybeProvider.getFilteredSession === 'function'
+  );
 }
 
 /**

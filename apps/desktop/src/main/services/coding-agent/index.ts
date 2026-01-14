@@ -55,7 +55,10 @@ export type {
   SessionIdentifier,
   SessionInfo,
   SessionContent,
+  SessionSummary,
   SessionFilter,
+  SessionFilterOptions,
+  MessageFilterOptions,
   ContinueOptions,
   ForkOptions,
   ChatMessage,
@@ -82,6 +85,7 @@ export {
   isSessionForkable,
   hasSessionManager,
   supportsStreaming,
+  isChatHistoryProvider,
   getMissingCapabilities,
 } from './utils/capability-checker';
 

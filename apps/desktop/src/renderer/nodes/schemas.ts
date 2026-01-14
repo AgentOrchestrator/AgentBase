@@ -106,6 +106,20 @@ export const AgentNodeDataSchema = z.object({
   activeView: z.enum(['overview', 'terminal']).optional(),
 });
 
+/**
+ * Schema for ConversationNode data
+ */
+export const ConversationNodeDataSchema = z.object({
+  sessionId: z.string(),
+  agentType: z.string().optional(),
+  title: z.string().optional(),
+  projectPath: z.string().optional(),
+  projectName: z.string().optional(),
+  messageCount: z.number().optional(),
+  timestamp: z.number().optional(),
+  isExpanded: z.boolean().optional(),
+});
+
 // =============================================================================
 // Inferred Types
 // =============================================================================
@@ -114,3 +128,4 @@ export type CustomNodeData = z.infer<typeof CustomNodeDataSchema>;
 export type TerminalNodeData = z.infer<typeof TerminalNodeDataSchema>;
 export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
+export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;

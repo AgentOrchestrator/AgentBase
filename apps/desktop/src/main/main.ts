@@ -15,6 +15,7 @@ import {
   CodingAgentFactory,
   isSessionResumable,
   isSessionForkable,
+  isChatHistoryProvider,
 } from './services/coding-agent';
 import type {
   CodingAgentType,
@@ -22,6 +23,8 @@ import type {
   SessionIdentifier,
   ForkOptions,
   ContinueOptions,
+  SessionFilterOptions,
+  MessageFilterOptions,
 } from './services/coding-agent';
 import {
   LLMServiceFactory,
@@ -519,6 +522,69 @@ ipcMain.handle(
       return { success: true, data: available };
     } catch (error) {
       console.error('[Main] Error checking agent availability', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:list-session-summaries',
+  async (_event, agentType: CodingAgentType, filter?: SessionFilterOptions) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isChatHistoryProvider(agent)) {
+        return { success: false, error: `${agentType} does not support chat history retrieval` };
+      }
+
+      const result = await agent.listSessionSummaries(filter);
+      if (result.success === false) {
+        console.error('[Main] Error listing session summaries', { agentType, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Listed session summaries', { agentType, count: result.data.length });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:list-session-summaries', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'coding-agent:get-session',
+  async (
+    _event,
+    agentType: CodingAgentType,
+    sessionId: string,
+    filter?: MessageFilterOptions
+  ) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isChatHistoryProvider(agent)) {
+        return { success: false, error: `${agentType} does not support chat history retrieval` };
+      }
+
+      const result = await agent.getFilteredSession(sessionId, filter);
+      if (result.success === false) {
+        console.error('[Main] Error getting session', { agentType, sessionId, error: result.error });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Got session', { agentType, sessionId, messageCount: result.data?.messages?.length ?? 0 });
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:get-session', { agentType, sessionId, error });
       return { success: false, error: (error as Error).message };
     }
   }

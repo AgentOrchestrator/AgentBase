@@ -952,7 +952,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       <div
         ref={terminalRef}
         className={`terminal-node-content ${selected ? 'active' : ''}`}
-        style={{ pointerEvents: selected ? 'auto' : 'none' }}
+        onClick={() => terminalInstanceRef.current?.focus()}
       />
       <Handle type="source" position={Position.Bottom} />
 

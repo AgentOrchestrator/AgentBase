@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import * as crypto from 'crypto';
 import type { CanvasState, CanvasMetadata } from './types/database';
 import type {
   WorktreeInfo,
@@ -15,6 +14,10 @@ import type {
   GenerateResponse,
   SessionIdentifier,
   SessionInfo,
+  SessionSummary,
+  SessionContent,
+  SessionFilterOptions,
+  MessageFilterOptions,
   ForkOptions,
   ContinueOptions,
 } from './services/coding-agent';
@@ -162,6 +165,19 @@ export interface CodingAgentAPI {
 
   /** Check if a specific agent is available */
   isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
+
+  /** List session summaries (without full messages) */
+  listSessionSummaries: (
+    agentType: CodingAgentType,
+    filter?: SessionFilterOptions
+  ) => Promise<SessionSummary[]>;
+
+  /** Get full session content */
+  getSession: (
+    agentType: CodingAgentType,
+    sessionId: string,
+    filter?: MessageFilterOptions
+  ) => Promise<SessionContent | null>;
 
   /** Subscribe to stream chunks */
   onStreamChunk: (
@@ -317,7 +333,7 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     request: GenerateRequest,
     onChunk: (chunk: string) => void
   ) => {
-    const requestId = crypto.randomUUID();
+    const requestId = globalThis.crypto.randomUUID();
 
     // Set up chunk listener
     const handler = (
@@ -368,6 +384,16 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
 
   isAgentAvailable: (agentType: CodingAgentType) =>
     unwrapResponse<boolean>(ipcRenderer.invoke('coding-agent:is-available', agentType)),
+
+  listSessionSummaries: (agentType: CodingAgentType, filter?: SessionFilterOptions) =>
+    unwrapResponse<SessionSummary[]>(
+      ipcRenderer.invoke('coding-agent:list-session-summaries', agentType, filter)
+    ),
+
+  getSession: (agentType: CodingAgentType, sessionId: string, filter?: MessageFilterOptions) =>
+    unwrapResponse<SessionContent | null>(
+      ipcRenderer.invoke('coding-agent:get-session', agentType, sessionId, filter)
+    ),
 
   onStreamChunk: (
     callback: (data: { requestId: string; chunk: string }) => void
