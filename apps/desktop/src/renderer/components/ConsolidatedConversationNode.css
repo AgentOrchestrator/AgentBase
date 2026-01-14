@@ -232,16 +232,6 @@
   color: #d4d4d4;
 }
 
-.consolidated-assistant-text-content li p {
-  margin: 0 !important;
-  padding: 0;
-  display: inline;
-}
-
-.consolidated-assistant-text-content li > * {
-  margin: 0 !important;
-}
-
 .consolidated-assistant-text-content code {
   background: rgba(0, 0, 0, 0.3);
   color: #d4d4d4;

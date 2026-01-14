@@ -1,9 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { marked } from 'marked';
 import type { MessageGroup, UserMessageGroup, AssistantMessageGroup, MessageContent } from '../types/conversation';
 import './ConsolidatedConversationNode.css';
+
+// Configure marked for tight spacing
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+});
 
 interface ConsolidatedConversationNodeData {
   groups: MessageGroup[];
@@ -57,7 +62,7 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
           const contentHeight = contentRef.current.scrollHeight;
           const padding = 24; // 12px top + 12px bottom
           const fullHeight = Math.max(contentHeight + padding, 600); // At least 600px
-          
+
           // Update node dimensions using setNodes
           setNodes((nds) =>
             nds.map((node) => {
@@ -106,12 +111,13 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   const renderAssistantMessage = (group: AssistantMessageGroup, index: number) => {
     const renderContent = (content: MessageContent, entryIndex: number) => {
       if (content.type === 'text') {
+        const html = marked.parse(content.text) as string;
         return (
-          <div key={`text-${entryIndex}`} className="consolidated-assistant-text-content">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {content.text}
-            </ReactMarkdown>
-          </div>
+          <div
+            key={`text-${entryIndex}`}
+            className="consolidated-assistant-text-content"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
         );
       }
       return null;
@@ -142,19 +148,19 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   };
 
   return (
-    <div 
+    <div
       className={`consolidated-conversation-node ${selected ? 'selected' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <NodeResizer 
-        minWidth={600} 
+      <NodeResizer
+        minWidth={600}
         minHeight={600}
         isVisible={true}
         lineStyle={{ borderColor: 'transparent' }}
         handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
       />
-      
+
       {/* Fullscreen icon - appears on hover */}
       {isHovered && (
         <div
@@ -165,10 +171,10 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
           {isExpanded ? '⤓' : '⤢'}
         </div>
       )}
-      
+
       <Handle type="target" position={Position.Top} />
-      
-      <div 
+
+      <div
         ref={contentRef}
         className="consolidated-conversation-content"
       >
@@ -180,7 +186,7 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
           }
         })}
       </div>
-      
+
       <Handle type="source" position={Position.Bottom} />
     </div>
   );

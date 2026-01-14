@@ -1,9 +1,14 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { marked } from 'marked';
 import type { AssistantMessageGroup, MessageContent } from '../types/conversation';
 import './AssistantMessageNode.css';
+
+// Configure marked for tight spacing
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+});
 
 interface AssistantMessageNodeData {
   messageGroup: AssistantMessageGroup;
@@ -49,12 +54,13 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
   const renderContent = (content: MessageContent, entryIndex: number) => {
     // Only display text content, skip tool_use and tool_result
     if (content.type === 'text') {
+      const html = marked.parse(content.text) as string;
       return (
-        <div key={`text-${entryIndex}`} className="assistant-text-content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {content.text}
-          </ReactMarkdown>
-        </div>
+        <div
+          key={`text-${entryIndex}`}
+          className="assistant-text-content"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       );
     }
 
@@ -65,24 +71,24 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
   return (
     <div className={`assistant-message-node ${selected ? 'selected' : ''}`}>
       <Handle type="target" position={Position.Top} />
-      
+
       <div className="assistant-message-header">
         <span className="assistant-message-label">Assistant</span>
       </div>
-      
-      <div 
+
+      <div
         ref={contentRef}
         className="assistant-message-content"
       >
         {messageGroup.entries.map((entry, entryIndex) => {
           // Filter to only text content
           const textContent = entry.message.content.filter(c => c.type === 'text');
-          
+
           // Skip entries with no text content
           if (textContent.length === 0) {
             return null;
           }
-          
+
           return (
             <div key={entry.uuid} className="assistant-entry">
               {textContent.map((content, contentIndex) =>
@@ -92,7 +98,7 @@ function AssistantMessageNode({ data, id, selected }: NodeProps) {
           );
         })}
       </div>
-      
+
       <Handle type="source" position={Position.Bottom} />
     </div>
   );
