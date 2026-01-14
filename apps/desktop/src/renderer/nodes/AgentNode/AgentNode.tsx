@@ -11,7 +11,7 @@ import type { AgentNodeData } from '../../types/agent-node';
 import { NodeContextProvider } from '../../context';
 import { agentStore } from '../../stores';
 import { AgentNodePresentation } from './AgentNodePresentation';
-import { useWorkspaceInheritance } from '../../hooks';
+import { useWorkspaceInheritance, useRecentWorkspaces } from '../../hooks';
 import { WorkspaceSelectionModal } from '../../components/WorkspaceSelectionModal';
 import { createWorkspaceMetadataAttachment } from '../../types/attachments';
 
@@ -35,6 +35,9 @@ function AgentNode({ data, id }: NodeProps) {
 
   // Get inherited workspace from parent nodes
   const { inheritedWorkspacePath } = useWorkspaceInheritance(id);
+
+  // Get recent workspaces for the modal
+  const { workspaces: recentWorkspaces, trackWorkspace } = useRecentWorkspaces(10);
 
   useEffect(() => {
     // Try to get data from store first
@@ -88,16 +91,43 @@ function AgentNode({ data, id }: NodeProps) {
     }
   }, [workspacePath, showWorkspaceModal]);
 
+  // Handler for browsing directories
+  const handleBrowse = useCallback(async (): Promise<string | null> => {
+    if (!window.shellAPI?.openDirectoryDialog) {
+      console.error('[AgentNode] openDirectoryDialog not available');
+      return null;
+    }
+    return window.shellAPI.openDirectoryDialog({
+      title: 'Select Workspace Directory',
+    });
+  }, []);
+
   // Handler for workspace selection
   const handleWorkspaceSelect = useCallback(
-    (path: string) => {
+    async (path: string) => {
       setSelectedWorkspace(path);
       setShowWorkspaceModal(false);
+
+      const name = path.split('/').pop() || 'Workspace';
+
+      // Track as recently opened (non-blocking)
+      try {
+        let gitInfo: { branch?: string; remote?: string } | undefined;
+        if (window.gitAPI?.getInfo) {
+          const info = await window.gitAPI.getInfo(path);
+          if (info) {
+            gitInfo = { branch: info.branch, remote: info.remote };
+          }
+        }
+        await trackWorkspace(path, name, gitInfo);
+      } catch (err) {
+        console.debug('[AgentNode] Failed to track recent workspace:', err);
+      }
 
       // Create workspace attachment and update node data
       const newAttachment = createWorkspaceMetadataAttachment({
         path,
-        name: path.split('/').pop() || 'Workspace',
+        name,
       });
 
       dispatchNodeUpdate({
@@ -105,7 +135,7 @@ function AgentNode({ data, id }: NodeProps) {
         attachments: [...(agentData.attachments || []), newAttachment],
       });
     },
-    [agentData, dispatchNodeUpdate]
+    [agentData, dispatchNodeUpdate, trackWorkspace]
   );
 
   const handleWorkspaceCancel = () => {
@@ -132,8 +162,10 @@ function AgentNode({ data, id }: NodeProps) {
       {/* Modal overlay - rendered inside node to maintain React tree */}
       <WorkspaceSelectionModal
         isOpen={showWorkspaceModal && !workspacePath}
+        recentWorkspaces={recentWorkspaces}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
+        onBrowse={handleBrowse}
       />
     </NodeContextProvider>
   );

@@ -84,4 +84,38 @@ export interface IDatabase {
    * @returns Array of all agent states
    */
   loadAllAgentStatuses(): Promise<CodingAgentState[]>;
+
+  // ==========================================================================
+  // Recent Workspaces Methods
+  // ==========================================================================
+
+  /**
+   * Track a workspace as recently opened (upsert with LRU eviction)
+   * @param path - Workspace path
+   * @param name - Workspace name
+   * @param gitInfo - Optional git metadata
+   */
+  trackRecentWorkspace(
+    path: string,
+    name: string,
+    gitInfo?: { branch?: string; remote?: string }
+  ): Promise<void>;
+
+  /**
+   * Get recent workspaces sorted by last opened
+   * @param limit - Maximum number of workspaces to return (default 10)
+   */
+  getRecentWorkspaces(limit?: number): Promise<{
+    path: string;
+    name: string;
+    lastOpenedAt: string;
+    openCount: number;
+    git?: { branch?: string; remote?: string };
+  }[]>;
+
+  /**
+   * Remove a workspace from recent list
+   * @param path - Workspace path to remove
+   */
+  removeRecentWorkspace(path: string): Promise<void>;
 }

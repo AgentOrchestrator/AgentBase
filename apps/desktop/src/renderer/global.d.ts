@@ -4,7 +4,7 @@
  * Extends Window interface with Electron IPC APIs.
  */
 
-import type { ElectronAPI, WorktreeAPI, CodingAgentAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI } from '../main/preload';
+import type { ElectronAPI, WorktreeAPI, CodingAgentAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI, RecentWorkspaceAPI } from '../main/preload';
 
 // Extended ShellAPI with directory dialog (added for workspace selection)
 interface ExtendedShellAPI {
@@ -25,6 +25,7 @@ declare global {
     shellAPI?: ExtendedShellAPI;
     canvasAPI?: import('../main/preload').CanvasAPI;
     gitAPI?: GitAPI;
+    recentWorkspaceAPI?: RecentWorkspaceAPI;
   }
 }
 

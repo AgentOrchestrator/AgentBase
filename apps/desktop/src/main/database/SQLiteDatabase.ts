@@ -84,6 +84,22 @@ export class SQLiteDatabase implements IDatabase {
         updated_at INTEGER NOT NULL
       )
     `);
+
+    // Create recent_workspaces table for tracking recently opened workspaces
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS recent_workspaces (
+        path TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        last_opened_at TEXT NOT NULL,
+        open_count INTEGER NOT NULL DEFAULT 1,
+        git_branch TEXT,
+        git_remote TEXT
+      )
+    `);
+
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_recent_workspaces_last_opened ON recent_workspaces(last_opened_at DESC)'
+    );
   }
 
   async saveCanvas(canvasId: string, state: CanvasState): Promise<void> {
@@ -398,6 +414,83 @@ export class SQLiteDatabase implements IDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
+  }
+
+  // ===========================================================================
+  // Recent Workspaces Methods
+  // ===========================================================================
+
+  async trackRecentWorkspace(
+    path: string,
+    name: string,
+    gitInfo?: { branch?: string; remote?: string }
+  ): Promise<void> {
+    const now = new Date().toISOString();
+
+    const existing = await this.get<{ path: string }>(
+      'SELECT path FROM recent_workspaces WHERE path = ?',
+      [path]
+    );
+
+    if (existing) {
+      await this.run(
+        `UPDATE recent_workspaces SET
+          name = ?,
+          last_opened_at = ?,
+          open_count = open_count + 1,
+          git_branch = ?,
+          git_remote = ?
+        WHERE path = ?`,
+        [name, now, gitInfo?.branch ?? null, gitInfo?.remote ?? null, path]
+      );
+    } else {
+      await this.run(
+        `INSERT INTO recent_workspaces (path, name, last_opened_at, open_count, git_branch, git_remote)
+        VALUES (?, ?, ?, 1, ?, ?)`,
+        [path, name, now, gitInfo?.branch ?? null, gitInfo?.remote ?? null]
+      );
+
+      // LRU eviction: keep only the 20 most recent
+      await this.run(
+        `DELETE FROM recent_workspaces WHERE path NOT IN (
+          SELECT path FROM recent_workspaces ORDER BY last_opened_at DESC LIMIT 20
+        )`
+      );
+    }
+  }
+
+  async getRecentWorkspaces(limit: number = 10): Promise<{
+    path: string;
+    name: string;
+    lastOpenedAt: string;
+    openCount: number;
+    git?: { branch?: string; remote?: string };
+  }[]> {
+    const rows = await this.all<{
+      path: string;
+      name: string;
+      last_opened_at: string;
+      open_count: number;
+      git_branch: string | null;
+      git_remote: string | null;
+    }>(
+      'SELECT path, name, last_opened_at, open_count, git_branch, git_remote FROM recent_workspaces ORDER BY last_opened_at DESC LIMIT ?',
+      [limit]
+    );
+
+    return rows.map((row) => ({
+      path: row.path,
+      name: row.name,
+      lastOpenedAt: row.last_opened_at,
+      openCount: row.open_count,
+      git: row.git_branch || row.git_remote
+        ? { branch: row.git_branch ?? undefined, remote: row.git_remote ?? undefined }
+        : undefined,
+    }));
+  }
+
+  async removeRecentWorkspace(path: string): Promise<void> {
+    await this.run('DELETE FROM recent_workspaces WHERE path = ?', [path]);
   }
 
   // Helper methods to promisify sqlite3 callbacks

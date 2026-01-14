@@ -1,16 +1,25 @@
 import { useState } from 'react';
+import type { RecentWorkspaceEntry } from '../../main/preload';
 import '../WorkspaceSelectionModal.css';
 
 export interface WorkspaceSelectionModalProps {
   isOpen: boolean;
+  recentWorkspaces: RecentWorkspaceEntry[];
   onSelect: (workspacePath: string) => void;
   onCancel: () => void;
+  onBrowse: () => Promise<string | null>;
 }
 
+/**
+ * Pure presentation component for workspace selection.
+ * Receives data and callbacks via props - no business logic.
+ */
 export function WorkspaceSelectionModal({
   isOpen,
+  recentWorkspaces,
   onSelect,
   onCancel,
+  onBrowse,
 }: WorkspaceSelectionModalProps) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -20,22 +29,10 @@ export function WorkspaceSelectionModal({
   const handleBrowse = async () => {
     setIsSelecting(true);
     try {
-      // Debug: log what's in shellAPI
-      console.log('[WorkspaceSelectionModal] shellAPI:', window.shellAPI);
-      console.log('[WorkspaceSelectionModal] shellAPI keys:', window.shellAPI ? Object.keys(window.shellAPI) : 'undefined');
-
-      if (!window.shellAPI?.openDirectoryDialog) {
-        throw new Error('openDirectoryDialog not available in shellAPI');
-      }
-
-      const path = await window.shellAPI.openDirectoryDialog({
-        title: 'Select Workspace Directory',
-      });
+      const path = await onBrowse();
       if (path) {
         setSelectedPath(path);
       }
-    } catch (err) {
-      console.error('[WorkspaceSelectionModal] Failed to open directory dialog:', err);
     } finally {
       setIsSelecting(false);
     }
@@ -56,7 +53,30 @@ export function WorkspaceSelectionModal({
         </div>
 
         <div className="workspace-modal-content">
-          <p>This agent node requires a workspace. Please select a directory:</p>
+          {/* Recent workspaces section */}
+          {recentWorkspaces.length > 0 && (
+            <div className="recent-workspaces-section">
+              <h4>Recent Workspaces</h4>
+              <div className="recent-workspaces-list">
+                {recentWorkspaces.map((ws) => (
+                  <button
+                    key={ws.path}
+                    className={`recent-workspace-item ${selectedPath === ws.path ? 'selected' : ''}`}
+                    onClick={() => setSelectedPath(ws.path)}
+                  >
+                    <div className="workspace-name">{ws.name}</div>
+                    <div className="workspace-path">{ws.path}</div>
+                    {ws.git?.branch && (
+                      <div className="workspace-git">{ws.git.branch}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="section-divider">OR</div>
+            </div>
+          )}
+
+          <p>Browse or enter a workspace path:</p>
 
           <div className="workspace-path-input">
             <input
