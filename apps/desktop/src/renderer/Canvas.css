@@ -552,12 +552,6 @@
   background: rgba(0, 0, 0, 0.4);
 }
 
-/* Custom minimap styling */
-.react-flow__minimap {
-  background: #1e1e1e;
-  border: 1px solid #d4d4d4;
-}
-
 /* Custom background */
 .react-flow__background {
   background-color: #141414;
@@ -566,6 +560,11 @@
 /* Hide background dots */
 .react-flow__background pattern {
   display: none;
+}
+
+/* Hide React Flow attribution */
+.react-flow__attribution {
+  display: none !important;
 }
 
 /* Settings FAB */
@@ -868,8 +867,8 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
+  background: #1e1e1e;
+  border: 1px solid #232323;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   transition: all 0.3s ease-in-out;
 }
@@ -888,7 +887,8 @@
 }
 
 .issues-pill.cursor-pointer:hover:not(.square) {
-  background: #3a3c46;
+  background: #2a2c36;
+  border-color: #232323;
   transform: translateX(-50%) scale(1.02);
 }
 
@@ -973,8 +973,8 @@
   gap: 10px;
   padding: 12px 16px 10px;
   margin: 0 -16px 12px;
-  background: rgba(42, 44, 54, 0.95);
-  border-bottom: 1px solid #3a3c46;
+  background: rgba(30, 30, 30, 0.95);
+  border-bottom: 1px solid #232323;
   backdrop-filter: blur(6px);
 }
 
@@ -1021,9 +1021,9 @@
 
 .issues-select {
   width: 100%;
-  background: #1f2026;
+  background: #1e1e1e;
   color: #d4d4d4;
-  border: 1px solid #3a3c46;
+  border: 1px solid #232323;
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 12px;
@@ -1036,7 +1036,7 @@
 }
 
 .issues-select option {
-  background: #1f2026;
+  background: #1e1e1e;
   color: #d4d4d4;
 }
 
@@ -1073,7 +1073,7 @@
 /* Issue card */
 .issue-card {
   background: #1e1e1e;
-  border: 1px solid #3a3c46;
+  border: 1px solid #232323;
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
@@ -1210,19 +1210,7 @@
 
 /* Save status indicator */
 .save-indicator {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: rgba(42, 44, 54, 0.8);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(139, 157, 195, 0.1);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: #888;
-  z-index: 1000;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  display: none !important;
 }
 
 .save-indicator:not(:empty) {
