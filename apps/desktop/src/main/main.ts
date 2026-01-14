@@ -510,6 +510,48 @@ ipcMain.handle(
   }
 );
 
+// Get the latest session for a workspace path
+ipcMain.handle(
+  'coding-agent:get-latest-session',
+  async (_event, agentType: CodingAgentType, workspacePath: string) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+
+      // Check if agent supports listing sessions (IChatHistoryProvider)
+      if (!('listSessionSummaries' in agent)) {
+        return { success: false, error: 'Agent does not support session listing' };
+      }
+
+      // Get sessions filtered by project path
+      const summariesResult = await (agent as { listSessionSummaries: (filter?: { projectPath?: string }) => Promise<{ success: boolean; data?: Array<{ id: string; updatedAt: string }>; error?: { message: string } }> }).listSessionSummaries({
+        projectPath: workspacePath,
+      });
+
+      if (summariesResult.success === false || !summariesResult.data) {
+        return { success: false, error: summariesResult.error?.message || 'Failed to list sessions' };
+      }
+
+      if (summariesResult.data.length === 0) {
+        console.log('[Main] No sessions found for workspace', { workspacePath });
+        return { success: true, data: null };
+      }
+
+      // Sessions are already sorted by most recent first
+      const latestSession = summariesResult.data[0];
+      console.log('[Main] Latest session found', { workspacePath, sessionId: latestSession.id });
+      return { success: true, data: { id: latestSession.id, updatedAt: latestSession.updatedAt } };
+    } catch (error) {
+      console.error('[Main] Error getting latest session', { agentType, workspacePath, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
 // ============================================
 // Representation Service IPC Handlers
 // ============================================

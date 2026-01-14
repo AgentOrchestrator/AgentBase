@@ -14,3 +14,7 @@ export * from './factories';
 // Fork service
 export { ForkService, forkService } from './ForkService';
 export type { IForkService, ForkRequest, ForkResult, ForkError, ForkErrorType } from './ForkService';
+
+// Session provider (abstraction for hooks system integration)
+export { FileBasedSessionProvider, sessionProvider } from './SessionProvider';
+export type { ISessionProvider, SessionInfo, SessionStartCallback } from './SessionProvider';

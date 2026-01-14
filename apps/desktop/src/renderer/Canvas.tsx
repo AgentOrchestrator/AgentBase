@@ -16,6 +16,7 @@ import {
   OnConnectStartParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import ForkGhostNode from './ForkGhostNode';
 import ForkSessionModal from './ForkSessionModal';
 import './Canvas.css';
 import { forkStore } from './stores';
@@ -560,7 +561,7 @@ function CanvasFlow() {
 
   // Validate and show fork modal (defined before onConnectEnd to avoid hoisting issues)
   const handleForkCreate = useCallback(
-    (sourceNodeId: string, position: { x: number; y: number }) => {
+    async (sourceNodeId: string, position: { x: number; y: number }) => {
       // Find the source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) {
@@ -574,8 +575,47 @@ function CanvasFlow() {
       const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
       const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
 
+      // Log the source data for debugging
+      console.log('[Canvas] Fork attempt - sourceData:', {
+        agentId: sourceData.agentId,
+        agentType: sourceData.agentType,
+        sessionId: sourceData.sessionId,
+        workspacePath,
+        attachments: sourceData.attachments?.length ?? 0,
+      });
+
+      // Auto-detect session if not set
+      let sessionId = sourceData.sessionId;
+      if (!sessionId && workspacePath) {
+        console.log('[Canvas] Session not set, auto-detecting from workspace...');
+        const latestSession = await forkService.getLatestSessionForWorkspace(
+          sourceData.agentType,
+          workspacePath
+        );
+        if (latestSession) {
+          sessionId = latestSession.id;
+          console.log('[Canvas] Auto-detected session:', sessionId);
+
+          // Update the node with the detected sessionId
+          setNodes((nds) =>
+            nds.map((n) => {
+              if (n.id === sourceNodeId) {
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    sessionId,
+                  },
+                };
+              }
+              return n;
+            })
+          );
+        }
+      }
+
       // Validate requirements
-      const validation = forkService.validateForkRequest(sourceData.sessionId, workspacePath);
+      const validation = forkService.validateForkRequest(sessionId, workspacePath);
       if (!validation.valid) {
         // Show error as a toast-like notification
         console.warn('[Canvas] Fork validation failed:', validation.error);
@@ -589,7 +629,7 @@ function CanvasFlow() {
       setForkModalData({ sourceNodeId, position });
       setForkError(null);
     },
-    [nodes]
+    [nodes, setNodes]
   );
 
   // Handle fork modal confirmation

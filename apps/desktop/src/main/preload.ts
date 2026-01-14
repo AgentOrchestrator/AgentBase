@@ -328,6 +328,11 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
 
   isAgentAvailable: (agentType: CodingAgentType) =>
     unwrapResponse<boolean>(ipcRenderer.invoke('coding-agent:is-available', agentType)),
+
+  getLatestSession: (agentType: CodingAgentType, workspacePath: string) =>
+    unwrapResponse<{ id: string; updatedAt: string } | null>(
+      ipcRenderer.invoke('coding-agent:get-latest-session', agentType, workspacePath)
+    ),
 } as CodingAgentAPI);
 
 // Expose LLM API

@@ -7,7 +7,21 @@
 
 import type { CodingAgentType, SessionInfo, SessionIdentifier, ForkOptions } from '../../main/services/coding-agent';
 import type { WorktreeInfo } from '../../main/types/worktree';
+import type { AgentType } from '@agent-orchestrator/shared';
 import { worktreeService } from './WorktreeService';
+import { sessionProvider } from './SessionProvider';
+
+/**
+ * Supported agent types for forking
+ */
+const FORKABLE_AGENT_TYPES: CodingAgentType[] = ['claude_code', 'cursor', 'codex'];
+
+/**
+ * Check if an agent type supports fork operations
+ */
+function isForkableAgentType(agentType: AgentType): agentType is CodingAgentType {
+  return FORKABLE_AGENT_TYPES.includes(agentType as CodingAgentType);
+}
 
 /**
  * Request to fork an agent session
@@ -17,8 +31,8 @@ export interface ForkRequest {
   sourceAgentId: string;
   /** Parent session identifier */
   parentSessionId: string;
-  /** Type of coding agent */
-  agentType: CodingAgentType;
+  /** Type of agent (must be claude_code, cursor, or codex for fork support) */
+  agentType: AgentType;
   /** User-provided title for the fork (used in branch name) */
   forkTitle: string;
   /** Path to the source repository */
@@ -73,6 +87,17 @@ export interface IForkService {
     sessionId: string | undefined,
     repoPath: string | undefined
   ): { valid: true } | { valid: false; error: string };
+
+  /**
+   * Auto-detect the latest session for a workspace
+   * @param agentType - Type of agent (only claude_code, cursor, codex supported)
+   * @param workspacePath - Workspace path to search
+   * @returns Session info or null if not found or unsupported agent
+   */
+  getLatestSessionForWorkspace(
+    agentType: AgentType,
+    workspacePath: string
+  ): Promise<{ id: string; updatedAt: string } | null>;
 }
 
 /**
@@ -112,12 +137,36 @@ export class ForkService implements IForkService {
   }
 
   /**
+   * Auto-detect the latest session for a workspace
+   * Delegates to the session provider (file-based now, hooks-based in future)
+   */
+  async getLatestSessionForWorkspace(
+    agentType: AgentType,
+    workspacePath: string
+  ): Promise<{ id: string; updatedAt: string } | null> {
+    const result = await sessionProvider.getActiveSession(agentType, workspacePath);
+    console.log('[ForkService] Session lookup via provider:', { workspacePath, result });
+    return result;
+  }
+
+  /**
    * Fork an agent session with worktree isolation
    */
   async forkAgent(
     request: ForkRequest
   ): Promise<{ success: true; data: ForkResult } | { success: false; error: ForkError }> {
     console.log('[ForkService] Starting fork operation:', request);
+
+    // Validate agent type supports forking
+    if (!isForkableAgentType(request.agentType)) {
+      return {
+        success: false,
+        error: {
+          type: 'VALIDATION_FAILED',
+          message: `Agent type '${request.agentType}' does not support forking`,
+        },
+      };
+    }
 
     // Check API availability
     if (!window.codingAgentAPI || !window.worktreeAPI) {
