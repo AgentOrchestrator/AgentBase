@@ -78,6 +78,8 @@ export interface GenerateRequest {
   systemPrompt?: string;
   /** Timeout in milliseconds */
   timeout?: number;
+  /** Session ID for stateful agents */
+  sessionId?: string;
 }
 
 /**

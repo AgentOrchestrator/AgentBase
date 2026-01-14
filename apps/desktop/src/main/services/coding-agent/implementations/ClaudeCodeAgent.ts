@@ -184,6 +184,11 @@ export class ClaudeCodeAgent
         abortController,
         startTime: Date.now(),
       };
+
+      if (request.sessionId) {
+        options.resume = request.sessionId;
+      }
+
       this.activeQueries.set(queryId, handle);
 
       // Collect all messages
@@ -233,6 +238,11 @@ export class ClaudeCodeAgent
         abortController,
         startTime: Date.now(),
       };
+
+      if (request.sessionId) {
+        options.resume = request.sessionId;
+      }
+
       this.activeQueries.set(queryId, handle);
 
       // Collect messages and stream chunks
@@ -291,6 +301,10 @@ export class ClaudeCodeAgent
       };
     } else {
       options.systemPrompt = { type: 'preset', preset: 'claude_code' };
+    }
+
+    if (request.sessionId) {
+      options.resume = request.sessionId;
     }
 
     // Enable streaming partial messages
