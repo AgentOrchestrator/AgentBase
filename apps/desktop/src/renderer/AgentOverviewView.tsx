@@ -136,7 +136,6 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
  * Delegates all business logic to parent via callbacks.
  */
 export default function AgentOverviewView({
-  agentId,
   title,
   summary,
   status,
@@ -296,9 +295,11 @@ export default function AgentOverviewView({
       )} */}
 
       {/* Footer */}
-      {/* <div className="overview-footer">
-        <span className="agent-id-label">ID: {agentId}</span>
-      </div> */}
+      {sessionId && (
+        <div className="overview-footer">
+          <span className="agent-session-label">Session: {sessionId}</span>
+        </div>
+      )}
     </div>
   );
 }

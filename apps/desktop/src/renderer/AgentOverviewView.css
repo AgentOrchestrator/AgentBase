@@ -346,8 +346,9 @@
   border-top: 1px solid #888;
 }
 
-.agent-id-label {
+.agent-session-label {
   color: #666;
   font-size: 10px;
   font-family: 'Menlo', 'Monaco', monospace;
+  word-break: break-all;
 }
