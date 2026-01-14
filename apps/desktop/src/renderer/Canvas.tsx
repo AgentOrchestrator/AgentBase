@@ -1216,13 +1216,15 @@ function CanvasFlow() {
           <h2 className="sidebar-title">Canvas</h2>
           <button
             className="sidebar-toggle"
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setIsSidebarCollapsed(true)}
+            aria-label="Collapse sidebar"
           >
-            {isSidebarCollapsed ? '▶' : '◀'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
           </button>
         </div>
-        
+
         {!isSidebarCollapsed && (
           <div className="sidebar-content">
             {hasAgents && (
@@ -1250,6 +1252,30 @@ function CanvasFlow() {
                           <span className="sidebar-folder-icon">
                             {isProjectCollapsed ? '▶' : '▼'}
                           </span>
+                          <svg
+                            className="sidebar-folder-svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 512 512"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="32"
+                            />
+                            <path
+                              d="M479.9,226.55,463.68,392a40,40,0,0,1-39.93,40H88.25a40,40,0,0,1-39.93-40L32.1,226.55A32,32,0,0,1,64,192h384.1A32,32,0,0,1,479.9,226.55Z"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="32"
+                            />
+                          </svg>
                           <span className="sidebar-folder-name">{projectName}</span>
                         </button>
                         {showLock && projectPath && (
@@ -1297,6 +1323,63 @@ function CanvasFlow() {
                                   <span className="sidebar-folder-icon">
                                     {isBranchCollapsed ? '▶' : '▼'}
                                   </span>
+                                  <svg
+                                    className="sidebar-branch-svg"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 512 512"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <circle
+                                      cx="160"
+                                      cy="96"
+                                      r="48"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="32"
+                                    />
+                                    <circle
+                                      cx="160"
+                                      cy="416"
+                                      r="48"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="32"
+                                    />
+                                    <line
+                                      x1="160"
+                                      y1="368"
+                                      x2="160"
+                                      y2="144"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="32"
+                                    />
+                                    <circle
+                                      cx="352"
+                                      cy="160"
+                                      r="48"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="32"
+                                    />
+                                    <path
+                                      d="M352,208c0,128-192,48-192,160"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="32"
+                                    />
+                                  </svg>
                                   <span className="sidebar-folder-name">{branchName}</span>
                                 </button>
                                 {!isBranchCollapsed && (
@@ -1324,6 +1407,19 @@ function CanvasFlow() {
 
       {/* Canvas Content */}
       <div className={`canvas-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        {/* Expand button when sidebar is collapsed */}
+        {isSidebarCollapsed && (
+          <button
+            className="sidebar-expand-button"
+            onClick={() => setIsSidebarCollapsed(false)}
+            aria-label="Expand sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        )}
+
         {/* Save status indicator */}
         <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
           {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
@@ -1352,7 +1448,7 @@ function CanvasFlow() {
         onDrop={handleCanvasDrop}
         nodeTypes={nodeTypes}
         fitView
-        style={{ backgroundColor: '#1e1e1e' }}
+        style={{ backgroundColor: '#141414' }}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.1}
         maxZoom={4}

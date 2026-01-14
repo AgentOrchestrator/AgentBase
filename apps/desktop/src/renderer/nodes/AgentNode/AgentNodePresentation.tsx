@@ -32,6 +32,8 @@ export interface AgentNodePresentationProps {
   data: AgentNodeData;
   /** Callback when node data changes */
   onDataChange: (data: Partial<AgentNodeData>) => void;
+  /** Whether the node is selected */
+  selected?: boolean;
 }
 
 /**
@@ -43,6 +45,7 @@ export interface AgentNodePresentationProps {
 export function AgentNodePresentation({
   data,
   onDataChange,
+  selected,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const workspace = useWorkspaceService();
@@ -188,7 +191,7 @@ export function AgentNodePresentation({
 
   return (
     <div
-      className={`agent-node ${isDragOver ? 'drag-over' : ''}`}
+      className={`agent-node ${isDragOver ? 'drag-over' : ''} ${selected ? 'selected' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

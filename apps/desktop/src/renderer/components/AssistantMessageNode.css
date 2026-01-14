@@ -55,31 +55,27 @@
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+  padding-right: 8px;
 }
 
-/* Hide scrollbar when not needed or not selected */
-.assistant-message-node:not(.selected) .assistant-message-content::-webkit-scrollbar {
-  width: 0;
-  background: transparent;
-}
-
-.assistant-message-node.selected .assistant-message-content::-webkit-scrollbar {
+/* Scrollbar styling - always visible */
+.assistant-message-content::-webkit-scrollbar {
   width: 8px;
 }
 
-.assistant-message-node.selected .assistant-message-content::-webkit-scrollbar-track {
-  background: #1a1c24;
+.assistant-message-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
   border-radius: 4px;
 }
 
-.assistant-message-node.selected .assistant-message-content::-webkit-scrollbar-thumb {
-  background: #4a5568;
+.assistant-message-content::-webkit-scrollbar-thumb {
+  background: #232323;
   border-radius: 4px;
   transition: background 0.2s ease;
 }
 
-.assistant-message-node.selected .assistant-message-content::-webkit-scrollbar-thumb:hover {
-  background: #5a6578;
+.assistant-message-content::-webkit-scrollbar-thumb:hover {
+  background: #333333;
 }
 
 .assistant-entry {

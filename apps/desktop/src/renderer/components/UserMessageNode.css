@@ -56,29 +56,25 @@
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+  padding-right: 8px;
 }
 
-/* Hide scrollbar when not needed or not selected */
-.user-message-node:not(.selected) .user-message-content::-webkit-scrollbar {
-  width: 0;
-  background: transparent;
-}
-
-.user-message-node.selected .user-message-content::-webkit-scrollbar {
+/* Scrollbar styling - always visible */
+.user-message-content::-webkit-scrollbar {
   width: 8px;
 }
 
-.user-message-node.selected .user-message-content::-webkit-scrollbar-track {
-  background: #1a1c24;
+.user-message-content::-webkit-scrollbar-track {
+  background: #2D2D2D;
   border-radius: 4px;
 }
 
-.user-message-node.selected .user-message-content::-webkit-scrollbar-thumb {
-  background: #4a5568;
+.user-message-content::-webkit-scrollbar-thumb {
+  background: #232323;
   border-radius: 4px;
   transition: background 0.2s ease;
 }
 
-.user-message-node.selected .user-message-content::-webkit-scrollbar-thumb:hover {
-  background: #5a6578;
+.user-message-content::-webkit-scrollbar-thumb:hover {
+  background: #333333;
 }

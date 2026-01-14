@@ -81,31 +81,27 @@
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+  padding-right: 8px;
 }
 
-/* Hide scrollbar when not needed or not selected */
-.consolidated-conversation-node:not(.selected) .consolidated-conversation-content::-webkit-scrollbar {
-  width: 0;
-  background: transparent;
-}
-
-.consolidated-conversation-node.selected .consolidated-conversation-content::-webkit-scrollbar {
+/* Scrollbar styling - always visible */
+.consolidated-conversation-content::-webkit-scrollbar {
   width: 8px;
 }
 
-.consolidated-conversation-node.selected .consolidated-conversation-content::-webkit-scrollbar-track {
-  background: #1a1c24;
+.consolidated-conversation-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
   border-radius: 4px;
 }
 
-.consolidated-conversation-node.selected .consolidated-conversation-content::-webkit-scrollbar-thumb {
-  background: #4a5568;
+.consolidated-conversation-content::-webkit-scrollbar-thumb {
+  background: #232323;
   border-radius: 4px;
   transition: background 0.2s ease;
 }
 
-.consolidated-conversation-node.selected .consolidated-conversation-content::-webkit-scrollbar-thumb:hover {
-  background: #5a6578;
+.consolidated-conversation-content::-webkit-scrollbar-thumb:hover {
+  background: #333333;
 }
 
 /* User message styling */

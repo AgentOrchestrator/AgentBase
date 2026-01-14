@@ -23,7 +23,7 @@ import { createWorkspaceMetadataAttachment } from '../../types/attachments';
  * 2. Subscribes to the agent store for data updates
  * 3. Dispatches data changes to the canvas
  */
-function AgentNode({ data, id }: NodeProps) {
+function AgentNode({ data, id, selected }: NodeProps) {
   const nodeData = data as unknown as AgentNodeData;
 
   // Subscribe to store updates for this agent
@@ -169,6 +169,7 @@ function AgentNode({ data, id }: NodeProps) {
       <AgentNodePresentation
         data={agentData}
         onDataChange={handleDataChange}
+        selected={selected}
       />
       {/* Modal overlay - rendered inside node to maintain React tree */}
       <WorkspaceSelectionModal

@@ -20,7 +20,36 @@
 }
 
 .canvas-sidebar.collapsed {
-  width: 48px;
+  width: 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+/* Expand button when sidebar is collapsed */
+.sidebar-expand-button {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 50;
+  padding: 8px;
+  background: #1e1e1e;
+  border: 1px solid #232323;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.sidebar-expand-button:hover {
+  background: #2a2c36;
+}
+
+.sidebar-expand-button svg {
+  width: 16px;
+  height: 16px;
+  color: #888;
 }
 
 .sidebar-header {
@@ -50,17 +79,24 @@
   background: none;
   border: none;
   color: #888;
-  font-size: 14px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-toggle:hover {
   background: rgba(0, 0, 0, 0.4);
   color: #d4d4d4;
+}
+
+.sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
 }
 
 .sidebar-content {
@@ -239,6 +275,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.sidebar-folder-svg,
+.sidebar-branch-svg {
+  flex-shrink: 0;
+  color: #888;
 }
 
 .sidebar-folder-name {
@@ -497,9 +539,14 @@
   border: 1px solid #d4d4d4;
 }
 
-/* Custom background dots */
+/* Custom background */
 .react-flow__background {
-  background-color: #1e1e1e;
+  background-color: #141414;
+}
+
+/* Hide background dots */
+.react-flow__background pattern {
+  display: none;
 }
 
 /* Settings FAB */
@@ -511,7 +558,7 @@
   height: 40px;
   background: #1e1e1e;
   backdrop-filter: blur(10px);
-  border: 1px solid #d4d4d4;
+  border: 1px solid #232323;
   border-radius: 12px;
   color: #d4d4d4;
   font-size: 16px;
@@ -525,8 +572,8 @@
 }
 
 .settings-fab:hover {
-  background: #1e1e1e;
-  border-color: #d4d4d4;
+  background: #2a2c36;
+  border-color: #232323;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
@@ -560,7 +607,7 @@
 
 .settings-modal {
   background: #1e1e1e;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #232323;
   border-radius: 12px;
   width: 90%;
   max-width: 600px;
@@ -583,7 +630,7 @@
 
 .settings-modal-header {
   padding: 20px 24px;
-  border-bottom: 1px solid #d4d4d4;
+  border-bottom: 1px solid #232323;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -643,7 +690,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #d4d4d4;
+  border-bottom: 1px solid #232323;
   color: #d4d4d4;
   font-size: 14px;
 }
@@ -659,13 +706,13 @@
   background: #1e1e1e;
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #232323;
 }
 
 /* Integration settings */
 .settings-integration {
   background: #1e1e1e;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #232323;
   border-radius: 8px;
   padding: 16px;
 }
@@ -708,7 +755,7 @@
 .integration-input {
   flex: 1;
   background: #1e1e1e;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #232323;
   border-radius: 6px;
   padding: 10px 12px;
   color: #d4d4d4;
@@ -734,7 +781,7 @@
 
 .integration-button {
   background: #1e1e1e;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #232323;
   border-radius: 6px;
   padding: 10px 20px;
   color: #d4d4d4;

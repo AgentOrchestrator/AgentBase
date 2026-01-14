@@ -24,6 +24,17 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
+.agent-node.selected {
+  border-color: #d4d4d4;
+  box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.2);
+}
+
+/* Hide React Flow's default selection border/outline */
+.react-flow__node.agentNode.react-flow__node-selected {
+  outline: none !important;
+  border: none !important;
+}
+
 .agent-node.drag-over {
   box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
   transform: scale(1.01);
@@ -84,41 +95,9 @@
   background: #d4d4d4;
 }
 
-/* Resize handles */
+/* Resize handles - hidden */
 .agent-node .react-flow__resize-control.handle {
-  width: 8px;
-  height: 8px;
-  border: 1px solid #666;
-  background: #888;
-  border-radius: 50%;
-  opacity: 0.5;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.agent-node .react-flow__resize-control.handle:hover {
-  opacity: 1;
-  transform: scale(1.3);
-}
-
-/* Position resize handles at corners */
-.agent-node .react-flow__resize-control.handle.top-left {
-  top: -4px;
-  left: -4px;
-}
-
-.agent-node .react-flow__resize-control.handle.top-right {
-  top: -4px;
-  right: -4px;
-}
-
-.agent-node .react-flow__resize-control.handle.bottom-left {
-  bottom: -4px;
-  left: -4px;
-}
-
-.agent-node .react-flow__resize-control.handle.bottom-right {
-  bottom: -4px;
-  right: -4px;
+  display: none;
 }
 
 /* Attachment headers within agent node */
