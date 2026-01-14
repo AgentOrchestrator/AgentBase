@@ -24,6 +24,7 @@ import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import ConsolidatedConversationNode from './components/ConsolidatedConversationNode';
+import { CommandPalette, type CommandAction } from './components/CommandPalette';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -234,6 +235,7 @@ function CanvasFlow() {
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1182,6 +1184,140 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
+  // Add Claude Code Terminal - a terminal that auto-starts claude command
+  const addClaudeCodeTerminal = useCallback((position?: { x: number; y: number }) => {
+    let nodePosition = position;
+
+    // If no position provided and context menu is open, use context menu position
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    // If still no position, use center of viewport
+    if (!nodePosition) {
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    const terminalId = `terminal-${crypto.randomUUID()}`;
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'terminal',
+      position: nodePosition,
+      data: {
+        terminalId,
+        autoStartClaude: true, // Flag to auto-start claude command
+      },
+      style: {
+        width: 600,
+        height: 400,
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition, setNodes]);
+
+  // Create Linear ticket
+  const createLinearTicket = useCallback(async () => {
+    const apiKey = localStorage.getItem('linear_api_key');
+    if (!apiKey) {
+      alert('Please connect to Linear first in the settings');
+      return;
+    }
+
+    // Get default team ID (we'll use the first team from the viewer)
+    try {
+      const query = `
+        query {
+          viewer {
+            id
+            teams {
+              nodes {
+                id
+                name
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await response.json();
+      const teams = data.data?.viewer?.teams?.nodes || [];
+      
+      if (teams.length === 0) {
+        alert('No teams found in Linear workspace');
+        return;
+      }
+
+      // Use the first team
+      const teamId = teams[0].id;
+
+      // Create issue mutation
+      const mutation = `
+        mutation($teamId: String!, $title: String!) {
+          issueCreate(
+            input: {
+              teamId: $teamId
+              title: $title
+            }
+          ) {
+            success
+            issue {
+              id
+              identifier
+              title
+              url
+            }
+          }
+        }
+      `;
+
+      const title = prompt('Enter ticket title:');
+      if (!title) return;
+
+      const mutationResponse = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({
+          query: mutation,
+          variables: {
+            teamId,
+            title,
+          },
+        }),
+      });
+
+      const mutationData = await mutationResponse.json();
+      if (mutationData.data?.issueCreate?.success) {
+        const issue = mutationData.data.issueCreate.issue;
+        alert(`Ticket created: ${issue.identifier} - ${issue.title}\n${issue.url}`);
+      } else {
+        alert('Failed to create ticket: ' + (mutationData.errors?.[0]?.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error creating Linear ticket:', error);
+      alert('Error creating ticket: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  }, []);
+
   // Handle session selection from picker
   const handleSessionSelect = useCallback((session: { id: string; projectName?: string; projectPath?: string; messageCount?: number; timestamp?: string }) => {
     const position = pendingConversationPosition.current || screenToFlowPosition({
@@ -1228,17 +1364,59 @@ function CanvasFlow() {
     }
   }, [contextMenu]);
 
-  // Keyboard shortcuts: CMD+K to add terminal, CMD+W to add workspace
+  // Command palette commands
+  const commandActions = useMemo<CommandAction[]>(() => [
+    {
+      id: 'add-agent',
+      label: 'Add Agent',
+      shortcut: 'c',
+      action: () => addAgentNode(),
+    },
+    {
+      id: 'add-terminal',
+      label: 'Add Terminal',
+      shortcut: 'v',
+      action: () => addTerminalNode(),
+    },
+    {
+      id: 'add-claude-terminal',
+      label: 'Add Claude Code Terminal',
+      shortcut: 'b',
+      action: () => addClaudeCodeTerminal(),
+    },
+    {
+      id: 'load-conversation',
+      label: 'Load Conversation',
+      shortcut: 'n',
+      action: () => addConversationNode(),
+    },
+    {
+      id: 'create-linear-ticket',
+      label: 'Create Linear Ticket',
+      shortcut: 'm',
+      action: () => createLinearTicket(),
+    },
+  ], [addAgentNode, addTerminalNode, addClaudeCodeTerminal, addConversationNode, createLinearTicket]);
+
+  // Keyboard shortcuts: CMD+K to open command palette, CMD+W to add workspace
   useEffect(() => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const modifierKey = isMac ? event.metaKey : event.ctrlKey;
 
-      // CMD+K / CTRL+K to add terminal
+      // CMD+K / CTRL+K to toggle command palette
       if (modifierKey && event.key === 'k') {
         event.preventDefault(); // Prevent default browser behavior
-        addTerminalNode();
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // CMD+T / CTRL+T to add agent
+      if (modifierKey && event.key === 't') {
+        event.preventDefault(); // Prevent default browser behavior
+        addAgentNode();
+        return;
       }
 
       // CMD+W / CTRL+W to add workspace
@@ -1247,7 +1425,7 @@ function CanvasFlow() {
         addWorkspaceNode();
       }
 
-      // CMD+Shift+A / CTRL+Shift+A to add agent
+      // CMD+Shift+A / CTRL+Shift+A to add agent (legacy shortcut, still works)
       if (modifierKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         addAgentNode();
@@ -1286,7 +1464,7 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addTerminalNode, addWorkspaceNode, addAgentNode, addStarterNode, addConversationNode, isNodeDragEnabled]);
+  }, [addWorkspaceNode, addAgentNode, addStarterNode, addConversationNode, isNodeDragEnabled]);
 
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
@@ -1302,6 +1480,11 @@ function CanvasFlow() {
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        commands={commandActions}
+      />
       {/* Sidebar Panel */}
       <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
@@ -1612,7 +1795,7 @@ function CanvasFlow() {
           <div className="context-menu-item" onClick={() => addAgentNode()}>
             <span>Add Agent</span>
             <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘A' : 'Ctrl+Shift+A'}
+              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
             </span>
           </div>
           <div className="context-menu-divider" />

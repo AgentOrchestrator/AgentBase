@@ -17,6 +17,7 @@ import {
 interface TerminalNodeData {
   terminalId: string;
   attachments?: TerminalAttachment[];
+  autoStartClaude?: boolean; // Flag to auto-start claude command
   // Legacy support - will be migrated to attachments array
   issue?: {
     id?: string;
@@ -588,8 +589,20 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     // Create terminal process in main process (only once)
     if (window.electronAPI && !terminalProcessCreatedRef.current) {
       terminalProcessCreatedRef.current = true;
-      console.log('[TerminalNode] Creating terminal process', { terminalId });
+      console.log('[TerminalNode] Creating terminal process', { terminalId, autoStartClaude: nodeData.autoStartClaude });
       window.electronAPI.createTerminal(terminalId);
+      
+      // Auto-start claude command if flag is set
+      if (nodeData.autoStartClaude) {
+        // Wait for terminal to initialize, then send claude command
+        setTimeout(() => {
+          if (window.electronAPI) {
+            console.log('[TerminalNode] Auto-starting claude command', { terminalId });
+            // Send claude command with newline to execute
+            window.electronAPI.sendTerminalInput(terminalId, 'claude\n');
+          }
+        }, 500); // Delay to ensure terminal is ready
+      }
     } else if (terminalProcessCreatedRef.current) {
       console.log('[TerminalNode] Terminal process already created, skipping', { terminalId });
     }
