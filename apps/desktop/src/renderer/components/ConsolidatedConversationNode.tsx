@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
 import { marked } from 'marked';
-import type { MessageGroup, UserMessageGroup, AssistantMessageGroup, MessageContent } from '../types/conversation';
+import type { MessageGroup, UserMessageGroup, AssistantMessageGroup, MessageContent, ToolUseContent, ThinkingContent } from '../types/conversation';
 import './ConsolidatedConversationNode.css';
 
 // Configure marked for tight spacing
@@ -98,9 +98,6 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   const renderUserMessage = (group: UserMessageGroup, index: number) => {
     return (
       <div key={`user-${group.uuid}`} className="consolidated-user-message">
-        <div className="consolidated-user-header">
-          <span className="consolidated-user-label">User</span>
-        </div>
         <div className="consolidated-user-content">
           {group.text}
         </div>
@@ -108,40 +105,115 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
     );
   };
 
-  const renderAssistantMessage = (group: AssistantMessageGroup, index: number) => {
-    const renderContent = (content: MessageContent, entryIndex: number) => {
-      if (content.type === 'text') {
-        const html = marked.parse(content.text) as string;
-        return (
-          <div
-            key={`text-${entryIndex}`}
-            className="consolidated-assistant-text-content"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        );
+  // Represents a displayable item for assistant messages
+  type DisplayItem =
+    | { type: 'text'; content: MessageContent; key: string }
+    | { type: 'thinking'; content: ThinkingContent; key: string }
+    | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep'; count: number; key: string };
+
+  const getToolType = (toolName: string): 'read' | 'edit' | 'grep' | null => {
+    if (toolName === 'Read') return 'read';
+    if (toolName === 'Edit' || toolName === 'Write') return 'edit';
+    if (toolName === 'Grep' || toolName === 'Glob') return 'grep';
+    return null; // Skip TodoWrite and other tools
+  };
+
+  const processAssistantEntries = (group: AssistantMessageGroup): DisplayItem[] => {
+    const items: DisplayItem[] = [];
+    let currentToolType: 'read' | 'edit' | 'grep' | null = null;
+    let currentToolCount = 0;
+    let itemIndex = 0;
+
+    const flushToolGroup = () => {
+      if (currentToolType && currentToolCount > 0) {
+        items.push({
+          type: 'tool_summary',
+          toolType: currentToolType,
+          count: currentToolCount,
+          key: `tool-summary-${itemIndex++}`
+        });
+        currentToolType = null;
+        currentToolCount = 0;
       }
-      return null;
     };
+
+    for (const entry of group.entries) {
+      for (const content of entry.message.content) {
+        if (content.type === 'text') {
+          flushToolGroup();
+          items.push({ type: 'text', content, key: `text-${itemIndex++}` });
+        } else if (content.type === 'thinking') {
+          flushToolGroup();
+          items.push({ type: 'thinking', content: content as ThinkingContent, key: `thinking-${itemIndex++}` });
+        } else if (content.type === 'tool_use') {
+          const toolContent = content as ToolUseContent;
+          const toolType = getToolType(toolContent.name);
+
+          if (toolType) {
+            if (currentToolType === toolType) {
+              currentToolCount++;
+            } else {
+              flushToolGroup();
+              currentToolType = toolType;
+              currentToolCount = 1;
+            }
+          }
+        }
+      }
+    }
+
+    flushToolGroup();
+    return items;
+  };
+
+  const renderDisplayItem = (item: DisplayItem) => {
+    if (item.type === 'text') {
+      const html = marked.parse((item.content as any).text) as string;
+      return (
+        <div
+          key={item.key}
+          className="consolidated-assistant-text-content"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      );
+    }
+
+    if (item.type === 'thinking') {
+      return (
+        <div key={item.key} className="consolidated-thinking-content">
+          <span className="thinking-label">Thinking:</span>
+          <span className="thinking-text">{item.content.thinking}</span>
+        </div>
+      );
+    }
+
+    if (item.type === 'tool_summary') {
+      let label = '';
+      if (item.toolType === 'read') {
+        label = `Read ${item.count} file${item.count > 1 ? 's' : ''}`;
+      } else if (item.toolType === 'edit') {
+        label = `Edited ${item.count} file${item.count > 1 ? 's' : ''}`;
+      } else if (item.toolType === 'grep') {
+        label = 'Scanning the code';
+      }
+
+      return (
+        <div key={item.key} className="consolidated-tool-summary">
+          {label}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const renderAssistantMessage = (group: AssistantMessageGroup, index: number) => {
+    const displayItems = processAssistantEntries(group);
 
     return (
       <div key={`assistant-${group.uuid}`} className="consolidated-assistant-message">
-        <div className="consolidated-assistant-header">
-          <span className="consolidated-assistant-label">Assistant</span>
-        </div>
         <div className="consolidated-assistant-content">
-          {group.entries.map((entry, entryIndex) => {
-            const textContent = entry.message.content.filter(c => c.type === 'text');
-            if (textContent.length === 0) {
-              return null;
-            }
-            return (
-              <div key={entry.uuid} className="consolidated-assistant-entry">
-                {textContent.map((content, contentIndex) =>
-                  renderContent(content, `${entryIndex}-${contentIndex}`)
-                )}
-              </div>
-            );
-          })}
+          {displayItems.map(item => renderDisplayItem(item))}
         </div>
       </div>
     );
