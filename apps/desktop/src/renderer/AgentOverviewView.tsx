@@ -240,7 +240,6 @@ export default function AgentOverviewView({
             {title.value}
           </h2>
         )}
-        {!title.isManuallySet && <span className="title-auto-badge">auto</span>}
       </div>
 
       {/* Status Indicator */}
