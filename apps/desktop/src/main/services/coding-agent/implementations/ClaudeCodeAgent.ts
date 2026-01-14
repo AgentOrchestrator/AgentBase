@@ -1,8 +1,9 @@
-import { spawn } from 'child_process';
+import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { BaseCliAgent } from './BaseCliAgent';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { Query, SDKMessage, Options } from '@anthropic-ai/claude-agent-sdk';
 import type {
   ICodingAgentProvider,
   ISessionResumable,
@@ -13,6 +14,7 @@ import type {
 import type {
   Result,
   AgentError,
+  AgentConfig,
   AgentCapabilities,
   CodingAgentType,
   GenerateRequest,
@@ -27,30 +29,48 @@ import type {
   ContinueOptions,
   ForkOptions,
   ChatMessage,
-  MessageType,
   ToolCategory,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
+import {
+  mapSdkMessagesToResponse,
+  findResultMessage,
+  extractStreamingChunk,
+  isResultError,
+} from '../utils/sdk-message-mapper';
+import {
+  mapSdkError,
+  mapSdkResultError,
+  noResultError,
+} from '../utils/sdk-error-mapper';
 
 /**
- * Claude Code CLI agent implementation
+ * Active query handle for tracking and cancellation
+ */
+interface QueryHandle {
+  id: string;
+  query: Query;
+  abortController: AbortController;
+  startTime: number;
+}
+
+/**
+ * Claude Code SDK agent implementation
  *
  * Implements:
- * - ICodingAgentProvider: Core generation via `claude -p`
- * - ISessionResumable: Resume via `--resume` and `--continue`
- * - ISessionForkable: Fork via `--fork-session`
- * - IProcessLifecycle: Lifecycle management (inherited from BaseCliAgent)
+ * - ICodingAgentProvider: Core generation via SDK query()
+ * - ISessionResumable: Resume via SDK options.resume and options.continue
+ * - ISessionForkable: Fork via SDK options.forkSession
+ * - IProcessLifecycle: Lifecycle management via AbortController
+ * - IChatHistoryProvider: Session listing via filesystem (SDK doesn't support this)
  *
- * Does NOT implement ISessionManager since Claude Code CLI
- * doesn't expose session listing commands (CLI-only approach).
- *
- * CLI Commands Used:
- * - `claude -p "prompt"` - One-off generation
- * - `claude --resume <id> -p "prompt"` - Resume by ID/name
- * - `claude --continue -p "prompt"` - Resume latest session
- * - `claude --fork-session --session-id <parent>` - Fork session
- * - `claude --version` - Verify availability
+ * SDK Methods Used:
+ * - query({ prompt }) - One-off generation
+ * - query({ prompt, options: { resume: id } }) - Resume by ID
+ * - query({ prompt, options: { continue: true } }) - Resume latest session
+ * - query({ prompt, options: { resume: id, forkSession: true } }) - Fork session
  */
+
 /**
  * JSONL line structure from Claude Code session files
  */
@@ -66,10 +86,17 @@ interface JsonlLine {
 }
 
 export class ClaudeCodeAgent
-  extends BaseCliAgent
+  extends EventEmitter
   implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider
 {
-  private static readonly DEFAULT_EXECUTABLE = 'claude';
+  protected readonly config: AgentConfig;
+  private readonly activeQueries = new Map<string, QueryHandle>();
+  private isInitialized = false;
+
+  constructor(config: AgentConfig) {
+    super();
+    this.config = config;
+  }
 
   get agentType(): CodingAgentType {
     return 'claude_code';
@@ -80,40 +107,58 @@ export class ClaudeCodeAgent
       canGenerate: true,
       canResumeSession: true,
       canForkSession: true,
-      canListSessions: false, // CLI doesn't expose listing
+      canListSessions: false, // SDK doesn't expose listing, we use filesystem
       supportsStreaming: true,
     };
   }
 
-  protected getExecutablePath(): string {
-    return this.config.executablePath ?? ClaudeCodeAgent.DEFAULT_EXECUTABLE;
+  // ============================================
+  // IProcessLifecycle Implementation
+  // ============================================
+
+  async initialize(): Promise<Result<void, AgentError>> {
+    if (this.isInitialized) {
+      return ok(undefined);
+    }
+
+    // SDK is always available if installed - no CLI verification needed
+    // The SDK will throw on query() if not properly configured
+    this.isInitialized = true;
+    return ok(undefined);
   }
 
-  protected async verifyExecutable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      const proc = spawn(this.getExecutablePath(), ['--version'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 5000,
-      });
-
-      proc.on('close', (code) => {
-        resolve(code === 0);
-      });
-
-      proc.on('error', () => {
-        resolve(false);
-      });
-    });
+  async isAvailable(): Promise<boolean> {
+    // SDK is available if the package is installed
+    // Actual availability is determined when making queries
+    return true;
   }
 
-  protected parseOutput(output: string): GenerateResponse {
-    // Claude Code in print mode outputs directly to stdout
-    // The output is the assistant's response text
-    return {
-      content: output.trim(),
-      messageId: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-    };
+  async cancelAll(): Promise<void> {
+    for (const [id, handle] of this.activeQueries) {
+      handle.abortController.abort();
+      this.activeQueries.delete(id);
+    }
+  }
+
+  async dispose(): Promise<void> {
+    await this.cancelAll();
+    this.isInitialized = false;
+    this.removeAllListeners();
+  }
+
+  /**
+   * Check if the agent is initialized
+   */
+  private ensureInitialized(): Result<void, AgentError> {
+    if (!this.isInitialized) {
+      return err(
+        agentError(
+          AgentErrorCode.AGENT_NOT_INITIALIZED,
+          'ClaudeCodeAgent not initialized. Call initialize() first.'
+        )
+      );
+    }
+    return ok(undefined);
   }
 
   // ============================================
@@ -126,18 +171,44 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const args = this.buildGenerateArgs(request);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: request.workingDirectory,
-      timeout: request.timeout,
-      stdinInput: request.prompt, // Claude CLI expects prompt via stdin in --print mode
-    });
+    const queryId = crypto.randomUUID();
+    const abortController = new AbortController();
 
-    if (spawnResult.success === false) {
-      return { success: false, error: spawnResult.error };
+    try {
+      const options = this.buildQueryOptions(request, abortController);
+      const queryResult = query({ prompt: request.prompt, options });
+
+      const handle: QueryHandle = {
+        id: queryId,
+        query: queryResult,
+        abortController,
+        startTime: Date.now(),
+      };
+      this.activeQueries.set(queryId, handle);
+
+      // Collect all messages
+      const messages: SDKMessage[] = [];
+      for await (const message of queryResult) {
+        messages.push(message);
+      }
+
+      this.activeQueries.delete(queryId);
+
+      // Find result message and check for errors
+      const resultMessage = findResultMessage(messages);
+      if (!resultMessage) {
+        return err(noResultError());
+      }
+
+      if (isResultError(resultMessage)) {
+        return err(mapSdkResultError(resultMessage));
+      }
+
+      return ok(mapSdkMessagesToResponse(messages, resultMessage));
+    } catch (error) {
+      this.activeQueries.delete(queryId);
+      return err(mapSdkError(error));
     }
-
-    return this.collectOutput(spawnResult.data, request.timeout);
   }
 
   async generateStreaming(
@@ -149,29 +220,85 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const args = this.buildGenerateArgs(request);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: request.workingDirectory,
-      timeout: request.timeout,
-      stdinInput: request.prompt, // Claude CLI expects prompt via stdin in --print mode
-    });
+    const queryId = crypto.randomUUID();
+    const abortController = new AbortController();
 
-    if (spawnResult.success === false) {
-      return { success: false, error: spawnResult.error };
+    try {
+      const options = this.buildQueryOptions(request, abortController, true);
+      const queryResult = query({ prompt: request.prompt, options });
+
+      const handle: QueryHandle = {
+        id: queryId,
+        query: queryResult,
+        abortController,
+        startTime: Date.now(),
+      };
+      this.activeQueries.set(queryId, handle);
+
+      // Collect messages and stream chunks
+      const messages: SDKMessage[] = [];
+      for await (const message of queryResult) {
+        messages.push(message);
+
+        // Stream partial messages
+        if (message.type === 'stream_event') {
+          const chunk = extractStreamingChunk(message);
+          if (chunk) {
+            onChunk(chunk);
+          }
+        }
+      }
+
+      this.activeQueries.delete(queryId);
+
+      // Find result message and check for errors
+      const resultMessage = findResultMessage(messages);
+      if (!resultMessage) {
+        return err(noResultError());
+      }
+
+      if (isResultError(resultMessage)) {
+        return err(mapSdkResultError(resultMessage));
+      }
+
+      return ok(mapSdkMessagesToResponse(messages, resultMessage));
+    } catch (error) {
+      this.activeQueries.delete(queryId);
+      return err(mapSdkError(error));
     }
-
-    return this.streamOutput(spawnResult.data, onChunk, request.timeout);
   }
 
-  private buildGenerateArgs(request: GenerateRequest): string[] {
-    // Use --print flag for non-interactive mode; prompt is sent via stdin
-    const args: string[] = ['-p'];
+  /**
+   * Build SDK query options from a generate request
+   */
+  private buildQueryOptions(
+    request: GenerateRequest,
+    abortController: AbortController,
+    streaming = false
+  ): Partial<Options> {
+    const options: Partial<Options> = {
+      cwd: request.workingDirectory ?? this.config.workingDirectory,
+      abortController,
+      tools: { type: 'preset', preset: 'claude_code' },
+    };
 
+    // Handle system prompt
     if (request.systemPrompt) {
-      args.push('--append-system-prompt', request.systemPrompt);
+      options.systemPrompt = {
+        type: 'preset',
+        preset: 'claude_code',
+        append: request.systemPrompt,
+      };
+    } else {
+      options.systemPrompt = { type: 'preset', preset: 'claude_code' };
     }
 
-    return args;
+    // Enable streaming partial messages
+    if (streaming) {
+      options.includePartialMessages = true;
+    }
+
+    return options;
   }
 
   // ============================================
@@ -188,18 +315,43 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const args = this.buildContinueArgs(identifier);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: options?.workingDirectory,
-      timeout: options?.timeout,
-      stdinInput: prompt, // Claude CLI expects prompt via stdin
-    });
+    const queryId = crypto.randomUUID();
+    const abortController = new AbortController();
 
-    if (spawnResult.success === false) {
-      return { success: false, error: spawnResult.error };
+    try {
+      const sdkOptions = this.buildContinueOptions(identifier, abortController, options);
+      const queryResult = query({ prompt, options: sdkOptions });
+
+      const handle: QueryHandle = {
+        id: queryId,
+        query: queryResult,
+        abortController,
+        startTime: Date.now(),
+      };
+      this.activeQueries.set(queryId, handle);
+
+      // Collect all messages
+      const messages: SDKMessage[] = [];
+      for await (const message of queryResult) {
+        messages.push(message);
+      }
+
+      this.activeQueries.delete(queryId);
+
+      const resultMessage = findResultMessage(messages);
+      if (!resultMessage) {
+        return err(noResultError());
+      }
+
+      if (isResultError(resultMessage)) {
+        return err(mapSdkResultError(resultMessage));
+      }
+
+      return ok(mapSdkMessagesToResponse(messages, resultMessage));
+    } catch (error) {
+      this.activeQueries.delete(queryId);
+      return err(mapSdkError(error));
     }
-
-    return this.collectOutput(spawnResult.data, options?.timeout);
   }
 
   async continueSessionStreaming(
@@ -213,35 +365,84 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const args = this.buildContinueArgs(identifier);
-    const spawnResult = this.spawnProcess(args, {
-      workingDirectory: options?.workingDirectory,
-      timeout: options?.timeout,
-      stdinInput: prompt, // Claude CLI expects prompt via stdin
-    });
+    const queryId = crypto.randomUUID();
+    const abortController = new AbortController();
 
-    if (spawnResult.success === false) {
-      return { success: false, error: spawnResult.error };
+    try {
+      const sdkOptions = this.buildContinueOptions(identifier, abortController, options, true);
+      const queryResult = query({ prompt, options: sdkOptions });
+
+      const handle: QueryHandle = {
+        id: queryId,
+        query: queryResult,
+        abortController,
+        startTime: Date.now(),
+      };
+      this.activeQueries.set(queryId, handle);
+
+      // Collect messages and stream chunks
+      const messages: SDKMessage[] = [];
+      for await (const message of queryResult) {
+        messages.push(message);
+
+        if (message.type === 'stream_event') {
+          const chunk = extractStreamingChunk(message);
+          if (chunk) {
+            onChunk(chunk);
+          }
+        }
+      }
+
+      this.activeQueries.delete(queryId);
+
+      const resultMessage = findResultMessage(messages);
+      if (!resultMessage) {
+        return err(noResultError());
+      }
+
+      if (isResultError(resultMessage)) {
+        return err(mapSdkResultError(resultMessage));
+      }
+
+      return ok(mapSdkMessagesToResponse(messages, resultMessage));
+    } catch (error) {
+      this.activeQueries.delete(queryId);
+      return err(mapSdkError(error));
     }
-
-    return this.streamOutput(spawnResult.data, onChunk, options?.timeout);
   }
 
-  private buildContinueArgs(identifier: SessionIdentifier): string[] {
-    // Use --print flag; prompt is sent via stdin
-    const args: string[] = ['-p'];
+  /**
+   * Build SDK options for session continuation
+   */
+  private buildContinueOptions(
+    identifier: SessionIdentifier,
+    abortController: AbortController,
+    continueOptions?: ContinueOptions,
+    streaming = false
+  ): Partial<Options> {
+    const options: Partial<Options> = {
+      cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
+      abortController,
+      tools: { type: 'preset', preset: 'claude_code' },
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+    };
 
+    // Map SessionIdentifier to SDK options
     switch (identifier.type) {
       case 'latest':
-        args.push('--continue');
+        options.continue = true;
         break;
       case 'id':
       case 'name':
-        args.push('--resume', identifier.value);
+        options.resume = identifier.value;
         break;
     }
 
-    return args;
+    if (streaming) {
+      options.includePartialMessages = true;
+    }
+
+    return options;
   }
 
   // ============================================
@@ -268,42 +469,59 @@ export class ClaudeCodeAgent
       );
     }
 
-    const args: string[] = ['--fork-session', '--resume', parentId];
+    const queryId = crypto.randomUUID();
+    const abortController = new AbortController();
 
-    if (options?.customSessionId) {
-      args.push('--session-id', options.customSessionId);
+    try {
+      const sdkOptions: Partial<Options> = {
+        resume: parentId,
+        forkSession: true,
+        abortController,
+        tools: { type: 'preset', preset: 'claude_code' },
+      };
+
+      // Use empty prompt to trigger the fork
+      const queryResult = query({ prompt: '', options: sdkOptions });
+
+      const handle: QueryHandle = {
+        id: queryId,
+        query: queryResult,
+        abortController,
+        startTime: Date.now(),
+      };
+      this.activeQueries.set(queryId, handle);
+
+      // Collect messages to get the new session ID
+      let newSessionId: string | null = null;
+      for await (const message of queryResult) {
+        // Extract session_id from any message
+        if ('session_id' in message && message.session_id) {
+          newSessionId = message.session_id;
+        }
+      }
+
+      this.activeQueries.delete(queryId);
+
+      if (!newSessionId) {
+        return err(
+          agentError(AgentErrorCode.SESSION_INVALID, 'Failed to obtain new session ID from fork')
+        );
+      }
+
+      const now = new Date().toISOString();
+      return ok({
+        id: newSessionId,
+        name: options?.newSessionName,
+        agentType: 'claude_code',
+        createdAt: now,
+        updatedAt: now,
+        messageCount: 0,
+        parentSessionId: parentId,
+      });
+    } catch (error) {
+      this.activeQueries.delete(queryId);
+      return err(mapSdkError(error));
     }
-
-    // Add a minimal prompt to trigger the fork
-    args.push('-p', '');
-
-    const spawnResult = this.spawnProcess(args);
-    if (spawnResult.success === false) {
-      return { success: false, error: spawnResult.error };
-    }
-
-    // Wait for the process to complete
-    const result = await this.collectOutput(spawnResult.data);
-
-    if (result.success === false) {
-      return { success: false, error: result.error };
-    }
-
-    // Return the new session info
-    // Note: The actual session ID is generated by Claude Code internally
-    // We return what we know about the new session
-    const newSessionId = options?.customSessionId ?? crypto.randomUUID();
-    const now = new Date().toISOString();
-
-    return ok({
-      id: newSessionId,
-      name: options?.newSessionName,
-      agentType: 'claude_code',
-      createdAt: now,
-      updatedAt: now,
-      messageCount: 0, // Unknown without DB access
-      parentSessionId: parentId,
-    });
   }
 
   private resolveSessionId(identifier: SessionIdentifier): string | null {
@@ -312,12 +530,13 @@ export class ClaudeCodeAgent
       case 'name':
         return identifier.value;
       case 'latest':
-        return null; // Cannot resolve latest without DB access
+        return null; // Cannot resolve latest without session context
     }
   }
 
   // ============================================
   // IChatHistoryProvider Implementation
+  // (Filesystem-based - unchanged from CLI version)
   // ============================================
 
   /**
@@ -582,7 +801,6 @@ export class ClaudeCodeAgent
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(line => line.trim());
     const messages: ChatMessage[] = [];
-    let lastTimestamp: string | undefined;
 
     for (const line of lines) {
       try {
@@ -602,7 +820,6 @@ export class ClaudeCodeAgent
           }
 
           messages.push(msg);
-          if (msg.timestamp) lastTimestamp = msg.timestamp;
         }
       } catch {
         // Skip malformed lines
