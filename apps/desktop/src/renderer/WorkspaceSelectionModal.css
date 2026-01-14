@@ -143,3 +143,95 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Recent workspaces section */
+.recent-workspaces-section {
+  margin-bottom: 16px;
+}
+
+.recent-workspaces-section h4 {
+  font-size: 13px;
+  color: #cccccc;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.recent-workspaces-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: #252526;
+}
+
+.recent-workspace-item {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid #3c3c3c;
+  transition: background-color 0.15s ease;
+}
+
+.recent-workspace-item:last-child {
+  border-bottom: none;
+}
+
+.recent-workspace-item:hover {
+  background: #2a2d2e;
+}
+
+.recent-workspace-item.selected {
+  background: #094771;
+}
+
+.workspace-name {
+  color: #cccccc;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.workspace-path {
+  color: #858585;
+  font-size: 11px;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-git {
+  color: #3794ff;
+  font-size: 11px;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+.section-divider {
+  margin: 16px 0;
+  text-align: center;
+  color: #6e6e6e;
+  font-size: 12px;
+  position: relative;
+}
+
+.section-divider::before,
+.section-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: #3c3c3c;
+}
+
+.section-divider::before {
+  left: 0;
+}
+
+.section-divider::after {
+  right: 0;
+}

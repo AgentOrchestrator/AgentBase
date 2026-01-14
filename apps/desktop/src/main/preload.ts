@@ -480,3 +480,49 @@ contextBridge.exposeInMainWorld('gitAPI', {
     }
   },
 } as GitAPI);
+
+// Recent workspace entry type
+export interface RecentWorkspaceEntry {
+  path: string;
+  name: string;
+  lastOpenedAt: string;
+  openCount: number;
+  git?: {
+    branch?: string;
+    remote?: string;
+  };
+}
+
+// Type definitions for the recent workspace API
+export interface RecentWorkspaceAPI {
+  /** Track a workspace as recently opened */
+  trackRecent: (
+    path: string,
+    name: string,
+    gitInfo?: { branch?: string; remote?: string }
+  ) => Promise<void>;
+  /** Get recent workspaces sorted by last opened */
+  getRecent: (limit?: number) => Promise<RecentWorkspaceEntry[]>;
+  /** Remove a workspace from recent list */
+  removeRecent: (path: string) => Promise<void>;
+}
+
+// Expose recent workspace API
+contextBridge.exposeInMainWorld('recentWorkspaceAPI', {
+  trackRecent: async (
+    path: string,
+    name: string,
+    gitInfo?: { branch?: string; remote?: string }
+  ) => {
+    await unwrapResponse(
+      ipcRenderer.invoke('workspace:track-recent', path, name, gitInfo)
+    );
+  },
+  getRecent: (limit?: number) =>
+    unwrapResponse<RecentWorkspaceEntry[]>(
+      ipcRenderer.invoke('workspace:get-recent', limit)
+    ),
+  removeRecent: async (path: string) => {
+    await unwrapResponse(ipcRenderer.invoke('workspace:remove-recent', path));
+  },
+} as RecentWorkspaceAPI);

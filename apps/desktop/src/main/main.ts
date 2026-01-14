@@ -780,6 +780,48 @@ function runGitCommand(cwd: string, args: string[]): Promise<string> {
   });
 }
 
+// ============================================================================
+// Recent Workspaces API handlers
+// ============================================================================
+
+ipcMain.handle(
+  'workspace:track-recent',
+  async (
+    _event,
+    path: string,
+    name: string,
+    gitInfo?: { branch?: string; remote?: string }
+  ) => {
+    try {
+      await database.trackRecentWorkspace(path, name, gitInfo);
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error tracking recent workspace', { path, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('workspace:get-recent', async (_event, limit?: number) => {
+  try {
+    const workspaces = await database.getRecentWorkspaces(limit);
+    return { success: true, data: workspaces };
+  } catch (error) {
+    console.error('[Main] Error getting recent workspaces', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('workspace:remove-recent', async (_event, path: string) => {
+  try {
+    await database.removeRecentWorkspace(path);
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Error removing recent workspace', { path, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 ipcMain.handle('git:get-info', async (_event, workspacePath: string): Promise<{ success: boolean; data?: GitInfo; error?: string }> => {
   try {
     // Verify path exists and is a git repo
