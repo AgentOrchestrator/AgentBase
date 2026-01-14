@@ -10,6 +10,7 @@ import type {
   IWorkspaceService,
   IAgentService,
 } from './types';
+import type { IConversationService } from './IConversationService';
 
 // =============================================================================
 // Service Bundles (Discriminated Unions)
@@ -50,13 +51,22 @@ export interface CustomNodeServices {
 }
 
 /**
+ * Services available to ConversationNode
+ */
+export interface ConversationNodeServices {
+  readonly type: 'conversation';
+  readonly conversation: IConversationService;
+}
+
+/**
  * Discriminated union of all node service types
  */
 export type NodeServices =
   | TerminalNodeServices
   | AgentNodeServices
   | WorkspaceNodeServices
-  | CustomNodeServices;
+  | CustomNodeServices
+  | ConversationNodeServices;
 
 // =============================================================================
 // Type Guards
@@ -98,6 +108,15 @@ export function isCustomNodeServices(
   return services.type === 'custom';
 }
 
+/**
+ * Type guard for ConversationNodeServices
+ */
+export function isConversationNodeServices(
+  services: NodeServices
+): services is ConversationNodeServices {
+  return services.type === 'conversation';
+}
+
 // =============================================================================
 // Service Availability Helpers
 // =============================================================================
@@ -131,4 +150,13 @@ export function hasAgentService(
   services: NodeServices
 ): services is AgentNodeServices {
   return services.type === 'agent';
+}
+
+/**
+ * Check if services bundle has conversation service
+ */
+export function hasConversationService(
+  services: NodeServices
+): services is ConversationNodeServices {
+  return services.type === 'conversation';
 }

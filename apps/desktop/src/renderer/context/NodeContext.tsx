@@ -19,14 +19,17 @@ import type {
   ITerminalService,
   IWorkspaceService,
   IAgentService,
+  IConversationService,
   NodeServices,
 } from './node-services';
 import {
   hasTerminalService,
   hasWorkspaceService,
   hasAgentService,
+  hasConversationService,
 } from './node-services';
 import { useNodeServicesRegistry } from './NodeServicesRegistry';
+import type { NodeServiceConfig } from './NodeServicesRegistry';
 
 // =============================================================================
 // Context Types
@@ -46,22 +49,6 @@ export interface NodeContextValue<T extends NodeServices = NodeServices> {
   isInitialized: boolean;
   /** Error during initialization (if any) */
   error: Error | null;
-}
-
-/**
- * Configuration for node services
- */
-export interface NodeServiceConfig {
-  /** Terminal ID (for terminal/agent nodes) */
-  terminalId?: string;
-  /** Agent ID (for agent nodes) */
-  agentId?: string;
-  /** Agent type (for agent nodes) */
-  agentType?: AgentType;
-  /** Workspace path (for all nodes with workspace support) */
-  workspacePath?: string;
-  /** Auto-start CLI on mount (for agent nodes) */
-  autoStartCli?: boolean;
 }
 
 // =============================================================================
@@ -84,7 +71,9 @@ export interface NodeContextProviderProps {
   /** Agent ID (required for agent nodes) */
   agentId?: string;
   /** Agent type (required for agent nodes) */
-  agentType?: AgentType;
+  agentType?: AgentType | string;
+  /** Session ID (required for conversation nodes) */
+  sessionId?: string;
   /** Workspace path */
   workspacePath?: string;
   /** Auto-start CLI on mount (agent nodes only) */
@@ -109,6 +98,7 @@ export function NodeContextProvider({
   terminalId,
   agentId,
   agentType,
+  sessionId,
   workspacePath,
   autoStartCli = false,
   children,
@@ -123,7 +113,8 @@ export function NodeContextProvider({
   const config: NodeServiceConfig = {
     terminalId: terminalId || `terminal-${nodeId}`,
     agentId: agentId || `agent-${nodeId}`,
-    agentType: agentType || 'claude_code',
+    agentType: (agentType as AgentType) || 'claude_code',
+    sessionId,
     workspacePath,
     autoStartCli,
   };
@@ -303,6 +294,19 @@ export function useAgentService(): IAgentService {
     );
   }
   return context.services.agent;
+}
+
+/**
+ * Access conversation service (throws if not available)
+ */
+export function useConversationService(): IConversationService {
+  const context = useNodeContext();
+  if (!hasConversationService(context.services)) {
+    throw new Error(
+      `Conversation service not available for node type: ${context.nodeType}`
+    );
+  }
+  return context.services.conversation;
 }
 
 /**

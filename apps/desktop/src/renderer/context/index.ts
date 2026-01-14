@@ -15,14 +15,15 @@ export {
   useTerminalService,
   useWorkspaceService,
   useAgentService,
+  useConversationService,
   useNodeInitialized,
   useNodeError,
 } from './NodeContext';
-export type { NodeContextValue, NodeServiceConfig } from './NodeContext';
+export type { NodeContextValue } from './NodeContext';
 
 // Services registry
 export {
   NodeServicesRegistryProvider,
   useNodeServicesRegistry,
 } from './NodeServicesRegistry';
-export type { ServiceFactories } from './NodeServicesRegistry';
+export type { ServiceFactories, NodeServiceConfig } from './NodeServicesRegistry';

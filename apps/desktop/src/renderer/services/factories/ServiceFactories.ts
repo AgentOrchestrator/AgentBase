@@ -11,6 +11,7 @@ import type { ITerminalService } from '../../context/node-services';
 import { TerminalServiceImpl } from '../impl/TerminalServiceImpl';
 import { WorkspaceServiceImpl } from '../impl/WorkspaceServiceImpl';
 import { AgentServiceImpl } from '../impl/AgentServiceImpl';
+import { ConversationServiceImpl } from '../impl/ConversationServiceImpl';
 
 /**
  * Create production service factories
@@ -33,6 +34,14 @@ export function createServiceFactories(): ServiceFactories {
       workspacePath?: string
     ) => {
       return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, workspacePath);
+    },
+
+    createConversationService: (
+      nodeId: string,
+      sessionId: string,
+      agentType: string
+    ) => {
+      return new ConversationServiceImpl(nodeId, sessionId, agentType);
     },
   };
 }

@@ -1,15 +1,35 @@
+/**
+ * StarterNodePresentation
+ *
+ * Pure UI component for the starter node.
+ * Handles textarea input, auto-resize, and keyboard events.
+ */
+
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position } from '@xyflow/react';
 import './StarterNode.css';
 
-interface StarterNodeData {
+export interface StarterNodePresentationProps {
+  /** Whether the node is selected */
+  selected?: boolean;
+  /** Placeholder text for the input */
   placeholder?: string;
+  /** Callback when user submits a message */
+  onSubmit: (message: string) => void;
 }
 
-function StarterNode({ data, selected, id }: NodeProps) {
-  const nodeData = data as unknown as StarterNodeData;
+/**
+ * StarterNodePresentation
+ *
+ * Renders the starter node UI with a textarea input.
+ * Calls onSubmit when user presses Enter (without Shift).
+ */
+export function StarterNodePresentation({
+  selected = false,
+  placeholder = 'Type your message...',
+  onSubmit,
+}: StarterNodePresentationProps) {
   const [inputValue, setInputValue] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-focus on mount
@@ -29,24 +49,12 @@ function StarterNode({ data, selected, id }: NodeProps) {
 
   // Handle submit
   const handleSubmit = useCallback(() => {
-    if (!inputValue.trim() || isSubmitting) return;
+    const message = inputValue.trim();
+    if (!message) return;
 
-    setIsSubmitting(true);
-
-    // Dispatch event for Canvas to handle
-    window.dispatchEvent(
-      new CustomEvent('starter-node-submit', {
-        detail: {
-          nodeId: id,
-          message: inputValue.trim(),
-        },
-      })
-    );
-
-    // Clear input after submit
+    onSubmit(message);
     setInputValue('');
-    setIsSubmitting(false);
-  }, [id, inputValue, isSubmitting]);
+  }, [inputValue, onSubmit]);
 
   // Handle key down - Enter to submit, Shift+Enter for newline
   const handleKeyDown = useCallback(
@@ -73,7 +81,7 @@ function StarterNode({ data, selected, id }: NodeProps) {
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={nodeData.placeholder || 'Type your message...'}
+        placeholder={placeholder}
         rows={3}
       />
 
@@ -81,5 +89,3 @@ function StarterNode({ data, selected, id }: NodeProps) {
     </div>
   );
 }
-
-export default StarterNode;

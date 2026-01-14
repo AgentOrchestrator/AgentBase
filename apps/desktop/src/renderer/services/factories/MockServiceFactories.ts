@@ -12,6 +12,10 @@ import type {
   ITerminalService,
   IWorkspaceService,
   IAgentService,
+  IConversationService,
+  ChatMessage,
+  MessagesLoadedListener,
+  ErrorListener,
   GitInfo,
 } from '../../context/node-services';
 
@@ -157,6 +161,86 @@ function createMockAgentService(
       };
       return commands[agentType] || '';
     },
+    setWorkspace: async () => {
+      // No-op for mock
+    },
+  };
+}
+
+/**
+ * Create a mock conversation service
+ */
+function createMockConversationService(
+  nodeId: string,
+  sessionId: string,
+  agentType: string
+): IConversationService {
+  let messages: ChatMessage[] = [];
+  let isLoading = false;
+  let error: string | null = null;
+
+  const messagesListeners = new Set<MessagesLoadedListener>();
+  const errorListeners = new Set<ErrorListener>();
+
+  // Generate mock messages
+  const mockMessages: ChatMessage[] = [
+    {
+      id: 'mock-msg-1',
+      role: 'user',
+      content: 'Hello, can you help me with a coding task?',
+      timestamp: new Date(Date.now() - 60000).toISOString(),
+    },
+    {
+      id: 'mock-msg-2',
+      role: 'assistant',
+      content: 'Of course! I\'d be happy to help. What would you like to work on?',
+      timestamp: new Date(Date.now() - 30000).toISOString(),
+    },
+  ];
+
+  return {
+    nodeId,
+    sessionId,
+    agentType,
+    initialize: async () => {},
+    dispose: async () => {
+      messages = [];
+      error = null;
+      messagesListeners.clear();
+      errorListeners.clear();
+    },
+    loadSession: async () => {
+      isLoading = true;
+      // Simulate async load
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      messages = mockMessages;
+      isLoading = false;
+      for (const listener of messagesListeners) {
+        listener(messages);
+      }
+    },
+    getMessages: () => messages,
+    isLoading: () => isLoading,
+    getError: () => error,
+    onMessagesLoaded: (listener) => {
+      messagesListeners.add(listener);
+      return () => messagesListeners.delete(listener);
+    },
+    onError: (listener) => {
+      errorListeners.add(listener);
+      return () => errorListeners.delete(listener);
+    },
+    refresh: async () => {
+      messages = [];
+      error = null;
+      isLoading = true;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      messages = mockMessages;
+      isLoading = false;
+      for (const listener of messagesListeners) {
+        listener(messages);
+      }
+    },
   };
 }
 
@@ -168,5 +252,6 @@ export function createMockServiceFactories(): ServiceFactories {
     createTerminalService: createMockTerminalService,
     createWorkspaceService: createMockWorkspaceService,
     createAgentService: createMockAgentService,
+    createConversationService: createMockConversationService,
   };
 }

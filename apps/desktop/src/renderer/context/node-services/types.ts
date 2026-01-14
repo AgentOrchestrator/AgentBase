@@ -24,7 +24,7 @@ export type { GitInfo };
 /**
  * Discriminator for node types
  */
-export type NodeType = 'agent' | 'terminal' | 'workspace' | 'custom';
+export type NodeType = 'agent' | 'terminal' | 'workspace' | 'custom' | 'conversation';
 
 // =============================================================================
 // Base Service Interface
