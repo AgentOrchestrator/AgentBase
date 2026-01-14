@@ -5,3 +5,6 @@ export * from './types.js';
 
 // Chat history loaders module
 export * from './loaders/index.js';
+
+// Agent hooks module (vendor-agnostic event system)
+export * from './hooks/index.js';
