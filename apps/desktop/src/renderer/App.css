@@ -10,6 +10,7 @@ body {
   font-family: "SF UI Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #1e1e1e;
 }
 
 .app {
@@ -18,6 +19,7 @@ body {
   overflow: hidden;
   background: #1e1e1e;
   display: flex;
+  flex-direction: column;
 }
 
 .terminal-container {

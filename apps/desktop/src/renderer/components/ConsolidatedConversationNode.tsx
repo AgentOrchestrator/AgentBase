@@ -109,18 +109,19 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   type DisplayItem =
     | { type: 'text'; content: MessageContent; key: string }
     | { type: 'thinking'; content: ThinkingContent; key: string }
-    | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep'; count: number; key: string };
+    | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
 
-  const getToolType = (toolName: string): 'read' | 'edit' | 'grep' | null => {
+  const getToolType = (toolName: string): 'read' | 'edit' | 'grep' | 'glob' | null => {
     if (toolName === 'Read') return 'read';
     if (toolName === 'Edit' || toolName === 'Write') return 'edit';
-    if (toolName === 'Grep' || toolName === 'Glob') return 'grep';
+    if (toolName === 'Grep') return 'grep';
+    if (toolName === 'Glob') return 'glob';
     return null; // Skip TodoWrite and other tools
   };
 
   const processAssistantEntries = (group: AssistantMessageGroup): DisplayItem[] => {
     const items: DisplayItem[] = [];
-    let currentToolType: 'read' | 'edit' | 'grep' | null = null;
+    let currentToolType: 'read' | 'edit' | 'grep' | 'glob' | null = null;
     let currentToolCount = 0;
     let itemIndex = 0;
 
@@ -195,6 +196,8 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
         label = `Edited ${item.count} file${item.count > 1 ? 's' : ''}`;
       } else if (item.toolType === 'grep') {
         label = 'Scanning the code';
+      } else if (item.toolType === 'glob') {
+        label = 'Gathering files';
       }
 
       return (

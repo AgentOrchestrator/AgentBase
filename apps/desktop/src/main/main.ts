@@ -71,6 +71,8 @@ const createWindow = (): void => {
   const win = new BrowserWindow({
     width: 1000,
     height: 700,
+    backgroundColor: '#1e1e1e',
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -93,6 +95,27 @@ const createWindow = (): void => {
   // Return home directory synchronously
   ipcMain.on('get-home-dir', (event) => {
     event.returnValue = process.env.HOME || os.homedir();
+  });
+
+  // Window control handlers for custom titlebar
+  ipcMain.on('window-minimize', () => {
+    win.minimize();
+  });
+
+  ipcMain.on('window-maximize', () => {
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  });
+
+  ipcMain.on('window-close', () => {
+    win.close();
+  });
+
+  ipcMain.handle('window-is-maximized', () => {
+    return win.isMaximized();
   });
 
   // Track terminals being created to prevent race conditions

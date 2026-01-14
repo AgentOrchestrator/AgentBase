@@ -118,6 +118,19 @@ export const MessageNodeDataSchema = z.object({
   agentNodeId: z.string(), // Reference to the parent agent node
 });
 
+/**
+ * Schema for ConversationNode data
+ */
+export const ConversationNodeDataSchema = z.object({
+  sessionId: z.string(),
+  agentType: z.string(),
+  title: z.string(),
+  projectName: z.string().optional(),
+  messageCount: z.number().optional(),
+  timestamp: z.string().optional(),
+  isExpanded: z.boolean().optional(),
+});
+
 // =============================================================================
 // Inferred Types
 // =============================================================================
@@ -127,3 +140,4 @@ export type TerminalNodeData = z.infer<typeof TerminalNodeDataSchema>;
 export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
 export type MessageNodeData = z.infer<typeof MessageNodeDataSchema>;
+export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;

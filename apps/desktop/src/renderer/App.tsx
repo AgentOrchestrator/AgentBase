@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import Canvas from './Canvas';
 import { NodeServicesRegistryProvider } from './context';
 import { createServiceFactories } from './services';
+import { TitleBar } from './components/TitleBar';
 import './App.css';
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
   return (
     <NodeServicesRegistryProvider factories={factories}>
       <div className="app">
+        <TitleBar />
         <Canvas />
       </div>
     </NodeServicesRegistryProvider>

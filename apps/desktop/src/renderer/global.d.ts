@@ -6,6 +6,12 @@
 
 import type { ElectronAPI, WorktreeAPI, CodingAgentAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI } from '../main/preload';
 
+// Declare SVG module imports (Vite handles these as URLs)
+declare module '*.svg' {
+  const content: string;
+  export default content;
+}
+
 // Extended ShellAPI with directory dialog (added for workspace selection)
 interface ExtendedShellAPI {
   openWithEditor: (directoryPath: string, editor: string) => Promise<void>;
