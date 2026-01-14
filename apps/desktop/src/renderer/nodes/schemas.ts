@@ -120,6 +120,13 @@ export const ConversationNodeDataSchema = z.object({
   isExpanded: z.boolean().optional(),
 });
 
+/**
+ * Schema for StarterNode data
+ */
+export const StarterNodeDataSchema = z.object({
+  placeholder: z.string().optional(),
+});
+
 // =============================================================================
 // Inferred Types
 // =============================================================================
@@ -129,3 +136,4 @@ export type TerminalNodeData = z.infer<typeof TerminalNodeDataSchema>;
 export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
 export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;
+export type StarterNodeData = z.infer<typeof StarterNodeDataSchema>;

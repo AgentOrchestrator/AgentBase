@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as pty from 'node-pty';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as os from 'os';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import { DatabaseFactory } from './database';
@@ -88,6 +89,11 @@ const createWindow = (): void => {
   } else {
     win.loadFile(path.join(__dirname, '../../../index.html'));
   }
+
+  // Return home directory synchronously
+  ipcMain.on('get-home-dir', (event) => {
+    event.returnValue = process.env.HOME || os.homedir();
+  });
 
   // Track terminals being created to prevent race conditions
   const terminalsBeingCreated = new Set<string>();
@@ -531,7 +537,8 @@ ipcMain.handle(
   'coding-agent:list-session-summaries',
   async (_event, agentType: CodingAgentType, filter?: SessionFilterOptions) => {
     try {
-      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      // Use skipCliVerification since chat history reads from filesystem, not CLI
+      const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
       if (agentResult.success === false) {
         return { success: false, error: agentResult.error.message };
       }
@@ -565,7 +572,8 @@ ipcMain.handle(
     filter?: MessageFilterOptions
   ) => {
     try {
-      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      // Use skipCliVerification since chat history reads from filesystem, not CLI
+      const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
       if (agentResult.success === false) {
         return { success: false, error: agentResult.error.message };
       }

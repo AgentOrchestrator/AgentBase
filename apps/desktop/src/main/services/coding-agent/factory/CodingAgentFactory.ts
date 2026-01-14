@@ -4,6 +4,20 @@ import { AgentErrorCode, ok, err, agentError } from '../types';
 import { ClaudeCodeAgent } from '../implementations';
 
 /**
+ * Options for getAgent
+ */
+interface GetAgentOptions {
+  /** Configuration overrides */
+  config?: Partial<Omit<AgentConfig, 'type'>>;
+  /**
+   * Skip CLI verification during initialization.
+   * Use this for read-only operations (like chat history retrieval)
+   * that don't require the CLI to be installed.
+   */
+  skipCliVerification?: boolean;
+}
+
+/**
  * Factory for creating coding agent instances
  *
  * Follows the DatabaseFactory pattern:
@@ -29,12 +43,42 @@ export class CodingAgentFactory {
    * Returns a cached instance if available, otherwise creates and initializes a new one.
    *
    * @param type - The type of agent to create
-   * @param config - Optional configuration overrides
+   * @param options - Optional options including config and skipCliVerification
    */
   static async getAgent(
     type: CodingAgentType,
-    config?: Partial<Omit<AgentConfig, 'type'>>
+    options?: GetAgentOptions | Partial<Omit<AgentConfig, 'type'>>
   ): Promise<Result<IMinimalCodingAgent, AgentError>> {
+    // Normalize options - support both old config-only signature and new options object
+    const normalizedOptions: GetAgentOptions = options && 'skipCliVerification' in options
+      ? options as GetAgentOptions
+      : { config: options as Partial<Omit<AgentConfig, 'type'>> | undefined };
+
+    const { config, skipCliVerification } = normalizedOptions;
+
+    // For skipCliVerification requests, don't use the cached instance
+    // (it might have failed initialization)
+    // Instead, create an uninitialized instance
+    if (skipCliVerification) {
+      const fullConfig: AgentConfig = {
+        type,
+        ...config,
+      };
+
+      switch (type) {
+        case 'claude_code':
+          return ok(new ClaudeCodeAgent(fullConfig));
+
+        default:
+          return err(
+            agentError(
+              AgentErrorCode.AGENT_NOT_AVAILABLE,
+              `Unsupported agent type: ${type}`
+            )
+          );
+      }
+    }
+
     // Return cached instance if available
     const existing = this.instances.get(type);
     if (existing) {

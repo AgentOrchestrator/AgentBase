@@ -50,6 +50,7 @@ export interface ElectronAPI {
   sendTerminalResize: (terminalId: string, cols: number, rows: number) => void;
   destroyTerminal: (terminalId: string) => void;
   removeAllListeners: (channel: string) => void;
+  getHomeDir: () => string;
 }
 
 // Type definitions for the canvas API
@@ -249,7 +250,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removeAllListeners: (channel: string) => {
     ipcRenderer.removeAllListeners(channel);
-  }
+  },
+  getHomeDir: () => ipcRenderer.sendSync('get-home-dir'),
 } as ElectronAPI);
 
 // Helper to unwrap IPC response

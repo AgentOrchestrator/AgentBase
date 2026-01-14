@@ -145,8 +145,8 @@ function ConversationNode({ data, id, selected }: NodeProps) {
     });
   };
 
-  // Get display title
-  const displayTitle = title || projectName || `Session ${sessionId.slice(0, 8)}...`;
+  // Get display title (with safety check for sessionId)
+  const displayTitle = title || projectName || (sessionId ? `Session ${sessionId.slice(0, 8)}...` : 'Conversation');
 
   return (
     <div className={`conversation-node ${selected ? 'selected' : ''}`}>

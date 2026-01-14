@@ -76,6 +76,7 @@
   max-height: 400px;
   overflow-y: auto;
   padding: 12px;
+  background: #2a2c36;
 }
 
 .conversation-node-loading {

@@ -18,6 +18,7 @@ import { createDefaultAgentTitle } from './types/agent-node';
 import { createLinearIssueAttachment, createWorkspaceMetadataAttachment } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
 import { nodeRegistry } from './nodes/registry';
+import SessionPickerModal from './components/SessionPickerModal';
 
 // Use node types from the registry (single source of truth)
 const nodeTypes = nodeRegistry.reactFlowNodeTypes;
@@ -121,6 +122,7 @@ function CanvasFlow() {
   const { screenToFlowPosition } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
 
@@ -199,6 +201,54 @@ function CanvasFlow() {
       window.removeEventListener('update-node', handleUpdateNode as EventListener);
     };
   }, [setNodes]);
+
+  // Listen for starter node submit events
+  useEffect(() => {
+    const handleStarterSubmit = (event: CustomEvent) => {
+      const { nodeId, message } = event.detail;
+
+      // Find the starter node to get its position
+      const starterNode = nodes.find((n) => n.id === nodeId);
+      if (!starterNode) return;
+
+      // Get home directory as default working directory
+      const electronAPI = (window as unknown as { electronAPI?: { getHomeDir: () => string } }).electronAPI;
+      const workingDirectory = electronAPI?.getHomeDir() || '/';
+
+      // Create a new terminal and agent node below the starter
+      const terminalId = `terminal-${crypto.randomUUID()}`;
+      const agentId = `agent-${Date.now()}`;
+
+      const agentNode = {
+        id: `node-${Date.now()}`,
+        type: 'agent',
+        position: {
+          x: starterNode.position.x,
+          y: starterNode.position.y + 150,
+        },
+        data: {
+          agentId,
+          terminalId,
+          agentType: 'claude_code',
+          status: 'idle',
+          title: { value: message.slice(0, 50) + (message.length > 50 ? '...' : ''), isManuallySet: false },
+          summary: null,
+          progress: null,
+          initialPrompt: message,
+          workingDirectory,
+        },
+        style: { width: 600 },
+      };
+
+      // Remove the starter node and add the agent node
+      setNodes((nds) => [...nds.filter((n) => n.id !== nodeId), agentNode]);
+    };
+
+    window.addEventListener('starter-node-submit', handleStarterSubmit as EventListener);
+    return () => {
+      window.removeEventListener('starter-node-submit', handleStarterSubmit as EventListener);
+    };
+  }, [nodes, setNodes]);
 
   const handleLinearConnect = useCallback(() => {
     if (linearApiKey.trim()) {
@@ -696,6 +746,9 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
+  // Store pending position for conversation node creation
+  const pendingConversationPosition = useRef<{ x: number; y: number } | null>(null);
+
   const addConversationNode = useCallback((position?: { x: number; y: number }, sessionId?: string) => {
     let nodePosition = position;
 
@@ -715,18 +768,21 @@ function CanvasFlow() {
       });
     }
 
-    // If no sessionId provided, generate a placeholder
-    // TODO: Replace with session picker modal
-    const actualSessionId = sessionId || `session-${Date.now()}`;
+    // If no sessionId provided, open session picker modal
+    if (!sessionId) {
+      pendingConversationPosition.current = nodePosition;
+      setIsSessionPickerOpen(true);
+      setContextMenu(null);
+      return;
+    }
 
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type: 'conversation',
       position: nodePosition,
       data: {
-        sessionId: actualSessionId,
+        sessionId,
         agentType: 'claude_code',
-        title: sessionId ? undefined : 'New Conversation',
         isExpanded: true,
       },
       style: {
@@ -737,6 +793,36 @@ function CanvasFlow() {
     setNodes((nds) => [...nds, newNode]);
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
+
+  // Handle session selection from picker
+  const handleSessionSelect = useCallback((session: { id: string; projectName?: string; projectPath?: string; messageCount?: number; timestamp?: string }) => {
+    const position = pendingConversationPosition.current || screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'conversation',
+      position,
+      data: {
+        sessionId: session.id,
+        agentType: 'claude_code',
+        title: session.projectName,
+        projectPath: session.projectPath,
+        projectName: session.projectName,
+        messageCount: session.messageCount,
+        timestamp: session.timestamp ? new Date(session.timestamp).getTime() : undefined,
+        isExpanded: true,
+      },
+      style: {
+        width: 500,
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    pendingConversationPosition.current = null;
+  }, [screenToFlowPosition, setNodes]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -1161,6 +1247,13 @@ function CanvasFlow() {
           ) : null}
         </div>
       )}
+
+      {/* Session Picker Modal */}
+      <SessionPickerModal
+        isOpen={isSessionPickerOpen}
+        onClose={() => setIsSessionPickerOpen(false)}
+        onSelect={handleSessionSelect}
+      />
     </div>
   );
 }
