@@ -419,6 +419,14 @@ export class ClaudeCodeAgent
     }
   }
 
+  /**
+   * Encode a path to Claude's directory naming format
+   * Replaces / with - and prepends -
+   */
+  private encodeProjectPath(projectPath: string): string {
+    return projectPath.replace(/\//g, '-');
+  }
+
   async listSessionSummaries(
     filter?: SessionFilterOptions
   ): Promise<Result<SessionSummary[], AgentError>> {
@@ -437,16 +445,23 @@ export class ClaudeCodeAgent
         : 30 * 24 * 60 * 60 * 1000; // Default 30 days
       const minTime = Date.now() - lookbackMs;
 
+      // Encode the filter path to match Claude's directory naming
+      const encodedFilterPath = filter?.projectPath
+        ? this.encodeProjectPath(filter.projectPath)
+        : undefined;
+
       for (const projectDir of projectDirs) {
         const projectDirPath = path.join(projectsDir, projectDir);
         if (!fs.statSync(projectDirPath).isDirectory()) continue;
 
+        // Note: Decoding is lossy (hyphens in dir names get converted to /)
+        // So we use the encoded path for comparison instead
         const projectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
         const projectName = path.basename(projectPath);
 
-        // Apply project filter
+        // Apply project filter using encoded path comparison
         if (filter?.projectName && projectName !== filter.projectName) continue;
-        if (filter?.projectPath && projectPath !== filter.projectPath) continue;
+        if (encodedFilterPath && projectDir !== encodedFilterPath) continue;
 
         const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
 
