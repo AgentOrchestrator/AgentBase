@@ -7,6 +7,7 @@ import './AgentTerminalView.css';
 
 interface AgentTerminalViewProps {
   terminalId: string;
+  selected?: boolean;
 }
 
 /**
@@ -40,7 +41,7 @@ const TERMINAL_THEME = {
  * Simplified terminal component for embedding within AgentNode.
  * Handles terminal lifecycle and IPC communication with main process.
  */
-export default function AgentTerminalView({ terminalId }: AgentTerminalViewProps) {
+export default function AgentTerminalView({ terminalId, selected = false }: AgentTerminalViewProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -225,6 +226,25 @@ export default function AgentTerminalView({ terminalId }: AgentTerminalViewProps
       isInitializedRef.current = false;
     };
   }, [terminalId]);
+
+  // Handle scroll events when node is selected
+  // Only prevent canvas scrolling when node is selected (clicked)
+  // This matches the behavior of other nodes like UserMessageNode and AssistantMessageNode
+  useEffect(() => {
+    const terminalElement = terminalRef.current;
+    if (!terminalElement || !selected) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Always prevent canvas scrolling when node is selected
+      // This prevents the "snap" effect when reaching boundaries
+      e.stopPropagation();
+    };
+
+    terminalElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      terminalElement.removeEventListener('wheel', handleWheel);
+    };
+  }, [selected]);
 
   const handleClick = () => {
     terminalInstanceRef.current?.focus();

@@ -46,8 +46,11 @@ export function groupConversationMessages(
 
     if (entry.type === 'user') {
       // Check if this is a tool_result user message (part of assistant flow)
-      const isToolResult = entry.message.content.some(
-        (c) => c.type === 'tool_result'
+      // Handle both array and non-array content
+      const content = entry.message.content;
+      const contentArray = Array.isArray(content) ? content : [content];
+      const isToolResult = contentArray.some(
+        (c) => c && typeof c === 'object' && 'type' in c && c.type === 'tool_result'
       );
       
       // If it's a tool result, skip it (it's part of the assistant's tool use flow)
@@ -71,13 +74,21 @@ export function groupConversationMessages(
 
       // Extract text content from user message
       const textParts: string[] = [];
-      for (const content of entry.message.content) {
-        if (content.type === 'text') {
-          // Remove IDE event markers for cleaner display
-          let text = content.text;
-          text = text.replace(/<ide_opened_file>.*?<\/ide_opened_file>/g, '').trim();
+      for (const contentItem of contentArray) {
+        // Handle string content directly
+        if (typeof contentItem === 'string') {
+          const text = contentItem.replace(/<ide_opened_file>.*?<\/ide_opened_file>/g, '').trim();
           if (text) {
             textParts.push(text);
+          }
+        } else if (contentItem && typeof contentItem === 'object' && 'type' in contentItem) {
+          if (contentItem.type === 'text') {
+            // Remove IDE event markers for cleaner display
+            let text = contentItem.text || '';
+            text = text.replace(/<ide_opened_file>.*?<\/ide_opened_file>/g, '').trim();
+            if (text) {
+              textParts.push(text);
+            }
           }
         }
       }

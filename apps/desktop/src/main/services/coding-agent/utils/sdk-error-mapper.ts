@@ -15,7 +15,7 @@ import { AgentErrorCode, agentError } from '../types/result.types';
 export function mapSdkError(error: unknown): AgentError {
   // Handle AbortError (cancellation)
   if (error instanceof AbortError) {
-    return agentError(AgentErrorCode.PROCESS_KILLED, 'Operation was cancelled', undefined, error);
+    return agentError(AgentErrorCode.PROCESS_KILLED, 'Operation was cancelled', undefined, error instanceof Error ? error : undefined);
   }
 
   // Handle standard Error instances

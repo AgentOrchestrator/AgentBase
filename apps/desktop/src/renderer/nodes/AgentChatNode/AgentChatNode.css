@@ -156,18 +156,44 @@
 /* Input Area */
 .agent-chat-input-area {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 12px;
-  border-top: 1px solid var(--border, #333);
-  background: var(--input-area-bg, #1e1e1e);
+  background: transparent;
+}
+
+.agent-chat-add-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--button-secondary-bg, #2d2d2d);
+  color: var(--text-primary, #e0e0e0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.agent-chat-add-button:hover {
+  background: var(--button-secondary-hover-bg, #3d3d3d);
+}
+
+.agent-chat-add-icon {
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
 }
 
 .agent-chat-input {
   flex: 1;
   background: var(--input-bg, #2d2d2d);
-  border: 1px solid var(--input-border, #444);
-  border-radius: 6px;
-  padding: 10px 12px;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 16px;
   color: var(--text-primary, #e0e0e0);
   font-size: 13px;
   resize: none;
@@ -178,7 +204,6 @@
 
 .agent-chat-input:focus {
   outline: none;
-  border-color: var(--accent-color, #007acc);
 }
 
 .agent-chat-input:disabled {
@@ -190,15 +215,44 @@
   color: var(--text-muted, #888);
 }
 
+.agent-chat-mic-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #e0e0e0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.agent-chat-mic-button:hover {
+  background: var(--button-secondary-bg, #2d2d2d);
+}
+
+.agent-chat-mic-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
 .agent-chat-send-button {
-  padding: 8px 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
   background: var(--button-bg, #007acc);
   color: var(--button-text, #fff);
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
   transition: background 0.15s;
 }
 
@@ -209,4 +263,10 @@
 .agent-chat-send-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.agent-chat-send-icon {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 500;
 }

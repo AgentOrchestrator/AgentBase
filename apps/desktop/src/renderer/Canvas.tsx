@@ -101,12 +101,13 @@ function CanvasFlow() {
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
   const debugConversationNodes = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+  const [debugNodesLoaded, setDebugNodesLoaded] = useState(false);
 
   // DEBUG: Load conversation file early (before initial state is applied)
   useEffect(() => {
     if (debugConversationNodes.current) return; // Already loaded
     
-    const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/7b9e46fe-7879-4235-8fa3-a46d83bb56df.jsonl';
+    const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/2cc81131-2edc-48c3-96ac-c2b3d2256c02.jsonl';
     
     const loadDebugConversation = async () => {
       try {
@@ -116,28 +117,46 @@ function CanvasFlow() {
           return;
         }
         
+        console.log('[Canvas] Reading file:', conversationPath);
         const fileContent = await fileAPI.readFile(conversationPath);
+        console.log('[Canvas] File content length:', fileContent?.length || 0);
+        
+        if (!fileContent) {
+          console.error('[Canvas] File content is empty');
+          return;
+        }
+        
         const entries = parseConversationFile(fileContent);
+        console.log('[Canvas] Parsed entries:', entries.length);
+        
         const groups = groupConversationMessages(entries);
+        console.log('[Canvas] All groups:', groups.length, 'User groups:', groups.filter(g => g.type === 'user').length);
         
         if (groups.length > 0) {
           // Center the conversation on the canvas
           const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 - 300 : 400;
           const centerY = typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 300;
           
+          console.log('[Canvas] Creating nodes at position:', centerX, centerY);
           const { nodes: conversationNodes, edges: conversationEdges } = conversationToNodesAndEdges(
             groups,
             centerX,
             centerY
           );
           
+          console.log('[Canvas] Created nodes:', conversationNodes.length, 'edges:', conversationEdges.length);
+          console.log('[Canvas] Node details:', conversationNodes.map(n => ({ id: n.id, type: n.type, position: n.position })));
+          
           debugConversationNodes.current = { nodes: conversationNodes, edges: conversationEdges };
+          setDebugNodesLoaded(true); // Trigger useEffect to add nodes
           
           console.log('[Canvas] Loaded debug conversation:', {
             groups: groups.length,
             nodes: conversationNodes.length,
             edges: conversationEdges.length
           });
+        } else {
+          console.warn('[Canvas] No groups to display');
         }
       } catch (error) {
         console.error('[Canvas] Error loading debug conversation:', error);
@@ -149,7 +168,7 @@ function CanvasFlow() {
 
   // Apply restored state when it becomes available, including debug conversation
   useEffect(() => {
-    if (!isCanvasLoading && !initialStateApplied.current) {
+    if (!isCanvasLoading) {
       // Merge initial nodes with debug conversation nodes
       const allNodes = debugConversationNodes.current 
         ? [...initialNodes, ...debugConversationNodes.current.nodes]
@@ -158,7 +177,7 @@ function CanvasFlow() {
         ? [...initialEdges, ...debugConversationNodes.current.edges]
         : initialEdges;
       
-      if (allNodes.length > 0 || allEdges.length > 0) {
+      if (!initialStateApplied.current && (allNodes.length > 0 || allEdges.length > 0)) {
         setNodes(allNodes);
         setEdges(allEdges);
         initialStateApplied.current = true;
@@ -167,9 +186,29 @@ function CanvasFlow() {
           debugNodes: debugConversationNodes.current?.nodes.length || 0,
           totalNodes: allNodes.length
         });
+      } else if (debugConversationNodes.current && (initialStateApplied.current || debugNodesLoaded)) {
+        // If nodes were loaded after initial state was applied, add them now
+        setNodes((prevNodes) => {
+          const existingIds = new Set(prevNodes.map(n => n.id));
+          const newNodes = debugConversationNodes.current!.nodes.filter(n => !existingIds.has(n.id));
+          if (newNodes.length > 0) {
+            console.log('[Canvas] Adding late-loaded debug nodes:', newNodes.length);
+            return [...prevNodes, ...newNodes];
+          }
+          return prevNodes;
+        });
+        setEdges((prevEdges) => {
+          const existingIds = new Set(prevEdges.map(e => e.id));
+          const newEdges = debugConversationNodes.current!.edges.filter(e => !existingIds.has(e.id));
+          if (newEdges.length > 0) {
+            console.log('[Canvas] Adding late-loaded debug edges:', newEdges.length);
+            return [...prevEdges, ...newEdges];
+          }
+          return prevEdges;
+        });
       }
     }
-  }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
+  }, [isCanvasLoading, initialNodes, initialEdges, debugNodesLoaded, setNodes, setEdges]);
 
   // Persist nodes when they change
   const prevNodesRef = useRef<Node[]>(nodes);

@@ -157,22 +157,34 @@ export function AgentChatNodePresentation({
 
           {/* Input */}
           <div className="agent-chat-input-area">
+            <button className="agent-chat-add-button" type="button" aria-label="Add">
+              <span className="agent-chat-add-icon">+</span>
+            </button>
             <textarea
               ref={inputRef}
               className="agent-chat-input"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
+              placeholder="Add a follow up..."
               disabled={isStreaming}
               rows={1}
             />
             <button
+              className="agent-chat-mic-button"
+              type="button"
+              aria-label="Voice input"
+            >
+              <span className="agent-chat-mic-icon">🎤</span>
+            </button>
+            <button
               className="agent-chat-send-button"
               onClick={handleSend}
               disabled={!inputValue.trim() || isStreaming}
+              type="button"
+              aria-label="Send"
             >
-              {isStreaming ? '...' : 'Send'}
+              <span className="agent-chat-send-icon">↑</span>
             </button>
           </div>
         </>
