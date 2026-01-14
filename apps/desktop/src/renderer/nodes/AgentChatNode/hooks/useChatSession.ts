@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import type { CodingAgentAPI, CodingAgentType } from '../../../../main/services/coding-agent';
 
 interface ChatMessage {
   id: string;
@@ -24,21 +25,6 @@ interface UseChatSessionOptions {
   onError: (error: string) => void;
 }
 
-interface CodingAgentAPI {
-  generateStreaming: (
-    agentType: string,
-    request: { prompt: string; workingDirectory?: string },
-    onChunk: (chunk: string) => void
-  ) => Promise<{ content: string; sessionId?: string }>;
-  continueSessionStreaming: (
-    agentType: string,
-    identifier: { type: string; value: string },
-    prompt: string,
-    onChunk: (chunk: string) => void,
-    options?: { workingDirectory?: string }
-  ) => Promise<{ content: string; sessionId?: string }>;
-}
-
 export function useChatSession({
   agentType,
   sessionId,
@@ -47,10 +33,13 @@ export function useChatSession({
   onSessionCreated,
   onError,
 }: UseChatSessionOptions) {
+  console.log('useChatSession called with sessionId:', sessionId);
+
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesRef = useRef<ChatMessage[]>([]);
 
   const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI }).codingAgentAPI;
+  const resolvedAgentType = agentType as CodingAgentType;
 
   const sendMessage = useCallback(async (prompt: string) => {
     if (!codingAgentAPI) {
@@ -100,7 +89,7 @@ export function useChatSession({
       if (sessionId) {
         // Continue existing session
         result = await codingAgentAPI.continueSessionStreaming(
-          agentType,
+          resolvedAgentType,
           { type: 'id', value: sessionId },
           prompt,
           handleChunk,
@@ -109,7 +98,7 @@ export function useChatSession({
       } else {
         // Start new session
         result = await codingAgentAPI.generateStreaming(
-          agentType,
+          resolvedAgentType,
           { prompt, workingDirectory: workspacePath },
           handleChunk
         );

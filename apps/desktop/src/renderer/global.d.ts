@@ -4,7 +4,8 @@
  * Extends Window interface with Electron IPC APIs.
  */
 
-import type { ElectronAPI, WorktreeAPI, CodingAgentAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI } from '../main/preload';
+import type { ElectronAPI, WorktreeAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI } from '../main/preload';
+import type { CodingAgentAPI } from '../main/services/coding-agent';
 
 // Declare SVG module imports (Vite handles these as URLs)
 declare module '*.svg' {

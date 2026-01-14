@@ -22,6 +22,11 @@ import { useReactFlow } from '@xyflow/react';
 import type { WorktreeInfo } from '../../../main/types/worktree';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
+import type {
+  CodingAgentType,
+  MessageFilterOptions,
+  SessionFilterOptions,
+} from '../../../main/services/coding-agent';
 import { createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from '../../types/attachments';
 import { agentStore } from '../../stores';
 import type {
@@ -403,18 +408,25 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   // ---------------------------------------------------------------------------
   const codingAgent = useMemo(
     () => ({
-      listSessions: async (filter?: { lookbackDays?: number; sinceTimestamp?: number }) => {
+      listSessionSummaries: async (
+        agentType: CodingAgentType,
+        filter?: SessionFilterOptions
+      ) => {
         const api = (window as any).codingAgentAPI;
         if (!api) return [];
-        return api.listSessionSummaries(nodeData.agentType, filter);
+        return api.listSessionSummaries(agentType, filter);
       },
-      getSession: async (sid: string, filter?: { messageTypes?: string[] }) => {
+      getSession: async (
+        agentType: CodingAgentType,
+        sid: string,
+        filter?: MessageFilterOptions
+      ) => {
         const api = (window as any).codingAgentAPI;
         if (!api) return null;
-        return api.getSession(nodeData.agentType, sid, filter);
+        return api.getSession(agentType, sid, filter);
       },
     }),
-    [nodeData.agentType]
+    []
   );
 
   // ---------------------------------------------------------------------------

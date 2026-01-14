@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { CodingAgentAPI } from '../../main/services/coding-agent';
 import './SessionPickerModal.css';
 
 // Types from CodingAgent
@@ -27,14 +28,6 @@ interface SessionPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (session: SessionSummary) => void;
-}
-
-// Type for the coding agent API
-interface CodingAgentAPI {
-  listSessionSummaries: (
-    agentType: string,
-    filter?: { lookbackDays?: number }
-  ) => Promise<SessionSummary[]>;
 }
 
 function SessionPickerModal({ isOpen, onClose, onSelect }: SessionPickerModalProps) {

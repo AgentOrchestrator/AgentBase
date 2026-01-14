@@ -480,6 +480,105 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+  'coding-agent:continue-session-streaming',
+  async (
+    event,
+    requestId: string,
+    agentType: CodingAgentType,
+    identifier: SessionIdentifier,
+    prompt: string,
+    options?: ContinueOptions
+  ) => {
+    const startTime = Date.now();
+    let chunksSent = 0;
+    let totalBytesSent = 0;
+
+    console.log('[Main] Starting streaming session continuation', {
+      requestId,
+      agentType,
+      promptPreview: prompt.slice(0, 100),
+      promptLength: prompt.length,
+      identifier,
+      workingDirectory: options?.workingDirectory,
+      timeout: options?.timeout,
+    });
+
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        console.error('[Main] Error getting coding agent', {
+          requestId,
+          agentType,
+          error: agentResult.error,
+        });
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isSessionResumable(agent)) {
+        return { success: false, error: `${agentType} does not support session resumption` };
+      }
+
+      const result = await agent.continueSessionStreaming(
+        identifier,
+        prompt,
+        (chunk: string) => {
+          chunksSent++;
+          totalBytesSent += chunk.length;
+
+          if (chunksSent === 1) {
+            console.log('[Main] First chunk received from agent (continue)', {
+              requestId,
+              chunkLength: chunk.length,
+              timeSinceStart: `${Date.now() - startTime}ms`,
+            });
+          }
+
+          event.sender.send('coding-agent:stream-chunk', { requestId, chunk });
+        },
+        options
+      );
+
+      const duration = Date.now() - startTime;
+
+      if (result.success === false) {
+        console.error('[Main] Error continuing session with streaming', {
+          requestId,
+          agentType,
+          error: result.error,
+          durationMs: duration,
+          chunksSent,
+          totalBytesSent,
+        });
+        return { success: false, error: result.error.message };
+      }
+
+      console.log('[Main] Streaming session continuation complete', {
+        requestId,
+        agentType,
+        contentLength: result.data.content.length,
+        durationMs: duration,
+        chunksSent,
+        totalBytesSent,
+      });
+      return { success: true, data: result.data };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error('[Main] Error in coding-agent:continue-session-streaming', {
+        requestId,
+        agentType,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        durationMs: duration,
+        chunksSent,
+        totalBytesSent,
+      });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
   'coding-agent:fork-session',
   async (
     _event,
@@ -1116,4 +1215,3 @@ app.on('will-quit', async () => {
   await LLMServiceFactory.dispose();
   await representationService.dispose();
 });
-

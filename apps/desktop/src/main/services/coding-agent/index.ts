@@ -52,6 +52,7 @@ export type {
   CodingAgentType,
   AgentCapabilities,
   AgentConfig,
+  CodingAgentAPI,
   SessionIdentifier,
   SessionInfo,
   SessionContent,

@@ -8,6 +8,7 @@
 import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agent-status';
 import type { WorktreeInfo } from '../../../main/types/worktree';
 import type { GitInfo } from '@agent-orchestrator/shared';
+import type { CodingAgentAPI } from '../../../main/services/coding-agent';
 import type { AgentNodeData } from '../../types/agent-node';
 import type { TerminalAttachment } from '../../types/attachments';
 
@@ -69,7 +70,7 @@ export interface WorkspaceState {
 
 export interface SessionState {
   /** Matched session ID from conversation JSON files */
-  id: string | null;
+  id: string | undefined;
   /** Whether currently polling for session match */
   isMatching: boolean;
 }
@@ -104,17 +105,6 @@ export interface AgentActions {
   updateNodeData: (updates: Partial<AgentNodeData>) => void;
   /** Dispatch node deletion */
   deleteNode: () => void;
-}
-
-// =============================================================================
-// Coding Agent API (IPC wrapper)
-// =============================================================================
-
-export interface CodingAgentAPI {
-  /** List available sessions for this agent type */
-  listSessions: (filter?: { lookbackDays?: number; sinceTimestamp?: number }) => Promise<SessionSummary[]>;
-  /** Get full session content by ID */
-  getSession: (sessionId: string, filter?: { messageTypes?: string[] }) => Promise<SessionContent | null>;
 }
 
 // =============================================================================
@@ -170,7 +160,7 @@ export interface AgentState {
   // Coding Agent API
   // ---------------------------------------------------------------------------
   /** API for interacting with the coding agent */
-  codingAgent: CodingAgentAPI;
+  codingAgent: Pick<CodingAgentAPI, 'listSessionSummaries' | 'getSession'>;
 }
 
 // =============================================================================
@@ -185,3 +175,5 @@ export interface UseAgentStateInput {
   /** Attachments from node data */
   attachments?: TerminalAttachment[];
 }
+
+export type { CodingAgentAPI };

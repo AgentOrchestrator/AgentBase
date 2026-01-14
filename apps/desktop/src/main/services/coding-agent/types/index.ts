@@ -8,6 +8,9 @@ export {
   agentError,
 } from './result.types';
 
+// IPC API types
+export { type CodingAgentAPI } from './ipc.types';
+
 // Agent types
 export {
   type CodingAgentType,

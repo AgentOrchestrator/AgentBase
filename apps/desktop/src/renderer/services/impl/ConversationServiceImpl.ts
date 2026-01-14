@@ -13,17 +13,7 @@ import type {
   MessagesLoadedListener,
   ErrorListener,
 } from '../../context/node-services';
-
-/**
- * Type for the coding agent API
- */
-interface CodingAgentAPI {
-  getSession: (
-    agentType: string,
-    sessionId: string,
-    filter?: unknown
-  ) => Promise<SessionContent | null>;
-}
+import type { CodingAgentAPI, CodingAgentType } from '../../../main/services/coding-agent';
 
 /**
  * Conversation service implementation using codingAgentAPI
@@ -78,7 +68,7 @@ export class ConversationServiceImpl implements IConversationService {
 
     try {
       const session = await codingAgentAPI.getSession(
-        this.agentType,
+        this.agentType as CodingAgentType,
         this.sessionId,
         filter ? { roles: filter.roles } : undefined
       );
