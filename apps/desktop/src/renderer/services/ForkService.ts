@@ -212,15 +212,25 @@ export class ForkService implements IForkService {
     // Step 2: Fork the session
     console.log('[ForkService] Forking session:', request.parentSessionId);
 
+    // Get worktree info first to get the worktree path
+    const worktreeInfo = await window.worktreeAPI.get(worktreeResult.worktreeId);
+    if (!worktreeInfo) {
+      throw new Error('Worktree info not found after creation');
+    }
+
     try {
       const parentIdentifier: SessionIdentifier = {
         type: 'id',
         value: request.parentSessionId,
       };
 
+      // Pass worktree path as workingDirectory for cross-directory fork detection
       const forkOptions: ForkOptions = {
         newSessionName: request.forkTitle,
+        workingDirectory: worktreeInfo.worktreePath,
       };
+
+      console.log('[ForkService] Fork options:', forkOptions);
 
       const sessionInfo = await window.codingAgentAPI.forkSession(
         request.agentType,
@@ -229,12 +239,6 @@ export class ForkService implements IForkService {
       );
 
       console.log('[ForkService] Session forked successfully:', sessionInfo);
-
-      // Retrieve the full worktree info
-      const worktreeInfo = await window.worktreeAPI.get(worktreeResult.worktreeId);
-      if (!worktreeInfo) {
-        throw new Error('Worktree info not found after creation');
-      }
 
       return {
         success: true,
