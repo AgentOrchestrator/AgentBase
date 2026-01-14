@@ -25,7 +25,7 @@ import {
   useWorkspaceService,
   useNodeInitialized,
 } from '../../context';
-import { useWorkspaceDisplay } from '../../hooks';
+import type { WorkspaceState } from '../../hooks/useAgentState';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -35,6 +35,8 @@ export interface AgentNodePresentationProps {
   onDataChange: (data: Partial<AgentNodeData>) => void;
   /** Whether the node is selected */
   selected?: boolean;
+  /** Workspace state from useAgentState (optional for backwards compat) */
+  workspaceState?: WorkspaceState;
 }
 
 /**
@@ -47,6 +49,7 @@ export function AgentNodePresentation({
   data,
   onDataChange,
   selected,
+  workspaceState,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const workspace = useWorkspaceService();
@@ -175,11 +178,10 @@ export function AgentNodePresentation({
 
   const attachments = data.attachments || [];
 
-  // Use workspace display hook for live git info and inheritance detection
-  const { workspacePath, source: workspaceSource, gitInfo } = useWorkspaceDisplay(
-    data.agentId,
-    attachments
-  );
+  // Get workspace info from props (passed from useAgentState in parent)
+  const workspacePath = workspaceState?.path ?? null;
+  const workspaceSource = workspaceState?.source ?? null;
+  const gitInfo = workspaceState?.gitInfo ?? null;
 
   // Get workspace attachment for folder name
   const workspaceAttachment = attachments.find(isWorkspaceMetadataAttachment);
