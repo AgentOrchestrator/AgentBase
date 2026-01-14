@@ -35,22 +35,24 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
+    "@agent-orchestrator/shared": "^1.0.0",
     "@ai-sdk/anthropic": "^2.0.40",
     "@ai-sdk/google": "^2.0.26",
     "@ai-sdk/openai": "^2.0.59",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.7",
     "@types/sqlite3": "^3.1.11",
-    "ai": "^5.0.86",
-    "keytar": "^7.9.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
     "@xyflow/react": "^12.9.2",
+    "ai": "^5.0.86",
+    "keytar": "^7.9.0",
     "node-pty": "1.1.0-beta35",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.1",
     "sqlite3": "^5.1.7",
-    "zod": "^3.23.0"
+    "zod": "^4.3.5"
   }
 }

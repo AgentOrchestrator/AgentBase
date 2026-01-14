@@ -3,6 +3,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { BaseCliAgent } from './BaseCliAgent';
+import {
+  createEventRegistry,
+  createEvent,
+  type EventRegistry,
+  type SessionPayload,
+  type UserInputPayload,
+  type SystemPayload,
+} from '@agent-orchestrator/shared';
 import type {
   ICodingAgentProvider,
   ISessionResumable,
@@ -29,6 +37,7 @@ import type {
   ChatMessage,
   MessageType,
   ToolCategory,
+  AgentConfig,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
 
@@ -65,11 +74,44 @@ interface JsonlLine {
   summary?: string;
 }
 
+/**
+ * Configuration for ClaudeCodeAgent with hook options
+ */
+export interface ClaudeCodeAgentConfig extends AgentConfig {
+  /** Enable debug logging for hooks */
+  debugHooks?: boolean;
+}
+
 export class ClaudeCodeAgent
   extends BaseCliAgent
   implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider
 {
   private static readonly DEFAULT_EXECUTABLE = 'claude';
+  private readonly eventRegistry: EventRegistry;
+  private currentSessionId: string | null = null;
+  private readonly debugHooks: boolean;
+
+  constructor(config: ClaudeCodeAgentConfig) {
+    super(config);
+    this.eventRegistry = createEventRegistry();
+    this.debugHooks = config.debugHooks ?? false;
+  }
+
+  /**
+   * Get the event registry for registering custom handlers
+   *
+   * @example
+   * ```typescript
+   * const agent = new ClaudeCodeAgent({ type: 'claude_code' });
+   * agent.getEventRegistry().on('session:start', async (event) => {
+   *   console.log('Session starting:', event.payload);
+   *   return { action: 'continue' };
+   * });
+   * ```
+   */
+  getEventRegistry(): EventRegistry {
+    return this.eventRegistry;
+  }
 
   get agentType(): CodingAgentType {
     return 'claude_code';
@@ -126,6 +168,15 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
+    // Generate session ID for this request
+    this.currentSessionId = crypto.randomUUID();
+
+    // Emit session:start event
+    await this.emitSessionStart(request.workingDirectory);
+
+    // Emit user_input:complete event
+    await this.emitUserInput(request.prompt);
+
     const args = this.buildGenerateArgs(request);
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: request.workingDirectory,
@@ -134,10 +185,20 @@ export class ClaudeCodeAgent
     });
 
     if (spawnResult.success === false) {
+      await this.emitSessionEnd('error', spawnResult.error.message);
       return { success: false, error: spawnResult.error };
     }
 
-    return this.collectOutput(spawnResult.data, request.timeout);
+    const result = await this.collectOutput(spawnResult.data, request.timeout);
+
+    // Emit session:end event
+    if (result.success) {
+      await this.emitSessionEnd('completed');
+    } else {
+      await this.emitSessionEnd('error', result.error.message);
+    }
+
+    return result;
   }
 
   async generateStreaming(
@@ -149,6 +210,15 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
+    // Generate session ID for this request
+    this.currentSessionId = crypto.randomUUID();
+
+    // Emit session:start event
+    await this.emitSessionStart(request.workingDirectory);
+
+    // Emit user_input:complete event
+    await this.emitUserInput(request.prompt);
+
     const args = this.buildGenerateArgs(request);
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: request.workingDirectory,
@@ -157,10 +227,20 @@ export class ClaudeCodeAgent
     });
 
     if (spawnResult.success === false) {
+      await this.emitSessionEnd('error', spawnResult.error.message);
       return { success: false, error: spawnResult.error };
     }
 
-    return this.streamOutput(spawnResult.data, onChunk, request.timeout);
+    const result = await this.streamOutput(spawnResult.data, onChunk, request.timeout);
+
+    // Emit session:end event
+    if (result.success) {
+      await this.emitSessionEnd('completed');
+    } else {
+      await this.emitSessionEnd('error', result.error.message);
+    }
+
+    return result;
   }
 
   private buildGenerateArgs(request: GenerateRequest): string[] {
@@ -188,6 +268,18 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
+    // Set session ID from identifier or generate new
+    this.currentSessionId =
+      identifier.type === 'id' || identifier.type === 'name'
+        ? identifier.value
+        : crypto.randomUUID();
+
+    // Emit session:start event (resume)
+    await this.emitSessionStart(options?.workingDirectory, 'resume');
+
+    // Emit user_input:complete event
+    await this.emitUserInput(prompt);
+
     const args = this.buildContinueArgs(identifier);
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: options?.workingDirectory,
@@ -196,10 +288,20 @@ export class ClaudeCodeAgent
     });
 
     if (spawnResult.success === false) {
+      await this.emitSessionEnd('error', spawnResult.error.message);
       return { success: false, error: spawnResult.error };
     }
 
-    return this.collectOutput(spawnResult.data, options?.timeout);
+    const result = await this.collectOutput(spawnResult.data, options?.timeout);
+
+    // Emit session:end event
+    if (result.success) {
+      await this.emitSessionEnd('completed');
+    } else {
+      await this.emitSessionEnd('error', result.error.message);
+    }
+
+    return result;
   }
 
   async continueSessionStreaming(
@@ -213,6 +315,18 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
+    // Set session ID from identifier or generate new
+    this.currentSessionId =
+      identifier.type === 'id' || identifier.type === 'name'
+        ? identifier.value
+        : crypto.randomUUID();
+
+    // Emit session:start event (resume)
+    await this.emitSessionStart(options?.workingDirectory, 'resume');
+
+    // Emit user_input:complete event
+    await this.emitUserInput(prompt);
+
     const args = this.buildContinueArgs(identifier);
     const spawnResult = this.spawnProcess(args, {
       workingDirectory: options?.workingDirectory,
@@ -221,10 +335,20 @@ export class ClaudeCodeAgent
     });
 
     if (spawnResult.success === false) {
+      await this.emitSessionEnd('error', spawnResult.error.message);
       return { success: false, error: spawnResult.error };
     }
 
-    return this.streamOutput(spawnResult.data, onChunk, options?.timeout);
+    const result = await this.streamOutput(spawnResult.data, onChunk, options?.timeout);
+
+    // Emit session:end event
+    if (result.success) {
+      await this.emitSessionEnd('completed');
+    } else {
+      await this.emitSessionEnd('error', result.error.message);
+    }
+
+    return result;
   }
 
   private buildContinueArgs(identifier: SessionIdentifier): string[] {
@@ -857,5 +981,113 @@ export class ClaudeCodeAgent
 
       return; // Found the session, done
     }
+  }
+
+  // ============================================
+  // Hook Event Emission Helpers
+  // ============================================
+
+  /**
+   * Emit session:start event
+   */
+  private async emitSessionStart(
+    workspacePath?: string,
+    source: string = 'cli'
+  ): Promise<void> {
+    const event = createEvent<SessionPayload>(
+      'session:start',
+      'claude_code',
+      {
+        sessionId: this.currentSessionId ?? '',
+        workspacePath,
+        reason: source,
+      },
+      {
+        sessionId: this.currentSessionId ?? undefined,
+        workspacePath,
+      }
+    );
+
+    if (this.debugHooks) {
+      console.log('[ClaudeCodeAgent] session:start', event.payload);
+    }
+
+    await this.eventRegistry.emit(event);
+  }
+
+  /**
+   * Emit session:end event
+   */
+  private async emitSessionEnd(
+    reason: string,
+    errorMessage?: string
+  ): Promise<void> {
+    const event = createEvent<SessionPayload>(
+      'session:end',
+      'claude_code',
+      {
+        sessionId: this.currentSessionId ?? '',
+        reason: errorMessage ? `${reason}: ${errorMessage}` : reason,
+      },
+      {
+        sessionId: this.currentSessionId ?? undefined,
+      }
+    );
+
+    if (this.debugHooks) {
+      console.log('[ClaudeCodeAgent] session:end', event.payload);
+    }
+
+    await this.eventRegistry.emit(event);
+    this.currentSessionId = null;
+  }
+
+  /**
+   * Emit user_input:complete event
+   */
+  private async emitUserInput(prompt: string): Promise<void> {
+    const event = createEvent<UserInputPayload>(
+      'user_input:complete',
+      'claude_code',
+      {
+        content: prompt,
+        hasFiles: false,
+      },
+      {
+        sessionId: this.currentSessionId ?? undefined,
+      }
+    );
+
+    if (this.debugHooks) {
+      console.log('[ClaudeCodeAgent] user_input:complete', {
+        contentLength: prompt.length,
+      });
+    }
+
+    await this.eventRegistry.emit(event);
+  }
+
+  /**
+   * Emit system:error event
+   */
+  private async emitSystemError(message: string, code?: string): Promise<void> {
+    const event = createEvent<SystemPayload>(
+      'system:error',
+      'claude_code',
+      {
+        level: 'error',
+        message,
+        code,
+      },
+      {
+        sessionId: this.currentSessionId ?? undefined,
+      }
+    );
+
+    if (this.debugHooks) {
+      console.log('[ClaudeCodeAgent] system:error', event.payload);
+    }
+
+    await this.eventRegistry.emit(event);
   }
 }
