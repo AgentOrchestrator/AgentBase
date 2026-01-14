@@ -1249,8 +1249,10 @@ function CanvasFlow() {
                           className="sidebar-folder-header"
                           onClick={() => toggleProject(projectName)}
                         >
-                          <span className="sidebar-folder-icon">
-                            {isProjectCollapsed ? '▶' : '▼'}
+                          <span className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="15 18 9 12 15 6" />
+                            </svg>
                           </span>
                           <svg
                             className="sidebar-folder-svg"
@@ -1320,8 +1322,10 @@ function CanvasFlow() {
                                   className="sidebar-folder-header"
                                   onClick={() => toggleBranch(branchKey)}
                                 >
-                                  <span className="sidebar-folder-icon">
-                                    {isBranchCollapsed ? '▶' : '▼'}
+                                  <span className={`sidebar-folder-icon ${isBranchCollapsed ? 'collapsed' : 'expanded'}`}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="15 18 9 12 15 6" />
+                                    </svg>
                                   </span>
                                   <svg
                                     className="sidebar-branch-svg"

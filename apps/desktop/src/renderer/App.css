@@ -20,6 +20,38 @@ body {
   background: #1e1e1e;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
+  overflow: visible;
+  position: relative;
+}
+
+.app-sidebar {
+  width: 11px;
+  background: #1e1e1e;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  z-index: 1;
+}
+
+.app-sidebar-left {
+  /* Left sidebar */
+}
+
+.app-sidebar-right {
+  /* Right sidebar */
+}
+
+.app-bottom-bar {
+  height: 11px;
+  background: #1e1e1e;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+  z-index: 1;
 }
 
 .terminal-container {
