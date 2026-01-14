@@ -1,15 +1,15 @@
 .consolidated-conversation-node {
-  background: #2a2c36;
-  border: 1px solid #475569;
-  border-radius: 8px;
+  background: #1e1e1e;
+  border: 1px solid #232323;
+  border-radius: 12px;
   padding: 12px;
   width: 100%;
   height: 100%;
   min-width: 600px;
   min-height: 600px;
-  color: #ffffff;
+  color: #d4d4d4;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -18,8 +18,8 @@
 }
 
 .consolidated-conversation-node.selected {
-  border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+  border-color: #d4d4d4;
+  box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.2);
 }
 
 /* Hide React Flow's default selection border/outline */
@@ -52,27 +52,27 @@
   right: 12px;
   width: 24px;
   height: 24px;
-  background: rgba(42, 44, 54, 0.9);
-  border: 1px solid #475569;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #888;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 14px;
   z-index: 10;
   transition: all 0.2s ease;
 }
 
 .consolidated-fullscreen-icon:hover {
-  background: rgba(58, 60, 70, 0.95);
-  border-color: #4a9eff;
+  background: rgba(0, 0, 0, 0.4);
+  border-color: #d4d4d4;
   transform: scale(1.1);
 }
 
 .consolidated-conversation-content {
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 13px;
   line-height: 1.5;
   flex: 1;
@@ -111,10 +111,10 @@
 /* User message styling */
 .consolidated-user-message {
   margin-bottom: 16px;
-  border: 3px solid #ffffff;
+  border: 1px solid #232323;
   border-radius: 6px;
   padding: 8px;
-  background: #2a2c36;
+  background: #2D2D2D;
 }
 
 .consolidated-user-header {
@@ -122,17 +122,17 @@
   align-items: center;
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid #232323;
 }
 
 .consolidated-user-label {
   font-weight: 700;
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 14px;
 }
 
 .consolidated-user-content {
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -145,7 +145,7 @@
   border: none;
   border-radius: 6px;
   padding: 8px;
-  background: #2a2c36;
+  background: #1e1e1e;
 }
 
 .consolidated-assistant-header {
@@ -153,17 +153,17 @@
   align-items: center;
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid #232323;
 }
 
 .consolidated-assistant-label {
   font-weight: 700;
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 14px;
 }
 
 .consolidated-assistant-content {
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -171,7 +171,7 @@
 .consolidated-assistant-entry {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid #888;
 }
 
 .consolidated-assistant-entry:last-child {
@@ -193,16 +193,16 @@
 .consolidated-assistant-text-content h4,
 .consolidated-assistant-text-content h5,
 .consolidated-assistant-text-content h6 {
-  margin-top: 16px;
-  margin-bottom: 8px;
+  margin-top: 8px;
+  margin-bottom: 4px;
   font-weight: 600;
-  color: #ffffff;
+  color: #d4d4d4;
 }
 
 .consolidated-assistant-text-content h1 {
   font-size: 1.5em;
-  border-bottom: 1px solid #3a3c46;
-  padding-bottom: 8px;
+  border-bottom: 1px solid #888;
+  padding-bottom: 4px;
 }
 
 .consolidated-assistant-text-content h2 {
@@ -214,26 +214,37 @@
 }
 
 .consolidated-assistant-text-content p {
-  margin: 8px 0;
-  line-height: 1.6;
-  color: #ffffff;
+  margin: 2px 0;
+  line-height: 1.4;
+  color: #d4d4d4;
 }
 
 .consolidated-assistant-text-content ul,
 .consolidated-assistant-text-content ol {
-  margin: 8px 0;
-  padding-left: 24px;
+  margin: 2px 0;
+  padding-left: 18px;
 }
 
 .consolidated-assistant-text-content li {
-  margin: 4px 0;
-  line-height: 1.5;
-  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  color: #d4d4d4;
+}
+
+.consolidated-assistant-text-content li p {
+  margin: 0 !important;
+  padding: 0;
+  display: inline;
+}
+
+.consolidated-assistant-text-content li > * {
+  margin: 0 !important;
 }
 
 .consolidated-assistant-text-content code {
-  background: #1e1e1e;
-  color: #ffffff;
+  background: rgba(0, 0, 0, 0.3);
+  color: #d4d4d4;
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
@@ -241,25 +252,25 @@
 }
 
 .consolidated-assistant-text-content pre {
-  background: #1e1e1e;
-  border: 1px solid #3a3c46;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #888;
   border-radius: 6px;
-  padding: 12px;
+  padding: 8px;
   overflow-x: auto;
-  margin: 12px 0;
+  margin: 6px 0;
 }
 
 .consolidated-assistant-text-content pre code {
   background: transparent;
   padding: 0;
-  color: #ffffff;
+  color: #d4d4d4;
 }
 
 .consolidated-assistant-text-content blockquote {
-  border-left: 3px solid #475569;
-  padding-left: 16px;
-  margin: 12px 0;
-  color: #ffffff;
+  border-left: 3px solid #888;
+  padding-left: 12px;
+  margin: 6px 0;
+  color: #d4d4d4;
   font-style: italic;
 }
 
@@ -274,25 +285,34 @@
 
 .consolidated-assistant-text-content table {
   border-collapse: collapse;
-  margin: 12px 0;
+  margin: 6px 0;
   width: 100%;
 }
 
 .consolidated-assistant-text-content th,
 .consolidated-assistant-text-content td {
-  border: 1px solid #3a3c46;
-  padding: 8px 12px;
+  border: 1px solid #888;
+  padding: 4px 8px;
   text-align: left;
-  color: #ffffff;
+  color: #d4d4d4;
 }
 
 .consolidated-assistant-text-content th {
-  background: #1e1e1e;
+  background: rgba(0, 0, 0, 0.3);
   font-weight: 600;
 }
 
 .consolidated-assistant-text-content hr {
   border: none;
-  border-top: 1px solid #3a3c46;
-  margin: 16px 0;
+  border-top: 1px solid #888;
+  margin: 4px 0;
+}
+
+/* Remove extra spacing from first/last children */
+.consolidated-assistant-text-content > *:first-child {
+  margin-top: 0;
+}
+
+.consolidated-assistant-text-content > *:last-child {
+  margin-bottom: 0;
 }

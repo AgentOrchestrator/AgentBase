@@ -104,29 +104,18 @@ export const AgentNodeDataSchema = z.object({
   progress: z.record(z.unknown()).nullable(),
   attachments: z.array(TerminalAttachmentSchema).optional(),
   activeView: z.enum(['overview', 'terminal']).optional(),
-  createdAt: z.number().optional(),
-  sessionId: z.string().optional(),
+  conversationId: z.string().optional(),
 });
 
 /**
- * Schema for ConversationNode data
+ * Schema for MessageNode data
  */
-export const ConversationNodeDataSchema = z.object({
-  sessionId: z.string(),
-  agentType: z.string().optional(),
-  title: z.string().optional(),
-  projectPath: z.string().optional(),
-  projectName: z.string().optional(),
-  messageCount: z.number().optional(),
-  timestamp: z.number().optional(),
-  isExpanded: z.boolean().optional(),
-});
-
-/**
- * Schema for StarterNode data
- */
-export const StarterNodeDataSchema = z.object({
-  placeholder: z.string().optional(),
+export const MessageNodeDataSchema = z.object({
+  conversationId: z.string(),
+  message: z.string(),
+  role: z.enum(['user', 'assistant']),
+  timestamp: z.string(),
+  agentNodeId: z.string(), // Reference to the parent agent node
 });
 
 // =============================================================================
@@ -137,5 +126,4 @@ export type CustomNodeData = z.infer<typeof CustomNodeDataSchema>;
 export type TerminalNodeData = z.infer<typeof TerminalNodeDataSchema>;
 export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
-export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;
-export type StarterNodeData = z.infer<typeof StarterNodeDataSchema>;
+export type MessageNodeData = z.infer<typeof MessageNodeDataSchema>;

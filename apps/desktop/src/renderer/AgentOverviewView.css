@@ -1,7 +1,7 @@
 /**
  * Agent Overview View Styles
  *
- * Dark theme with #1e1e1e background, #4a9eff accent, #d4d4d4 text
+ * Dark theme with #1e1e1e background, grey accents (#888, #d4d4d4), #d4d4d4 text
  */
 
 /* Overview Container */
@@ -24,12 +24,12 @@
 }
 
 .agent-overview::-webkit-scrollbar-thumb {
-  background: #3a3c46;
+  background: #888;
   border-radius: 4px;
 }
 
 .agent-overview::-webkit-scrollbar-thumb:hover {
-  background: #4a4c56;
+  background: #d4d4d4;
 }
 
 /* Title Section */
@@ -56,13 +56,13 @@
 }
 
 .overview-title:hover {
-  background: rgba(74, 158, 255, 0.1);
+  background: rgba(136, 136, 136, 0.15);
 }
 
 .overview-title-input {
   flex: 1;
   background: #1e1e1e;
-  border: 1px solid #4a9eff;
+  border: 1px solid #888;
   border-radius: 4px;
   padding: 6px 10px;
   color: #d4d4d4;
@@ -72,13 +72,13 @@
 }
 
 .overview-title-input:focus {
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(136, 136, 136, 0.3);
 }
 
 .title-auto-badge {
   font-size: 10px;
   color: #888;
-  background: #3a3c46;
+  background: rgba(136, 136, 136, 0.2);
   padding: 2px 6px;
   border-radius: 3px;
   text-transform: uppercase;
@@ -92,8 +92,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: color-mix(in srgb, var(--status-color) 10%, transparent);
-  border-left: 3px solid var(--status-color);
+  background: transparent;
   border-radius: 0 6px 6px 0;
 }
 
@@ -144,7 +143,7 @@
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4a9eff, #7b61ff);
+  background: #888;
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -156,7 +155,7 @@
 }
 
 .progress-value {
-  color: #4a9eff;
+  color: #d4d4d4;
   font-size: 14px;
   font-weight: 600;
   font-family: 'Menlo', 'Monaco', monospace;
@@ -200,7 +199,7 @@
 }
 
 .todolist-items::-webkit-scrollbar-thumb {
-  background: #3a3c46;
+  background: #888;
   border-radius: 3px;
 }
 
@@ -215,7 +214,7 @@
 }
 
 .todolist-item.completed {
-  background: rgba(74, 222, 128, 0.08);
+  background: rgba(136, 136, 136, 0.1);
 }
 
 .todo-checkbox {
@@ -226,7 +225,7 @@
 }
 
 .todolist-item.completed .todo-checkbox {
-  color: #4ade80;
+  color: #d4d4d4;
 }
 
 .todo-content {
@@ -263,7 +262,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: #3a3c46;
+  background: rgba(136, 136, 136, 0.2);
   border: none;
   border-radius: 6px;
   color: #d4d4d4;
@@ -273,11 +272,11 @@
 }
 
 .open-with-button:hover {
-  background: #4a4c56;
+  background: rgba(136, 136, 136, 0.3);
 }
 
 .open-with-button:active {
-  background: #5a5c66;
+  background: rgba(136, 136, 136, 0.4);
 }
 
 .button-icon {
@@ -289,8 +288,8 @@
   bottom: 100%;
   left: 0;
   margin-bottom: 4px;
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
+  background: #1e1e1e;
+  border: 1px solid #888;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   min-width: 150px;
@@ -312,12 +311,12 @@
 }
 
 .editor-menu-item:hover {
-  background: rgba(74, 158, 255, 0.15);
-  color: #4a9eff;
+  background: rgba(136, 136, 136, 0.15);
+  color: #d4d4d4;
 }
 
 .editor-menu-item:active {
-  background: rgba(74, 158, 255, 0.25);
+  background: rgba(136, 136, 136, 0.25);
 }
 
 .editor-menu-item:first-child {
@@ -344,7 +343,7 @@
 .overview-footer {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid #3a3c46;
+  border-top: 1px solid #888;
 }
 
 .agent-id-label {

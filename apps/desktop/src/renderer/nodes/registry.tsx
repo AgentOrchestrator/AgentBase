@@ -15,9 +15,7 @@ import type { z } from 'zod';
 // Import node components
 import TerminalNode from '../TerminalNode';
 import WorkspaceNode from '../WorkspaceNode';
-import StarterNode from '../components/StarterNode';
 import { AgentNode } from './AgentNode';
-import { ConversationNode } from './ConversationNode';
 
 // Import schemas
 import {
@@ -25,8 +23,6 @@ import {
   TerminalNodeDataSchema,
   WorkspaceNodeDataSchema,
   AgentNodeDataSchema,
-  ConversationNodeDataSchema,
-  StarterNodeDataSchema,
 } from './schemas';
 
 // =============================================================================
@@ -119,22 +115,6 @@ const NODE_CONFIGS: NodeTypeConfig[] = [
     persistence: {
       enabled: true,
       dataSchema: AgentNodeDataSchema,
-    },
-  },
-  {
-    type: 'conversation',
-    component: ConversationNode as ComponentType<NodeProps>,
-    persistence: {
-      enabled: true,
-      dataSchema: ConversationNodeDataSchema,
-    },
-  },
-  {
-    type: 'starter',
-    component: StarterNode as ComponentType<NodeProps>,
-    persistence: {
-      enabled: false,
-      reason: 'Starter nodes are transient input fields, not meant to be persisted',
     },
   },
 ];

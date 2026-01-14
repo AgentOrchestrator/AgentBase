@@ -1,8 +1,8 @@
 .sidebar {
   width: 260px;
   height: 100vh;
-  background: #1a1b1e;
-  border-right: 1px solid #2a2c36;
+  background: #1e1e1e;
+  border-right: 1px solid #d4d4d4;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -10,7 +10,7 @@
 
 .sidebar-header {
   padding: 12px 12px 12px 16px;
-  border-bottom: 1px solid #2a2c36;
+  border-bottom: 1px solid #d4d4d4;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -30,7 +30,7 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #666;
+  color: #888;
   font-size: 14px;
   cursor: pointer;
   display: flex;
@@ -40,8 +40,8 @@
 }
 
 .sidebar-collapse-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #aaa;
+  background: rgba(0, 0, 0, 0.4);
+  color: #d4d4d4;
 }
 
 /* Expand button (when sidebar is collapsed) */
@@ -51,9 +51,9 @@
   left: 20px;
   width: 40px;
   height: 40px;
-  background: rgba(42, 44, 54, 0.8);
+  background: #1e1e1e;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(139, 157, 195, 0.1);
+  border: 1px solid #d4d4d4;
   border-radius: 12px;
   color: #d4d4d4;
   font-size: 18px;
@@ -63,11 +63,13 @@
   justify-content: center;
   transition: all 0.2s ease;
   z-index: 1000;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .sidebar-expand-button:hover {
-  background: rgba(58, 60, 70, 0.9);
-  border-color: rgba(139, 157, 195, 0.2);
+  background: #1e1e1e;
+  border-color: #d4d4d4;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 .sidebar-expand-button:active {
@@ -89,12 +91,12 @@
 }
 
 .sidebar-content::-webkit-scrollbar-thumb {
-  background: #3a3c46;
+  background: #888;
   border-radius: 3px;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: #4a4c56;
+  background: #d4d4d4;
 }
 
 /* Branch group */
@@ -114,11 +116,11 @@
 }
 
 .branch-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .branch-chevron {
-  color: #666;
+  color: #888;
   font-size: 14px;
   font-weight: 600;
   width: 12px;
@@ -156,7 +158,7 @@
 }
 
 .branch-meta {
-  color: #666;
+  color: #888;
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -180,11 +182,11 @@
 }
 
 .terminal-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .terminal-name {
-  color: #aaa;
+  color: #888;
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
