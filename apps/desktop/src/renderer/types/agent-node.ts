@@ -108,7 +108,18 @@ export interface AgentTitle {
 /**
  * View mode for the agent node
  */
-export type AgentNodeView = 'overview' | 'terminal';
+export type AgentNodeView = 'overview' | 'terminal' | 'chat';
+
+/**
+ * Chat message structure for agent chat view
+ */
+export interface AgentChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  messageType?: string;
+}
 
 // =============================================================================
 // Agent Node Data
@@ -153,6 +164,12 @@ export interface AgentNodeData {
 
   /** Session ID from the conversation JSON file (matched after workspace selection) */
   sessionId?: string;
+
+  /** Initial prompt to send to the agent when it starts */
+  initialPrompt?: string;
+
+  /** Chat messages for SDK-based chat view */
+  chatMessages?: AgentChatMessage[];
 }
 
 // =============================================================================

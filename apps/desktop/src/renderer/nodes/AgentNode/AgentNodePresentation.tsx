@@ -9,6 +9,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import AgentOverviewView from '../../AgentOverviewView';
 import AgentTerminalView from '../../AgentTerminalView';
+import AgentChatView from '../../AgentChatView';
 import AttachmentHeader from '../../AttachmentHeader';
 import IssueDetailsModal from '../../IssueDetailsModal';
 import {
@@ -219,6 +220,12 @@ export function AgentNodePresentation({
         >
           Terminal
         </button>
+        <button
+          className={`agent-tab ${activeView === 'chat' ? 'active' : ''}`}
+          onClick={() => handleViewChange('chat')}
+        >
+          Chat
+        </button>
       </div>
 
       {/* Attachments */}
@@ -254,6 +261,17 @@ export function AgentNodePresentation({
         </div>
         <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
           <AgentTerminalView terminalId={data.terminalId} />
+        </div>
+        <div style={{ display: activeView === 'chat' ? 'contents' : 'none' }}>
+          <AgentChatView
+            agentId={data.agentId}
+            sessionId={data.sessionId}
+            agentType={data.agentType}
+            workspacePath={workspacePath ?? undefined}
+            initialMessages={data.chatMessages}
+            onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
+            onSessionCreated={(sessionId) => onDataChange({ sessionId })}
+          />
         </div>
       </div>
 

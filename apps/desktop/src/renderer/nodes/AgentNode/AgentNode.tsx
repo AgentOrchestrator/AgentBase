@@ -165,6 +165,7 @@ function AgentNode({ data, id, selected }: NodeProps) {
       agentType={agentData.agentType}
       workspacePath={workspacePath}
       autoStartCli={!!workspacePath}
+      initialPrompt={agentData.initialPrompt}
     >
       <AgentNodePresentation
         data={agentData}

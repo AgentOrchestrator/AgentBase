@@ -88,6 +88,17 @@ export const WorkspaceNodeDataSchema = z.object({
 });
 
 /**
+ * Schema for ChatMessage data (must be before AgentNodeDataSchema)
+ */
+export const ChatMessageSchema = z.object({
+  id: z.string(),
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+  timestamp: z.string(),
+  messageType: z.string().optional(),
+});
+
+/**
  * Schema for AgentNode data
  */
 export const AgentNodeDataSchema = z.object({
@@ -103,8 +114,11 @@ export const AgentNodeDataSchema = z.object({
   summary: z.string().nullable(),
   progress: z.record(z.unknown()).nullable(),
   attachments: z.array(TerminalAttachmentSchema).optional(),
-  activeView: z.enum(['overview', 'terminal']).optional(),
+  activeView: z.enum(['overview', 'terminal', 'chat']).optional(),
   conversationId: z.string().optional(),
+  initialPrompt: z.string().optional(),
+  sessionId: z.string().optional(),
+  chatMessages: z.array(ChatMessageSchema).optional(),
 });
 
 /**
@@ -118,6 +132,32 @@ export const MessageNodeDataSchema = z.object({
   agentNodeId: z.string(), // Reference to the parent agent node
 });
 
+/**
+ * Schema for ConversationNode data
+ */
+export const ConversationNodeDataSchema = z.object({
+  sessionId: z.string(),
+  agentType: z.string(),
+  title: z.string(),
+  projectName: z.string(),
+  messageCount: z.number(),
+  timestamp: z.string(),
+  isExpanded: z.boolean().optional(),
+});
+
+/**
+ * Schema for AgentChatNode data
+ */
+export const AgentChatNodeDataSchema = z.object({
+  sessionId: z.string().optional(),
+  agentType: z.string(),
+  workspacePath: z.string().optional(),
+  title: z.string().optional(),
+  isExpanded: z.boolean().optional(),
+  messages: z.array(ChatMessageSchema),
+  isDraft: z.boolean(),
+});
+
 // =============================================================================
 // Inferred Types
 // =============================================================================
@@ -127,3 +167,6 @@ export type TerminalNodeData = z.infer<typeof TerminalNodeDataSchema>;
 export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
 export type MessageNodeData = z.infer<typeof MessageNodeDataSchema>;
+export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+export type AgentChatNodeData = z.infer<typeof AgentChatNodeDataSchema>;

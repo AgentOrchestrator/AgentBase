@@ -64,8 +64,9 @@ export class AgentServiceImpl implements IAgentService {
   /**
    * Set workspace and navigate terminal to it.
    * If autoStartCli is true, also starts the CLI after navigation.
+   * If initialPrompt is provided, it will be sent to the agent after CLI starts.
    */
-  async setWorkspace(path: string, autoStartCli?: boolean): Promise<void> {
+  async setWorkspace(path: string, autoStartCli?: boolean, initialPrompt?: string): Promise<void> {
     this.workspacePath = path;
 
     // Ensure terminal is created and running
@@ -84,7 +85,14 @@ export class AgentServiceImpl implements IAgentService {
       await new Promise((resolve) => setTimeout(resolve, 200));
       const cliCommand = this.getCliCommand();
       if (cliCommand) {
-        this.terminalService.write(`${cliCommand}\n`);
+        // If initial prompt is provided, use -p flag with stdin
+        if (initialPrompt) {
+          // Escape single quotes in the prompt for shell safety
+          const escapedPrompt = initialPrompt.replace(/'/g, "'\\''");
+          this.terminalService.write(`echo '${escapedPrompt}' | ${cliCommand} -p\n`);
+        } else {
+          this.terminalService.write(`${cliCommand}\n`);
+        }
         this.isStarted = true;
         this.updateStatus('running');
       }

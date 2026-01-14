@@ -78,6 +78,8 @@ export interface NodeContextProviderProps {
   workspacePath?: string;
   /** Auto-start CLI on mount (agent nodes only) */
   autoStartCli?: boolean;
+  /** Initial prompt to send to the agent when it starts */
+  initialPrompt?: string;
   /** Child components */
   children: React.ReactNode;
 }
@@ -101,6 +103,7 @@ export function NodeContextProvider({
   sessionId,
   workspacePath,
   autoStartCli = false,
+  initialPrompt,
   children,
 }: NodeContextProviderProps) {
   const registry = useNodeServicesRegistry();
@@ -199,7 +202,7 @@ export function NodeContextProvider({
     // Delegate workspace handling to the appropriate service
     if (hasAgentService(services)) {
       // Agent service handles terminal navigation + CLI start
-      services.agent.setWorkspace(workspacePath, autoStartCli);
+      services.agent.setWorkspace(workspacePath, autoStartCli, initialPrompt);
     } else if (hasTerminalService(services)) {
       // For non-agent nodes, just navigate the terminal
       const terminal = services.terminal;

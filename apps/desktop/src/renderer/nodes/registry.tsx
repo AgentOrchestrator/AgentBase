@@ -18,6 +18,7 @@ import WorkspaceNode from '../WorkspaceNode';
 import StarterNode from './StarterNode';
 import { AgentNode } from './AgentNode';
 import ConversationNode from './ConversationNode';
+import AgentChatNode from './AgentChatNode';
 
 // Import schemas
 import {
@@ -26,6 +27,7 @@ import {
   WorkspaceNodeDataSchema,
   AgentNodeDataSchema,
   ConversationNodeDataSchema,
+  AgentChatNodeDataSchema,
 } from './schemas';
 
 // =============================================================================
@@ -126,6 +128,14 @@ const NODE_CONFIGS: NodeTypeConfig[] = [
     persistence: {
       enabled: true,
       dataSchema: ConversationNodeDataSchema,
+    },
+  },
+  {
+    type: 'agent-chat',
+    component: AgentChatNode as ComponentType<NodeProps>,
+    persistence: {
+      enabled: true,
+      dataSchema: AgentChatNodeDataSchema,
     },
   },
   {
