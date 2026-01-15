@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
 import { marked } from 'marked';
 import type { MessageGroup, UserMessageGroup, AssistantMessageGroup, MessageContent, ToolUseContent, ThinkingContent } from '../types/conversation';
-import './ConsolidatedConversationNode.css';
+import './ConversationNode.css';
 
 // Configure marked for tight spacing
 marked.setOptions({
@@ -10,17 +10,22 @@ marked.setOptions({
   breaks: false,
 });
 
-interface ConsolidatedConversationNodeData {
+interface ConversationNodeData {
   groups: MessageGroup[];
 }
 
-function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
-  const nodeData = data as unknown as ConsolidatedConversationNodeData;
+function ConversationNode({ data, id, selected }: NodeProps) {
+  const nodeData = data as unknown as ConversationNodeData;
   const { groups } = nodeData;
   const contentRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const { setNodes } = useReactFlow();
+  const [textSelection, setTextSelection] = useState<{
+    text: string;
+    position: { top: number; right: number };
+  } | null>(null);
+  const [mouseY, setMouseY] = useState<number | null>(null);
+  const { setNodes, getViewport } = useReactFlow();
 
   // Auto-scroll to bottom on mount and when content changes
   useEffect(() => {
@@ -34,6 +39,69 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
     const timeoutId = setTimeout(scrollToBottom, 0);
     return () => clearTimeout(timeoutId);
   }, [groups]);
+
+  // Update button position based on mouse Y coordinate
+  const updateButtonPositionFromMouse = useCallback((clientY: number) => {
+    if (!contentRef.current) return;
+
+    const viewport = getViewport();
+    const zoom = viewport.zoom;
+    
+    // Get the content element's bounding rect (already accounts for React Flow zoom transform)
+    const contentRect = contentRef.current.getBoundingClientRect();
+    const scrollTop = contentRef.current.scrollTop;
+    
+    // Calculate mouse Y position relative to content container
+    // When React Flow zooms, it applies a CSS transform to the node
+    // getBoundingClientRect() returns coordinates in viewport space (already transformed)
+    // clientY is also in viewport space
+    // scrollTop is in content space (not transformed)
+    //
+    // The visible content area is scaled by zoom, so:
+    // - (clientY - contentRect.top) gives position in the visible viewport (scaled by zoom)
+    // - Divide by zoom to convert from viewport-scaled to content coordinates
+    // - Add scrollTop to get absolute position in the scrollable content
+    const viewportRelativeY = clientY - contentRect.top;
+    const contentRelativeY = viewportRelativeY / zoom;
+    const absoluteY = contentRelativeY + scrollTop;
+    
+    setMouseY(absoluteY);
+  }, [getViewport]);
+
+  // Detect text selection
+  const handleSelectionChange = useCallback(() => {
+    if (!contentRef.current) {
+      setTextSelection(null);
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      setTextSelection(null);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString().trim();
+
+    // Check if selection is within our content container
+    if (!contentRef.current.contains(range.commonAncestorContainer)) {
+      setTextSelection(null);
+      return;
+    }
+
+    // If no meaningful text is selected, hide button
+    if (!selectedText || selectedText.length === 0) {
+      setTextSelection(null);
+      return;
+    }
+
+    // Keep the selection text, position will be updated by mouse movement
+    setTextSelection({
+      text: selectedText,
+      position: { top: 0, right: 12 }, // Top will be overridden by mouseY
+    });
+  }, []);
 
   // Handle scroll events when node is selected
   useEffect(() => {
@@ -49,6 +117,52 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
       contentElement.removeEventListener('wheel', handleWheel);
     };
   }, [selected]);
+
+  // Track mouse movement and update button position
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // Track mouse Y position when within the content area
+      if (contentRef.current) {
+        const contentRect = contentRef.current.getBoundingClientRect();
+        // Check if mouse is over the content area
+        if (
+          e.clientX >= contentRect.left &&
+          e.clientX <= contentRect.right &&
+          e.clientY >= contentRect.top &&
+          e.clientY <= contentRect.bottom
+        ) {
+          updateButtonPositionFromMouse(e.clientY);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      // Small delay to ensure selection is updated
+      setTimeout(handleSelectionChange, 10);
+    };
+
+    // Listen for selection changes
+    document.addEventListener('selectionchange', handleSelectionChange);
+    // Track mouse movement
+    document.addEventListener('mousemove', handleMouseMove);
+    // Listen for mouseup to catch selection end
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleSelectionChange, updateButtonPositionFromMouse]);
+
+  // Update button position on scroll when text is selected
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement || !textSelection || mouseY === null) return;
+
+    // Note: mouseY already accounts for scrollTop in its calculation,
+    // so we don't need to adjust it on scroll - it's relative to the scrollable content
+  }, [textSelection, mouseY]);
 
   // Handle fullscreen toggle
   const handleFullscreenToggle = () => {
@@ -96,9 +210,13 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   };
 
   const renderUserMessage = (group: UserMessageGroup, index: number) => {
+    const messageKey = `user-${group.uuid}`;
     return (
-      <div key={`user-${group.uuid}`} className="consolidated-user-message">
-        <div className="consolidated-user-content">
+      <div
+        key={messageKey}
+        className="conversation-user-message"
+      >
+        <div className="conversation-user-content">
           {group.text}
         </div>
       </div>
@@ -168,12 +286,13 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   };
 
   const renderDisplayItem = (item: DisplayItem) => {
+
     if (item.type === 'text') {
       const html = marked.parse((item.content as any).text) as string;
       return (
         <div
           key={item.key}
-          className="consolidated-assistant-text-content"
+          className="conversation-assistant-text-content"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -181,7 +300,10 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
 
     if (item.type === 'thinking') {
       return (
-        <div key={item.key} className="consolidated-thinking-content">
+        <div 
+          key={item.key} 
+          className="conversation-thinking-content"
+        >
           <span className="thinking-label">Thinking:</span>
           <span className="thinking-text">{item.content.thinking}</span>
         </div>
@@ -201,7 +323,10 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
       }
 
       return (
-        <div key={item.key} className="consolidated-tool-summary">
+        <div 
+          key={item.key} 
+          className="conversation-tool-summary"
+        >
           {label}
         </div>
       );
@@ -212,10 +337,14 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
 
   const renderAssistantMessage = (group: AssistantMessageGroup, index: number) => {
     const displayItems = processAssistantEntries(group);
+    const messageKey = `assistant-${group.uuid}`;
 
     return (
-      <div key={`assistant-${group.uuid}`} className="consolidated-assistant-message">
-        <div className="consolidated-assistant-content">
+      <div
+        key={messageKey}
+        className="conversation-assistant-message"
+      >
+        <div className="conversation-assistant-content">
           {displayItems.map(item => renderDisplayItem(item))}
         </div>
       </div>
@@ -224,7 +353,7 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
 
   return (
     <div
-      className={`consolidated-conversation-node ${selected ? 'selected' : ''}`}
+      className={`conversation-node ${selected ? 'selected' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -239,7 +368,7 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
       {/* Fullscreen icon - appears on hover */}
       {isHovered && (
         <div
-          className="consolidated-fullscreen-icon"
+          className="conversation-fullscreen-icon"
           onClick={handleFullscreenToggle}
           title={isExpanded ? 'Collapse' : 'Expand to full conversation'}
         >
@@ -251,7 +380,7 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
 
       <div
         ref={contentRef}
-        className="consolidated-conversation-content"
+        className="conversation-content"
       >
         {groups.map((group, index) => {
           if (group.type === 'user') {
@@ -260,6 +389,19 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
             return renderAssistantMessage(group as AssistantMessageGroup, index);
           }
         })}
+        
+        {/* Plus button - appears when text is selected, follows mouse */}
+        {textSelection && mouseY !== null && (
+          <div
+            className="conversation-message-plus-button"
+            style={{
+              top: `${mouseY}px`,
+              right: `${textSelection.position.right}px`,
+            }}
+          >
+            +
+          </div>
+        )}
       </div>
 
       <Handle type="source" position={Position.Bottom} />
@@ -267,4 +409,4 @@ function ConsolidatedConversationNode({ data, id, selected }: NodeProps) {
   );
 }
 
-export default ConsolidatedConversationNode;
+export default ConversationNode;

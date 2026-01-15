@@ -240,7 +240,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--input-border, #444);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 4px 4px 4px 12px;
   background: transparent;
@@ -251,7 +251,7 @@
   background: transparent;
   border: none;
   padding: 8px 12px;
-  color: var(--text-primary, #e0e0e0);
+  color: var(--color-text-primary);
   font-size: 13px;
   resize: none;
   min-height: 20px;
@@ -277,8 +277,8 @@
   height: 32px;
   border-radius: 50%;
   border: none;
-  background: var(--button-secondary-bg, var(--color-bg-secondary));
-  color: var(--text-primary, #e0e0e0);
+  background: #000000;
+  color: var(--color-text-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -289,7 +289,8 @@
 }
 
 .agent-chat-view-send:hover:not(:disabled) {
-  background: var(--button-secondary-hover-bg, #3d3d3d);
+  background: #000000;
+  opacity: 0.8;
 }
 
 .agent-chat-view-send:disabled {
@@ -301,6 +302,7 @@
   font-size: 16px;
   line-height: 1;
   font-weight: 500;
+  color: #ffffff;
 }
 
 /* Tool Use Styling */

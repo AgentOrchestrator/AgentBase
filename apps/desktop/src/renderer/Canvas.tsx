@@ -31,7 +31,7 @@ import { parseConversationFile, groupConversationMessages } from './utils/conver
 import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
-import ConsolidatedConversationNode from './components/ConsolidatedConversationNode';
+import ConversationNode from './components/ConversationNode';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { NewAgentModal } from './components/NewAgentModal';
 import { useTheme } from './context';
@@ -42,7 +42,7 @@ const nodeTypes = {
   ...nodeRegistry.reactFlowNodeTypes,
   userMessage: UserMessageNode,
   assistantMessage: AssistantMessageNode,
-  consolidatedConversation: ConsolidatedConversationNode,
+  conversationNode: ConversationNode,
 };
 
 const defaultNodes: Node[] = [];

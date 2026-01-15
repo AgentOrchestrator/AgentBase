@@ -112,10 +112,6 @@ export class SQLiteDatabase implements IDatabase {
                 canvasId
               ]
             );
-
-            // Delete existing nodes and edges (will be replaced)
-            await this.run('DELETE FROM nodes WHERE canvas_id = ?', [canvasId]);
-            await this.run('DELETE FROM edges WHERE canvas_id = ?', [canvasId]);
           } else {
             // Insert new canvas
             await this.run(
@@ -130,10 +126,10 @@ export class SQLiteDatabase implements IDatabase {
             );
           }
 
-          // Insert nodes
+          // Insert or replace nodes
           for (const node of state.nodes) {
             await this.run(
-              `INSERT INTO nodes (id, canvas_id, type, position_x, position_y, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT OR REPLACE INTO nodes (id, canvas_id, type, position_x, position_y, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
               [
                 node.id,
                 canvasId,
@@ -146,10 +142,10 @@ export class SQLiteDatabase implements IDatabase {
             );
           }
 
-          // Insert edges
+          // Insert or replace edges
           for (const edge of state.edges) {
             await this.run(
-              `INSERT INTO edges (id, canvas_id, source, target, type, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT OR REPLACE INTO edges (id, canvas_id, source, target, type, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
               [
                 edge.id,
                 canvasId,
@@ -160,6 +156,31 @@ export class SQLiteDatabase implements IDatabase {
                 edge.style ? JSON.stringify(edge.style) : null
               ]
             );
+          }
+
+          // Delete nodes and edges that are no longer in the state
+          if (state.nodes.length > 0) {
+            const nodeIds = state.nodes.map(n => n.id);
+            const placeholders = nodeIds.map(() => '?').join(',');
+            await this.run(
+              `DELETE FROM nodes WHERE canvas_id = ? AND id NOT IN (${placeholders})`,
+              [canvasId, ...nodeIds]
+            );
+          } else {
+            // If no nodes in state, delete all nodes for this canvas
+            await this.run('DELETE FROM nodes WHERE canvas_id = ?', [canvasId]);
+          }
+
+          if (state.edges.length > 0) {
+            const edgeIds = state.edges.map(e => e.id);
+            const placeholders = edgeIds.map(() => '?').join(',');
+            await this.run(
+              `DELETE FROM edges WHERE canvas_id = ? AND id NOT IN (${placeholders})`,
+              [canvasId, ...edgeIds]
+            );
+          } else {
+            // If no edges in state, delete all edges for this canvas
+            await this.run('DELETE FROM edges WHERE canvas_id = ?', [canvasId]);
           }
 
           // Commit transaction
