@@ -40,6 +40,10 @@ import {
   DEFAULT_LLM_CONFIG,
 } from './services/llm';
 import {
+  registerSessionWatcherIpcHandlers,
+  disposeSessionWatcher,
+} from './services/session-watcher';
+import {
   RepresentationService,
   type RepresentationInput,
   type ImageTransformOptions,
@@ -362,6 +366,9 @@ const createWindow = (): void => {
       console.log('[Main] ⚠️ Terminal destroy requested but process not found', { terminalId });
     }
   });
+
+  // Initialize session file watcher for real-time sync between terminal and chat views
+  registerSessionWatcherIpcHandlers(win);
 
   // Clean up all terminals when window closes
   win.on('closed', () => {
@@ -1381,9 +1388,10 @@ app.whenReady().then(async () => {
 
 // Clean up on app quit
 app.on('will-quit', async () => {
-  console.log('[Main] App quitting, closing database, worktree manager, coding agents, LLM service, and representation service');
+  console.log('[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, and representation service');
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
+  disposeSessionWatcher();
   await CodingAgentFactory.disposeAll();
   await LLMServiceFactory.dispose();
   await representationService.dispose();

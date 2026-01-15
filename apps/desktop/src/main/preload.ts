@@ -6,7 +6,12 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type {
+  GitInfo,
+  SessionFileChangeEvent,
+  SessionWatcherAPI,
+  CodingAgentType as SharedCodingAgentType,
+} from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
   AgentCapabilities,
@@ -598,3 +603,27 @@ contextBridge.exposeInMainWorld('windowAPI', {
   close: () => ipcRenderer.send('window-close'),
   isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
 } as WindowAPI);
+
+// Expose session watcher API for real-time sync between terminal and chat views
+contextBridge.exposeInMainWorld('sessionWatcherAPI', {
+  watch: async (agentType: SharedCodingAgentType) => {
+    const result = await ipcRenderer.invoke('session-watcher:watch', agentType);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+  },
+  unwatch: async (agentType: SharedCodingAgentType) => {
+    const result = await ipcRenderer.invoke('session-watcher:unwatch', agentType);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+  },
+  onSessionFileChanged: (callback: (event: SessionFileChangeEvent) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: SessionFileChangeEvent
+    ) => callback(data);
+    ipcRenderer.on('session:file-changed', handler);
+    return () => ipcRenderer.removeListener('session:file-changed', handler);
+  },
+} as SessionWatcherAPI);
