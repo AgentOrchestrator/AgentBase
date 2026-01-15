@@ -2,10 +2,15 @@
  * Adapters Module
  *
  * Exports adapter interfaces and implementations for various coding agents.
+ *
+ * Two approaches are available for Claude Code:
+ * - `ClaudeCodeAdapter` - Terminal output parsing (legacy/fallback)
+ * - `createSDKHookBridge` - Native SDK hooks (recommended)
  */
 
 export * from './base.js';
 export * from './claude-code.js';
+export * from './claude-code-sdk.js';
 export * from './codex.js';
 
 import { AdapterRegistry } from './base.js';

@@ -25,7 +25,7 @@
     "setup": "node scripts/setup.js",
     "dev:daemon": "npm run dev --workspace=agent-orchestrator-daemon",
     "dev:web": "npm run dev --workspace=web",
-    "dev:desktop": "npm run dev --workspace=desktop",
+    "dev:desktop": "npm run build --workspace=@agent-orchestrator/shared && npm run dev --workspace=desktop",
     "dev:memory": "cd apps/memory-service && venv/bin/python -m src.main",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d",

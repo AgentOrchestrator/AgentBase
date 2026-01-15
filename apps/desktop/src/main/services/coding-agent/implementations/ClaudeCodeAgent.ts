@@ -4,6 +4,12 @@ import * as path from 'path';
 import * as os from 'os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { Query, SDKMessage, Options } from '@anthropic-ai/claude-agent-sdk';
+import {
+  createEventRegistry,
+  createSDKHookBridge,
+  type EventRegistry,
+  type SDKHookBridge,
+} from '@agent-orchestrator/shared';
 import type {
   ICodingAgentProvider,
   ISessionResumable,
@@ -86,17 +92,40 @@ interface JsonlLine {
   summary?: string;
 }
 
+/**
+ * Configuration for ClaudeCodeAgent with hook options
+ */
+export interface ClaudeCodeAgentConfig extends AgentConfig {
+  /** Enable debug logging for hooks */
+  debugHooks?: boolean;
+}
+
 export class ClaudeCodeAgent
   extends EventEmitter
   implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider
 {
   protected readonly config: AgentConfig;
+  private readonly eventRegistry: EventRegistry;
+  private readonly hookBridge: SDKHookBridge;
+  private readonly debugHooks: boolean;
   private readonly activeQueries = new Map<string, QueryHandle>();
   private isInitialized = false;
 
-  constructor(config: AgentConfig) {
+  constructor(config: ClaudeCodeAgentConfig) {
     super();
     this.config = config;
+    this.debugHooks = config.debugHooks ?? false;
+    this.eventRegistry = createEventRegistry();
+    this.hookBridge = createSDKHookBridge(this.eventRegistry, {
+      debug: this.debugHooks,
+    });
+  }
+
+  /**
+   * Get the event registry for registering custom handlers
+   */
+  getEventRegistry(): EventRegistry {
+    return this.eventRegistry;
   }
 
   get agentType(): CodingAgentType {
@@ -143,6 +172,8 @@ export class ClaudeCodeAgent
 
   async dispose(): Promise<void> {
     await this.cancelAll();
+    this.hookBridge.cleanup();
+    this.eventRegistry.clear();
     this.isInitialized = false;
     this.removeAllListeners();
   }
@@ -297,6 +328,7 @@ export class ClaudeCodeAgent
     const options: Partial<Options> = {
       cwd: request.workingDirectory ?? this.config.workingDirectory,
       abortController,
+      hooks: this.hookBridge.hooks,
       tools: { type: 'preset', preset: 'claude_code' },
     };
 
@@ -445,6 +477,7 @@ export class ClaudeCodeAgent
     const options: Partial<Options> = {
       cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
       abortController,
+      hooks: this.hookBridge.hooks,
       tools: { type: 'preset', preset: 'claude_code' },
       systemPrompt: { type: 'preset', preset: 'claude_code' },
     };
@@ -506,6 +539,7 @@ export class ClaudeCodeAgent
       if (isCrossDirectory) {
         sdkOptions = {
           abortController,
+          hooks: this.hookBridge.hooks,
           tools: { type: 'preset', preset: 'claude_code' },
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           extraArgs: { session_id: parentId }
@@ -514,6 +548,7 @@ export class ClaudeCodeAgent
       } else {
         sdkOptions = {
           abortController,
+          hooks: this.hookBridge.hooks,
           resume: parentId,
           forkSession: true,
           tools: { type: 'preset', preset: 'claude_code' },
