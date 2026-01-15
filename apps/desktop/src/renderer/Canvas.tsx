@@ -282,6 +282,7 @@ function CanvasFlow() {
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -1957,12 +1958,22 @@ function CanvasFlow() {
           setIsNodeDragEnabled(true);
         }
       }
+
+      // Track Shift key for snap-to-edge
+      if (event.key === 'Shift') {
+        setIsShiftPressed(true);
+      }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
       // Disable node drag mode when CMD/CTRL key is released
       if ((isMac && event.key === 'Meta') || (!isMac && event.key === 'Control')) {
         setIsNodeDragEnabled(false);
+      }
+
+      // Track Shift key release
+      if (event.key === 'Shift') {
+        setIsShiftPressed(false);
       }
     };
 
@@ -1973,6 +1984,211 @@ function CanvasFlow() {
       document.removeEventListener('keyup', handleKeyUp);
     };
   }, [addWorkspaceNode, addAgentNode, addStarterNode, addConversationNode, isNodeDragEnabled]);
+
+  // Snap-to-edge functionality when dragging nodes
+  const SNAP_THRESHOLD = 20; // pixels - soft snapping threshold
+  const isSnappingRef = useRef(false); // Prevent infinite loops
+
+  // Shared function to calculate and apply snapping
+  const applySnapping = useCallback(
+    (node: Node, allNodes: Node[]) => {
+      const currentNode = node;
+      const otherNodes = allNodes.filter((n) => n.id !== currentNode.id);
+
+      if (otherNodes.length === 0) {
+        return null;
+      }
+
+      // Get current node dimensions
+      const currentNodeWidth =
+        (currentNode.width as number) ||
+        (currentNode.style?.width as number) ||
+        (currentNode.measured?.width as number) ||
+        500;
+      const currentNodeHeight =
+        (currentNode.height as number) ||
+        (currentNode.style?.height as number) ||
+        (currentNode.measured?.height as number) ||
+        400;
+
+      // Calculate current node bounds
+      const currentNodeLeft = currentNode.position.x;
+      const currentNodeRight = currentNode.position.x + currentNodeWidth;
+      const currentNodeTop = currentNode.position.y;
+      const currentNodeBottom = currentNode.position.y + currentNodeHeight;
+
+      let snappedX = currentNode.position.x;
+      let snappedY = currentNode.position.y;
+      let minDistanceX = SNAP_THRESHOLD;
+      let minDistanceY = SNAP_THRESHOLD;
+
+      // Check alignment with other nodes
+      for (const otherNode of otherNodes) {
+        const otherNodeWidth =
+          (otherNode.width as number) ||
+          (otherNode.style?.width as number) ||
+          (otherNode.measured?.width as number) ||
+          500;
+        const otherNodeHeight =
+          (otherNode.height as number) ||
+          (otherNode.style?.height as number) ||
+          (otherNode.measured?.height as number) ||
+          400;
+
+        const otherNodeLeft = otherNode.position.x;
+        const otherNodeRight = otherNode.position.x + otherNodeWidth;
+        const otherNodeTop = otherNode.position.y;
+        const otherNodeBottom = otherNode.position.y + otherNodeHeight;
+
+        // Check horizontal alignment (left edges, right edges, left-right, right-left)
+        const leftToLeft = Math.abs(currentNodeLeft - otherNodeLeft);
+        const rightToRight = Math.abs(currentNodeRight - otherNodeRight);
+        const leftToRight = Math.abs(currentNodeLeft - otherNodeRight);
+        const rightToLeft = Math.abs(currentNodeRight - otherNodeLeft);
+
+        // Find closest horizontal alignment
+        const horizontalDistances = [
+          { distance: leftToLeft, snap: otherNodeLeft },
+          { distance: rightToRight, snap: otherNodeRight - currentNodeWidth },
+          { distance: leftToRight, snap: otherNodeRight },
+          { distance: rightToLeft, snap: otherNodeLeft - currentNodeWidth },
+        ];
+
+        for (const { distance, snap } of horizontalDistances) {
+          if (distance < minDistanceX) {
+            minDistanceX = distance;
+            snappedX = snap;
+          }
+        }
+
+        // Check vertical alignment (top edges, bottom edges, top-bottom, bottom-top)
+        const topToTop = Math.abs(currentNodeTop - otherNodeTop);
+        const bottomToBottom = Math.abs(currentNodeBottom - otherNodeBottom);
+        const topToBottom = Math.abs(currentNodeTop - otherNodeBottom);
+        const bottomToTop = Math.abs(currentNodeBottom - otherNodeTop);
+
+        // Find closest vertical alignment
+        const verticalDistances = [
+          { distance: topToTop, snap: otherNodeTop },
+          { distance: bottomToBottom, snap: otherNodeBottom - currentNodeHeight },
+          { distance: topToBottom, snap: otherNodeBottom },
+          { distance: bottomToTop, snap: otherNodeTop - currentNodeHeight },
+        ];
+
+        for (const { distance, snap } of verticalDistances) {
+          if (distance < minDistanceY) {
+            minDistanceY = distance;
+            snappedY = snap;
+          }
+        }
+      }
+
+      // Return snapped position if within threshold
+      if (minDistanceX < SNAP_THRESHOLD || minDistanceY < SNAP_THRESHOLD) {
+        return {
+          x: minDistanceX < SNAP_THRESHOLD ? snappedX : currentNode.position.x,
+          y: minDistanceY < SNAP_THRESHOLD ? snappedY : currentNode.position.y,
+        };
+      }
+
+      return null;
+    },
+    []
+  );
+
+  const onNodeDrag = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      // Only apply snapping if drag is enabled and not already snapping
+      if (!isNodeDragEnabled || isSnappingRef.current) {
+        return;
+      }
+
+      const allNodes = getNodes();
+      const snappedPosition = applySnapping(node, allNodes);
+
+      // Apply snapping if within threshold
+      if (snappedPosition) {
+        isSnappingRef.current = true;
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === node.id) {
+              return {
+                ...n,
+                position: snappedPosition,
+              };
+            }
+            return n;
+          })
+        );
+        // Reset flag after a short delay to allow next drag event
+        setTimeout(() => {
+          isSnappingRef.current = false;
+        }, 10);
+      }
+    },
+    [isNodeDragEnabled, getNodes, setNodes, applySnapping]
+  );
+
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      isSnappingRef.current = false;
+    },
+    []
+  );
+
+  // Wrap onNodesChange to intercept position changes and apply snapping
+  const handleNodesChange = useCallback(
+    (changes: any[]) => {
+      // If snapping is disabled or we're already snapping, just pass through
+      if (!isNodeDragEnabled || isSnappingRef.current) {
+        onNodesChange(changes);
+        return;
+      }
+
+      const allNodes = getNodes();
+      const modifiedChanges = changes.map((change) => {
+        // Intercept position changes and apply snapping
+        if (change.type === 'position' && change.position) {
+          const node = allNodes.find((n) => n.id === change.id);
+          if (node) {
+            // Create a temporary node with the new position to check snapping
+            const tempNode = {
+              ...node,
+              position: change.position,
+            };
+            const snappedPosition = applySnapping(tempNode, allNodes);
+            if (snappedPosition) {
+              // Modify the change to use the snapped position
+              return {
+                ...change,
+                position: snappedPosition,
+              };
+            }
+          }
+        }
+        return change;
+      });
+
+      // Check if any changes were modified
+      const hasSnapping = modifiedChanges.some(
+        (change, index) => change !== changes[index]
+      );
+
+      if (hasSnapping) {
+        isSnappingRef.current = true;
+        // Apply the modified changes
+        onNodesChange(modifiedChanges);
+        // Reset flag after a short delay
+        setTimeout(() => {
+          isSnappingRef.current = false;
+        }, 10);
+      } else {
+        // No snapping needed, pass through original changes
+        onNodesChange(changes);
+      }
+    },
+    [onNodesChange, isNodeDragEnabled, getNodes, applySnapping]
+  );
 
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
@@ -2269,11 +2485,13 @@ function CanvasFlow() {
         <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={onPaneClick}
         onDragOver={handleCanvasDragOver}
