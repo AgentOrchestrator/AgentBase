@@ -99,6 +99,17 @@
   cursor: text;
 }
 
+/* Change cursor to grab when Command/Ctrl is pressed */
+.conversation-content.command-pressed,
+.conversation-content.command-pressed * {
+  cursor: grab !important;
+}
+
+.conversation-content.command-pressed:active,
+.conversation-content.command-pressed:active * {
+  cursor: grabbing !important;
+}
+
 /* Scrollbar styling - always visible */
 .conversation-content::-webkit-scrollbar {
   width: 8px;

@@ -25,7 +25,42 @@ function ConversationNode({ data, id, selected }: NodeProps) {
     position: { top: number; right: number };
   } | null>(null);
   const [mouseY, setMouseY] = useState<number | null>(null);
+  const [isCommandPressed, setIsCommandPressed] = useState(false);
   const { setNodes, getViewport } = useReactFlow();
+
+  // Detect Command/Ctrl key press for cursor change
+  useEffect(() => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+      if (modifierKey) {
+        setIsCommandPressed(true);
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+      if (!modifierKey) {
+        setIsCommandPressed(false);
+      }
+    };
+
+    // Also handle when key is released outside the window
+    const handleBlur = () => {
+      setIsCommandPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   // Auto-scroll to bottom on mount and when content changes
   useEffect(() => {
@@ -380,7 +415,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
 
       <div
         ref={contentRef}
-        className="conversation-content"
+        className={`conversation-content ${isCommandPressed ? 'command-pressed' : ''}`}
       >
         {groups.map((group, index) => {
           if (group.type === 'user') {
