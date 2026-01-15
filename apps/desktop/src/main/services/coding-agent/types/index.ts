@@ -23,6 +23,7 @@ export {
 export {
   type SessionIdentifier,
   type SessionInfo,
+  type CodingAgentSessionContent,
   type SessionContent,
   type SessionSummary,
   type SessionFilter,

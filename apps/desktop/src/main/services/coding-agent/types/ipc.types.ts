@@ -4,7 +4,7 @@ import type {
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
-  SessionContent,
+  CodingAgentSessionContent,
   SessionFilterOptions,
   MessageFilterOptions,
   ContinueOptions,
@@ -76,7 +76,7 @@ export interface CodingAgentAPI {
     agentType: CodingAgentType,
     sessionId: string,
     filter?: MessageFilterOptions
-  ) => Promise<SessionContent | null>;
+  ) => Promise<CodingAgentSessionContent | null>;
 
   /** Subscribe to stream chunks */
   onStreamChunk: (

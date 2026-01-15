@@ -60,3 +60,33 @@ Supabase (with RLS)
     ↓
 Web Dashboard
 ```
+
+
+## Patterns
+
+Rule: *.d.ts files should never define real domain types.
+
+They should only do one thing:
+
+connect a runtime object to a real imported type.
+
+Correct pattern:
+
+// global.d.ts
+import type { ElectronAPI } from '@agent-orchestrator/shared';
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}
+
+export {};
+
+
+Wrong pattern:
+
+// global.d.ts
+interface ElectronAPI {
+  createTerminal(...): void;
+}

@@ -13,9 +13,13 @@ import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 // =============================================================================
 
 /**
- * Session content returned from the API
+ * Renderer-specific session content with CodingAgentMessage format.
+ *
+ * Note: This differs from the shared SessionContent which uses ChatMessage[]
+ * and has metadata in a nested object. This flat structure with CodingAgentMessage
+ * is specific to the desktop renderer's needs.
  */
-export interface SessionContent {
+export interface RendererSessionContent {
   id: string;
   messages: CodingAgentMessage[];
   messageCount: number;

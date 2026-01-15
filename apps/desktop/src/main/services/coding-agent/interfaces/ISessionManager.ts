@@ -3,7 +3,7 @@ import type {
   AgentError,
   SessionIdentifier,
   SessionInfo,
-  SessionContent,
+  CodingAgentSessionContent,
   SessionFilter,
 } from '../types';
 
@@ -38,7 +38,7 @@ export interface ISessionManager {
    */
   getSession(
     identifier: SessionIdentifier
-  ): Promise<Result<SessionContent | null, AgentError>>;
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>>;
 
   /**
    * Delete a session

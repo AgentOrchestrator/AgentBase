@@ -31,7 +31,7 @@ export function nodesToCanvasNodes(nodes: Node[]): CanvasNode[] {
       const validation = nodeRegistry.validateNodeData(nodeType, node.data);
       if (!validation.success) {
         console.warn(
-          `[canvasConverters] Invalid data for ${nodeType} node ${node.id}:`,
+          `[canvasConverters] Invalid data for ${nodeType} node ${JSON.stringify(node)}:`,
           validation.error
         );
       }

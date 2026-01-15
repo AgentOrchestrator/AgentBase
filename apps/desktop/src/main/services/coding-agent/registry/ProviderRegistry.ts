@@ -23,7 +23,7 @@ import type { IChatHistoryProvider } from '../interfaces';
 import type {
   CodingAgentType,
   SessionSummary,
-  SessionContent,
+  CodingAgentSessionContent,
   SessionFilterOptions,
   MessageFilterOptions,
   Result,
@@ -188,7 +188,7 @@ export class ProviderRegistry {
   async getFilteredSession(
     sessionId: string,
     filter?: ProviderMessageFilterOptions
-  ): Promise<Result<SessionContent | null, AgentError>> {
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
     // Single provider query
     if (filter?.agent) {
       const provider = this.providers.get(filter.agent);

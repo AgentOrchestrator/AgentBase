@@ -7,7 +7,7 @@
 
 import type {
   IConversationService,
-  SessionContent,
+  RendererSessionContent,
   SessionFilter,
   MessagesLoadedListener,
   ErrorListener,

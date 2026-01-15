@@ -55,7 +55,8 @@ export type {
   CodingAgentAPI,
   SessionIdentifier,
   SessionInfo,
-  SessionContent,
+  CodingAgentSessionContent,
+  SessionContent, // Backward compatibility alias
   SessionSummary,
   SessionFilter,
   SessionFilterOptions,
