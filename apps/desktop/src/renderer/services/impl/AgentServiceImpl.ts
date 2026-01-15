@@ -239,18 +239,32 @@ export class AgentServiceImpl implements IAgentService {
     cliCommand: string,
     options: { sessionId?: string; initialPrompt?: string }
   ): string {
-    return this.buildCliCommand(cliCommand, options);
+    const { sessionId } = options;
+
+    if (this.agentType !== 'claude_code' || !sessionId) {
+      return this.buildCliCommand(cliCommand, options);
+    }
+
+    const sessionIdCommand = this.buildCliCommand(cliCommand, options, 'session-id');
+    const resumeCommand = this.buildCliCommand(cliCommand, options, 'resume');
+    const logMessage = this.formatShellValue(
+      `[AgentService] Failed to create session ${sessionId}. Falling back to --resume.`
+    );
+
+    return `${sessionIdCommand} || (echo ${logMessage} >&2; ${resumeCommand})`;
   }
 
   private buildCliCommand(
     cliCommand: string,
-    options: { sessionId?: string; initialPrompt?: string }
+    options: { sessionId?: string; initialPrompt?: string },
+    sessionMode: 'session-id' | 'resume' = 'session-id'
   ): string {
     const { sessionId, initialPrompt } = options;
     const args: string[] = [];
 
     if (this.agentType === 'claude_code' && sessionId) {
-      args.push(`--session-id ${this.formatShellValue(sessionId)}`);
+      const flag = sessionMode === 'resume' ? '--resume' : '--session-id';
+      args.push(`${flag} ${this.formatShellValue(sessionId)}`);
     }
 
     if (initialPrompt) {

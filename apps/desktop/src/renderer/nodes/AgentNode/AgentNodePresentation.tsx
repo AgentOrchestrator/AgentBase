@@ -266,7 +266,7 @@ export function AgentNodePresentation({
           />
         </div>
         <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
-          <AgentTerminalView terminalId={data.terminalId} />
+          <AgentTerminalView terminalId={data.terminalId} selected={selected} />
         </div>
         <div style={{ display: activeView === 'chat' ? 'contents' : 'none' }}>
           <AgentChatView
@@ -278,6 +278,7 @@ export function AgentNodePresentation({
             onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
             onSessionCreated={(sessionId) => onDataChange({ sessionId })}
             isSessionReady={isSessionReady}
+            selected={selected}
           />
         </div>
       </div>

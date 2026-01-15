@@ -491,9 +491,56 @@ export class ClaudeCodeAgent
       );
     }
 
+    // Handle same-directory fork (original SDK fork behavior)
+    const queryId = crypto.randomUUID();
+    const abortController = new AbortController();
+  
     const targetCwd = options?.workingDirectory ?? this.config.workingDirectory ?? process.cwd();
     const sourceCwd = this.config.workingDirectory ?? process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
+
+    try {
+
+      var sdkOptions: Partial<Options>;
+
+      if (isCrossDirectory) {
+        sdkOptions = {
+          abortController,
+          tools: { type: 'preset', preset: 'claude_code' },
+          systemPrompt: { type: 'preset', preset: 'claude_code' },
+          extraArgs: { session_id: parentId }
+        };
+
+      } else {
+        sdkOptions = {
+          abortController,
+          resume: parentId,
+          forkSession: true,
+          tools: { type: 'preset', preset: 'claude_code' },
+          systemPrompt: { type: 'preset', preset: 'claude_code' },
+        };
+      }
+
+      // Use empty prompt to trigger the fork
+      const queryResult = query({ prompt: '', options: sdkOptions });
+
+      const handle: QueryHandle = {
+        id: queryId,
+        query: queryResult,
+        abortController,
+        startTime: Date.now(),
+      };
+      this.activeQueries.set(queryId, handle);
+
+      for await (const message of queryResult) {
+        // Extract session_id from any message
+        if ('session_id' in message && message.session_id) {
+          parentId != message.session_id;
+        }
+      }
+    } catch (error) {
+      console.error('[ClaudeCodeAgent] Failed to create new session', { error });
+    }
 
     // Handle cross-directory fork (worktree scenario)
     if (isCrossDirectory) {
@@ -532,156 +579,28 @@ export class ClaudeCodeAgent
         );
 
         if (!forkResult.success) {
-          return { success: false, error: forkResult.error };
+          console.error('[ClaudeCodeAgent] Fork adapter failed to fork session', { error: forkResult.error });
+          throw forkResult.error;
         }
-
-        console.log('[ClaudeCodeAgent] Session file forked successfully', {
-          sessionId: parentId,
-          targetCwd: resolvedTargetCwd,
-        });
-
-        // Resume the session in the new directory
-        // The SDK will find the JSONL file in ~/.claude/projects/{encoded-targetCwd}/
-        const queryId = crypto.randomUUID();
-        const abortController = new AbortController();
-
-        const sdkOptions: Partial<Options> = {
-          cwd: resolvedTargetCwd,
-          abortController,
-          tools: { type: 'preset', preset: 'claude_code' },
-          systemPrompt: { type: 'preset', preset: 'claude_code' },
-          stderr: (data: string) => console.error(data),
-        };
-
-        // Use empty prompt to initialize the session with context
-        const queryResult = query({ prompt: `If needed use ${resolvedTargetCwd}/${parentId}.jsonl for context.`, options: sdkOptions });
-
-        console.log('[ClaudeCodeAgent] Resuming forked session in new directory', { resolvedTargetCwd, parentId });
-        console.debug('[ClaudeCodeAgent] Forked session resume query started', { queryId });
-
-        const handle: QueryHandle = {
-          id: queryId,
-          query: queryResult,
-          abortController,
-          startTime: Date.now(),
-        };
-        this.activeQueries.set(queryId, handle);
-
-        // Consume the messages to verify session loaded
-        let verifiedSessionId: string | null = null;
-
-
-        try {
-          for await (const message of queryResult) {
-            console.debug('[ClaudeCodeAgent] Forked session resume message', { message });
-            if ('session_id' in message && message.session_id) {
-              verifiedSessionId = message.session_id;
-            }
-          }
-        } catch (error) {
-          this.activeQueries.delete(queryId);
-          console.error('[ClaudeCodeAgent] Error while consuming messages for forked session resume', { error });
-          
-          if (verifiedSessionId) {
-            console.log('[ClaudeCodeAgent] Forked session resumed successfully despite error', { verifiedSessionId });
-            return ok({
-              id: verifiedSessionId,
-              name: options?.newSessionName,
-              agentType: 'claude_code',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              messageCount: 0,
-              parentSessionId: parentId,
-            });
-          } else {
-            return err(
-              agentError(
-                AgentErrorCode.SESSION_INVALID,
-                `Cross-directory fork resume failed: ${error instanceof Error ? error.message : String(error)}`
-              )
-            );
-          }
-        }
-
-        console.debug('[ClaudeCodeAgent] Forked session resumed messages consumed', { verifiedSessionId });
-
-        this.activeQueries.delete(queryId);
-
-        // The verified session ID should match the parentId since we're resuming
-        const finalSessionId = verifiedSessionId || parentId;
-
-        const now = new Date().toISOString();
-        return ok({
-          id: finalSessionId,
-          name: options?.newSessionName,
-          agentType: 'claude_code',
-          createdAt: now,
-          updatedAt: now,
-          messageCount: 0,
-          parentSessionId: parentId,
-        });
       } catch (error) {
         return err(
           agentError(
             AgentErrorCode.UNKNOWN_ERROR,
-            `Cross-directory fork failed: ${error instanceof Error ? error.message : String(error)}`
+            `Failed to fork session file: ${error}`
           )
         );
       }
     }
 
-    // Handle same-directory fork (original SDK fork behavior)
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const sdkOptions: Partial<Options> = {
-        abortController,
-        tools: { type: 'preset', preset: 'claude_code' },
-      };
-
-      // Use empty prompt to trigger the fork
-      const queryResult = query({ prompt: '', options: sdkOptions });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect messages to get the new session ID
-      let newSessionId: string | null = null;
-      for await (const message of queryResult) {
-        // Extract session_id from any message
-        if ('session_id' in message && message.session_id) {
-          newSessionId = message.session_id;
-        }
-      }
-
-      this.activeQueries.delete(queryId);
-
-      if (!newSessionId) {
-        return err(
-          agentError(AgentErrorCode.SESSION_INVALID, 'Failed to obtain new session ID from fork')
-        );
-      }
-
-      const now = new Date().toISOString();
-      return ok({
-        id: newSessionId,
-        name: options?.newSessionName,
-        agentType: 'claude_code',
-        createdAt: now,
-        updatedAt: now,
-        messageCount: 0,
-        parentSessionId: parentId,
-      });
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    return ok({
+      id: parentId,
+      name: options?.newSessionName,
+      agentType: 'claude_code',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messageCount: 0,
+      parentSessionId: parentId,
+    });
   }
 
   /**

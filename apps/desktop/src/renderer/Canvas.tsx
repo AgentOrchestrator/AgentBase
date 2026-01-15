@@ -32,6 +32,9 @@ import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import ConsolidatedConversationNode from './components/ConsolidatedConversationNode';
+import { CommandPalette, type CommandAction } from './components/CommandPalette';
+import { NewAgentModal } from './components/NewAgentModal';
+import { useTheme } from './context';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -86,6 +89,9 @@ type ContextMenu = {
 } | null;
 
 function CanvasFlow() {
+  // Theme hook
+  const { theme, toggleTheme } = useTheme();
+
   // Canvas persistence hook - centralized save/restore logic
   const {
     isLoading: isCanvasLoading,
@@ -109,12 +115,13 @@ function CanvasFlow() {
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
   const debugConversationNodes = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+  const [debugNodesLoaded, setDebugNodesLoaded] = useState(false);
 
   // DEBUG: Load conversation file early (before initial state is applied)
   useEffect(() => {
     if (debugConversationNodes.current) return; // Already loaded
     
-    const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/7b9e46fe-7879-4235-8fa3-a46d83bb56df.jsonl';
+    const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/2cc81131-2edc-48c3-96ac-c2b3d2256c02.jsonl';
     
     const loadDebugConversation = async () => {
       try {
@@ -124,28 +131,46 @@ function CanvasFlow() {
           return;
         }
         
+        console.log('[Canvas] Reading file:', conversationPath);
         const fileContent = await fileAPI.readFile(conversationPath);
+        console.log('[Canvas] File content length:', fileContent?.length || 0);
+        
+        if (!fileContent) {
+          console.error('[Canvas] File content is empty');
+          return;
+        }
+        
         const entries = parseConversationFile(fileContent);
+        console.log('[Canvas] Parsed entries:', entries.length);
+        
         const groups = groupConversationMessages(entries);
+        console.log('[Canvas] All groups:', groups.length, 'User groups:', groups.filter(g => g.type === 'user').length);
         
         if (groups.length > 0) {
           // Center the conversation on the canvas
           const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 - 300 : 400;
           const centerY = typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 300;
           
+          console.log('[Canvas] Creating nodes at position:', centerX, centerY);
           const { nodes: conversationNodes, edges: conversationEdges } = conversationToNodesAndEdges(
             groups,
             centerX,
             centerY
           );
           
+          console.log('[Canvas] Created nodes:', conversationNodes.length, 'edges:', conversationEdges.length);
+          console.log('[Canvas] Node details:', conversationNodes.map(n => ({ id: n.id, type: n.type, position: n.position })));
+          
           debugConversationNodes.current = { nodes: conversationNodes, edges: conversationEdges };
+          setDebugNodesLoaded(true); // Trigger useEffect to add nodes
           
           console.log('[Canvas] Loaded debug conversation:', {
             groups: groups.length,
             nodes: conversationNodes.length,
             edges: conversationEdges.length
           });
+        } else {
+          console.warn('[Canvas] No groups to display');
         }
       } catch (error) {
         console.error('[Canvas] Error loading debug conversation:', error);
@@ -157,7 +182,7 @@ function CanvasFlow() {
 
   // Apply restored state when it becomes available, including debug conversation
   useEffect(() => {
-    if (!isCanvasLoading && !initialStateApplied.current) {
+    if (!isCanvasLoading) {
       // Merge initial nodes with debug conversation nodes
       const allNodes = debugConversationNodes.current 
         ? [...initialNodes, ...debugConversationNodes.current.nodes]
@@ -166,7 +191,7 @@ function CanvasFlow() {
         ? [...initialEdges, ...debugConversationNodes.current.edges]
         : initialEdges;
       
-      if (allNodes.length > 0 || allEdges.length > 0) {
+      if (!initialStateApplied.current && (allNodes.length > 0 || allEdges.length > 0)) {
         setNodes(allNodes);
         setEdges(allEdges);
         initialStateApplied.current = true;
@@ -175,9 +200,29 @@ function CanvasFlow() {
           debugNodes: debugConversationNodes.current?.nodes.length || 0,
           totalNodes: allNodes.length
         });
+      } else if (debugConversationNodes.current && (initialStateApplied.current || debugNodesLoaded)) {
+        // If nodes were loaded after initial state was applied, add them now
+        setNodes((prevNodes) => {
+          const existingIds = new Set(prevNodes.map(n => n.id));
+          const newNodes = debugConversationNodes.current!.nodes.filter(n => !existingIds.has(n.id));
+          if (newNodes.length > 0) {
+            console.log('[Canvas] Adding late-loaded debug nodes:', newNodes.length);
+            return [...prevNodes, ...newNodes];
+          }
+          return prevNodes;
+        });
+        setEdges((prevEdges) => {
+          const existingIds = new Set(prevEdges.map(e => e.id));
+          const newEdges = debugConversationNodes.current!.edges.filter(e => !existingIds.has(e.id));
+          if (newEdges.length > 0) {
+            console.log('[Canvas] Adding late-loaded debug edges:', newEdges.length);
+            return [...prevEdges, ...newEdges];
+          }
+          return prevEdges;
+        });
       }
     }
-  }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
+  }, [isCanvasLoading, initialNodes, initialEdges, debugNodesLoaded, setNodes, setEdges]);
 
   // Persist nodes when they change
   const prevNodesRef = useRef<Node[]>(nodes);
@@ -203,6 +248,9 @@ function CanvasFlow() {
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
+  const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1289,8 +1337,18 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
-  const addAgentNode = useCallback((position?: { x: number; y: number }) => {
-    let nodePosition = position;
+  // Function to actually create the agent node (called from modal)
+  const createAgentNode = useCallback((position?: { x: number; y: number }, modalData?: {
+    title: string;
+    description: string;
+    workspacePath?: string;
+    todo?: string;
+    priority?: string;
+    assignee?: string;
+    project?: string;
+    labels?: string[];
+  }) => {
+    let nodePosition = position || pendingAgentPosition;
 
     // If no position provided and context menu is open, use context menu position
     if (!nodePosition && contextMenu) {
@@ -1318,9 +1376,16 @@ function CanvasFlow() {
       agentId,
       terminalId,
       createdAt: new Date(createdAt).toISOString(),
+      modalData,
     });
 
-    // Pre-fill with locked folder path (but don't create attachment yet - let modal show with it pre-filled)
+    // Use title from modal if provided, otherwise use default
+    const nodeTitle = modalData?.title || createDefaultAgentTitle();
+
+    // Determine workspace path: use from modal data, or locked folder, or null
+    const selectedWorkspacePath = modalData?.workspacePath || lockedFolderPath || null;
+
+    // Pre-fill with workspace path (but don't create attachment yet - let agent node handle it)
     const newNode: Node = {
       id: `node-${createdAt}`,
       type: 'agent',
@@ -1330,15 +1395,15 @@ function CanvasFlow() {
         terminalId,
         agentType: 'claude_code',
         status: 'idle',
-        title: createDefaultAgentTitle(),
-        summary: null,
+        title: nodeTitle,
+        summary: modalData?.description || null,
         progress: null,
         attachments: [],
         activeView: 'overview',
         sessionId,
         createdAt,
-        // Add prefilled workspace path if locked folder exists
-        ...(lockedFolderPath && { prefilledWorkspacePath: lockedFolderPath }),
+        // Add prefilled workspace path if selected
+        ...(selectedWorkspacePath && { prefilledWorkspacePath: selectedWorkspacePath }),
       },
       style: {
         width: 500,
@@ -1348,7 +1413,33 @@ function CanvasFlow() {
 
     setNodes((nds) => [...nds, newNode]);
     setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes, lockedFolderPath]);
+    setPendingAgentPosition(undefined);
+  }, [contextMenu, screenToFlowPosition, setNodes, lockedFolderPath, pendingAgentPosition]);
+
+  // Function to show the modal (replaces direct node creation)
+  const addAgentNode = useCallback((position?: { x: number; y: number }) => {
+    // Calculate position if not provided
+    let nodePosition = position;
+
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    if (!nodePosition) {
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    // Store position and show modal
+    setPendingAgentPosition(nodePosition);
+    setIsNewAgentModalOpen(true);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition]);
 
   const addStarterNode = useCallback((position?: { x: number; y: number }) => {
     let nodePosition = position;
@@ -1434,6 +1525,140 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
+  // Add Claude Code Terminal - a terminal that auto-starts claude command
+  const addClaudeCodeTerminal = useCallback((position?: { x: number; y: number }) => {
+    let nodePosition = position;
+
+    // If no position provided and context menu is open, use context menu position
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    // If still no position, use center of viewport
+    if (!nodePosition) {
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    const terminalId = `terminal-${crypto.randomUUID()}`;
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'terminal',
+      position: nodePosition,
+      data: {
+        terminalId,
+        autoStartClaude: true, // Flag to auto-start claude command
+      },
+      style: {
+        width: 600,
+        height: 400,
+      },
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition, setNodes]);
+
+  // Create Linear ticket
+  const createLinearTicket = useCallback(async () => {
+    const apiKey = localStorage.getItem('linear_api_key');
+    if (!apiKey) {
+      alert('Please connect to Linear first in the settings');
+      return;
+    }
+
+    // Get default team ID (we'll use the first team from the viewer)
+    try {
+      const query = `
+        query {
+          viewer {
+            id
+            teams {
+              nodes {
+                id
+                name
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await response.json();
+      const teams = data.data?.viewer?.teams?.nodes || [];
+      
+      if (teams.length === 0) {
+        alert('No teams found in Linear workspace');
+        return;
+      }
+
+      // Use the first team
+      const teamId = teams[0].id;
+
+      // Create issue mutation
+      const mutation = `
+        mutation($teamId: String!, $title: String!) {
+          issueCreate(
+            input: {
+              teamId: $teamId
+              title: $title
+            }
+          ) {
+            success
+            issue {
+              id
+              identifier
+              title
+              url
+            }
+          }
+        }
+      `;
+
+      const title = prompt('Enter ticket title:');
+      if (!title) return;
+
+      const mutationResponse = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': apiKey,
+        },
+        body: JSON.stringify({
+          query: mutation,
+          variables: {
+            teamId,
+            title,
+          },
+        }),
+      });
+
+      const mutationData = await mutationResponse.json();
+      if (mutationData.data?.issueCreate?.success) {
+        const issue = mutationData.data.issueCreate.issue;
+        alert(`Ticket created: ${issue.identifier} - ${issue.title}\n${issue.url}`);
+      } else {
+        alert('Failed to create ticket: ' + (mutationData.errors?.[0]?.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error creating Linear ticket:', error);
+      alert('Error creating ticket: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  }, []);
+
   // Handle session selection from picker
   const handleSessionSelect = useCallback((session: { id: string; projectName?: string; projectPath?: string; messageCount?: number; timestamp?: string }) => {
     const position = pendingConversationPosition.current || screenToFlowPosition({
@@ -1480,17 +1705,64 @@ function CanvasFlow() {
     }
   }, [contextMenu]);
 
-  // Keyboard shortcuts: CMD+K to add terminal, CMD+W to add workspace
+  // Command palette commands
+  const commandActions = useMemo<CommandAction[]>(() => [
+    {
+      id: 'add-agent',
+      label: 'Add Agent',
+      shortcut: 'c',
+      action: () => addAgentNode(),
+    },
+    {
+      id: 'add-terminal',
+      label: 'Add Terminal',
+      shortcut: 'v',
+      action: () => addTerminalNode(),
+    },
+    {
+      id: 'add-claude-terminal',
+      label: 'Add Claude Code Terminal',
+      shortcut: 'b',
+      action: () => addClaudeCodeTerminal(),
+    },
+    {
+      id: 'load-conversation',
+      label: 'Load Conversation',
+      shortcut: 'n',
+      action: () => addConversationNode(),
+    },
+    {
+      id: 'create-linear-ticket',
+      label: 'Create Linear Ticket',
+      shortcut: 'm',
+      action: () => createLinearTicket(),
+    },
+  ], [addAgentNode, addTerminalNode, addClaudeCodeTerminal, addConversationNode, createLinearTicket]);
+
+  // Keyboard shortcuts: CMD+K to open command palette, CMD+W to add workspace
   useEffect(() => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const modifierKey = isMac ? event.metaKey : event.ctrlKey;
 
-      // CMD+K / CTRL+K to add terminal
+      // CMD+K / CTRL+K to toggle command palette
       if (modifierKey && event.key === 'k') {
         event.preventDefault(); // Prevent default browser behavior
-        addTerminalNode();
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // CMD+T / CTRL+T to toggle agent modal
+      if (modifierKey && event.key === 't') {
+        event.preventDefault(); // Prevent default browser behavior
+        if (isNewAgentModalOpen) {
+          setIsNewAgentModalOpen(false);
+          setPendingAgentPosition(undefined);
+        } else {
+          addAgentNode();
+        }
+        return;
       }
 
       // CMD+W / CTRL+W to add workspace
@@ -1499,7 +1771,7 @@ function CanvasFlow() {
         addWorkspaceNode();
       }
 
-      // CMD+Shift+A / CTRL+Shift+A to add agent
+      // CMD+Shift+A / CTRL+Shift+A to add agent (legacy shortcut, still works)
       if (modifierKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         addAgentNode();
@@ -1538,7 +1810,7 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addTerminalNode, addWorkspaceNode, addAgentNode, addStarterNode, addConversationNode, isNodeDragEnabled]);
+  }, [addWorkspaceNode, addAgentNode, addStarterNode, addConversationNode, isNodeDragEnabled]);
 
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
@@ -1554,6 +1826,24 @@ function CanvasFlow() {
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        commands={commandActions}
+      />
+      <NewAgentModal
+        isOpen={isNewAgentModalOpen}
+        onClose={() => {
+          setIsNewAgentModalOpen(false);
+          setPendingAgentPosition(undefined);
+        }}
+        onCreate={(data) => {
+          createAgentNode(pendingAgentPosition, data);
+          setIsNewAgentModalOpen(false);
+        }}
+        initialPosition={pendingAgentPosition}
+        initialWorkspacePath={lockedFolderPath}
+      />
       {/* Sidebar Panel */}
       <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
@@ -1824,7 +2114,7 @@ function CanvasFlow() {
         onDrop={handleCanvasDrop}
         nodeTypes={nodeTypes}
         fitView
-        style={{ backgroundColor: '#141414' }}
+        style={{ backgroundColor: 'var(--color-bg-canvas)' }}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.1}
         maxZoom={4}
@@ -1892,7 +2182,7 @@ function CanvasFlow() {
           <div className="context-menu-item" onClick={() => addAgentNode()}>
             <span>Add Agent</span>
             <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘A' : 'Ctrl+Shift+A'}
+              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
             </span>
           </div>
           <div className="context-menu-divider" />
@@ -1979,6 +2269,23 @@ function CanvasFlow() {
                       Linear Settings → API
                     </a>
                   </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Appearance</h3>
+                <div className="settings-item">
+                  <span>Color Palette</span>
+                  <label className="theme-toggle">
+                    <input
+                      type="checkbox"
+                      checked={theme === 'light'}
+                      onChange={toggleTheme}
+                    />
+                    <span className="theme-toggle-slider">
+                      <span className="theme-toggle-label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+                    </span>
+                  </label>
                 </div>
               </div>
 

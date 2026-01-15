@@ -1,0 +1,242 @@
+.new-agent-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.new-agent-modal-container {
+  width: 600px;
+  max-width: 90vw;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top Bar */
+.new-agent-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.new-agent-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+/* Folder wrapper - completely independent */
+.new-agent-modal-folder-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-agent-modal-folder-icon {
+  width: 16px;
+  height: 16px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-folder-path {
+  color: #888;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-icon,
+.new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-path {
+  color: #ffffff;
+}
+
+/* Branch wrapper - completely independent */
+.new-agent-modal-branch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.new-agent-modal-branch-icon {
+  width: 14px;
+  height: 14px;
+  color: #888;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-branch {
+  color: #888;
+  font-size: 13px;
+  font-weight: 400;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-icon,
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch {
+  color: #ffffff;
+}
+
+.new-agent-modal-branch-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.new-agent-modal-branch-dropdown-item {
+  padding: 8px 12px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.new-agent-modal-branch-dropdown-item:hover {
+  background: var(--color-bg-secondary);
+}
+
+.new-agent-modal-branch-dropdown-item.active {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.new-agent-modal-branch-dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar-thumb {
+  background: var(--color-bg-hover);
+  border-radius: 4px;
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar-thumb:hover {
+  background: var(--color-bg-hover-light);
+}
+
+.new-agent-modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-agent-modal-window-control {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.new-agent-modal-window-control:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.new-agent-modal-window-control svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Main Content */
+.new-agent-modal-content {
+  padding: 16px;
+}
+
+.new-agent-modal-description-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.new-agent-modal-description-input::placeholder {
+  color: #666;
+}
+
+.new-agent-modal-description-input:focus {
+  outline: none;
+}
+
+/* Bottom Bar */
+.new-agent-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  background: var(--color-bg-primary);
+}
+
+.new-agent-modal-create-btn {
+  padding: 8px 16px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.new-agent-modal-create-btn:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+.new-agent-modal-create-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

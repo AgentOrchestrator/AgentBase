@@ -1,6 +1,6 @@
 .titlebar {
   height: 32px;
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
