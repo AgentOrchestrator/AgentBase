@@ -85,6 +85,8 @@ export interface ForkOptions {
   newSessionName?: string;
   /** Custom session ID (auto-generated if not provided) */
   customSessionId?: string;
+  /** Working directory for the new session (defaults to current if not provided) */
+  workingDirectory?: string;
 }
 
 /**

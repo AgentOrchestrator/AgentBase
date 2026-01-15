@@ -43,6 +43,7 @@ import {
   mapSdkResultError,
   noResultError,
 } from '../utils/sdk-error-mapper';
+import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
 
 /**
  * Active query handle for tracking and cancellation
@@ -191,17 +192,24 @@ export class ClaudeCodeAgent
 
       this.activeQueries.set(queryId, handle);
 
+      console.log(`[ClaudeCodeAgent] Starting generate query ${queryId} with options:`, options);
+
       // Collect all messages
       const messages: SDKMessage[] = [];
       for await (const message of queryResult) {
         messages.push(message);
       }
 
+      console.log(`[ClaudeCodeAgent] Completed generate query ${queryId} with ${messages.length} messages.`);
+      console.debug(`[ClaudeCodeAgent] Messages:`, messages);
+
       this.activeQueries.delete(queryId);
 
       // Find result message and check for errors
       const resultMessage = findResultMessage(messages);
+      
       if (!resultMessage) {
+        console.error(`[ClaudeCodeAgent] No result message found for query ${queryId}.`);
         return err(noResultError());
       }
 
@@ -483,13 +491,151 @@ export class ClaudeCodeAgent
       );
     }
 
+    const targetCwd = options?.workingDirectory ?? this.config.workingDirectory ?? process.cwd();
+    const sourceCwd = this.config.workingDirectory ?? process.cwd();
+    const isCrossDirectory = targetCwd !== sourceCwd;
+
+    // Handle cross-directory fork (worktree scenario)
+    if (isCrossDirectory) {
+      console.log('[ClaudeCodeAgent] Cross-directory fork detected', { sourceCwd, targetCwd });
+
+      // Get fork adapter for Claude Code
+      const adapter = ForkAdapterFactory.getAdapter('claude_code');
+      if (!adapter) {
+        return err(
+          agentError(
+            AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
+            'Cross-directory fork adapter not available'
+          )
+        );
+      }
+
+      try {
+        // Resolve real path of target (handles symlinks like /tmp -> /private/tmp on macOS)
+        let resolvedTargetCwd = targetCwd;
+        try {
+          if (!fs.existsSync(targetCwd)) {
+            fs.mkdirSync(targetCwd, { recursive: true });
+          }
+          resolvedTargetCwd = fs.realpathSync(targetCwd);
+        } catch {
+          // If resolution fails, use original path
+        }
+
+        // IMPORTANT: Use the SAME session ID (parentId) for the forked session
+        // This allows Claude Code SDK to find the copied JSONL file in the new directory
+        const forkResult = await adapter.forkSessionFile(
+          parentId,
+          parentId, // Use same session ID - file will be in different project directory
+          sourceCwd,
+          resolvedTargetCwd
+        );
+
+        if (!forkResult.success) {
+          return { success: false, error: forkResult.error };
+        }
+
+        console.log('[ClaudeCodeAgent] Session file forked successfully', {
+          sessionId: parentId,
+          targetCwd: resolvedTargetCwd,
+        });
+
+        // Resume the session in the new directory
+        // The SDK will find the JSONL file in ~/.claude/projects/{encoded-targetCwd}/
+        const queryId = crypto.randomUUID();
+        const abortController = new AbortController();
+
+        const sdkOptions: Partial<Options> = {
+          cwd: resolvedTargetCwd,
+          abortController,
+          tools: { type: 'preset', preset: 'claude_code' },
+          systemPrompt: { type: 'preset', preset: 'claude_code' },
+          stderr: (data: string) => console.error(data),
+        };
+
+        // Use empty prompt to initialize the session with context
+        const queryResult = query({ prompt: `If needed use ${resolvedTargetCwd}/${parentId}.jsonl for context.`, options: sdkOptions });
+
+        console.log('[ClaudeCodeAgent] Resuming forked session in new directory', { resolvedTargetCwd, parentId });
+        console.debug('[ClaudeCodeAgent] Forked session resume query started', { queryId });
+
+        const handle: QueryHandle = {
+          id: queryId,
+          query: queryResult,
+          abortController,
+          startTime: Date.now(),
+        };
+        this.activeQueries.set(queryId, handle);
+
+        // Consume the messages to verify session loaded
+        let verifiedSessionId: string | null = null;
+
+
+        try {
+          for await (const message of queryResult) {
+            console.debug('[ClaudeCodeAgent] Forked session resume message', { message });
+            if ('session_id' in message && message.session_id) {
+              verifiedSessionId = message.session_id;
+            }
+          }
+        } catch (error) {
+          this.activeQueries.delete(queryId);
+          console.error('[ClaudeCodeAgent] Error while consuming messages for forked session resume', { error });
+          
+          if (verifiedSessionId) {
+            console.log('[ClaudeCodeAgent] Forked session resumed successfully despite error', { verifiedSessionId });
+            return ok({
+              id: verifiedSessionId,
+              name: options?.newSessionName,
+              agentType: 'claude_code',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              messageCount: 0,
+              parentSessionId: parentId,
+            });
+          } else {
+            return err(
+              agentError(
+                AgentErrorCode.SESSION_INVALID,
+                `Cross-directory fork resume failed: ${error instanceof Error ? error.message : String(error)}`
+              )
+            );
+          }
+        }
+
+        console.debug('[ClaudeCodeAgent] Forked session resumed messages consumed', { verifiedSessionId });
+
+        this.activeQueries.delete(queryId);
+
+        // The verified session ID should match the parentId since we're resuming
+        const finalSessionId = verifiedSessionId || parentId;
+
+        const now = new Date().toISOString();
+        return ok({
+          id: finalSessionId,
+          name: options?.newSessionName,
+          agentType: 'claude_code',
+          createdAt: now,
+          updatedAt: now,
+          messageCount: 0,
+          parentSessionId: parentId,
+        });
+      } catch (error) {
+        return err(
+          agentError(
+            AgentErrorCode.UNKNOWN_ERROR,
+            `Cross-directory fork failed: ${error instanceof Error ? error.message : String(error)}`
+          )
+        );
+      }
+    }
+
+    // Handle same-directory fork (original SDK fork behavior)
     const queryId = crypto.randomUUID();
     const abortController = new AbortController();
 
     try {
       const sdkOptions: Partial<Options> = {
-        resume: parentId,
-        forkSession: true,
         abortController,
         tools: { type: 'preset', preset: 'claude_code' },
       };
@@ -536,6 +682,15 @@ export class ClaudeCodeAgent
       this.activeQueries.delete(queryId);
       return err(mapSdkError(error));
     }
+  }
+
+  /**
+   * Extract branch name from worktree path
+   * e.g., "/repo/.git/worktrees/fork-feature-123" → "fork-feature-123"
+   */
+  private extractBranchFromPath(path: string): string | null {
+    const match = path.match(/worktrees\/([^\/]+)/);
+    return match ? match[1] : null;
   }
 
   private resolveSessionId(identifier: SessionIdentifier): string | null {
@@ -640,12 +795,17 @@ export class ClaudeCodeAgent
         const projectDirPath = path.join(projectsDir, projectDir);
         if (!fs.statSync(projectDirPath).isDirectory()) continue;
 
-        const projectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
-        const projectName = path.basename(projectPath);
+        // Decode the project path (note: paths with hyphens can't be perfectly decoded)
+        const decodedProjectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
+        const projectName = path.basename(decodedProjectPath);
 
-        // Apply project filter
+        // For filtering, encode the filter path the same way Claude Code does
+        // so we can compare encoded paths directly (avoids hyphen corruption issue)
+        if (filter?.projectPath) {
+          const encodedFilterPath = filter.projectPath.replace(/\//g, '-');
+          if (projectDir !== encodedFilterPath) continue;
+        }
         if (filter?.projectName && projectName !== filter.projectName) continue;
-        if (filter?.projectPath && projectPath !== filter.projectPath) continue;
 
         const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
 
@@ -658,7 +818,7 @@ export class ClaudeCodeAgent
           if (mtime < Math.max(cutoffTime, minTime)) continue;
 
           const sessionId = path.basename(sessionFile, '.jsonl');
-          const summary = this.parseSessionSummary(sessionFilePath, sessionId, projectPath, projectName);
+          const summary = this.parseSessionSummary(sessionFilePath, sessionId, decodedProjectPath, projectName);
 
           if (summary) {
             // Apply additional filters

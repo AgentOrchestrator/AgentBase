@@ -109,6 +109,22 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   const [nodeData, setNodeData] = useState<AgentNodeData>(initialNodeData);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Sync external node updates (e.g. fork/session updates) without clobbering store-managed data.
+  useEffect(() => {
+    setNodeData((prev) => ({
+      ...prev,
+      ...initialNodeData,
+      sessionId: initialNodeData.sessionId ?? prev.sessionId,
+      parentSessionId: initialNodeData.parentSessionId ?? prev.parentSessionId,
+      worktreeId: initialNodeData.worktreeId ?? prev.worktreeId,
+      workingDirectory: initialNodeData.workingDirectory ?? prev.workingDirectory,
+      chatMessages: initialNodeData.chatMessages ?? prev.chatMessages,
+      attachments: initialNodeData.attachments ?? prev.attachments,
+      createdAt: initialNodeData.createdAt ?? prev.createdAt,
+      initialPrompt: initialNodeData.initialPrompt ?? prev.initialPrompt,
+    }));
+  }, [initialNodeData]);
+
   // ---------------------------------------------------------------------------
   // Workspace State
   // ---------------------------------------------------------------------------
@@ -213,6 +229,9 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
         ...prev,
         ...storeData,
         sessionId: storeData.sessionId ?? prev.sessionId,
+        parentSessionId: storeData.parentSessionId ?? prev.parentSessionId,
+        worktreeId: storeData.worktreeId ?? prev.worktreeId,
+        workingDirectory: storeData.workingDirectory ?? prev.workingDirectory,
         chatMessages: storeData.chatMessages ?? prev.chatMessages,
         attachments: storeData.attachments ?? prev.attachments,
         createdAt: storeData.createdAt ?? prev.createdAt,
@@ -225,6 +244,9 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
         ...prev,
         ...updatedAgent,
         sessionId: updatedAgent.sessionId ?? prev.sessionId,
+        parentSessionId: updatedAgent.parentSessionId ?? prev.parentSessionId,
+        worktreeId: updatedAgent.worktreeId ?? prev.worktreeId,
+        workingDirectory: updatedAgent.workingDirectory ?? prev.workingDirectory,
         chatMessages: updatedAgent.chatMessages ?? prev.chatMessages,
         attachments: updatedAgent.attachments ?? prev.attachments,
         createdAt: updatedAgent.createdAt ?? prev.createdAt,

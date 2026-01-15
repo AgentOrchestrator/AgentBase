@@ -157,8 +157,17 @@ export interface AgentNodeData {
   /** Timestamp when agent node was created (for matching to conversation files) */
   createdAt?: number;
 
-  /** Session ID from the conversation JSON file (matched after workspace selection) */
+  /** Vendor-specific session identifier for resume/fork operations */
   sessionId?: string;
+
+  /** Parent session ID if this agent was forked */
+  parentSessionId?: string;
+
+  /** Worktree ID if agent runs in isolated worktree */
+  worktreeId?: string;
+
+  /** Working directory path (worktree path or original repo) */
+  workingDirectory?: string;
 
   /** Initial prompt to send to the agent when it starts */
   initialPrompt?: string;

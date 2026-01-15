@@ -720,6 +720,47 @@ ipcMain.handle(
   }
 );
 
+// Get the latest session for a workspace path
+ipcMain.handle(
+  'coding-agent:get-latest-session',
+  async (_event, agentType: CodingAgentType, workspacePath: string) => {
+    try {
+      // Use skipCliVerification since chat history reads from filesystem, not CLI
+      const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
+      }
+
+      const agent = agentResult.data;
+      if (!isChatHistoryProvider(agent)) {
+        return { success: false, error: `${agentType} does not support chat history retrieval` };
+      }
+
+      const result = await agent.listSessionSummaries({ projectPath: workspacePath });
+      if (result.success === false) {
+        return { success: false, error: result.error.message };
+      }
+
+      if (!result.data.length) {
+        console.log('[Main] No sessions found for workspace', { workspacePath });
+        return { success: true, data: null };
+      }
+
+      const latestSession = [...result.data].sort((a, b) => {
+        const aTime = new Date(a.updatedAt ?? a.timestamp ?? a.createdAt).getTime();
+        const bTime = new Date(b.updatedAt ?? b.timestamp ?? b.createdAt).getTime();
+        return bTime - aTime;
+      })[0];
+
+      console.log('[Main] Latest session found', { workspacePath, sessionId: latestSession.id });
+      return { success: true, data: { id: latestSession.id, updatedAt: latestSession.updatedAt } };
+    } catch (error) {
+      console.error('[Main] Error getting latest session', { agentType, workspacePath, error });
+      return { success: false, error: (error as Error).message };
+    }
+  }
+);
+
 // Streaming generation handler
 ipcMain.handle(
   'coding-agent:generate-streaming',

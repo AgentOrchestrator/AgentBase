@@ -58,6 +58,12 @@ export interface CodingAgentAPI {
   /** Check if a specific agent is available */
   isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
 
+  /** Get the latest session for a workspace path */
+  getLatestSession: (
+    agentType: CodingAgentType,
+    workspacePath: string
+  ) => Promise<{ id: string; updatedAt: string } | null>;
+
   /** List session summaries (without full messages) */
   listSessionSummaries: (
     agentType: CodingAgentType,

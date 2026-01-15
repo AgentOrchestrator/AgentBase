@@ -386,6 +386,10 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     // Return cleanup function
     return () => ipcRenderer.removeListener('coding-agent:stream-chunk', handler);
   },
+  getLatestSession: (agentType: CodingAgentType, workspacePath: string) =>
+    unwrapResponse<{ id: string; updatedAt: string } | null>(
+      ipcRenderer.invoke('coding-agent:get-latest-session', agentType, workspacePath)
+    ),
 } as CodingAgentAPI);
 
 // Expose LLM API

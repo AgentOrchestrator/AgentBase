@@ -11,14 +11,22 @@ import {
   Edge,
   Node,
   useReactFlow,
+  OnConnectStartParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import ForkGhostNode from './ForkGhostNode';
+import ForkSessionModal from './ForkSessionModal';
 import './Canvas.css';
-import { createDefaultAgentTitle } from './types/agent-node';
-import { createLinearIssueAttachment, createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from './types/attachments';
+import { forkStore } from './stores';
+import { forkService } from './services';
+import { createDefaultAgentTitle, type AgentNodeData } from './types/agent-node';
+import {
+  createLinearIssueAttachment,
+  createWorkspaceMetadataAttachment,
+  isWorkspaceMetadataAttachment,
+} from './types/attachments';
 import { useCanvasPersistence } from './hooks';
 import { nodeRegistry } from './nodes/registry';
-import type { AgentNodeData } from './types/agent-node';
 import { parseConversationFile, groupConversationMessages } from './utils/conversationParser';
 import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 import UserMessageNode from './components/UserMessageNode';
@@ -224,6 +232,14 @@ function CanvasFlow() {
   const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [selectedMilestoneId, setSelectedMilestoneId] = useState('all');
   const [selectedStatusId, setSelectedStatusId] = useState('all');
+
+  // Fork modal state
+  const [forkModalData, setForkModalData] = useState<{
+    sourceNodeId: string;
+    position: { x: number; y: number };
+  } | null>(null);
+  const [isForkLoading, setIsForkLoading] = useState(false);
+  const [forkError, setForkError] = useState<string | null>(null);
 
   // Load Linear API key from localStorage on mount
   useEffect(() => {
@@ -918,6 +934,268 @@ function CanvasFlow() {
     [setEdges]
   );
 
+  // Fork handling: track when user starts dragging from a handle
+  const onConnectStart = useCallback(
+    (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
+      if (params.nodeId && params.handleType) {
+        forkStore.startDrag(params.nodeId, params.handleType);
+      }
+    },
+    []
+  );
+
+  // Validate and show fork modal (defined before onConnectEnd to avoid hoisting issues)
+  const handleForkCreate = useCallback(
+    async (sourceNodeId: string, position: { x: number; y: number }) => {
+      // Find the source node
+      const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found for fork:', sourceNodeId);
+        return;
+      }
+
+      const sourceData = sourceNode.data as AgentNodeData;
+
+      // Get workspace path from attachments
+      const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
+      const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
+
+      // Log the source data for debugging
+      console.log('[Canvas] Fork attempt - sourceData:', {
+        agentId: sourceData.agentId,
+        agentType: sourceData.agentType,
+        sessionId: sourceData.sessionId,
+        workspacePath,
+        attachments: sourceData.attachments?.length ?? 0,
+      });
+
+      // Auto-detect session if not set
+      let sessionId = sourceData.sessionId;
+      if (!sessionId && workspacePath) {
+        console.log('[Canvas] Session not set, auto-detecting from workspace...');
+        const latestSession = await forkService.getLatestSessionForWorkspace(
+          sourceData.agentType,
+          workspacePath
+        );
+        if (latestSession) {
+          sessionId = latestSession.id;
+          console.log('[Canvas] Auto-detected session:', sessionId);
+
+          // Update the node with the detected sessionId
+          setNodes((nds) =>
+            nds.map((n) => {
+              if (n.id === sourceNodeId) {
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    sessionId,
+                  },
+                };
+              }
+              return n;
+            })
+          );
+        }
+      }
+
+      // Validate requirements
+      const validation = forkService.validateForkRequest(sessionId, workspacePath);
+      if (!validation.valid) {
+        // Show error as a toast-like notification
+        console.warn('[Canvas] Fork validation failed:', validation.error);
+        setForkError(validation.error);
+        // Auto-dismiss error after 5 seconds
+        setTimeout(() => setForkError(null), 5000);
+        return;
+      }
+
+      // Show fork modal
+      setForkModalData({ sourceNodeId, position });
+      setForkError(null);
+    },
+    [nodes, setNodes]
+  );
+
+  // Handle fork modal confirmation
+  const handleForkConfirm = useCallback(
+    async (forkTitle: string) => {
+      if (!forkModalData) return;
+
+      const sourceNode = nodes.find((n) => n.id === forkModalData.sourceNodeId);
+      if (!sourceNode) {
+        setForkError('Source node not found');
+        return;
+      }
+
+      const sourceData = sourceNode.data as AgentNodeData;
+      const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
+      const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
+
+      if (!sourceData.sessionId || !workspacePath) {
+        setForkError('Missing session or workspace');
+        return;
+      }
+
+      setIsForkLoading(true);
+      setForkError(null);
+
+      try {
+        // Call fork service to create worktree and fork session
+        const result = await forkService.forkAgent({
+          sourceAgentId: sourceData.agentId,
+          parentSessionId: sourceData.sessionId,
+          agentType: sourceData.agentType,
+          forkTitle,
+          repoPath: workspacePath,
+        });
+
+        if (!result.success) {
+          setForkError(result.error.message);
+          setIsForkLoading(false);
+          return;
+        }
+
+        // Generate new IDs for the forked node
+        const newNodeId = `node-${Date.now()}`;
+        const newAgentId = `agent-${crypto.randomUUID()}`;
+        const newTerminalId = `terminal-${crypto.randomUUID()}`;
+
+        // Create forked node data with new session and worktree info
+        const forkedData: AgentNodeData = {
+          ...sourceData,
+          agentId: newAgentId,
+          terminalId: newTerminalId,
+          title: createDefaultAgentTitle(forkTitle),
+          sessionId: result.data.sessionInfo.id,
+          parentSessionId: sourceData.sessionId,
+          worktreeId: result.data.worktreeInfo.id,
+          workingDirectory: result.data.worktreeInfo.worktreePath,
+          // Update attachments to reflect new workspace
+          attachments: [
+            ...(sourceData.attachments?.filter((a) => !isWorkspaceMetadataAttachment(a)) || []),
+            createWorkspaceMetadataAttachment({
+              path: result.data.worktreeInfo.worktreePath,
+              name: forkTitle,
+            }),
+          ],
+        };
+
+        // Create the new forked node
+        const forkedNode: Node = {
+          id: newNodeId,
+          type: sourceNode.type,
+          position: forkModalData.position,
+          data: forkedData,
+          style: sourceNode.style,
+        };
+
+        // Create edge from source to forked node
+        const newEdgeId = `edge-${Date.now()}`;
+        const newEdge: Edge = {
+          id: newEdgeId,
+          source: forkModalData.sourceNodeId,
+          target: newNodeId,
+          sourceHandle: null,
+          targetHandle: null,
+        };
+
+        // Add the new node and edge
+        setNodes((nds) => [...nds, forkedNode]);
+        setEdges((eds) => [...eds, newEdge]);
+
+        console.log('[Canvas] Fork created successfully:', {
+          newNodeId,
+          sessionId: result.data.sessionInfo.id,
+          worktreePath: result.data.worktreeInfo.worktreePath,
+        });
+
+        // Close modal
+        setForkModalData(null);
+      } catch (error) {
+        console.error('[Canvas] Fork failed:', error);
+        setForkError(error instanceof Error ? error.message : 'Fork failed');
+      } finally {
+        setIsForkLoading(false);
+      }
+    },
+    [forkModalData, nodes, setNodes, setEdges]
+  );
+
+  // Handle fork modal cancellation
+  const handleForkCancel = useCallback(() => {
+    setForkModalData(null);
+    setForkError(null);
+    setIsForkLoading(false);
+  }, []);
+
+  // Fork handling: detect when drag ends on empty canvas (not on a handle)
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const state = forkStore.getState();
+
+      if (!state.isDragging || !state.sourceNodeId) {
+        forkStore.cancelDrag();
+        return;
+      }
+
+      // Check if the drop target is a handle (normal connection) or empty canvas (fork)
+      const target = event.target as HTMLElement;
+      const isDropOnHandle = target.classList.contains('react-flow__handle');
+
+      if (!isDropOnHandle) {
+        // Dropped on canvas - create fork
+        const clientX = 'clientX' in event ? event.clientX : event.touches?.[0]?.clientX ?? 0;
+        const clientY = 'clientY' in event ? event.clientY : event.touches?.[0]?.clientY ?? 0;
+
+        const position = screenToFlowPosition({ x: clientX, y: clientY });
+        handleForkCreate(state.sourceNodeId, position);
+      }
+
+      forkStore.cancelDrag();
+    },
+    [screenToFlowPosition, handleForkCreate]
+  );
+
+  // Keyboard shortcut: Shift+Cmd+S (Mac) / Shift+Ctrl+S (Windows/Linux) to fork selected node
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Shift+Cmd+S (Mac) or Shift+Ctrl+S (Windows/Linux)
+      const isForkShortcut =
+        event.shiftKey &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 's';
+
+      if (!isForkShortcut) return;
+
+      event.preventDefault();
+
+      // Find selected AgentNode
+      const selectedNode = nodes.find(
+        (n) => n.selected && n.type === 'agentNode'
+      );
+
+      if (!selectedNode) {
+        console.log('[Canvas] No AgentNode selected for fork shortcut');
+        setForkError('Select an agent node to fork');
+        setTimeout(() => setForkError(null), 3000);
+        return;
+      }
+
+      // Calculate position for the forked node (offset to the right)
+      const forkPosition = {
+        x: (selectedNode.position?.x ?? 0) + 350,
+        y: (selectedNode.position?.y ?? 0) + 50,
+      };
+
+      console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
+      handleForkCreate(selectedNode.id, forkPosition);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, handleForkCreate]);
+
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({
@@ -1525,6 +1803,8 @@ function CanvasFlow() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={onPaneClick}
         onDragOver={handleCanvasDragOver}
@@ -1540,13 +1820,39 @@ function CanvasFlow() {
         panOnDrag={isNodeDragEnabled}
         zoomOnPinch={true}
         nodesDraggable={isNodeDragEnabled}
-        nodesConnectable={isNodeDragEnabled}
+        nodesConnectable={true}
         elementsSelectable={true}
         nodesFocusable={true}
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <ForkGhostNode />
       </ReactFlow>
-      
+
+      {/* Fork Session Modal */}
+      {forkModalData && (
+        <ForkSessionModal
+          onConfirm={handleForkConfirm}
+          onCancel={handleForkCancel}
+          isLoading={isForkLoading}
+          error={forkError}
+        />
+      )}
+
+      {/* Fork Error Toast (shown when validation fails outside modal) */}
+      {forkError && !forkModalData && (
+        <div className="fork-error-toast">
+          <span className="fork-error-icon">!</span>
+          <span className="fork-error-message">{forkError}</span>
+          <button
+            className="fork-error-dismiss"
+            onClick={() => setForkError(null)}
+            aria-label="Dismiss"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {contextMenu && (
         <div
           ref={contextMenuRef}
