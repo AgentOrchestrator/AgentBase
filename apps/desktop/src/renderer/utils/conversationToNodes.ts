@@ -69,7 +69,7 @@ export function conversationToNodesAndEdges(
   // Create consolidated conversation node (for debugging) - spawn next to individual nodes
   const consolidatedNode: Node = {
     id: `consolidated-${groups[0]?.uuid || 'conversation'}`,
-    type: 'consolidatedConversation',
+    type: 'conversationNode',
     position: { x: fixedX + 650, y: startY }, // 650px to the right (600px width + 50px spacing)
     data: {
       groups: groups,
