@@ -8,6 +8,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { CodingAgentAPI, CodingAgentType } from '../../../../main/services/coding-agent';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+import { useSessionFileWatcher } from '../../../hooks/useSessionFileWatcher';
 
 interface UseChatSessionOptions {
   agentId?: string;
@@ -111,6 +112,24 @@ export function useChatSession({
 
     void loadSessionHistory();
   }, [autoLoadHistory, sessionId, currentMessages?.length, loadSessionHistory]);
+
+  // Watch for external changes to the session file (e.g., from terminal view)
+  // This enables real-time synchronization between terminal and chat views
+  useSessionFileWatcher({
+    agentType: resolvedAgentType,
+    sessionId: sessionId ?? undefined,
+    onSessionChange: useCallback(
+      (event) => {
+        // Only reload on updates (not creates/deletes), and not while we're streaming
+        if (event.type === 'updated' && !isStreaming) {
+          console.log('[useChatSession] Session file updated externally, reloading history');
+          void loadSessionHistory();
+        }
+      },
+      [isStreaming, loadSessionHistory]
+    ),
+    enabled: autoLoadHistory && !!sessionId,
+  });
 
   const sendMessage = useCallback(async (prompt: string) => {
     if (!codingAgentAPI) {
