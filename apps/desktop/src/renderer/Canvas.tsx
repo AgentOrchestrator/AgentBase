@@ -280,7 +280,7 @@ function CanvasFlow() {
 
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition, getEdges } = useReactFlow();
+  const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
@@ -1226,22 +1226,32 @@ function CanvasFlow() {
     [screenToFlowPosition, handleForkCreate]
   );
 
-  // Keyboard shortcut: Shift+Cmd+S (Mac) / Shift+Ctrl+S (Windows/Linux) to fork selected node
+  // Keyboard shortcut: Cmd+F (Mac) / Ctrl+F (Windows/Linux) to fork selected node
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Shift+Cmd+S (Mac) or Shift+Ctrl+S (Windows/Linux)
+      // Check for Cmd+F (Mac) or Ctrl+F (Windows/Linux)
+      // Don't trigger if user is typing in an input/textarea
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
       const isForkShortcut =
-        event.shiftKey &&
         (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === 's';
+        event.key.toLowerCase() === 'f' &&
+        !event.shiftKey &&
+        !event.altKey;
 
       if (!isForkShortcut) return;
 
       event.preventDefault();
 
-      // Find selected AgentNode
-      const selectedNode = nodes.find(
-        (n) => n.selected && n.type === 'agentNode'
+      // Get current nodes from React Flow (includes up-to-date selection state)
+      const currentNodes = getNodes();
+      
+      // Find selected AgentNode (type is 'agent', not 'agentNode')
+      const selectedNode = currentNodes.find(
+        (n) => n.selected && n.type === 'agent'
       );
 
       if (!selectedNode) {
@@ -1251,10 +1261,13 @@ function CanvasFlow() {
         return;
       }
 
-      // Calculate position for the forked node (offset to the right)
+      // Calculate position for the forked node (placed below the source node)
+      // Get node dimensions to calculate proper offset
+      const nodeHeight = 400; // Default agent node height
+      const verticalSpacing = 100; // Space between nodes
       const forkPosition = {
-        x: (selectedNode.position?.x ?? 0) + 350,
-        y: (selectedNode.position?.y ?? 0) + 50,
+        x: selectedNode.position?.x ?? 0,
+        y: (selectedNode.position?.y ?? 0) + nodeHeight + verticalSpacing,
       };
 
       console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
@@ -1263,7 +1276,7 @@ function CanvasFlow() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, handleForkCreate]);
+  }, [getNodes, handleForkCreate]);
 
   // Listen for fork button clicks from agent nodes
   useEffect(() => {
@@ -1278,10 +1291,12 @@ function CanvasFlow() {
         return;
       }
 
-      // Calculate position for the forked node (offset to the right)
+      // Calculate position for the forked node (placed below the source node)
+      const nodeHeight = 400; // Default agent node height
+      const verticalSpacing = 100; // Space between nodes
       const forkPosition = {
-        x: (sourceNode.position?.x ?? 0) + 350,
-        y: (sourceNode.position?.y ?? 0) + 50,
+        x: sourceNode.position?.x ?? 0,
+        y: (sourceNode.position?.y ?? 0) + nodeHeight + verticalSpacing,
       };
 
       console.log('[Canvas] Fork button clicked for node:', nodeId);

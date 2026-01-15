@@ -331,7 +331,7 @@
   flex-direction: column;
   border-radius: 12px;
   margin-bottom: 11px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
   z-index: 10;
 }
 

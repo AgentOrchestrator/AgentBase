@@ -1,239 +1,162 @@
-/* Fork Session Modal */
+/* Fork Session Modal - Aligned with NewAgentModal design */
 .fork-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3000;
-  animation: fadeIn 0.2s ease;
-  pointer-events: all;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 
-.fork-modal {
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 450px;
+.fork-modal-container {
+  width: 600px;
+  max-width: 90vw;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  animation: slideUp 0.2s ease;
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Header */
+/* Top Bar */
 .fork-modal-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid #3a3c46;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background: #1e1e1e;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.fork-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+  font-size: 14px;
 }
 
 .fork-modal-title {
-  margin: 0;
-  color: #d4d4d4;
-  font-size: 18px;
-  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.fork-modal-close {
-  background: none;
+.fork-modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fork-modal-window-control {
+  background: transparent;
   border: none;
   color: #888;
-  font-size: 28px;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: all 0.2s ease;
-  line-height: 1;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.fork-modal-close:hover:not(:disabled) {
-  background: #3a3c46;
-  color: #d4d4d4;
+.fork-modal-window-control:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
-.fork-modal-close:disabled {
+.fork-modal-window-control:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Content */
-.fork-modal-content {
-  padding: 24px;
+.fork-modal-window-control svg {
+  width: 12px;
+  height: 12px;
 }
 
-.fork-modal-description {
-  margin: 0 0 20px 0;
-  color: #888;
+/* Main Content */
+.fork-modal-content {
+  padding: 16px;
+}
+
+.fork-modal-title-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--color-text-primary);
   font-size: 14px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
   line-height: 1.5;
 }
 
-/* Field */
-.fork-modal-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
+.fork-modal-title-input::placeholder {
+  color: #666;
 }
 
-.fork-modal-label {
-  color: #d4d4d4;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.fork-modal-input {
-  background: #1e1e1e;
-  border: 1px solid #3a3c46;
-  border-radius: 6px;
-  padding: 12px 14px;
-  color: #d4d4d4;
-  font-size: 14px;
-  font-family: inherit;
+.fork-modal-title-input:focus {
   outline: none;
-  transition: all 0.2s ease;
 }
 
-.fork-modal-input:hover:not(:disabled) {
-  border-color: #4a4c56;
-}
-
-.fork-modal-input:focus {
-  border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
-}
-
-.fork-modal-input:disabled {
+.fork-modal-title-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.fork-modal-input::placeholder {
-  color: #666;
-}
-
-.fork-modal-hint {
-  color: #666;
-  font-size: 12px;
-}
-
-/* Error */
+/* Error message */
 .fork-modal-error {
+  margin-top: 12px;
+  padding: 8px 12px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 6px;
-  padding: 12px 14px;
   color: #ef4444;
   font-size: 13px;
-  margin-bottom: 20px;
 }
 
-/* Actions */
-.fork-modal-actions {
+/* Bottom Bar */
+.fork-modal-footer {
   display: flex;
-  gap: 12px;
+  align-items: center;
   justify-content: flex-end;
+  padding: 12px 16px;
+  background: var(--color-bg-primary);
 }
 
-.fork-modal-button {
-  padding: 10px 20px;
+.fork-modal-create-btn {
+  padding: 8px 16px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
+  transition: all 0.15s ease;
 }
 
-.fork-modal-button:disabled {
+.fork-modal-create-btn:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+.fork-modal-create-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.fork-modal-button-cancel {
-  background: #2a2c36;
-  border-color: #3a3c46;
-  color: #d4d4d4;
-}
-
-.fork-modal-button-cancel:hover:not(:disabled) {
-  background: #3a3c46;
-}
-
-.fork-modal-button-confirm {
-  background: #4a9eff;
-  border-color: #4a9eff;
-  color: #fff;
-}
-
-.fork-modal-button-confirm:hover:not(:disabled) {
-  background: #6bb3ff;
-  border-color: #6bb3ff;
-}
-
-/* Loading overlay */
-.fork-modal-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(30, 30, 30, 0.95);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  color: #888;
-  font-size: 14px;
-}
-
-.fork-modal-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #3a3c46;
-  border-top-color: #4a9eff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.fork-modal-create-btn:disabled:hover {
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
 }
