@@ -33,25 +33,9 @@ const LinearIssueAttachmentSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-const WorkspaceMetadataAttachmentSchema = z.object({
-  type: z.literal('workspace-metadata'),
-  id: z.string(),
-  path: z.string(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  gitRepo: z.string().optional(),
-  projectType: z.string().optional(),
-  git: z.object({
-    branch: z.string(),
-    remote: z.string().optional(),
-  }).optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
-
-const TerminalAttachmentSchema = z.discriminatedUnion('type', [
-  LinearIssueAttachmentSchema,
-  WorkspaceMetadataAttachmentSchema,
-]);
+// TerminalAttachment is now only LinearIssueAttachment
+// Workspace metadata is stored directly in AgentNodeData.workspacePath
+const TerminalAttachmentSchema = LinearIssueAttachmentSchema;
 
 // =============================================================================
 // Node Data Schemas
@@ -101,6 +85,15 @@ export const ChatMessageSchema: z.ZodType<CodingAgentMessage> = z.object({
 });
 
 /**
+ * Schema for GitInfo
+ */
+const GitInfoSchema = z.object({
+  branch: z.string().optional(),
+  remote: z.string().optional(),
+  status: z.string().optional(),
+}).nullable();
+
+/**
  * Schema for AgentNode data
  */
 export const AgentNodeDataSchema = z.object({
@@ -122,6 +115,10 @@ export const AgentNodeDataSchema = z.object({
   sessionId: z.string().optional(),
   chatMessages: z.array(ChatMessageSchema).optional(),
   forking: z.boolean().optional(),
+  // Workspace - single source of truth
+  workspacePath: z.string().optional(),
+  gitInfo: GitInfoSchema.optional(),
+  workingDirectory: z.string().optional(),
 });
 
 /**

@@ -1,6 +1,9 @@
 /**
  * Abstract attachment system for terminal nodes
- * Supports multiple types of data attachments (Linear issues, workspace metadata, etc.)
+ * Supports multiple types of data attachments (Linear issues, etc.)
+ *
+ * NOTE: Workspace metadata is stored directly in AgentNodeData.workspacePath,
+ * not as an attachment. This ensures a single source of truth for workspace state.
  */
 
 /**
@@ -12,7 +15,7 @@ export interface BaseAttachment {
   /** Unique identifier for this attachment */
   id: string;
   /** Optional metadata for extension */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -41,31 +44,10 @@ export interface LinearIssueAttachment extends BaseAttachment {
 }
 
 /**
- * Workspace metadata attachment - represents workspace information attached to a terminal
- */
-export interface WorkspaceMetadataAttachment extends BaseAttachment {
-  type: 'workspace-metadata';
-  /** Workspace path */
-  path: string;
-  /** Optional: Workspace name */
-  name?: string;
-  /** Optional: Workspace description */
-  description?: string;
-  /** Optional: Git repository information */
-  git?: {
-    branch?: string;
-    remote?: string;
-    status?: string;
-  };
-  /** Optional: Project type (e.g., "node", "python", "rust") */
-  projectType?: string;
-}
-
-/**
  * Union type of all supported attachment types
  * Add new attachment types here as they are implemented
  */
-export type TerminalAttachment = LinearIssueAttachment | WorkspaceMetadataAttachment;
+export type TerminalAttachment = LinearIssueAttachment;
 
 /**
  * Type guard to check if an attachment is a Linear issue
@@ -74,15 +56,6 @@ export function isLinearIssueAttachment(
   attachment: TerminalAttachment
 ): attachment is LinearIssueAttachment {
   return attachment.type === 'linear-issue';
-}
-
-/**
- * Type guard to check if an attachment is workspace metadata
- */
-export function isWorkspaceMetadataAttachment(
-  attachment: TerminalAttachment
-): attachment is WorkspaceMetadataAttachment {
-  return attachment.type === 'workspace-metadata';
 }
 
 /**
@@ -105,30 +78,5 @@ export function createLinearIssueAttachment(issue: {
     state: issue.state,
     priority: issue.priority,
     assignee: issue.assignee,
-  };
-}
-
-/**
- * Helper function to create a workspace metadata attachment
- */
-export function createWorkspaceMetadataAttachment(workspace: {
-  path: string;
-  name?: string;
-  description?: string;
-  git?: {
-    branch?: string;
-    remote?: string;
-    status?: string;
-  };
-  projectType?: string;
-}): WorkspaceMetadataAttachment {
-  return {
-    type: 'workspace-metadata',
-    id: `workspace-${workspace.path}`,
-    path: workspace.path,
-    name: workspace.name,
-    description: workspace.description,
-    git: workspace.git,
-    projectType: workspace.projectType,
   };
 }

@@ -11,7 +11,7 @@ import type {
   CodingAgentStatusInfo,
 } from '../../../types/coding-agent-status';
 import type { TerminalAttachment } from './attachments';
-import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+import type { CodingAgentMessage, GitInfo } from '@agent-orchestrator/shared';
 
 // =============================================================================
 // Progress Variants (Discriminated Union)
@@ -166,8 +166,11 @@ export interface AgentNodeData {
   /** Worktree ID if agent runs in isolated worktree */
   worktreeId?: string;
 
-  /** Working directory path (worktree path or original repo) */
-  workingDirectory?: string;
+  /** Workspace path - single source of truth for agent workspace (worktree path or original repo) */
+  workspacePath: string;
+
+  /** Git info for the workspace */
+  gitInfo?: GitInfo | null;
 
   /** Initial prompt to send to the agent when it starts */
   initialPrompt?: string;

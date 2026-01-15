@@ -119,8 +119,11 @@ export function NodeServicesRegistryProvider({
       // Return cached if exists
       const cached = servicesCache.current.get(nodeId);
       if (cached) {
+        console.log('[NodeServicesRegistry] Returning CACHED services', { nodeId, nodeType });
         return cached;
       }
+
+      console.log('[NodeServicesRegistry] Creating NEW services', { nodeId, nodeType, config });
 
       // Create new services based on node type
       let services: NodeServices;
@@ -203,8 +206,18 @@ export function NodeServicesRegistryProvider({
    * Dispose services for a node
    */
   const disposeServices = useCallback(async (nodeId: string): Promise<void> => {
+    console.log('[NodeServicesRegistry] disposeServices called', { nodeId });
     const services = servicesCache.current.get(nodeId);
-    if (!services) return;
+    if (!services) {
+      console.log('[NodeServicesRegistry] No services to dispose', { nodeId });
+      return;
+    }
+
+    // IMPORTANT: Remove from cache FIRST to prevent race conditions
+    // This ensures that if getOrCreateServices is called during dispose,
+    // it will create new services instead of returning the ones being disposed
+    servicesCache.current.delete(nodeId);
+    console.log('[NodeServicesRegistry] Removed from cache, now disposing', { nodeId });
 
     // Dispose all services in the bundle
     const disposePromises: Promise<void>[] = [];
@@ -223,7 +236,7 @@ export function NodeServicesRegistryProvider({
     }
 
     await Promise.all(disposePromises);
-    servicesCache.current.delete(nodeId);
+    console.log('[NodeServicesRegistry] Dispose complete', { nodeId });
   }, []);
 
   /**

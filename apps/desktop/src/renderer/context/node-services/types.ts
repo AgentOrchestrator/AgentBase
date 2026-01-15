@@ -154,16 +154,10 @@ export interface IAgentService extends INodeService {
 
   // Workspace
   /**
-   * Set workspace and navigate terminal to it.
-   * If autoStartCli is true, also starts the CLI after navigation.
-   * If initialPrompt is provided, it will be sent to the agent after CLI starts.
+   * Set workspace path and navigate terminal to it.
+   * Does NOT start the CLI - use start() for that.
    */
-  setWorkspace(
-    path: string,
-    autoStartCli?: boolean,
-    initialPrompt?: string,
-    sessionId?: string
-  ): Promise<void>;
+  setWorkspace(path: string): Promise<void>;
 
   // Session management
   /** Get CLI command for this agent type */

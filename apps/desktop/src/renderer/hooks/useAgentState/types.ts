@@ -9,7 +9,6 @@ import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agen
 import type { WorktreeInfo } from '../../../main/types/worktree';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
-import type { TerminalAttachment } from '../../types/attachments';
 
 // =============================================================================
 // Workspace State
@@ -136,6 +135,4 @@ export interface UseAgentStateInput {
   nodeId: string;
   /** Initial node data from React Flow */
   initialNodeData: AgentNodeData;
-  /** Attachments from node data */
-  attachments?: TerminalAttachment[];
 }

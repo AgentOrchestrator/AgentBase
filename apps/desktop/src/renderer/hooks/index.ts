@@ -1,5 +1,11 @@
 export { useCanvasPersistence } from './useCanvasPersistence';
 export * from './canvasConverters';
+export {
+  useAgentHierarchy,
+  type AgentHierarchy,
+  type AgentHierarchyEntry,
+  type UseAgentHierarchyReturn,
+} from './useAgentHierarchy';
 
 // =============================================================================
 // useAgentState - THE SINGLE SOURCE OF TRUTH for agent state
@@ -14,3 +20,53 @@ export {
   type AgentActions,
   type WorkspaceSource,
 } from './useAgentState';
+
+// =============================================================================
+// Canvas UI State Hooks
+// =============================================================================
+
+export { useFolderLock, type UseFolderLockReturn } from './useFolderLock';
+
+export { useSidebarState, type UseSidebarStateReturn } from './useSidebarState';
+
+export { usePillState, type UsePillStateReturn } from './usePillState';
+
+export {
+  useCanvasDrop,
+  type UseCanvasDropReturn,
+  type UseCanvasDropOptions,
+  type LinearIssue,
+} from './useCanvasDrop';
+
+// =============================================================================
+// Fork Modal Hook - Manages fork modal UI state and operations
+// =============================================================================
+export { useForkModal } from './useForkModal';
+export type {
+  ForkModalData,
+  ForkConfirmResult,
+  ForkConfirmError,
+  UseForkModalReturn,
+  UseForkModalInput,
+} from './useForkModal';
+
+// =============================================================================
+// Canvas Actions Hook - Node creation actions for canvas
+// =============================================================================
+export { useCanvasActions } from './useCanvasActions';
+export type { UseCanvasActionsReturn, UseCanvasActionsInput } from './useCanvasActions';
+
+// =============================================================================
+// Linear Integration Hook - Linear API and state management
+// =============================================================================
+export { useLinear } from './useLinear';
+export type { UseLinearReturn } from './useLinear';
+// Re-export Linear types from the store for convenience
+export type {
+  LinearIssue as LinearIssueType,
+  LinearProject as LinearProjectType,
+  LinearMilestone as LinearMilestoneType,
+  LinearWorkflowState as LinearWorkflowStateType,
+  MilestoneOption as LinearMilestoneOption,
+  LinearFilterState,
+} from '../stores/ILinearStore';

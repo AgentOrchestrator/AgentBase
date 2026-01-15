@@ -6,7 +6,7 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type { GitInfo, TerminalSessionState, TerminalSessionAPI } from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
   AgentCapabilities,
@@ -197,7 +197,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHomeDir: () => ipcRenderer.sendSync('get-home-dir'),
 } as ElectronAPI);
 
-// Helper to unwrap IPC response
+// Helper to unwrap IPC response (declared early for use in terminalSessionAPI)
 interface IPCResponse<T> {
   success: boolean;
   data?: T;
@@ -211,6 +211,22 @@ async function unwrapResponse<T>(promise: Promise<IPCResponse<T>>): Promise<T> {
   }
   return response.data as T;
 }
+
+// Expose terminal session API for state synchronization across renderer refreshes
+contextBridge.exposeInMainWorld('terminalSessionAPI', {
+  getTerminalSessionState: (terminalId: string) =>
+    unwrapResponse<TerminalSessionState | null>(
+      ipcRenderer.invoke('terminal-get-session-state', terminalId)
+    ),
+  setTerminalSessionState: async (terminalId: string, state: TerminalSessionState) => {
+    await unwrapResponse(ipcRenderer.invoke('terminal-set-session-state', terminalId, state));
+  },
+  clearTerminalSessionState: async (terminalId: string) => {
+    await unwrapResponse(ipcRenderer.invoke('terminal-clear-session-state', terminalId));
+  },
+  getTerminalBuffer: (terminalId: string) =>
+    unwrapResponse<string>(ipcRenderer.invoke('terminal-get-buffer', terminalId)),
+} as TerminalSessionAPI);
 
 // Expose canvas persistence API
 contextBridge.exposeInMainWorld('canvasAPI', {

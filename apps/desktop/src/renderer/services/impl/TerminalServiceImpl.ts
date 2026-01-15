@@ -97,9 +97,20 @@ export class TerminalServiceImpl implements ITerminalService {
    */
   write(data: string): void {
     if (!this.isCreated) {
-      console.warn('[TerminalService] Cannot write - terminal not created');
+      console.warn('[TerminalService] Cannot write - terminal not created', {
+        terminalId: this.terminalId,
+        data: data.substring(0, 100),
+      });
       return;
     }
+
+    // Log what's being written to the terminal for debugging
+    console.log('[TerminalService] write()', {
+      terminalId: this.terminalId,
+      dataLength: data.length,
+      data: data.length > 200 ? data.substring(0, 200) + '...' : data,
+      stack: new Error().stack?.split('\n').slice(2, 5).join('\n'),
+    });
 
     if (window.electronAPI) {
       window.electronAPI.sendTerminalInput(this.terminalId, data);

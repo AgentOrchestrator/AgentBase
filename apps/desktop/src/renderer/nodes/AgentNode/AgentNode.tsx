@@ -30,7 +30,6 @@ function AgentNode({ data, id, selected }: NodeProps) {
   const agent = useAgentState({
     nodeId: id,
     initialNodeData,
-    attachments: initialNodeData.attachments,
   });
 
   // ---------------------------------------------------------------------------
@@ -38,8 +37,8 @@ function AgentNode({ data, id, selected }: NodeProps) {
   // ---------------------------------------------------------------------------
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
 
-  // Check for prefilled workspace path (from locked folder)
-  const prefilledWorkspacePath = (initialNodeData as any).prefilledWorkspacePath as string | undefined;
+  // Use workspace path from node data as initial suggestion for modal
+  const initialWorkspacePath = initialNodeData.workspacePath || undefined;
 
   // Show modal if no workspace is available (auto-open on mount)
   useEffect(() => {
@@ -97,7 +96,7 @@ function AgentNode({ data, id, selected }: NodeProps) {
       nodeType="agent"
       terminalId={agent.config.terminalId}
       agentId={agent.config.agentId}
-      sessionId={agent.session.id}
+      sessionId={agent.session.id ?? undefined}
       agentType={agent.config.agentType}
       workspacePath={agent.workspace.path ?? undefined}
       autoStartCli={!!agent.workspace.path}
@@ -107,7 +106,6 @@ function AgentNode({ data, id, selected }: NodeProps) {
         data={agent.nodeData}
         onDataChange={handleDataChange}
         selected={selected}
-        workspaceState={agent.workspace}
         sessionReadiness={agent.session.readiness}
         nodeId={id}
       />
@@ -116,7 +114,7 @@ function AgentNode({ data, id, selected }: NodeProps) {
         isOpen={showWorkspaceModal && !agent.workspace.path}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
-        initialPath={prefilledWorkspacePath || null}
+        initialPath={initialWorkspacePath || null}
       />
     </NodeContextProvider>
   );

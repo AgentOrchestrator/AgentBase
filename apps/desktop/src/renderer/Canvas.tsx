@@ -17,16 +17,19 @@ import '@xyflow/react/dist/style.css';
 import ForkGhostNode from './ForkGhostNode';
 import ForkSessionModal from './ForkSessionModal';
 import './Canvas.css';
-import { forkStore } from './stores';
-import { forkService } from './services';
-import { createDefaultAgentTitle, type AgentNodeData } from './types/agent-node';
+import { forkStore, nodeStore } from './stores';
 import {
-  type TerminalAttachment,
-  createLinearIssueAttachment,
-  createWorkspaceMetadataAttachment,
-  isWorkspaceMetadataAttachment,
-} from './types/attachments';
-import { useCanvasPersistence } from './hooks';
+  useCanvasPersistence,
+  useLinear,
+  useAgentHierarchy,
+  useForkModal,
+  useCanvasActions,
+  useFolderLock,
+  useSidebarState,
+  usePillState,
+  useCanvasDrop,
+  type LinearIssue,
+} from './hooks';
 import { nodeRegistry } from './nodes/registry';
 import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
@@ -35,7 +38,6 @@ import { CommandPalette, type CommandAction } from './components/CommandPalette'
 import { NewAgentModal } from './components/NewAgentModal';
 import { ActionPill } from './components/ActionPill';
 import { useTheme } from './context';
-import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -47,181 +49,12 @@ const nodeTypes = {
 };
 
 const defaultNodes: Node[] = [];
-
 const defaultEdges: Edge[] = [];
-
-type LinearProject = {
-  id: string;
-  name: string;
-};
-
-type LinearMilestone = {
-  id: string;
-  name: string;
-  project?: LinearProject;
-};
-
-type LinearWorkflowState = {
-  id: string;
-  name: string;
-  color: string;
-  type?: string;
-};
-
-type LinearIssue = {
-  id: string;
-  title: string;
-  identifier: string;
-  state: LinearWorkflowState;
-  priority: number;
-  assignee?: {
-    name: string;
-    avatarUrl?: string;
-  };
-  project?: LinearProject;
-  projectMilestone?: LinearMilestone;
-  createdAt: string;
-  updatedAt: string;
-};
 
 type ContextMenu = {
   x: number;
   y: number;
 } | null;
-
-type SessionSyncPayload = {
-  sessionId?: string;
-  agentType?: string;
-  attachments?: TerminalAttachment[];
-  chatMessages?: CodingAgentMessage[];
-  workspacePath?: string;
-  status?: AgentNodeData['status'];
-  statusInfo?: AgentNodeData['statusInfo'];
-  summary?: AgentNodeData['summary'];
-  progress?: AgentNodeData['progress'];
-  titleValue?: string;
-  titleObject?: AgentNodeData['title'];
-};
-
-const isAgentTitle = (value: unknown): value is AgentNodeData['title'] => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  return 'value' in value && 'isManuallySet' in value;
-};
-
-const buildSessionSyncPayload = (data: Record<string, unknown>): SessionSyncPayload => {
-  const payload: SessionSyncPayload = {};
-
-  if ('sessionId' in data && typeof data.sessionId === 'string') {
-    payload.sessionId = data.sessionId;
-  }
-
-  if ('agentType' in data && typeof data.agentType === 'string') {
-    payload.agentType = data.agentType;
-  }
-
-  if ('attachments' in data) {
-    payload.attachments = data.attachments as TerminalAttachment[] | undefined;
-  }
-
-  if ('chatMessages' in data || 'messages' in data) {
-    payload.chatMessages = (data.chatMessages ?? data.messages) as CodingAgentMessage[] | undefined;
-  }
-
-  if ('workspacePath' in data && typeof data.workspacePath === 'string') {
-    payload.workspacePath = data.workspacePath;
-  }
-
-  if ('status' in data) {
-    payload.status = data.status as AgentNodeData['status'];
-  }
-
-  if ('statusInfo' in data) {
-    payload.statusInfo = data.statusInfo as AgentNodeData['statusInfo'];
-  }
-
-  if ('summary' in data) {
-    payload.summary = data.summary as AgentNodeData['summary'];
-  }
-
-  if ('progress' in data) {
-    payload.progress = data.progress as AgentNodeData['progress'];
-  }
-
-  if ('title' in data) {
-    const titleValue = data.title;
-    if (isAgentTitle(titleValue)) {
-      payload.titleObject = titleValue;
-      payload.titleValue = titleValue.value;
-    } else if (typeof titleValue === 'string') {
-      payload.titleValue = titleValue;
-    }
-  }
-
-  if (!payload.workspacePath && payload.attachments) {
-    const workspaceAttachment = payload.attachments.find(isWorkspaceMetadataAttachment);
-    if (workspaceAttachment?.path) {
-      payload.workspacePath = workspaceAttachment.path;
-    }
-  }
-
-  return payload;
-};
-
-const applySessionSync = (node: Node, payload: SessionSyncPayload): Node => {
-  const data = node.data as Record<string, unknown>;
-  let nextData = data;
-
-  const updateField = (key: string, value: unknown) => {
-    if (value === undefined || (nextData as Record<string, unknown>)[key] === value) {
-      return;
-    }
-    if (nextData === data) {
-      nextData = { ...data };
-    }
-    (nextData as Record<string, unknown>)[key] = value;
-  };
-
-  switch (node.type) {
-    case 'agent': {
-      updateField('sessionId', payload.sessionId);
-      updateField('agentType', payload.agentType);
-      updateField('attachments', payload.attachments);
-      updateField('chatMessages', payload.chatMessages);
-      updateField('status', payload.status);
-      updateField('statusInfo', payload.statusInfo);
-      updateField('summary', payload.summary);
-      updateField('progress', payload.progress);
-      if (payload.titleObject) {
-        updateField('title', payload.titleObject);
-      }
-      break;
-    }
-    case 'agent-chat': {
-      updateField('sessionId', payload.sessionId);
-      updateField('agentType', payload.agentType);
-      updateField('workspacePath', payload.workspacePath);
-      updateField('messages', payload.chatMessages);
-      updateField('title', payload.titleValue);
-      if (payload.sessionId && (nextData as Record<string, unknown>).isDraft === true) {
-        updateField('isDraft', false);
-      }
-      break;
-    }
-    default:
-      break;
-  }
-
-  if (nextData === data) {
-    return node;
-  }
-
-  return {
-    ...node,
-    data: nextData,
-  };
-};
 
 function CanvasFlow() {
   // Theme hook
@@ -234,7 +67,6 @@ function CanvasFlow() {
     lastSavedAt,
     initialNodes,
     initialEdges,
-    // initialViewport and persistViewport available for future viewport persistence
     persistNodes,
     persistEdges,
   } = useCanvasPersistence({ debounceMs: 1000 });
@@ -253,6 +85,11 @@ function CanvasFlow() {
   useEffect(() => {
     if (!isCanvasLoading) {
       if (!initialStateApplied.current && (initialNodes.length > 0 || initialEdges.length > 0)) {
+        console.log('[Canvas] Restoring nodes from persistence:', initialNodes.map(n => ({
+          nodeId: n.id,
+          agentId: (n.data as Record<string, unknown>)?.agentId,
+          title: ((n.data as Record<string, unknown>)?.title as { value?: string })?.value,
+        })));
         setNodes(initialNodes);
         setEdges(initialEdges);
         initialStateApplied.current = true;
@@ -278,133 +115,108 @@ function CanvasFlow() {
     }
   }, [edges, isCanvasLoading, persistEdges]);
 
+  // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition, getEdges } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
   const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
-  const [linearApiKey, setLinearApiKey] = useState('');
-  const [isLinearConnected, setIsLinearConnected] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
-  const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
-  const [workspaceGitInfo, setWorkspaceGitInfo] = useState<Record<string, { branch: string | null }>>({});
-  const [lockedFolderPath, setLockedFolderPath] = useState<string | null>(null);
-  const [hoveredFolderPath, setHoveredFolderPath] = useState<string | null>(null);
 
-  // Issues pill state
-  const [isPillExpanded, setIsPillExpanded] = useState(false);
-  const [isPillSquare, setIsPillSquare] = useState(false);
-  const [showPillContent, setShowPillContent] = useState(false);
-  const [isContentVisible, setIsContentVisible] = useState(false);
-  const [isTextVisible, setIsTextVisible] = useState(true);
+  // =============================================================================
+  // Hook-based state management
+  // =============================================================================
 
-  const [issues, setIssues] = useState<LinearIssue[]>([]);
-  const [loadingIssues, setLoadingIssues] = useState(false);
-  const [linearWorkspaceName, setLinearWorkspaceName] = useState('');
-  const [linearProjects, setLinearProjects] = useState<LinearProject[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('all');
-  const [selectedMilestoneId, setSelectedMilestoneId] = useState('all');
-  const [selectedStatusId, setSelectedStatusId] = useState('all');
+  // Linear integration
+  const linear = useLinear();
 
-  // Fork modal state
-  const [forkModalData, setForkModalData] = useState<{
-    sourceNodeId: string;
-    position: { x: number; y: number };
-    sessionId: string;
-    workspacePath: string;
-  } | null>(null);
-  const [isForkLoading, setIsForkLoading] = useState(false);
-  const [forkError, setForkError] = useState<string | null>(null);
+  // Sidebar collapse state
+  const sidebar = useSidebarState();
 
-  // Load Linear API key from localStorage on mount
+  // Agent hierarchy computation
+  const { hierarchy: agentHierarchy, folderPathMap } = useAgentHierarchy(nodes, edges);
+
+  // Folder lock state
+  const folderLock = useFolderLock(agentHierarchy, folderPathMap);
+
+  // Pill animation state
+  const pill = usePillState(() => {
+    // onExpand callback - fetch issues when pill expands
+    linear.fetchIssues();
+    linear.fetchProjects();
+  });
+
+  // Fork modal state and operations
+  const forkModal = useForkModal({
+    nodes,
+    onNodeUpdate: (nodeId, data) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n))
+      );
+    },
+  });
+
+  // Canvas drop handlers
+  const canvasDrop = useCanvasDrop({
+    screenToFlowPosition,
+    setNodes,
+    isPillExpanded: pill.isPillExpanded,
+    collapsePill: pill.collapsePill,
+  });
+
+  // Canvas node creation actions
+  const canvasActions = useCanvasActions({
+    setNodes,
+    contextMenu,
+    closeContextMenu: () => setContextMenu(null),
+    lockedFolderPath: folderLock.lockedFolderPath,
+    onShowAgentModal: (pos) => {
+      setPendingAgentPosition(pos);
+      setIsNewAgentModalOpen(true);
+    },
+  });
+
+  // Check if there are any agents
+  const hasAgents = useMemo(() => {
+    return nodes.some((node) => node.type === 'agent');
+  }, [nodes]);
+
+  // =============================================================================
+  // Node store sync
+  // =============================================================================
+
+  // Sync nodeStore with React Flow's nodes state
   useEffect(() => {
-    const storedKey = localStorage.getItem('linear_api_key');
-    if (storedKey) {
-      setLinearApiKey(storedKey);
-      setIsLinearConnected(true);
-    }
-  }, []);
+    nodeStore.setNodes(nodes);
+  }, []); // Only run once on mount
 
-  const fetchLinearProjects = useCallback(async () => {
-    const apiKey = localStorage.getItem('linear_api_key');
-    if (!apiKey) return;
-
-    try {
-      const query = `
-        query {
-          projects(first: 100) {
-            nodes {
-              id
-              name
-            }
-          }
-        }
-      `;
-
-      const response = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({ query }),
-      });
-
-      const data = await response.json();
-      if (data.data?.projects?.nodes) {
-        setLinearProjects(data.data.projects.nodes);
-      }
-    } catch (error) {
-      console.error('Error fetching Linear projects:', error);
-    }
-  }, []);
-
-  // Listen for node update events from TerminalNode
+  // Listen for node update events and delegate to nodeStore
   useEffect(() => {
     const handleUpdateNode = (event: CustomEvent) => {
       const { nodeId, data } = event.detail;
-      setNodes((nds) => {
-        const targetNode = nds.find((node) => node.id === nodeId);
-        if (!targetNode) {
-          return nds;
-        }
-
-        const targetSessionId =
-          (data as Record<string, unknown>)?.sessionId ??
-          (targetNode.data as Record<string, unknown>)?.sessionId;
-
-        const syncPayload = buildSessionSyncPayload(data as Record<string, unknown>);
-        const resolvedSessionId = typeof targetSessionId === 'string' ? targetSessionId : undefined;
-        if (resolvedSessionId && !syncPayload.sessionId) {
-          syncPayload.sessionId = resolvedSessionId;
-        }
-
-        return nds.map((node) => {
-          if (node.id === nodeId) {
-            return { ...node, data: { ...data } };
-          }
-
-          if (!resolvedSessionId) {
-            return node;
-          }
-
-          const nodeSessionId = (node.data as Record<string, unknown>)?.sessionId;
-          if (nodeSessionId !== resolvedSessionId) {
-            return node;
-          }
-
-          return applySessionSync(node, syncPayload);
-        });
+      const existingNode = nodeStore.getNode(nodeId);
+      console.warn('[Canvas] handleUpdateNode BEFORE', {
+        nodeId,
+        agentId: (data as Record<string, unknown>)?.agentId,
+        existingData: existingNode?.data,
+        incomingData: data,
+      });
+      nodeStore.updateNode(nodeId, data as Record<string, unknown>);
+      setNodes((nds) =>
+        nds.map((node) => (node.id === nodeId ? { ...node, data: { ...data } } : node))
+      );
+      console.warn('[Canvas] handleUpdateNode AFTER', {
+        nodeId,
+        agentId: (data as Record<string, unknown>)?.agentId,
+        updatedData: data,
       });
     };
 
     const handleDeleteNode = (event: CustomEvent) => {
       const { nodeId } = event.detail;
+      nodeStore.deleteNode(nodeId);
       setNodes((nds) => nds.filter((node) => node.id !== nodeId));
     };
 
@@ -416,20 +228,20 @@ function CanvasFlow() {
     };
   }, [setNodes]);
 
-  // Listen for starter node submit events
+  // =============================================================================
+  // Starter node handling
+  // =============================================================================
+
   useEffect(() => {
     const handleStarterSubmit = (event: CustomEvent) => {
       const { nodeId, message } = event.detail;
 
-      // Find the starter node to get its position
       const starterNode = nodes.find((n) => n.id === nodeId);
       if (!starterNode) return;
 
-      // Get home directory as default working directory
       const electronAPI = (window as unknown as { electronAPI?: { getHomeDir: () => string } }).electronAPI;
       const workingDirectory = electronAPI?.getHomeDir() || '/';
 
-      // Create a new terminal and agent node below the starter
       const terminalId = `terminal-${crypto.randomUUID()}`;
       const agentId = `agent-${Date.now()}`;
       const sessionId = crypto.randomUUID();
@@ -465,7 +277,6 @@ function CanvasFlow() {
         style: { width: 600 },
       };
 
-      // Remove the starter node and add the agent node
       setNodes((nds) => [...nds.filter((n) => n.id !== nodeId), agentNode]);
     };
 
@@ -475,528 +286,15 @@ function CanvasFlow() {
     };
   }, [nodes, setNodes]);
 
-  const handleLinearConnect = useCallback(() => {
-    if (linearApiKey.trim()) {
-      localStorage.setItem('linear_api_key', linearApiKey);
-      setIsLinearConnected(true);
-    }
-  }, [linearApiKey]);
-
-  const handleLinearDisconnect = useCallback(() => {
-    localStorage.removeItem('linear_api_key');
-    setLinearApiKey('');
-    setIsLinearConnected(false);
-    setLinearWorkspaceName('');
-    setLinearProjects([]);
-  }, []);
-
-  const fetchLinearIssues = useCallback(async () => {
-    const apiKey = localStorage.getItem('linear_api_key');
-    if (!apiKey) return;
-
-    setLoadingIssues(true);
-    try {
-      const query = `
-        query {
-          viewer {
-            organization {
-              name
-            }
-          }
-          issues(
-            filter: { state: { type: { in: ["triage", "backlog", "unstarted", "started"] } } }
-            first: 50
-          ) {
-            nodes {
-              id
-              title
-              identifier
-              state {
-                id
-                name
-                color
-                type
-              }
-              priority
-              assignee {
-                name
-                avatarUrl
-              }
-              project {
-                id
-                name
-              }
-              projectMilestone {
-                id
-                name
-                project {
-                  id
-                  name
-                }
-              }
-              createdAt
-              updatedAt
-            }
-          }
-        }
-      `;
-
-      const response = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({ query }),
-      });
-
-      const data = await response.json();
-      if (data.data?.issues?.nodes) {
-        setIssues(data.data.issues.nodes);
-      }
-      const workspaceName =
-        data.data?.viewer?.organization?.name ?? data.data?.organization?.name ?? '';
-      if (workspaceName) {
-        setLinearWorkspaceName(workspaceName);
-      }
-    } catch (error) {
-      console.error('Error fetching Linear issues:', error);
-    } finally {
-      setLoadingIssues(false);
-    }
-  }, []);
-
-  const projectOptions = useMemo(() => {
-    const map = new Map<string, LinearProject>();
-    linearProjects.forEach((project) => {
-      if (project.id) {
-        map.set(project.id, project);
-      }
-    });
-    issues.forEach((issue) => {
-      if (issue.project?.id) {
-        map.set(issue.project.id, issue.project);
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [issues, linearProjects]);
-
-  const milestoneOptions = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; label: string; projectId?: string }>();
-    issues.forEach((issue) => {
-      if (issue.projectMilestone?.id) {
-        const milestone = issue.projectMilestone;
-        const label = milestone.project?.name
-          ? `${milestone.project.name} / ${milestone.name}`
-          : milestone.name;
-        map.set(milestone.id, {
-          id: milestone.id,
-          name: milestone.name,
-          label,
-          projectId: milestone.project?.id,
-        });
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [issues]);
-
-  const statusOptions = useMemo(() => {
-    const map = new Map<string, LinearWorkflowState>();
-    issues.forEach((issue) => {
-      if (issue.state?.id) {
-        map.set(issue.state.id, issue.state);
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [issues]);
-
-  const hasUnassignedProject = useMemo(
-    () => issues.some((issue) => !issue.project),
-    [issues]
-  );
-
-  const hasUnassignedMilestone = useMemo(
-    () => issues.some((issue) => !issue.projectMilestone),
-    [issues]
-  );
-
-  const visibleMilestoneOptions = useMemo(() => {
-    if (selectedProjectId === 'all') {
-      return milestoneOptions;
-    }
-    if (selectedProjectId === 'none') {
-      return [];
-    }
-    return milestoneOptions.filter((milestone) => milestone.projectId === selectedProjectId);
-  }, [milestoneOptions, selectedProjectId]);
-
-  useEffect(() => {
-    if (
-      selectedProjectId !== 'all' &&
-      selectedProjectId !== 'none' &&
-      !projectOptions.some((project) => project.id === selectedProjectId)
-    ) {
-      setSelectedProjectId('all');
-    }
-  }, [projectOptions, selectedProjectId]);
-
-  useEffect(() => {
-    if (
-      selectedMilestoneId !== 'all' &&
-      selectedMilestoneId !== 'none' &&
-      !visibleMilestoneOptions.some((milestone) => milestone.id === selectedMilestoneId)
-    ) {
-      setSelectedMilestoneId('all');
-    }
-  }, [visibleMilestoneOptions, selectedMilestoneId]);
-
-  useEffect(() => {
-    if (selectedStatusId !== 'all' && !statusOptions.some((state) => state.id === selectedStatusId)) {
-      setSelectedStatusId('all');
-    }
-  }, [statusOptions, selectedStatusId]);
-
-  const filteredIssues = useMemo(() => {
-    return issues.filter((issue) => {
-      if (selectedProjectId === 'none' && issue.project) {
-        return false;
-      }
-      if (
-        selectedProjectId !== 'all' &&
-        selectedProjectId !== 'none' &&
-        issue.project?.id !== selectedProjectId
-      ) {
-        return false;
-      }
-      if (selectedMilestoneId === 'none' && issue.projectMilestone) {
-        return false;
-      }
-      if (
-        selectedMilestoneId !== 'all' &&
-        selectedMilestoneId !== 'none' &&
-        issue.projectMilestone?.id !== selectedMilestoneId
-      ) {
-        return false;
-      }
-      if (selectedStatusId !== 'all' && issue.state?.id !== selectedStatusId) {
-        return false;
-      }
-      return true;
-    });
-  }, [issues, selectedProjectId, selectedMilestoneId, selectedStatusId]);
-
-  // Helper function to extract final folder name from path
-  const getFolderName = (path: string): string => {
-    // Remove trailing slashes and get the last segment
-    const normalized = path.replace(/\/$/, '');
-    const parts = normalized.split(/[/\\]/);
-    return parts[parts.length - 1] || path;
-  };
-
-  // Organize agents hierarchically: Project > Branch > Agent
-  // Also create a mapping from folder name to full path
-  const { agentHierarchy, folderPathMap } = useMemo(() => {
-    const hierarchy: Record<string, Record<string, Array<{ nodeId: string; agentId: string; name: string }>>> = {};
-    const pathMap: Record<string, string> = {}; // Maps folder name to full path
-
-    // Get all agent nodes
-    const agentNodes = nodes.filter((node) => node.type === 'agent');
-
-    for (const node of agentNodes) {
-      const agentData = node.data as unknown as AgentNodeData;
-      
-      // Extract project path from workspace attachment or find connected workspace node
-      let projectPath: string | null = null;
-      let branch: string | null = null;
-
-      // Check for workspace metadata attachment
-      if (agentData.attachments) {
-        const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
-        if (workspaceAttachment) {
-          projectPath = workspaceAttachment.path;
-        }
-      }
-
-      // If no attachment, try to find connected workspace node
-      if (!projectPath) {
-        const edges = getEdges();
-        const connectedEdge = edges.find((e) => e.target === node.id || e.source === node.id);
-        if (connectedEdge) {
-          const connectedNodeId = connectedEdge.source === node.id ? connectedEdge.target : connectedEdge.source;
-          const connectedNode = nodes.find((n) => n.id === connectedNodeId);
-          if (connectedNode?.type === 'workspace' && connectedNode.data?.path) {
-            projectPath = connectedNode.data.path as string;
-          }
-        }
-      }
-
-      // Get branch from fetched git info (preferred) or fallback to attachment/workspace data
-      if (projectPath && workspaceGitInfo[projectPath]?.branch) {
-        branch = workspaceGitInfo[projectPath].branch;
-      } else if (agentData.attachments) {
-        const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
-        if (workspaceAttachment?.git?.branch) {
-          branch = workspaceAttachment.git.branch;
-        }
-      }
-
-      // Extract final folder name from project path
-      const project = projectPath ? getFolderName(projectPath) : 'Unknown Project';
-      // Store mapping from folder name to full path
-      if (projectPath) {
-        pathMap[project] = projectPath;
-      }
-      // Only use 'main' as fallback if we truly have no branch info
-      const branchName = branch || 'main';
-      const agentName = agentData.title?.value || agentData.agentId;
-
-      // Build hierarchy
-      if (!hierarchy[project]) {
-        hierarchy[project] = {};
-      }
-      if (!hierarchy[project][branchName]) {
-        hierarchy[project][branchName] = [];
-      }
-      hierarchy[project][branchName].push({
-        nodeId: node.id,
-        agentId: agentData.agentId,
-        name: agentName,
-      });
-    }
-
-    return { agentHierarchy: hierarchy, folderPathMap: pathMap };
-  }, [nodes, getEdges, workspaceGitInfo]);
-
-  // Auto-lock the first folder that appears, and clear lock if no folders exist
-  useEffect(() => {
-    const folderNames = Object.keys(agentHierarchy);
-    if (folderNames.length === 0) {
-      // Clear lock if no folders exist
-      setLockedFolderPath(null);
-    } else if (!lockedFolderPath) {
-      // Auto-lock first folder if none is locked
-      const firstFolderName = folderNames[0];
-      const firstFolderPath = folderPathMap[firstFolderName];
-      if (firstFolderPath) {
-        setLockedFolderPath(firstFolderPath);
-      }
-    } else {
-      // Validate that locked folder still exists
-      const lockedFolderName = Object.keys(folderPathMap).find(
-        (name) => folderPathMap[name] === lockedFolderPath
-      );
-      if (!lockedFolderName || !agentHierarchy[lockedFolderName]) {
-        // Locked folder no longer exists, clear it
-        setLockedFolderPath(null);
-      }
-    }
-  }, [agentHierarchy, folderPathMap, lockedFolderPath]);
-
-  // Check if there are any agents
-  const hasAgents = useMemo(() => {
-    return nodes.some((node) => node.type === 'agent');
-  }, [nodes]);
-
-  // Fetch git info for all unique workspace paths
-  useEffect(() => {
-    const workspacePaths = new Set<string>();
-    
-    // Collect all workspace paths from agent nodes
-    nodes.forEach((node) => {
-      if (node.type === 'agent') {
-        const agentData = node.data as unknown as AgentNodeData;
-        
-        // Check for workspace metadata attachment
-        if (agentData.attachments) {
-          const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
-          if (workspaceAttachment?.path) {
-            workspacePaths.add(workspaceAttachment.path);
-          }
-        }
-        
-        // Check for connected workspace node
-        const edges = getEdges();
-        const connectedEdge = edges.find((e) => e.target === node.id || e.source === node.id);
-        if (connectedEdge) {
-          const connectedNodeId = connectedEdge.source === node.id ? connectedEdge.target : connectedEdge.source;
-          const connectedNode = nodes.find((n) => n.id === connectedNodeId);
-          if (connectedNode?.type === 'workspace' && connectedNode.data?.path) {
-            workspacePaths.add(connectedNode.data.path as string);
-          }
-        }
-      }
-    });
-
-    // Fetch git info for each workspace path
-    const fetchGitInfo = async () => {
-      const gitInfoMap: Record<string, { branch: string | null }> = {};
-      
-      for (const path of workspacePaths) {
-        try {
-          const gitInfo = await window.gitAPI?.getInfo(path);
-          gitInfoMap[path] = {
-            branch: gitInfo?.branch || null,
-          };
-        } catch (error) {
-          gitInfoMap[path] = { branch: null };
-        }
-      }
-      
-      setWorkspaceGitInfo(gitInfoMap);
-    };
-
-    if (workspacePaths.size > 0) {
-      fetchGitInfo();
-    } else {
-      setWorkspaceGitInfo({});
-    }
-  }, [nodes, getEdges]);
-
-  const toggleProject = useCallback((projectPath: string) => {
-    setCollapsedProjects((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(projectPath)) {
-        newSet.delete(projectPath);
-      } else {
-        newSet.add(projectPath);
-      }
-      return newSet;
-    });
-  }, []);
-
-  const toggleBranch = useCallback((branchKey: string) => {
-    setCollapsedBranches((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(branchKey)) {
-        newSet.delete(branchKey);
-      } else {
-        newSet.add(branchKey);
-      }
-      return newSet;
-    });
-  }, []);
-
-  const togglePill = useCallback(() => {
-    if (!isPillExpanded) {
-      // Fetch issues and projects when expanding
-      fetchLinearIssues();
-      fetchLinearProjects();
-
-      // Hide text immediately when expanding
-      setIsTextVisible(false);
-      // Both phases start simultaneously
-      setIsPillExpanded(true);
-      setIsPillSquare(true);
-      // Show pill content after expansion completes (300ms) + 50ms delay
-      setTimeout(() => {
-        setShowPillContent(true);
-        // Start content animation after pill content is shown
-        setTimeout(() => {
-          setIsContentVisible(true);
-        }, 100);
-      }, 350);
-    } else {
-      // Hide animations immediately when collapsing
-      setIsContentVisible(false);
-      // Hide pill content immediately when collapsing
-      setShowPillContent(false);
-      // Both phases collapse simultaneously
-      setIsPillSquare(false);
-      setIsPillExpanded(false);
-      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
-      setTimeout(() => {
-        setIsTextVisible(true);
-      }, 350);
-    }
-  }, [isPillExpanded, fetchLinearIssues, fetchLinearProjects]);
-
-  const collapsePill = useCallback(() => {
-    // First hide animations immediately
-    setIsContentVisible(false);
-    // First hide content with 50ms delay
-    setShowPillContent(false);
-    setTimeout(() => {
-      // Then collapse the pill
-      setIsPillSquare(false);
-      setIsPillExpanded(false);
-      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
-      setTimeout(() => {
-        setIsTextVisible(true);
-      }, 350);
-    }, 50);
-  }, []);
-
-
-  // Drag and drop handlers for issue cards
-  const handleIssueDragStart = useCallback((e: React.DragEvent, issue: LinearIssue) => {
-    e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/json', JSON.stringify(issue));
-    e.dataTransfer.setData('text/plain', `${issue.identifier}: ${issue.title}`);
-  }, []);
-
-  const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-  }, []);
-
-  const handleCanvasDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-
-    try {
-      const jsonData = e.dataTransfer.getData('application/json');
-      if (!jsonData) return;
-
-      const data = JSON.parse(jsonData);
-      const attachmentType = e.dataTransfer.getData('attachment-type');
-
-      // Get the drop position relative to the ReactFlow canvas
-      const position = screenToFlowPosition({
-        x: e.clientX,
-        y: e.clientY,
-      });
-
-      const terminalId = `terminal-${crypto.randomUUID()}`;
-
-      // Create attachment based on type
-      let attachment;
-      if (attachmentType === 'workspace-metadata') {
-        attachment = createWorkspaceMetadataAttachment(data);
-      } else {
-        // Default to Linear issue if no type specified (for backward compatibility)
-        attachment = createLinearIssueAttachment(data);
-      }
-
-      const newNode: Node = {
-        id: `node-${Date.now()}`,
-        type: 'terminal',
-        position,
-        data: {
-          terminalId,
-          attachments: [attachment],
-        },
-        style: {
-          width: 600,
-          height: 400,
-        },
-      };
-
-      setNodes((nds) => [...nds, newNode]);
-
-      // Close the issues pill after dropping
-      if (isPillExpanded) {
-        collapsePill();
-      }
-    } catch (error) {
-      console.error('Error handling drop:', error);
-    }
-  }, [screenToFlowPosition, setNodes, isPillExpanded, collapsePill]);
+  // =============================================================================
+  // ReactFlow event handlers
+  // =============================================================================
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
-  // Fork handling: track when user starts dragging from a handle
   const onConnectStart = useCallback(
     (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
       if (params.nodeId && params.handleType) {
@@ -1006,198 +304,6 @@ function CanvasFlow() {
     []
   );
 
-  // Validate and show fork modal (defined before onConnectEnd to avoid hoisting issues)
-  const handleForkCreate = useCallback(
-    async (sourceNodeId: string, position: { x: number; y: number }) => {
-      // Find the source node
-      const sourceNode = nodes.find((n) => n.id === sourceNodeId);
-      if (!sourceNode) {
-        console.error('[Canvas] Source node not found for fork:', sourceNodeId);
-        return;
-      }
-
-      const sourceData = sourceNode.data as AgentNodeData;
-
-      // Get workspace path from attachments
-      const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
-      const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
-
-      // Log the source data for debugging
-      console.log('[Canvas] Fork attempt - sourceData:', {
-        agentId: sourceData.agentId,
-        agentType: sourceData.agentType,
-        sessionId: sourceData.sessionId,
-        workspacePath,
-        attachments: sourceData.attachments?.length ?? 0,
-      });
-
-      // Auto-detect session if not set
-      let sessionId = sourceData.sessionId;
-      if (!sessionId && workspacePath) {
-        console.log('[Canvas] Session not set, auto-detecting from workspace...');
-        const latestSession = await forkService.getLatestSessionForWorkspace(
-          sourceData.agentType,
-          workspacePath
-        );
-        if (latestSession) {
-          sessionId = latestSession.id;
-          console.log('[Canvas] Auto-detected session:', sessionId);
-
-          // Update the node with the detected sessionId
-          setNodes((nds) =>
-            nds.map((n) => {
-              if (n.id === sourceNodeId) {
-                return {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    sessionId,
-                  },
-                };
-              }
-              return n;
-            })
-          );
-        }
-      }
-
-      // Validate requirements
-      const validation = forkService.validateForkRequest(sessionId, workspacePath);
-      if (!validation.valid) {
-        // Show error as a toast-like notification
-        console.warn('[Canvas] Fork validation failed:', validation.error);
-        setForkError(validation.error);
-        // Auto-dismiss error after 5 seconds
-        setTimeout(() => setForkError(null), 5000);
-        return;
-      }
-
-      if (!sessionId || !workspacePath) {
-        setForkError('Missing session or workspace');
-        setTimeout(() => setForkError(null), 5000);
-        return;
-      }
-
-      // Show fork modal with resolved session/workspace to avoid stale node data later
-      setForkModalData({ sourceNodeId, position, sessionId, workspacePath });
-      setForkError(null);
-    },
-    [nodes, setNodes]
-  );
-
-  // Handle fork modal confirmation
-  const handleForkConfirm = useCallback(
-    async (forkTitle: string) => {
-      if (!forkModalData) return;
-
-      const sourceNode = nodes.find((n) => n.id === forkModalData.sourceNodeId);
-      if (!sourceNode) {
-        setForkError('Source node not found');
-        return;
-      }
-
-      const sourceData = sourceNode.data as AgentNodeData;
-      const parentSessionId = forkModalData.sessionId;
-      const workspacePath = forkModalData.workspacePath;
-
-      if (!parentSessionId || !workspacePath) {
-        setForkError('Missing session or workspace');
-        return;
-      }
-
-      setIsForkLoading(true);
-      setForkError(null);
-
-      try {
-        // Call fork service to create worktree and fork session
-        const result = await forkService.forkAgent({
-          sourceAgentId: sourceData.agentId,
-          parentSessionId,
-          agentType: sourceData.agentType,
-          forkTitle,
-          repoPath: workspacePath,
-        });
-
-        if (!result.success) {
-          setForkError(result.error.message);
-          setIsForkLoading(false);
-          return;
-        }
-
-        // Generate new IDs for the forked node
-        const newNodeId = `node-${Date.now()}`;
-        const newAgentId = `agent-${crypto.randomUUID()}`;
-        const newTerminalId = `terminal-${crypto.randomUUID()}`;
-
-        // Create forked node data with new session and worktree info
-        const forkedData: AgentNodeData = {
-          ...sourceData,
-          agentId: newAgentId,
-          terminalId: newTerminalId,
-          title: createDefaultAgentTitle(forkTitle),
-          sessionId: result.data.sessionInfo.id,
-          parentSessionId,
-          worktreeId: result.data.worktreeInfo.id,
-          workingDirectory: result.data.worktreeInfo.worktreePath,
-          // Update attachments to reflect new workspace
-          attachments: [
-            ...(sourceData.attachments?.filter((a) => !isWorkspaceMetadataAttachment(a)) || []),
-            createWorkspaceMetadataAttachment({
-              path: result.data.worktreeInfo.worktreePath,
-              name: forkTitle,
-            }),
-          ],
-        };
-
-        // Create the new forked node
-        const forkedNode: Node = {
-          id: newNodeId,
-          type: sourceNode.type,
-          position: forkModalData.position,
-          data: forkedData,
-          style: sourceNode.style,
-        };
-
-        // Create edge from source to forked node
-        const newEdgeId = `edge-${Date.now()}`;
-        const newEdge: Edge = {
-          id: newEdgeId,
-          source: forkModalData.sourceNodeId,
-          target: newNodeId,
-          sourceHandle: null,
-          targetHandle: null,
-        };
-
-        // Add the new node and edge
-        setNodes((nds) => [...nds, forkedNode]);
-        setEdges((eds) => [...eds, newEdge]);
-
-        console.log('[Canvas] Fork created successfully:', {
-          newNodeId,
-          sessionId: result.data.sessionInfo.id,
-          worktreePath: result.data.worktreeInfo.worktreePath,
-        });
-
-        // Close modal
-        setForkModalData(null);
-      } catch (error) {
-        console.error('[Canvas] Fork failed:', error);
-        setForkError(error instanceof Error ? error.message : 'Fork failed');
-      } finally {
-        setIsForkLoading(false);
-      }
-    },
-    [forkModalData, nodes, setNodes, setEdges]
-  );
-
-  // Handle fork modal cancellation
-  const handleForkCancel = useCallback(() => {
-    setForkModalData(null);
-    setForkError(null);
-    setIsForkLoading(false);
-  }, []);
-
-  // Fork handling: detect when drag ends on empty canvas (not on a handle)
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent) => {
       const state = forkStore.getState();
@@ -1207,89 +313,21 @@ function CanvasFlow() {
         return;
       }
 
-      // Check if the drop target is a handle (normal connection) or empty canvas (fork)
       const target = event.target as HTMLElement;
       const isDropOnHandle = target.classList.contains('react-flow__handle');
 
       if (!isDropOnHandle) {
-        // Dropped on canvas - create fork
         const clientX = 'clientX' in event ? event.clientX : event.touches?.[0]?.clientX ?? 0;
         const clientY = 'clientY' in event ? event.clientY : event.touches?.[0]?.clientY ?? 0;
 
         const position = screenToFlowPosition({ x: clientX, y: clientY });
-        handleForkCreate(state.sourceNodeId, position);
+        forkModal.open(state.sourceNodeId, position);
       }
 
       forkStore.cancelDrag();
     },
-    [screenToFlowPosition, handleForkCreate]
+    [screenToFlowPosition, forkModal]
   );
-
-  // Keyboard shortcut: Shift+Cmd+S (Mac) / Shift+Ctrl+S (Windows/Linux) to fork selected node
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Shift+Cmd+S (Mac) or Shift+Ctrl+S (Windows/Linux)
-      const isForkShortcut =
-        event.shiftKey &&
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === 's';
-
-      if (!isForkShortcut) return;
-
-      event.preventDefault();
-
-      // Find selected AgentNode
-      const selectedNode = nodes.find(
-        (n) => n.selected && n.type === 'agentNode'
-      );
-
-      if (!selectedNode) {
-        console.log('[Canvas] No AgentNode selected for fork shortcut');
-        setForkError('Select an agent node to fork');
-        setTimeout(() => setForkError(null), 3000);
-        return;
-      }
-
-      // Calculate position for the forked node (offset to the right)
-      const forkPosition = {
-        x: (selectedNode.position?.x ?? 0) + 350,
-        y: (selectedNode.position?.y ?? 0) + 50,
-      };
-
-      console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
-      handleForkCreate(selectedNode.id, forkPosition);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, handleForkCreate]);
-
-  // Listen for fork button clicks from agent nodes
-  useEffect(() => {
-    const handleForkClick = (event: Event) => {
-      const customEvent = event as CustomEvent<{ nodeId: string }>;
-      const { nodeId } = customEvent.detail;
-
-      // Find the source node
-      const sourceNode = nodes.find((n) => n.id === nodeId);
-      if (!sourceNode) {
-        console.error('[Canvas] Source node not found for fork click:', nodeId);
-        return;
-      }
-
-      // Calculate position for the forked node (offset to the right)
-      const forkPosition = {
-        x: (sourceNode.position?.x ?? 0) + 350,
-        y: (sourceNode.position?.y ?? 0) + 50,
-      };
-
-      console.log('[Canvas] Fork button clicked for node:', nodeId);
-      handleForkCreate(nodeId, forkPosition);
-    };
-
-    window.addEventListener('agent-node:fork-click', handleForkClick as EventListener);
-    return () => window.removeEventListener('agent-node:fork-click', handleForkClick as EventListener);
-  }, [nodes, handleForkCreate]);
 
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
@@ -1303,431 +341,108 @@ function CanvasFlow() {
     setContextMenu(null);
   }, []);
 
-  const addTerminalNode = useCallback((position?: { x: number; y: number }) => {
-    let nodePosition = position;
+  // =============================================================================
+  // Fork modal confirmation handler
+  // =============================================================================
 
-    // If no position provided and context menu is open, use context menu position
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
+  const handleForkConfirm = useCallback(
+    async (forkTitle: string) => {
+      const result = await forkModal.confirm(forkTitle);
+      if (result.success) {
+        setNodes((nds) => [...nds, result.forkedNode]);
+        setEdges((eds) => [...eds, result.newEdge]);
+      }
+    },
+    [forkModal, setNodes, setEdges]
+  );
 
-    // If still no position, use center of viewport
-    if (!nodePosition) {
-      // Default to center of canvas view
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
+  // =============================================================================
+  // Fork keyboard shortcut
+  // =============================================================================
 
-    const terminalId = `terminal-${crypto.randomUUID()}`;
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'terminal',
-      position: nodePosition,
-      data: {
-        terminalId,
-      },
-      style: {
-        width: 600,
-        height: 400,
-      },
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isForkShortcut =
+        event.shiftKey &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 's';
+
+      if (!isForkShortcut) return;
+
+      event.preventDefault();
+
+      const selectedNode = nodes.find(
+        (n) => n.selected && n.type === 'agentNode'
+      );
+
+      if (!selectedNode) {
+        console.log('[Canvas] No AgentNode selected for fork shortcut');
+        return;
+      }
+
+      const forkPosition = {
+        x: (selectedNode.position?.x ?? 0) + 350,
+        y: (selectedNode.position?.y ?? 0) + 50,
+      };
+
+      console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
+      forkModal.open(selectedNode.id, forkPosition);
     };
 
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, forkModal]);
 
-  const addWorkspaceNode = useCallback((position?: { x: number; y: number }) => {
-    let nodePosition = position;
+  // Listen for fork button clicks from agent nodes
+  useEffect(() => {
+    const handleForkClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{ nodeId: string }>;
+      const { nodeId } = customEvent.detail;
 
-    // If no position provided and context menu is open, use context menu position
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found for fork click:', nodeId);
+        return;
+      }
 
-    // If still no position, use center of viewport
-    if (!nodePosition) {
-      // Default to center of canvas view
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
+      const forkPosition = {
+        x: (sourceNode.position?.x ?? 0) + 350,
+        y: (sourceNode.position?.y ?? 0) + 50,
+      };
 
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'workspace',
-      position: nodePosition,
-      data: {
-        path: '',
-      },
+      console.log('[Canvas] Fork button clicked for node:', nodeId);
+      forkModal.open(nodeId, forkPosition);
     };
 
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
+    window.addEventListener('agent-node:fork-click', handleForkClick as EventListener);
+    return () => window.removeEventListener('agent-node:fork-click', handleForkClick as EventListener);
+  }, [nodes, forkModal]);
 
-  // Function to actually create the agent node (called from modal)
-  const createAgentNode = useCallback((position?: { x: number; y: number }, modalData?: {
-    title: string;
-    description: string;
-    workspacePath?: string;
-    todo?: string;
-    priority?: string;
-    assignee?: string;
-    project?: string;
-    labels?: string[];
-  }) => {
-    let nodePosition = position || pendingAgentPosition;
+  // =============================================================================
+  // Linear ticket creation (kept as is - uses linear hook)
+  // =============================================================================
 
-    // If no position provided and context menu is open, use context menu position
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
-
-    // If still no position, use center of viewport
-    if (!nodePosition) {
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
-
-    // Always generate unique IDs for each new node
-    const agentId = `agent-${crypto.randomUUID()}`;
-    const terminalId = `terminal-${crypto.randomUUID()}`;
-    const sessionId = crypto.randomUUID();
-    const createdAt = Date.now();
-
-    console.log('[Canvas] Creating agent node', {
-      agentId,
-      terminalId,
-      createdAt: new Date(createdAt).toISOString(),
-      modalData,
-    });
-
-    // Use title from modal if provided, otherwise use default
-    const nodeTitle = modalData?.title || createDefaultAgentTitle();
-
-    // Determine workspace path: use from modal data, or locked folder, or null
-    const selectedWorkspacePath = modalData?.workspacePath || lockedFolderPath || null;
-
-    // Pre-fill with workspace path (but don't create attachment yet - let agent node handle it)
-    const newNode: Node = {
-      id: `node-${createdAt}`,
-      type: 'agent',
-      position: nodePosition,
-      data: {
-        agentId,
-        terminalId,
-        agentType: 'claude_code',
-        status: 'idle',
-        title: nodeTitle,
-        summary: modalData?.description || null,
-        progress: null,
-        attachments: [],
-        activeView: 'overview',
-        sessionId,
-        createdAt,
-        forking: false, // Default to false, will be set to true when JSONL file is found
-        // Add prefilled workspace path if selected
-        ...(selectedWorkspacePath && { prefilledWorkspacePath: selectedWorkspacePath }),
-      },
-      style: {
-        width: 500,
-        height: 450,
-      },
-    };
-
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-    setPendingAgentPosition(undefined);
-  }, [contextMenu, screenToFlowPosition, setNodes, lockedFolderPath, pendingAgentPosition]);
-
-  // Function to show the modal (replaces direct node creation)
-  const addAgentNode = useCallback((position?: { x: number; y: number }) => {
-    // Calculate position if not provided
-    let nodePosition = position;
-
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
-
-    if (!nodePosition) {
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
-
-    // Store position and show modal
-    setPendingAgentPosition(nodePosition);
-    setIsNewAgentModalOpen(true);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition]);
-
-  const addStarterNode = useCallback((position?: { x: number; y: number }) => {
-    let nodePosition = position;
-
-    // If no position provided and context menu is open, use context menu position
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
-
-    // If still no position, use center of viewport
-    if (!nodePosition) {
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
-
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'starter',
-      position: nodePosition,
-      data: {
-        placeholder: 'Ask Claude anything... (Enter to send)',
-      },
-      style: {
-        width: 500,
-        height: 180,
-      },
-    };
-
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
-
-  // Store pending position for conversation node creation
-  const pendingConversationPosition = useRef<{ x: number; y: number } | null>(null);
-
-  const addConversationNode = useCallback((position?: { x: number; y: number }, sessionId?: string) => {
-    let nodePosition = position;
-
-    // If no position provided and context menu is open, use context menu position
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
-
-    // If still no position, use center of viewport
-    if (!nodePosition) {
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
-
-    // If no sessionId provided, open session picker modal
-    if (!sessionId) {
-      pendingConversationPosition.current = nodePosition;
-      setIsSessionPickerOpen(true);
-      setContextMenu(null);
-      return;
-    }
-
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'conversation',
-      position: nodePosition,
-      data: {
-        sessionId,
-        agentType: 'claude_code',
-        isExpanded: true,
-      },
-      style: {
-        width: 500,
-      },
-    };
-
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
-
-  // Add Claude Code Terminal - a terminal that auto-starts claude command
-  const addClaudeCodeTerminal = useCallback((position?: { x: number; y: number }) => {
-    let nodePosition = position;
-
-    // If no position provided and context menu is open, use context menu position
-    if (!nodePosition && contextMenu) {
-      nodePosition = screenToFlowPosition({
-        x: contextMenu.x,
-        y: contextMenu.y,
-      });
-    }
-
-    // If still no position, use center of viewport
-    if (!nodePosition) {
-      nodePosition = screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
-    }
-
-    const terminalId = `terminal-${crypto.randomUUID()}`;
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'terminal',
-      position: nodePosition,
-      data: {
-        terminalId,
-        autoStartClaude: true, // Flag to auto-start claude command
-      },
-      style: {
-        width: 600,
-        height: 400,
-      },
-    };
-
-    setNodes((nds) => [...nds, newNode]);
-    setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes]);
-
-  // Create Linear ticket
   const createLinearTicket = useCallback(async () => {
-    const apiKey = localStorage.getItem('linear_api_key');
-    if (!apiKey) {
+    if (!linear.isConnected) {
       alert('Please connect to Linear first in the settings');
       return;
     }
 
-    // Get default team ID (we'll use the first team from the viewer)
-    try {
-      const query = `
-        query {
-          viewer {
-            id
-            teams {
-              nodes {
-                id
-                name
-              }
-            }
-          }
-        }
-      `;
+    const title = prompt('Enter ticket title:');
+    if (!title) return;
 
-      const response = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({ query }),
-      });
-
-      const data = await response.json();
-      const teams = data.data?.viewer?.teams?.nodes || [];
-      
-      if (teams.length === 0) {
-        alert('No teams found in Linear workspace');
-        return;
-      }
-
-      // Use the first team
-      const teamId = teams[0].id;
-
-      // Create issue mutation
-      const mutation = `
-        mutation($teamId: String!, $title: String!) {
-          issueCreate(
-            input: {
-              teamId: $teamId
-              title: $title
-            }
-          ) {
-            success
-            issue {
-              id
-              identifier
-              title
-              url
-            }
-          }
-        }
-      `;
-
-      const title = prompt('Enter ticket title:');
-      if (!title) return;
-
-      const mutationResponse = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({
-          query: mutation,
-          variables: {
-            teamId,
-            title,
-          },
-        }),
-      });
-
-      const mutationData = await mutationResponse.json();
-      if (mutationData.data?.issueCreate?.success) {
-        const issue = mutationData.data.issueCreate.issue;
-        alert(`Ticket created: ${issue.identifier} - ${issue.title}\n${issue.url}`);
-      } else {
-        alert('Failed to create ticket: ' + (mutationData.errors?.[0]?.message || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error creating Linear ticket:', error);
-      alert('Error creating ticket: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    const result = await linear.createTicket(title);
+    if (result.success && result.issue) {
+      alert(`Ticket created: ${result.issue.identifier} - ${result.issue.title}\n${result.issue.url}`);
+    } else {
+      alert('Failed to create ticket: ' + (result.error || 'Unknown error'));
     }
-  }, []);
+  }, [linear]);
 
-  // Handle session selection from picker
-  const handleSessionSelect = useCallback((session: { id: string; projectName?: string; projectPath?: string; messageCount?: number; timestamp?: string }) => {
-    const position = pendingConversationPosition.current || screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
+  // =============================================================================
+  // Context menu outside click handler
+  // =============================================================================
 
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'conversation',
-      position,
-      data: {
-        sessionId: session.id,
-        agentType: 'claude_code',
-        title: session.projectName,
-        projectPath: session.projectPath,
-        projectName: session.projectName,
-        messageCount: session.messageCount,
-        timestamp: session.timestamp ? new Date(session.timestamp).getTime() : undefined,
-        isExpanded: true,
-      },
-      style: {
-        width: 500,
-      },
-    };
-
-    setNodes((nds) => [...nds, newNode]);
-    pendingConversationPosition.current = null;
-  }, [screenToFlowPosition, setNodes]);
-
-  // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as HTMLElement)) {
@@ -1743,31 +458,37 @@ function CanvasFlow() {
     }
   }, [contextMenu]);
 
+  // =============================================================================
   // Command palette commands
+  // =============================================================================
+
   const commandActions = useMemo<CommandAction[]>(() => [
     {
       id: 'add-agent',
       label: 'Add Agent',
       shortcut: 'c',
-      action: () => addAgentNode(),
+      action: () => canvasActions.addAgentNode(),
     },
     {
       id: 'add-terminal',
       label: 'Add Terminal',
       shortcut: 'v',
-      action: () => addTerminalNode(),
+      action: () => canvasActions.addTerminalNode(),
     },
     {
       id: 'add-claude-terminal',
       label: 'Add Claude Code Terminal',
       shortcut: 'b',
-      action: () => addClaudeCodeTerminal(),
+      action: () => canvasActions.addClaudeCodeTerminal(),
     },
     {
       id: 'load-conversation',
       label: 'Load Conversation',
       shortcut: 'n',
-      action: () => addConversationNode(),
+      action: () => canvasActions.addConversationNode({ id: '' } as never, screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      })),
     },
     {
       id: 'create-linear-ticket',
@@ -1775,59 +496,58 @@ function CanvasFlow() {
       shortcut: 'm',
       action: () => createLinearTicket(),
     },
-  ], [addAgentNode, addTerminalNode, addClaudeCodeTerminal, addConversationNode, createLinearTicket]);
+  ], [canvasActions, createLinearTicket, screenToFlowPosition]);
 
-  // Keyboard shortcuts: CMD+K to open command palette, CMD+W to add workspace
+  // =============================================================================
+  // Keyboard shortcuts
+  // =============================================================================
+
   useEffect(() => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const modifierKey = isMac ? event.metaKey : event.ctrlKey;
 
-      // CMD+K / CTRL+K to toggle command palette
       if (modifierKey && event.key === 'k') {
-        event.preventDefault(); // Prevent default browser behavior
+        event.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
         return;
       }
 
-      // CMD+T / CTRL+T to toggle agent modal
       if (modifierKey && event.key === 't') {
-        event.preventDefault(); // Prevent default browser behavior
+        event.preventDefault();
         if (isNewAgentModalOpen) {
           setIsNewAgentModalOpen(false);
           setPendingAgentPosition(undefined);
         } else {
-          addAgentNode();
+          canvasActions.addAgentNode();
         }
         return;
       }
 
-      // CMD+W / CTRL+W to add workspace
       if (modifierKey && event.key === 'w') {
-        event.preventDefault(); // Prevent default browser behavior
-        addWorkspaceNode();
+        event.preventDefault();
+        canvasActions.addWorkspaceNode();
       }
 
-      // CMD+Shift+A / CTRL+Shift+A to add agent (legacy shortcut, still works)
       if (modifierKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
-        addAgentNode();
+        canvasActions.addAgentNode();
       }
 
-      // CMD+N / CTRL+N to add starter node (new conversation)
       if (modifierKey && event.key === 'n') {
         event.preventDefault();
-        addStarterNode();
+        canvasActions.addStarterNode();
       }
 
-      // CMD+Shift+L / CTRL+Shift+L to load conversation
       if (modifierKey && event.shiftKey && event.key === 'L') {
         event.preventDefault();
-        addConversationNode();
+        canvasActions.addConversationNode({ id: '' } as never, screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        }));
       }
 
-      // Enable node drag mode while holding CMD (Mac) or CTRL (Windows/Linux)
       if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
         if (!isNodeDragEnabled) {
           setIsNodeDragEnabled(true);
@@ -1836,7 +556,6 @@ function CanvasFlow() {
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      // Disable node drag mode when CMD/CTRL key is released
       if ((isMac && event.key === 'Meta') || (!isMac && event.key === 'Control')) {
         setIsNodeDragEnabled(false);
       }
@@ -1848,9 +567,12 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [addWorkspaceNode, addAgentNode, addStarterNode, addConversationNode, isNodeDragEnabled]);
+  }, [canvasActions, isNodeDragEnabled, isNewAgentModalOpen, screenToFlowPosition]);
 
-  // Show loading state while canvas is being restored
+  // =============================================================================
+  // Loading state
+  // =============================================================================
+
   if (isCanvasLoading) {
     return (
       <div className="canvas-loading">
@@ -1861,6 +583,10 @@ function CanvasFlow() {
       </div>
     );
   }
+
+  // =============================================================================
+  // Render
+  // =============================================================================
 
   return (
     <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
@@ -1876,19 +602,28 @@ function CanvasFlow() {
           setPendingAgentPosition(undefined);
         }}
         onCreate={(data) => {
-          createAgentNode(pendingAgentPosition, data);
+          canvasActions.createAgentWithData({
+            position: pendingAgentPosition,
+            modalData: {
+              title: data.title,
+              description: data.description,
+              workspacePath: data.workspacePath,
+            },
+            lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
+          });
           setIsNewAgentModalOpen(false);
         }}
         initialPosition={pendingAgentPosition}
-        initialWorkspacePath={lockedFolderPath}
+        initialWorkspacePath={folderLock.lockedFolderPath}
       />
+
       {/* Sidebar Panel */}
-      <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+      <div className={`canvas-sidebar ${sidebar.isSidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
           <h2 className="sidebar-title">Canvas</h2>
           <button
             className="sidebar-toggle"
-            onClick={() => setIsSidebarCollapsed(true)}
+            onClick={sidebar.toggleSidebar}
             aria-label="Collapse sidebar"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1897,29 +632,28 @@ function CanvasFlow() {
           </button>
         </div>
 
-        {!isSidebarCollapsed && (
+        {!sidebar.isSidebarCollapsed && (
           <div className="sidebar-content">
             {hasAgents && (
               <div className="sidebar-section">
                 {Object.entries(agentHierarchy).map(([projectName, branches]) => {
-                  const isProjectCollapsed = collapsedProjects.has(projectName);
+                  const isProjectCollapsed = sidebar.collapsedProjects.has(projectName);
                   const projectPath = folderPathMap[projectName];
-                  const isLocked = lockedFolderPath === projectPath;
-                  const isHovered = hoveredFolderPath === projectPath;
-                  // Show lock if: this folder is locked (always visible), OR this folder is hovered and not locked (show open lock on hover)
+                  const isLocked = folderLock.lockedFolderPath === projectPath;
+                  const isHovered = folderLock.hoveredFolderPath === projectPath;
                   const showLock = isLocked || (isHovered && !isLocked);
-                  
+
                   return (
-                    <div 
-                      key={projectName} 
+                    <div
+                      key={projectName}
                       className="sidebar-folder"
-                      onMouseEnter={() => setHoveredFolderPath(projectPath || null)}
-                      onMouseLeave={() => setHoveredFolderPath(null)}
+                      onMouseEnter={() => folderLock.setHoveredFolderPath(projectPath || null)}
+                      onMouseLeave={() => folderLock.setHoveredFolderPath(null)}
                     >
                       <div className="sidebar-folder-header-wrapper">
                         <button
                           className="sidebar-folder-header"
-                          onClick={() => toggleProject(projectName)}
+                          onClick={() => sidebar.toggleProject(projectName)}
                         >
                           <span className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1986,9 +720,9 @@ function CanvasFlow() {
                               e.preventDefault();
                               e.stopPropagation();
                               if (isLocked) {
-                                setLockedFolderPath(null);
+                                folderLock.setLockedFolderPath(null);
                               } else {
-                                setLockedFolderPath(projectPath);
+                                folderLock.setLockedFolderPath(projectPath);
                               }
                             }}
                             onMouseDown={(e) => {
@@ -2013,12 +747,12 @@ function CanvasFlow() {
                         <div className="sidebar-folder-content">
                           {Object.entries(branches).map(([branchName, agents]) => {
                             const branchKey = `${projectName}:${branchName}`;
-                            const isBranchCollapsed = collapsedBranches.has(branchKey);
+                            const isBranchCollapsed = sidebar.collapsedBranches.has(branchKey);
                             return (
                               <div key={branchKey} className="sidebar-folder nested">
                                 <button
                                   className="sidebar-folder-header"
-                                  onClick={() => toggleBranch(branchKey)}
+                                  onClick={() => sidebar.toggleBranch(branchKey)}
                                 >
                                   <span className={`sidebar-folder-icon ${isBranchCollapsed ? 'collapsed' : 'expanded'}`}>
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2108,12 +842,12 @@ function CanvasFlow() {
       </div>
 
       {/* Canvas Content */}
-      <div className={`canvas-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <div className={`canvas-content ${sidebar.isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         {/* Expand button when sidebar is collapsed */}
-        {isSidebarCollapsed && (
+        {sidebar.isSidebarCollapsed && (
           <button
             className="sidebar-expand-button"
-            onClick={() => setIsSidebarCollapsed(false)}
+            onClick={sidebar.toggleSidebar}
             aria-label="Expand sidebar"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2139,110 +873,110 @@ function CanvasFlow() {
         </div>
 
         <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onConnectStart={onConnectStart}
-        onConnectEnd={onConnectEnd}
-        onPaneContextMenu={onPaneContextMenu}
-        onPaneClick={onPaneClick}
-        onDragOver={handleCanvasDragOver}
-        onDrop={handleCanvasDrop}
-        nodeTypes={nodeTypes}
-        fitView
-        style={{ backgroundColor: 'var(--color-bg-canvas)' }}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        minZoom={0.1}
-        maxZoom={4}
-        panOnScroll={true}
-        zoomOnScroll={true}
-        panOnDrag={isNodeDragEnabled}
-        zoomOnPinch={true}
-        nodesDraggable={isNodeDragEnabled}
-        nodesConnectable={true}
-        elementsSelectable={true}
-        nodesFocusable={true}
-      >
-        <Background 
-          variant={BackgroundVariant.Lines} 
-          gap={12} 
-          size={1}
-          color={theme === 'light-web' ? '#F5F6F8' : '#3a3a3a'}
-        />
-        <ForkGhostNode />
-      </ReactFlow>
-
-      {/* Fork Session Modal */}
-      {forkModalData && (
-        <ForkSessionModal
-          onConfirm={handleForkConfirm}
-          onCancel={handleForkCancel}
-          isLoading={isForkLoading}
-          error={forkError}
-        />
-      )}
-
-      {/* Fork Error Toast (shown when validation fails outside modal) */}
-      {forkError && !forkModalData && (
-        <div className="fork-error-toast">
-          <span className="fork-error-icon">!</span>
-          <span className="fork-error-message">{forkError}</span>
-          <button
-            className="fork-error-dismiss"
-            onClick={() => setForkError(null)}
-            aria-label="Dismiss"
-          >
-            &times;
-          </button>
-        </div>
-      )}
-
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="context-menu"
-          style={{
-            position: 'fixed',
-            top: contextMenu.y,
-            left: contextMenu.x,
-          }}
-          onClick={(e) => e.stopPropagation()}
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
+          onPaneContextMenu={onPaneContextMenu}
+          onPaneClick={onPaneClick}
+          onDragOver={canvasDrop.handleCanvasDragOver}
+          onDrop={canvasDrop.handleCanvasDrop}
+          nodeTypes={nodeTypes}
+          fitView
+          style={{ backgroundColor: 'var(--color-bg-canvas)' }}
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+          minZoom={0.1}
+          maxZoom={4}
+          panOnScroll={true}
+          zoomOnScroll={true}
+          panOnDrag={isNodeDragEnabled}
+          zoomOnPinch={true}
+          nodesDraggable={isNodeDragEnabled}
+          nodesConnectable={true}
+          elementsSelectable={true}
+          nodesFocusable={true}
         >
-          <div className="context-menu-item" onClick={() => addTerminalNode()}>
-            <span>Add Terminal</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
-            </span>
+          <Background
+            variant={BackgroundVariant.Lines}
+            gap={12}
+            size={1}
+            color={theme === 'light-web' ? '#F5F6F8' : '#3a3a3a'}
+          />
+          <ForkGhostNode />
+        </ReactFlow>
+
+        {/* Fork Session Modal */}
+        {forkModal.isOpen && (
+          <ForkSessionModal
+            onConfirm={handleForkConfirm}
+            onCancel={forkModal.cancel}
+            isLoading={forkModal.isLoading}
+            error={forkModal.error}
+          />
+        )}
+
+        {/* Fork Error Toast (shown when validation fails outside modal) */}
+        {forkModal.error && !forkModal.isOpen && (
+          <div className="fork-error-toast">
+            <span className="fork-error-icon">!</span>
+            <span className="fork-error-message">{forkModal.error}</span>
+            <button
+              className="fork-error-dismiss"
+              onClick={forkModal.clearError}
+              aria-label="Dismiss"
+            >
+              &times;
+            </button>
           </div>
-          <div className="context-menu-item" onClick={() => addWorkspaceNode()}>
-            <span>Add Workspace</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
-            </span>
+        )}
+
+        {contextMenu && (
+          <div
+            ref={contextMenuRef}
+            className="context-menu"
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="context-menu-item" onClick={() => canvasActions.addTerminalNode()}>
+              <span>Add Terminal</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+              </span>
+            </div>
+            <div className="context-menu-item" onClick={() => canvasActions.addWorkspaceNode()}>
+              <span>Add Workspace</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
+              </span>
+            </div>
+            <div className="context-menu-item" onClick={() => canvasActions.addAgentNode()}>
+              <span>Add Agent</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
+              </span>
+            </div>
+            <div className="context-menu-divider" />
+            <div className="context-menu-item highlight" onClick={() => canvasActions.addStarterNode()}>
+              <span>New Conversation</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
+              </span>
+            </div>
+            <div className="context-menu-item" onClick={() => canvasActions.addConversationNode({ id: '' } as never, screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y }))}>
+              <span>Load Conversation</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘L' : 'Ctrl+Shift+L'}
+              </span>
+            </div>
           </div>
-          <div className="context-menu-item" onClick={() => addAgentNode()}>
-            <span>Add Agent</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
-            </span>
-          </div>
-          <div className="context-menu-divider" />
-          <div className="context-menu-item highlight" onClick={() => addStarterNode()}>
-            <span>New Conversation</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
-            </span>
-          </div>
-          <div className="context-menu-item" onClick={() => addConversationNode()}>
-            <span>Load Conversation</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘L' : 'Ctrl+Shift+L'}
-            </span>
-          </div>
-        </div>
-      )}
+        )}
 
         {/* Settings FAB */}
         <button
@@ -2254,255 +988,255 @@ function CanvasFlow() {
         </button>
 
         {/* Settings Modal */}
-      {isSettingsOpen && (
-        <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
-          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="settings-modal-header">
-              <h2>Settings</h2>
-              <button className="settings-close-button" onClick={() => setIsSettingsOpen(false)}>
-                ✕
-              </button>
-            </div>
-            <div className="settings-modal-content">
-              <div className="settings-section">
-                <h3>Integrations</h3>
-                <div className="settings-integration">
-                  <div className="integration-header">
-                    <div className="integration-info">
-                      <span className="integration-name">Linear</span>
-                      <span className={`integration-status ${isLinearConnected ? 'connected' : 'disconnected'}`}>
-                        {isLinearConnected ? '● Connected' : '○ Not connected'}
-                      </span>
+        {isSettingsOpen && (
+          <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+            <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="settings-modal-header">
+                <h2>Settings</h2>
+                <button className="settings-close-button" onClick={() => setIsSettingsOpen(false)}>
+                  ✕
+                </button>
+              </div>
+              <div className="settings-modal-content">
+                <div className="settings-section">
+                  <h3>Integrations</h3>
+                  <div className="settings-integration">
+                    <div className="integration-header">
+                      <div className="integration-info">
+                        <span className="integration-name">Linear</span>
+                        <span className={`integration-status ${linear.isConnected ? 'connected' : 'disconnected'}`}>
+                          {linear.isConnected ? '● Connected' : '○ Not connected'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="integration-content">
+                      <input
+                        type="password"
+                        placeholder="Enter Linear API Key"
+                        value={linear.apiKey}
+                        onChange={(e) => linear.connect(e.target.value)}
+                        className="integration-input"
+                        disabled={linear.isConnected}
+                      />
+                      {linear.isConnected ? (
+                        <button
+                          onClick={linear.disconnect}
+                          className="integration-button disconnect"
+                        >
+                          Disconnect
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => linear.connect(linear.apiKey)}
+                          className="integration-button connect"
+                          disabled={!linear.apiKey.trim()}
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                    <div className="integration-help">
+                      Get your API key from{' '}
+                      <a
+                        href="https://linear.app/settings/api"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="integration-link"
+                      >
+                        Linear Settings → API
+                      </a>
                     </div>
                   </div>
-                  <div className="integration-content">
-                    <input
-                      type="password"
-                      placeholder="Enter Linear API Key"
-                      value={linearApiKey}
-                      onChange={(e) => setLinearApiKey(e.target.value)}
-                      className="integration-input"
-                      disabled={isLinearConnected}
-                    />
-                    {isLinearConnected ? (
-                      <button
-                        onClick={handleLinearDisconnect}
-                        className="integration-button disconnect"
-                      >
-                        Disconnect
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleLinearConnect}
-                        className="integration-button connect"
-                        disabled={!linearApiKey.trim()}
-                      >
-                        Connect
-                      </button>
-                    )}
-                  </div>
-                  <div className="integration-help">
-                    Get your API key from{' '}
-                    <a
-                      href="https://linear.app/settings/api"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="integration-link"
+                </div>
+
+                <div className="settings-section">
+                  <h3>Appearance</h3>
+                  <div className="settings-item">
+                    <span>Color Palette</span>
+                    <select
+                      className="theme-select"
+                      value={theme}
+                      onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'light-web')}
                     >
-                      Linear Settings → API
-                    </a>
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                      <option value="light-web">Light (Web)</option>
+                    </select>
                   </div>
                 </div>
-              </div>
 
-              <div className="settings-section">
-                <h3>Appearance</h3>
-                <div className="settings-item">
-                  <span>Color Palette</span>
-                  <select
-                    className="theme-select"
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'light-web')}
-                  >
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
-                    <option value="light-web">Light (Web)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="settings-section">
-                <h3>Keyboard Shortcuts</h3>
-                <div className="settings-item">
-                  <span>Add Terminal</span>
-                  <span className="settings-shortcut">
-                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
-                  </span>
-                </div>
-                <div className="settings-item">
-                  <span>Add Workspace</span>
-                  <span className="settings-shortcut">
-                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
-                  </span>
-                </div>
-                <div className="settings-item">
-                  <span>Node Drag Mode</span>
-                  <span className="settings-shortcut">
-                    {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘' : 'Hold Ctrl'}
-                  </span>
+                <div className="settings-section">
+                  <h3>Keyboard Shortcuts</h3>
+                  <div className="settings-item">
+                    <span>Add Terminal</span>
+                    <span className="settings-shortcut">
+                      {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+                    </span>
+                  </div>
+                  <div className="settings-item">
+                    <span>Add Workspace</span>
+                    <span className="settings-shortcut">
+                      {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
+                    </span>
+                  </div>
+                  <div className="settings-item">
+                    <span>Node Drag Mode</span>
+                    <span className="settings-shortcut">
+                      {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘' : 'Hold Ctrl'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
         {/* Issues Pill - COMMENTED OUT */}
-        {false && isLinearConnected && (
-        <div
-          onClick={!isPillSquare ? togglePill : undefined}
-          className={`issues-pill ${!isPillSquare ? 'cursor-pointer' : 'cursor-default'} ${
-            isPillExpanded ? 'expanded' : ''
-          } ${isPillSquare ? 'square' : ''}`}
-          style={{
-            borderRadius: isPillSquare ? '24px' : '20px'
-          }}
-        >
-          {!isPillSquare ? (
-            <div className={`pill-text ${isTextVisible ? 'visible' : ''}`}>
-              View Issues...
-            </div>
-          ) : showPillContent ? (
-            <div className="pill-content-wrapper" onClick={(e) => e.stopPropagation()}>
-              {/* Collapse nozzle at top */}
-              <div
-                className={`collapse-nozzle ${isContentVisible ? 'visible' : ''}`}
-                onClick={collapsePill}
-                title="Collapse issues"
-              />
-
-              {/* Issues list */}
-                <div className={`issues-list ${isContentVisible ? 'visible' : ''}`}>
-                <div className="issues-toolbar">
-                  <div className="issues-workspace">
-                    <span className="issues-workspace-label">Workspace</span>
-                    <span className="issues-workspace-name">
-                      {linearWorkspaceName || (loadingIssues ? 'Loading...' : 'Unknown')}
-                    </span>
-                  </div>
-                  <div className="issues-filters">
-                    <div className="issues-filter">
-                      <label htmlFor="issues-filter-project">Project</label>
-                      <select
-                        id="issues-filter-project"
-                        className="issues-select"
-                        value={selectedProjectId}
-                        onChange={(event) => setSelectedProjectId(event.target.value)}
-                      >
-                        <option value="all">All projects</option>
-                        {hasUnassignedProject && <option value="none">No project</option>}
-                        {projectOptions.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="issues-filter">
-                      <label htmlFor="issues-filter-milestone">Milestone</label>
-                      <select
-                        id="issues-filter-milestone"
-                        className="issues-select"
-                        value={selectedMilestoneId}
-                        onChange={(event) => setSelectedMilestoneId(event.target.value)}
-                      >
-                        <option value="all">All milestones</option>
-                        {hasUnassignedMilestone && <option value="none">No milestone</option>}
-                        {visibleMilestoneOptions.map((milestone) => (
-                          <option key={milestone.id} value={milestone.id}>
-                            {milestone.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="issues-filter">
-                      <label htmlFor="issues-filter-status">Status</label>
-                      <select
-                        id="issues-filter-status"
-                        className="issues-select"
-                        value={selectedStatusId}
-                        onChange={(event) => setSelectedStatusId(event.target.value)}
-                      >
-                        <option value="all">All statuses</option>
-                        {statusOptions.map((state) => (
-                          <option key={state.id} value={state.id}>
-                            {state.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {loadingIssues ? (
-                  <div className="loading-state">Loading issues...</div>
-                ) : filteredIssues.length === 0 ? (
-                  <div className="empty-state">
-                    {issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
-                  </div>
-                ) : (
-                  filteredIssues.map((issue) => {
-                    const projectLabel = issue.project?.name;
-                    const milestoneLabel = issue.projectMilestone?.name;
-                    return (
-                      <div
-                        key={issue.id}
-                        className="issue-card"
-                        draggable
-                        onDragStart={(e) => handleIssueDragStart(e, issue)}
-                      >
-                        <div className="issue-header">
-                          <span className="issue-identifier">{issue.identifier}</span>
-                          <span
-                            className="issue-status"
-                            style={{ backgroundColor: issue.state.color }}
-                          >
-                            {issue.state.name}
-                          </span>
-                        </div>
-                        <div className="issue-title">{issue.title}</div>
-                        {(projectLabel || milestoneLabel) && (
-                          <div className="issue-meta">
-                            {projectLabel && <span>Project: {projectLabel}</span>}
-                            {projectLabel && milestoneLabel && (
-                              <span className="issue-meta-sep">|</span>
-                            )}
-                            {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
-                          </div>
-                        )}
-                        {issue.assignee && (
-                          <div className="issue-assignee">
-                            {issue.assignee.avatarUrl && (
-                              <img
-                                src={issue.assignee.avatarUrl}
-                                alt={issue.assignee.name}
-                                className="assignee-avatar"
-                              />
-                            )}
-                            <span className="assignee-name">{issue.assignee.name}</span>
-                          </div>
-                        )}
-                        <div className="issue-priority">
-                          Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+        {false && linear.isConnected && (
+          <div
+            onClick={!pill.isPillSquare ? pill.togglePill : undefined}
+            className={`issues-pill ${!pill.isPillSquare ? 'cursor-pointer' : 'cursor-default'} ${
+              pill.isPillExpanded ? 'expanded' : ''
+            } ${pill.isPillSquare ? 'square' : ''}`}
+            style={{
+              borderRadius: pill.isPillSquare ? '24px' : '20px'
+            }}
+          >
+            {!pill.isPillSquare ? (
+              <div className={`pill-text ${pill.isTextVisible ? 'visible' : ''}`}>
+                View Issues...
               </div>
-            </div>
-          ) : null}
-        </div>
+            ) : pill.showPillContent ? (
+              <div className="pill-content-wrapper" onClick={(e) => e.stopPropagation()}>
+                {/* Collapse nozzle at top */}
+                <div
+                  className={`collapse-nozzle ${pill.isContentVisible ? 'visible' : ''}`}
+                  onClick={pill.collapsePill}
+                  title="Collapse issues"
+                />
+
+                {/* Issues list */}
+                <div className={`issues-list ${pill.isContentVisible ? 'visible' : ''}`}>
+                  <div className="issues-toolbar">
+                    <div className="issues-workspace">
+                      <span className="issues-workspace-label">Workspace</span>
+                      <span className="issues-workspace-name">
+                        {linear.workspaceName || (linear.isLoading ? 'Loading...' : 'Unknown')}
+                      </span>
+                    </div>
+                    <div className="issues-filters">
+                      <div className="issues-filter">
+                        <label htmlFor="issues-filter-project">Project</label>
+                        <select
+                          id="issues-filter-project"
+                          className="issues-select"
+                          value={linear.selectedProjectId}
+                          onChange={(event) => linear.setFilter('selectedProjectId', event.target.value)}
+                        >
+                          <option value="all">All projects</option>
+                          {linear.hasUnassignedProject && <option value="none">No project</option>}
+                          {linear.projectOptions.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="issues-filter">
+                        <label htmlFor="issues-filter-milestone">Milestone</label>
+                        <select
+                          id="issues-filter-milestone"
+                          className="issues-select"
+                          value={linear.selectedMilestoneId}
+                          onChange={(event) => linear.setFilter('selectedMilestoneId', event.target.value)}
+                        >
+                          <option value="all">All milestones</option>
+                          {linear.hasUnassignedMilestone && <option value="none">No milestone</option>}
+                          {linear.visibleMilestoneOptions.map((milestone) => (
+                            <option key={milestone.id} value={milestone.id}>
+                              {milestone.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="issues-filter">
+                        <label htmlFor="issues-filter-status">Status</label>
+                        <select
+                          id="issues-filter-status"
+                          className="issues-select"
+                          value={linear.selectedStatusId}
+                          onChange={(event) => linear.setFilter('selectedStatusId', event.target.value)}
+                        >
+                          <option value="all">All statuses</option>
+                          {linear.statusOptions.map((state) => (
+                            <option key={state.id} value={state.id}>
+                              {state.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {linear.isLoading ? (
+                    <div className="loading-state">Loading issues...</div>
+                  ) : linear.filteredIssues.length === 0 ? (
+                    <div className="empty-state">
+                      {linear.issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
+                    </div>
+                  ) : (
+                    linear.filteredIssues.map((issue: LinearIssue) => {
+                      const projectLabel = issue.project?.name;
+                      const milestoneLabel = issue.projectMilestone?.name;
+                      return (
+                        <div
+                          key={issue.id}
+                          className="issue-card"
+                          draggable
+                          onDragStart={(e) => canvasDrop.handleIssueDragStart(e, issue)}
+                        >
+                          <div className="issue-header">
+                            <span className="issue-identifier">{issue.identifier}</span>
+                            <span
+                              className="issue-status"
+                              style={{ backgroundColor: issue.state.color }}
+                            >
+                              {issue.state.name}
+                            </span>
+                          </div>
+                          <div className="issue-title">{issue.title}</div>
+                          {(projectLabel || milestoneLabel) && (
+                            <div className="issue-meta">
+                              {projectLabel && <span>Project: {projectLabel}</span>}
+                              {projectLabel && milestoneLabel && (
+                                <span className="issue-meta-sep">|</span>
+                              )}
+                              {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
+                            </div>
+                          )}
+                          {issue.assignee && (
+                            <div className="issue-assignee">
+                              {issue.assignee.avatarUrl && (
+                                <img
+                                  src={issue.assignee.avatarUrl}
+                                  alt={issue.assignee.name}
+                                  className="assignee-avatar"
+                                />
+                              )}
+                              <span className="assignee-name">{issue.assignee.name}</span>
+                            </div>
+                          )}
+                          <div className="issue-priority">
+                            Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
         )}
 
         <ActionPill />

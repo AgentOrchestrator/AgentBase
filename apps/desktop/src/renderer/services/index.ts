@@ -18,3 +18,23 @@ export type { IForkService, ForkRequest, ForkResult, ForkError, ForkErrorType } 
 // Session provider (abstraction for hooks system integration)
 export { FileBasedSessionProvider, sessionProvider } from './SessionProvider';
 export type { ISessionProvider, SessionInfo, SessionStartCallback } from './SessionProvider';
+
+// Canvas node service
+export { CanvasNodeService, canvasNodeService } from './CanvasNodeService';
+export type {
+  CreateNodeOptions,
+  CreateAgentOptions,
+  CreateConversationOptions,
+  SessionData,
+} from './CanvasNodeService';
+
+// Linear service (GraphQL API calls)
+export { linearService } from './LinearService';
+export type {
+  ILinearService,
+  FetchProjectsResponse,
+  FetchIssuesResponse,
+  CreateTicketResponse,
+  LinearTeam,
+  LinearViewer,
+} from './LinearService';

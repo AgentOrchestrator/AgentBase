@@ -61,50 +61,189 @@ export class AgentServiceImpl implements IAgentService {
     };
   }
 
-  /**
-   * Set workspace and navigate terminal to it.
-   * If autoStartCli is true, also starts the CLI after navigation.
-   * If initialPrompt is provided, it will be sent to the agent after CLI starts.
-   */
-  async setWorkspace(
-    path: string,
-    autoStartCli?: boolean,
-    initialPrompt?: string,
-    sessionId?: string
-  ): Promise<void> {
-    this.workspacePath = path;
+  // =============================================================================
+  // Centralized Terminal Operations
+  // =============================================================================
 
-    // Ensure terminal is created and running
+  /**
+   * Write to shell (only when CLI is NOT running).
+   * Guards against accidentally piping shell commands into the REPL.
+   */
+  private writeToShell(data: string): void {
+    if (this.isStarted) {
+      console.warn('[AgentService] writeToShell() blocked - CLI is running, cannot write shell commands', {
+        agentId: this.agentId,
+        terminalId: this.terminalService.terminalId,
+        data: data.length > 100 ? data.substring(0, 100) + '...' : data,
+      });
+      return;
+    }
+
+    console.log('[AgentService] writeToShell()', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      dataLength: data.length,
+      data: data.length > 100 ? data.substring(0, 100) + '...' : data,
+    });
+    this.terminalService.write(data);
+  }
+
+  /**
+   * Write to CLI REPL (only when CLI IS running).
+   * Use this for sending prompts or Ctrl+C to the running agent.
+   */
+  private writeToCli(data: string): void {
+    if (!this.isStarted) {
+      console.warn('[AgentService] writeToCli() blocked - CLI is not running', {
+        agentId: this.agentId,
+        terminalId: this.terminalService.terminalId,
+        data: data.length > 100 ? data.substring(0, 100) + '...' : data,
+      });
+      return;
+    }
+
+    console.log('[AgentService] writeToCli()', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      dataLength: data.length,
+      data: data.length > 100 ? data.substring(0, 100) + '...' : data,
+    });
+    this.terminalService.write(data);
+  }
+
+  /**
+   * Ensure terminal is created and ready for input
+   */
+  private async ensureTerminalReady(): Promise<void> {
     if (!this.terminalService.isRunning()) {
       await this.terminalService.create();
       // Wait for shell to initialize
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
+  }
 
-    // Navigate to workspace
-    this.terminalService.write(`cd "${path}"\n`);
+  /**
+   * Start the CLI process (single entry point for CLI startup)
+   * This is the ONLY place that writes the CLI command to terminal.
+   */
+  private async startCli(options: {
+    sessionId?: string;
+    initialPrompt?: string;
+    customCommand?: string;
+  }): Promise<void> {
+    const { sessionId, initialPrompt, customCommand } = options;
 
-    // Start CLI if requested and not already started
-    if (autoStartCli && !this.isStarted) {
-      // Wait for cd to complete
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      const cliCommand = this.getCliCommand();
-      if (cliCommand) {
-        const startCommand = this.buildCliStartCommand(cliCommand, {
-          sessionId,
-          initialPrompt,
+    // ALWAYS check main process as source of truth (not renderer-side isStarted)
+    // This handles React StrictMode double-mount where dispose() may reset isStarted
+    if (window.terminalSessionAPI) {
+      const state = await window.terminalSessionAPI.getTerminalSessionState(
+        this.terminalService.terminalId
+      );
+      if (state?.agentRunning) {
+        console.log('[AgentService] startCli() skipped - main process says agent is running', {
+          agentId: this.agentId,
+          terminalId: this.terminalService.terminalId,
+          state,
         });
-        this.terminalService.write(`${startCommand}\n`);
-        this.isStarted = true;
+        this.isStarted = true; // Sync local state with main process
         this.updateStatus('running');
+        return;
       }
     }
+
+    // Fallback to local state check (for when main process API unavailable)
+    if (this.isStarted) {
+      console.log('[AgentService] startCli() skipped - already started (local state)', {
+        agentId: this.agentId,
+      });
+      return;
+    }
+
+    const cliCommand = customCommand || this.getCliCommand();
+    if (!cliCommand) {
+      throw new Error(`No CLI command configured for agent type: ${this.agentType}`);
+    }
+
+    const startCommand = customCommand
+      ? cliCommand
+      : this.buildCliStartCommand(cliCommand, { sessionId, initialPrompt });
+
+    console.log('[AgentService] startCli() - writing CLI command', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      startCommand,
+    });
+
+    // Write to shell (not CLI) - we're starting the CLI
+    this.writeToShell(`${startCommand}\n`);
+    this.isStarted = true;
+    this.updateStatus('running');
+
+    // Persist session state to main process (survives renderer refresh)
+    await this.persistSessionStateToMainProcess(sessionId);
+  }
+
+  // =============================================================================
+  // Public API
+  // =============================================================================
+
+  /**
+   * Set workspace path and navigate terminal to it.
+   * Does NOT start the CLI - use start() for that.
+   * IMPORTANT: Must be called BEFORE start() - cannot change workspace while CLI is running.
+   */
+  async setWorkspace(path: string): Promise<void> {
+    console.log('[AgentService] setWorkspace() called', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      path,
+      isStarted: this.isStarted,
+    });
+
+    // Check main process as source of truth (handles React StrictMode race conditions)
+    if (window.terminalSessionAPI) {
+      const state = await window.terminalSessionAPI.getTerminalSessionState(
+        this.terminalService.terminalId
+      );
+      if (state?.agentRunning) {
+        console.warn('[AgentService] setWorkspace() skipped - CLI is running per main process. Stop the CLI first to change workspace.');
+        this.isStarted = true; // Sync local state
+        return;
+      }
+    }
+
+    // Fallback to local state check
+    if (this.isStarted) {
+      console.warn('[AgentService] setWorkspace() skipped - CLI is already running (local state). Stop the CLI first to change workspace.');
+      return;
+    }
+
+    this.workspacePath = path;
+
+    // Ensure terminal is ready
+    await this.ensureTerminalReady();
+
+    // Navigate to workspace (shell command, not CLI)
+    this.writeToShell(`cd "${path}"\n`);
   }
 
   /**
    * Initialize the service
    */
   async initialize(): Promise<void> {
+    console.log('[AgentService] initialize() START', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+    });
+
+    // Check main process for existing session state (survives renderer refresh)
+    await this.restoreSessionStateFromMainProcess();
+
+    console.log('[AgentService] initialize() AFTER restore, isStarted=', this.isStarted, {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+    });
+
     // Listen to terminal exit to update status
     this.terminalService.onExit((code) => {
       if (this.isStarted) {
@@ -112,45 +251,116 @@ export class AgentServiceImpl implements IAgentService {
         this.updateStatus(code === 0 ? 'completed' : 'error', {
           errorMessage: code !== 0 ? `Process exited with code ${code}` : undefined,
         });
+        // Clear session state in main process
+        this.clearSessionStateInMainProcess();
       }
     });
   }
 
   /**
-   * Start the coding agent CLI in the terminal
+   * Restore session state from main process after renderer refresh
    */
-  async start(command?: string, sessionId?: string, initialPrompt?: string): Promise<void> {
-    if (this.isStarted) {
+  private async restoreSessionStateFromMainProcess(): Promise<void> {
+    console.log('[AgentService] restoreSessionStateFromMainProcess() called', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      hasAPI: !!window.terminalSessionAPI,
+    });
+
+    if (!window.terminalSessionAPI) {
+      console.log('[AgentService] No terminalSessionAPI available, skipping restore');
       return;
     }
 
-    // Ensure terminal is created
-    if (!this.terminalService.isRunning()) {
-      await this.terminalService.create();
-      // Small delay for shell to initialize
-      await new Promise((resolve) => setTimeout(resolve, 200));
+    try {
+      const state = await window.terminalSessionAPI.getTerminalSessionState(
+        this.terminalService.terminalId
+      );
+
+      console.log('[AgentService] Got session state from main process', {
+        agentId: this.agentId,
+        terminalId: this.terminalService.terminalId,
+        state,
+      });
+
+      if (state && state.agentRunning) {
+        console.log('[AgentService] ✅ Restoring isStarted=true from main process state', {
+          agentId: this.agentId,
+          terminalId: this.terminalService.terminalId,
+        });
+        this.isStarted = true;
+        this.updateStatus('running');
+      } else {
+        console.log('[AgentService] No active agent session to restore', {
+          agentId: this.agentId,
+          terminalId: this.terminalService.terminalId,
+          state,
+        });
+      }
+    } catch (error) {
+      console.warn('[AgentService] Failed to restore session state', error);
+    }
+  }
+
+  /**
+   * Persist session state to main process
+   */
+  private async persistSessionStateToMainProcess(sessionId?: string): Promise<void> {
+    if (!window.terminalSessionAPI) {
+      return;
     }
 
-    // Get CLI command
-    const cliCommand = command || this.getCliCommand();
-    if (!cliCommand) {
-      throw new Error(`No CLI command configured for agent type: ${this.agentType}`);
+    try {
+      await window.terminalSessionAPI.setTerminalSessionState(
+        this.terminalService.terminalId,
+        {
+          agentRunning: true,
+          agentType: this.agentType,
+          sessionId,
+          startedAt: Date.now(),
+        }
+      );
+    } catch (error) {
+      console.warn('[AgentService] Failed to persist session state', error);
+    }
+  }
+
+  /**
+   * Clear session state in main process
+   */
+  private async clearSessionStateInMainProcess(): Promise<void> {
+    if (!window.terminalSessionAPI) {
+      return;
     }
 
-    // Update status
-    this.updateStatus('running');
-
-    const startCommand = command
-      ? cliCommand
-      : this.buildCliStartCommand(cliCommand, { sessionId, initialPrompt });
-
-    // Change to workspace directory if set
-    if (this.workspacePath) {
-      this.terminalService.write(`cd "${this.workspacePath}" && ${startCommand}\n`);
-    } else {
-      this.terminalService.write(`${startCommand}\n`);
+    try {
+      await window.terminalSessionAPI.clearTerminalSessionState(
+        this.terminalService.terminalId
+      );
+    } catch (error) {
+      console.warn('[AgentService] Failed to clear session state', error);
     }
-    this.isStarted = true;
+  }
+
+  /**
+   * Start the coding agent CLI in the terminal.
+   * Call setWorkspace() first if you need to navigate to a directory.
+   */
+  async start(command?: string, sessionId?: string, initialPrompt?: string): Promise<void> {
+    console.log('[AgentService] start() called', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      isStarted: this.isStarted,
+      command,
+      sessionId,
+      hasInitialPrompt: !!initialPrompt,
+    });
+
+    // Ensure terminal is ready
+    await this.ensureTerminalReady();
+
+    // Delegate to centralized startCli
+    await this.startCli({ sessionId, initialPrompt, customCommand: command });
   }
 
   /**
@@ -161,12 +371,17 @@ export class AgentServiceImpl implements IAgentService {
       return;
     }
 
-    // Send Ctrl+C to interrupt
-    this.terminalService.write('\x03');
+    // Send Ctrl+C to interrupt the CLI
+    this.writeToCli('\x03');
 
     // Update status
     this.updateStatus('idle');
     this.isStarted = false;
+
+    // NOTE: We intentionally do NOT clear session state here.
+    // The session state is cleared in onExit when the terminal process actually exits.
+    // This prevents race conditions during browser refresh where stop() is called
+    // but the pty process is still running in the main process.
   }
 
   /**

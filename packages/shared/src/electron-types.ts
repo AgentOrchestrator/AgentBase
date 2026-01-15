@@ -33,6 +33,40 @@ export interface ElectronAPI {
 }
 
 // =============================================================================
+// Terminal Session State Types
+// =============================================================================
+
+/**
+ * State of a terminal session for tracking agent activity.
+ * Persisted in main process to survive renderer refreshes.
+ */
+export interface TerminalSessionState {
+  /** Whether a coding agent CLI is currently running */
+  agentRunning: boolean;
+  /** Type of agent running (e.g., 'claude_code', 'cursor') */
+  agentType?: CodingAgentType;
+  /** Session ID if agent supports sessions */
+  sessionId?: string;
+  /** Timestamp when agent was started */
+  startedAt?: number;
+}
+
+/**
+ * Terminal Session API for main/renderer state synchronization.
+ * Used to persist terminal state across renderer refreshes.
+ */
+export interface TerminalSessionAPI {
+  /** Get session state for a terminal */
+  getTerminalSessionState: (terminalId: string) => Promise<TerminalSessionState | null>;
+  /** Set session state for a terminal */
+  setTerminalSessionState: (terminalId: string, state: TerminalSessionState) => Promise<void>;
+  /** Clear session state for a terminal */
+  clearTerminalSessionState: (terminalId: string) => Promise<void>;
+  /** Get output buffer for a terminal (for restoring scrollback after refresh) */
+  getTerminalBuffer: (terminalId: string) => Promise<string>;
+}
+
+// =============================================================================
 // Canvas Persistence Types
 // =============================================================================
 

@@ -102,6 +102,22 @@ export default function AgentTerminalView({ terminalId, selected = false }: Agen
     if (window.electronAPI && !terminalProcessCreatedRef.current) {
       terminalProcessCreatedRef.current = true;
       window.electronAPI.createTerminal(terminalId);
+
+      // Restore terminal buffer after refresh (if any exists)
+      // This must happen BEFORE setting up data listeners to avoid duplicate output
+      if (window.terminalSessionAPI) {
+        window.terminalSessionAPI.getTerminalBuffer(terminalId).then((buffer) => {
+          if (buffer && buffer.length > 0) {
+            console.log('[AgentTerminalView] Restoring terminal buffer', {
+              terminalId,
+              bufferLength: buffer.length,
+            });
+            terminal.write(buffer);
+          }
+        }).catch((error) => {
+          console.warn('[AgentTerminalView] Failed to restore terminal buffer', error);
+        });
+      }
     }
 
     // Send terminal input to main process

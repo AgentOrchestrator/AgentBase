@@ -159,6 +159,8 @@ export function useCanvasPersistence(
           const loadedState = await window.canvasAPI.loadCanvas(currentId);
 
           if (loadedState) {
+            console.log('[CanvasPersistence] Restored canvas:', loadedState);
+  
             setCanvasId(loadedState.id);
             setInitialNodes(canvasNodesToNodes(loadedState.nodes));
             setInitialEdges(canvasEdgesToEdges(loadedState.edges));

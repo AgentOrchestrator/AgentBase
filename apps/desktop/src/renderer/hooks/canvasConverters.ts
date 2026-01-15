@@ -56,9 +56,11 @@ export function canvasNodesToNodes(canvasNodes: CanvasNode[]): Node[] {
   return canvasNodes.map((cn) => ({
     id: cn.id,
     type: cn.type,
-    position: cn.position,
-    data: cn.data as Record<string, unknown>,
-    style: cn.style,
+    position: { ...cn.position },
+    // Deep clone data to ensure each node has its own independent data object
+    // This prevents shared reference issues when multiple nodes are loaded
+    data: JSON.parse(JSON.stringify(cn.data)) as Record<string, unknown>,
+    style: cn.style ? { ...cn.style } : undefined,
   }));
 }
 

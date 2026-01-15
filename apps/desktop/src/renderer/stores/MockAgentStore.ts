@@ -59,6 +59,7 @@ function createMockAgents(): AgentNodeData[] {
         },
       ],
       activeView: 'overview',
+      workspacePath: '/Users/dev/projects/api-server',
     },
     {
       agentId: 'agent-002',
@@ -75,6 +76,7 @@ function createMockAgents(): AgentNodeData[] {
       progress: createPercentageProgress(35, 'Planning phase'),
       attachments: [],
       activeView: 'overview',
+      workspacePath: '/Users/dev/projects/database-service',
     },
     {
       agentId: 'agent-003',
@@ -90,17 +92,9 @@ function createMockAgents(): AgentNodeData[] {
       title: { value: 'Running Tests', isManuallySet: true },
       summary: 'Executing test suite for auth module',
       progress: createPercentageProgress(78, 'Test execution'),
-      attachments: [
-        {
-          type: 'workspace-metadata',
-          id: 'ws-001',
-          path: '/Users/dev/projects/api-server',
-          name: 'api-server',
-          git: { branch: 'feature/auth', remote: 'origin' },
-          projectType: 'node',
-        },
-      ],
+      attachments: [],
       activeView: 'terminal',
+      workspacePath: '/Users/dev/projects/api-server',
     },
     {
       agentId: 'agent-004',
@@ -124,6 +118,7 @@ function createMockAgents(): AgentNodeData[] {
       ),
       attachments: [],
       activeView: 'overview',
+      workspacePath: '/Users/dev/projects/frontend-app',
     },
     {
       agentId: 'agent-005',
@@ -140,6 +135,7 @@ function createMockAgents(): AgentNodeData[] {
       progress: null,
       attachments: [],
       activeView: 'overview',
+      workspacePath: '/Users/dev/projects/shared-lib',
     },
   ];
 }

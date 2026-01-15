@@ -14,33 +14,25 @@ import AttachmentHeader from '../../AttachmentHeader';
 import IssueDetailsModal from '../../IssueDetailsModal';
 import {
   isLinearIssueAttachment,
-  isWorkspaceMetadataAttachment,
   createLinearIssueAttachment,
-  createWorkspaceMetadataAttachment,
   TerminalAttachment,
 } from '../../types/attachments';
 import type { AgentNodeData, AgentNodeView } from '../../types/agent-node';
 import {
   useAgentService,
-  useWorkspaceService,
   useNodeInitialized,
 } from '../../context';
-import type {
-  WorkspaceState,
-  SessionReadiness,
-} from '../../hooks/useAgentState';
+import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
-  /** Agent node data */
+  /** Agent node data (single source of truth for workspace) */
   data: AgentNodeData;
   /** Callback when node data changes */
   onDataChange: (data: Partial<AgentNodeData>) => void;
   /** Whether the node is selected */
   selected?: boolean;
-  /** Workspace state from useAgentState (optional for backwards compat) */
-  workspaceState?: WorkspaceState;
   /** Session readiness from useAgentState */
   sessionReadiness?: SessionReadiness;
   /** React Flow node ID */
@@ -57,12 +49,10 @@ export function AgentNodePresentation({
   data,
   onDataChange,
   selected,
-  workspaceState,
   sessionReadiness = 'idle',
   nodeId,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
-  const workspace = useWorkspaceService();
   const isInitialized = useNodeInitialized();
   const isSessionReady = sessionReadiness === 'ready';
 
@@ -85,6 +75,8 @@ export function AgentNodePresentation({
         console.error('[AgentNode] Failed to auto-start agent:', err);
       });
     }
+
+    console.log('[AgentNodePresentation] isInitialized:', isInitialized, 'isSessionReady:', isSessionReady, data);
 
     return () => {
       // Stop agent on unmount
@@ -160,23 +152,12 @@ export function AgentNodePresentation({
 
       try {
         const droppedData = JSON.parse(jsonData);
-        let newAttachment: TerminalAttachment | null = null;
 
         if (attachmentType === 'linear-issue' || droppedData.identifier) {
-          newAttachment = createLinearIssueAttachment(droppedData);
-        } else if (attachmentType === 'workspace-metadata' || droppedData.path) {
-          newAttachment = createWorkspaceMetadataAttachment(droppedData);
-
-          // Update workspace service with the dropped path
-          if (droppedData.path) {
-            workspace.setWorkspacePath(droppedData.path);
-          }
-        }
-
-        if (newAttachment) {
+          const newAttachment = createLinearIssueAttachment(droppedData);
           const currentAttachments = data.attachments || [];
           const isDuplicate = currentAttachments.some(
-            (a) => a.type === newAttachment!.type && a.id === newAttachment!.id
+            (a) => a.type === newAttachment.type && a.id === newAttachment.id
           );
 
           if (!isDuplicate) {
@@ -184,20 +165,24 @@ export function AgentNodePresentation({
               attachments: [...currentAttachments, newAttachment],
             });
           }
+        } else if (attachmentType === 'workspace-metadata' || droppedData.path) {
+          // Workspace dropped - update workspace path directly in node data
+          if (droppedData.path) {
+            onDataChange({ workspacePath: droppedData.path });
+          }
         }
       } catch (error) {
         console.error('[AgentNode] Error parsing dropped data', error);
       }
     },
-    [data.attachments, onDataChange, workspace]
+    [data.attachments, onDataChange]
   );
 
   const attachments = data.attachments || [];
 
-  // Get workspace info from props (passed from useAgentState in parent)
-  const workspacePath = workspaceState?.path ?? null;
-  const workspaceSource = workspaceState?.source ?? null;
-  const gitInfo = workspaceState?.gitInfo ?? null;
+  // Get workspace info from node data (single source of truth)
+  const workspacePath = data.workspacePath ?? null;
+  const gitInfo = data.gitInfo ?? null;
 
   // Check if JSONL file exists
   const checkJsonlFile = useCallback(async () => {
@@ -273,15 +258,13 @@ export function AgentNodePresentation({
     };
   }, [forking]);
 
-  // Get workspace attachment for folder name
-  const workspaceAttachment = attachments.find(isWorkspaceMetadataAttachment);
-  const folderName = workspaceAttachment
-    ? workspaceAttachment.name || workspaceAttachment.path.split('/').pop() || 'Workspace'
-    : workspacePath
+  // Get folder name from workspace path
+  const folderName = workspacePath
     ? workspacePath.split('/').pop() || 'Workspace'
     : null;
-  const branch = gitInfo?.branch || workspaceAttachment?.git?.branch;
+  const branch = gitInfo?.branch;
 
+  console.log(['AgentNodePresentation data:', data]);
   return (
     <div className="agent-node-wrapper">
       {/* Frame Label - Folder and Branch */}
@@ -447,20 +430,16 @@ export function AgentNodePresentation({
         </button>
       </div>
 
-      {/* Attachments */}
-      {attachments.map((attachment, index) => (
-        <AttachmentHeader
-          key={`${attachment.type}-${attachment.id}-${index}`}
-          attachment={attachment}
-          onDetailsClick={
-            isLinearIssueAttachment(attachment)
-              ? () => handleAttachmentClick(attachment)
-              : undefined
-          }
-          isInherited={isWorkspaceMetadataAttachment(attachment) && workspaceSource === 'inherited'}
-          gitInfo={isWorkspaceMetadataAttachment(attachment) ? gitInfo : undefined}
-        />
-      ))}
+      {/* Attachments (Linear issues only - workspace is shown in frame label) */}
+      {attachments
+        .filter(isLinearIssueAttachment)
+        .map((attachment, index) => (
+          <AttachmentHeader
+            key={`${attachment.type}-${attachment.id}-${index}`}
+            attachment={attachment}
+            onDetailsClick={() => handleAttachmentClick(attachment)}
+          />
+        ))}
 
       {/* Content Area - Both views are always mounted, visibility controlled via CSS */}
       {/* This preserves terminal session state when switching between tabs */}

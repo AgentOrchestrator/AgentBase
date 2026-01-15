@@ -28,7 +28,6 @@ import type {
   PermissionPayload,
 } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
-import { createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from '../../types/attachments';
 import { agentStore, agentActionStore } from '../../stores';
 import type {
   AgentState,
@@ -95,7 +94,7 @@ function deterministicUuidFromString(input: string): string {
 // Main Hook
 // =============================================================================
 
-export function useAgentState({ nodeId, initialNodeData, attachments = [] }: UseAgentStateInput): AgentState {
+export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): AgentState {
   const { getNodes, getEdges } = useReactFlow();
 
   // ---------------------------------------------------------------------------
@@ -104,21 +103,21 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   const [nodeData, setNodeData] = useState<AgentNodeData>(initialNodeData);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Sync external node updates (e.g. fork/session updates) without clobbering store-managed data.
-  useEffect(() => {
-    setNodeData((prev) => ({
-      ...prev,
-      ...initialNodeData,
-      sessionId: initialNodeData.sessionId ?? prev.sessionId,
-      parentSessionId: initialNodeData.parentSessionId ?? prev.parentSessionId,
-      worktreeId: initialNodeData.worktreeId ?? prev.worktreeId,
-      workingDirectory: initialNodeData.workingDirectory ?? prev.workingDirectory,
-      chatMessages: initialNodeData.chatMessages ?? prev.chatMessages,
-      attachments: initialNodeData.attachments ?? prev.attachments,
-      createdAt: initialNodeData.createdAt ?? prev.createdAt,
-      initialPrompt: initialNodeData.initialPrompt ?? prev.initialPrompt,
-    }));
-  }, [initialNodeData]);
+  // COMMENTED OUT FOR DEBUGGING - Sync external node updates
+  // useEffect(() => {
+  //   setNodeData((prev) => ({
+  //     ...prev,
+  //     ...initialNodeData,
+  //     sessionId: initialNodeData.sessionId ?? prev.sessionId,
+  //     parentSessionId: initialNodeData.parentSessionId ?? prev.parentSessionId,
+  //     worktreeId: initialNodeData.worktreeId ?? prev.worktreeId,
+  //     workingDirectory: initialNodeData.workingDirectory ?? prev.workingDirectory,
+  //     chatMessages: initialNodeData.chatMessages ?? prev.chatMessages,
+  //     attachments: initialNodeData.attachments ?? prev.attachments,
+  //     createdAt: initialNodeData.createdAt ?? prev.createdAt,
+  //     initialPrompt: initialNodeData.initialPrompt ?? prev.initialPrompt,
+  //   }));
+  // }, [initialNodeData]);
 
   // ---------------------------------------------------------------------------
   // Workspace State
@@ -189,18 +188,14 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   const parentWorkspaceNode = parentNode?.type === 'workspace' ? parentNode : null;
   const parentWorkspacePath = parentWorkspaceNode?.data?.path as string | undefined;
 
-  // Get workspace from attachment
-  const currentAttachments = nodeData.attachments || attachments;
-  const attachmentWorkspace = currentAttachments.find(isWorkspaceMetadataAttachment);
-  const attachmentWorkspacePath = attachmentWorkspace?.path || null;
-
   // Resolve final workspace path and source
+  // Priority: node data > manual > worktree (inherited)
   let workspacePath: string | null = null;
   let workspaceSource: WorkspaceSource = null;
 
-  if (attachmentWorkspacePath) {
-    workspacePath = attachmentWorkspacePath;
-    workspaceSource = 'attachment';
+  if (nodeData.workspacePath) {
+    workspacePath = nodeData.workspacePath;
+    workspaceSource = 'manual';
   } else if (manualWorkspacePath) {
     workspacePath = manualWorkspacePath;
     workspaceSource = 'manual';
@@ -212,46 +207,65 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   // ---------------------------------------------------------------------------
   // Store Subscription
   // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const storeData = agentStore.getAgent(nodeData.agentId);
-    if (storeData) {
-      setNodeData((prev) => ({
-        ...prev,
-        ...storeData,
-        sessionId: storeData.sessionId ?? prev.sessionId,
-        parentSessionId: storeData.parentSessionId ?? prev.parentSessionId,
-        worktreeId: storeData.worktreeId ?? prev.worktreeId,
-        workingDirectory: storeData.workingDirectory ?? prev.workingDirectory,
-        chatMessages: storeData.chatMessages ?? prev.chatMessages,
-        attachments: storeData.attachments ?? prev.attachments,
-        createdAt: storeData.createdAt ?? prev.createdAt,
-        initialPrompt: storeData.initialPrompt ?? prev.initialPrompt,
-      }));
-    }
+  // COMMENTED OUT FOR DEBUGGING - Store subscription
+  // useEffect(() => {
+  //   // Debug: Log store subscription to detect shared agentId issues
+  //   console.log('[useAgentState] Subscribing to store', {
+  //     nodeId,
+  //     agentId: nodeData.agentId,
+  //     currentTitle: nodeData.title?.value,
+  //   });
 
-    const unsubscribe = agentStore.subscribe(nodeData.agentId, (updatedAgent) => {
-      setNodeData((prev) => ({
-        ...prev,
-        ...updatedAgent,
-        sessionId: updatedAgent.sessionId ?? prev.sessionId,
-        parentSessionId: updatedAgent.parentSessionId ?? prev.parentSessionId,
-        worktreeId: updatedAgent.worktreeId ?? prev.worktreeId,
-        workingDirectory: updatedAgent.workingDirectory ?? prev.workingDirectory,
-        chatMessages: updatedAgent.chatMessages ?? prev.chatMessages,
-        attachments: updatedAgent.attachments ?? prev.attachments,
-        createdAt: updatedAgent.createdAt ?? prev.createdAt,
-        initialPrompt: updatedAgent.initialPrompt ?? prev.initialPrompt,
-      }));
-    });
+  //   const storeData = agentStore.getAgent(nodeData.agentId);
+  //   if (storeData) {
+  //     console.log('[useAgentState] Found store data, applying to node', {
+  //       nodeId,
+  //       agentId: nodeData.agentId,
+  //       storeTitle: storeData.title?.value,
+  //     });
+  //     setNodeData((prev) => ({
+  //       ...prev,
+  //       ...storeData,
+  //       sessionId: storeData.sessionId ?? prev.sessionId,
+  //       parentSessionId: storeData.parentSessionId ?? prev.parentSessionId,
+  //       worktreeId: storeData.worktreeId ?? prev.worktreeId,
+  //       workingDirectory: storeData.workingDirectory ?? prev.workingDirectory,
+  //       chatMessages: storeData.chatMessages ?? prev.chatMessages,
+  //       attachments: storeData.attachments ?? prev.attachments,
+  //       createdAt: storeData.createdAt ?? prev.createdAt,
+  //       initialPrompt: storeData.initialPrompt ?? prev.initialPrompt,
+  //     }));
+  //   }
 
-    return unsubscribe;
-  }, [nodeData.agentId]);
+  //   const unsubscribe = agentStore.subscribe(nodeData.agentId, (updatedAgent) => {
+  //     console.log('[useAgentState] Store update received', {
+  //       nodeId,
+  //       agentId: nodeData.agentId,
+  //       updatedTitle: updatedAgent.title?.value,
+  //     });
+  //     setNodeData((prev) => ({
+  //       ...prev,
+  //       ...updatedAgent,
+  //       sessionId: updatedAgent.sessionId ?? prev.sessionId,
+  //       parentSessionId: updatedAgent.parentSessionId ?? prev.parentSessionId,
+  //       worktreeId: updatedAgent.worktreeId ?? prev.worktreeId,
+  //       workingDirectory: updatedAgent.workingDirectory ?? prev.workingDirectory,
+  //       chatMessages: updatedAgent.chatMessages ?? prev.chatMessages,
+  //       attachments: updatedAgent.attachments ?? prev.attachments,
+  //       createdAt: updatedAgent.createdAt ?? prev.createdAt,
+  //       initialPrompt: updatedAgent.initialPrompt ?? prev.initialPrompt,
+  //     }));
+  //   });
+
+  //   return unsubscribe;
+  // }, [nodeData.agentId, nodeId]);
 
   // ---------------------------------------------------------------------------
   // Worktree Provisioning (from parent workspace)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (parentWorkspacePath && !worktree && !isProvisioning && !attachmentWorkspacePath) {
+    // Only provision worktree if no workspace is set yet
+    if (parentWorkspacePath && !worktree && !isProvisioning && !nodeData.workspacePath) {
       setIsProvisioning(true);
       const branchName = `agent-${nodeId}`;
 
@@ -266,7 +280,7 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
           setIsProvisioning(false);
         });
     }
-  }, [parentWorkspacePath, nodeId, worktree, isProvisioning, attachmentWorkspacePath]);
+  }, [parentWorkspacePath, nodeId, worktree, isProvisioning, nodeData.workspacePath]);
 
   // Cleanup worktree on unmount
   useEffect(() => {
@@ -280,7 +294,7 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Git Info Fetching
+  // Git Info Fetching - sync to node data
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!workspacePath) {
@@ -294,54 +308,67 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
       .then((info) => {
         setGitInfo(info);
         setIsLoadingGit(false);
+        // Sync git info to node data for persistence
+        window.dispatchEvent(
+          new CustomEvent('update-node', {
+            detail: { nodeId, data: { ...nodeData, gitInfo: info, workspacePath } },
+          })
+        );
       })
       .catch(() => {
         setGitInfo(null);
         setIsLoadingGit(false);
       });
-  }, [workspacePath]);
+  }, [workspacePath, nodeId]);
 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
+  // COMMENTED OUT FOR DEBUGGING - dispatchNodeUpdate
   const dispatchNodeUpdate = useCallback(
     (updatedData: AgentNodeData) => {
-      setNodeData(updatedData);
+      console.warn('[useAgentState] dispatchNodeUpdate BEFORE dispatch', {
+        nodeId,
+        agentId: updatedData.agentId,
+        updatedData,
+      });
+      // setNodeData(updatedData);
       window.dispatchEvent(
         new CustomEvent('update-node', {
           detail: { nodeId, data: updatedData },
         })
       );
+      console.warn('[useAgentState] dispatchNodeUpdate AFTER dispatch', {
+        nodeId,
+        agentId: updatedData.agentId,
+      });
     },
     [nodeId]
   );
 
-  useEffect(() => {
-    if (nodeData.sessionId) {
-      return;
-    }
+  // COMMENTED OUT FOR DEBUGGING - Derived sessionId effect
+  // useEffect(() => {
+  //   if (nodeData.sessionId) {
+  //     return;
+  //   }
 
-    const derivedSessionId = deterministicUuidFromString(`agent-node:${nodeId}`);
-    if (sessionId === derivedSessionId) {
-      return;
-    }
+  //   const derivedSessionId = deterministicUuidFromString(`agent-node:${nodeId}`);
+  //   if (sessionId === derivedSessionId) {
+  //     return;
+  //   }
 
-    setSessionId(derivedSessionId);
-    dispatchNodeUpdate({ ...nodeData, sessionId: derivedSessionId });
-  }, [nodeId, nodeData, sessionId, dispatchNodeUpdate]);
+  //   setSessionId(derivedSessionId);
+  //   dispatchNodeUpdate({ ...nodeData, sessionId: derivedSessionId });
+  // }, [nodeId, nodeData, sessionId, dispatchNodeUpdate]);
 
   const setWorkspace = useCallback(
     (path: string) => {
       setManualWorkspacePath(path);
 
-      const newAttachment = createWorkspaceMetadataAttachment({
-        path,
-        name: path.split('/').pop() || 'Workspace',
-      });
-
+      // Store workspace path directly in node data (single source of truth)
       const updatedData = {
         ...nodeData,
-        attachments: [...(nodeData.attachments || []), newAttachment],
+        workspacePath: path,
       };
 
       dispatchNodeUpdate(updatedData);
@@ -351,9 +378,22 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
 
   const updateNodeData = useCallback(
     (updates: Partial<AgentNodeData>) => {
-      dispatchNodeUpdate({ ...nodeData, ...updates });
+      console.warn('[useAgentState] updateNodeData BEFORE', {
+        nodeId,
+        agentId: nodeData.agentId,
+        currentData: nodeData,
+        updates,
+        stack: new Error().stack,
+      });
+      const mergedData = { ...nodeData, ...updates };
+      console.warn('[useAgentState] updateNodeData AFTER', {
+        nodeId,
+        agentId: nodeData.agentId,
+        mergedData,
+      });
+      dispatchNodeUpdate(mergedData);
     },
-    [nodeData, dispatchNodeUpdate]
+    [nodeId, nodeData, dispatchNodeUpdate]
   );
 
   const deleteNode = useCallback(() => {

@@ -11,7 +11,6 @@ import {
   TerminalAttachment,
   isLinearIssueAttachment,
   createLinearIssueAttachment,
-  createWorkspaceMetadataAttachment,
 } from './types/attachments';
 
 interface TerminalNodeData {
@@ -905,24 +904,23 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const data = JSON.parse(jsonData);
       const attachmentType = e.dataTransfer.getData('attachment-type');
 
-      // Create attachment based on type
-      let newAttachment;
+      // Terminal nodes only support Linear issue attachments
+      // Workspace drops are handled by creating agent nodes instead
       if (attachmentType === 'workspace-metadata') {
-        newAttachment = createWorkspaceMetadataAttachment(data);
-      } else {
-        // Default to Linear issue
-        newAttachment = createLinearIssueAttachment(data);
+        console.log('[TerminalNode] Workspace drops not supported on terminal nodes');
+        return;
       }
 
+      // Create Linear issue attachment
+      const newAttachment = createLinearIssueAttachment(data);
+
       // Add to existing attachments
-      if (!nodeData.attachments) {
-        nodeData.attachments = [];
-      }
-      nodeData.attachments.push(newAttachment);
+      const currentAttachments = nodeData.attachments || [];
+      const updatedAttachments = [...currentAttachments, newAttachment];
 
       // Trigger a re-render by updating the node
       window.dispatchEvent(new CustomEvent('update-node', {
-        detail: { nodeId: id, data: nodeData }
+        detail: { nodeId: id, data: { ...nodeData, attachments: updatedAttachments } }
       }));
     } catch (error) {
       console.error('Error handling drop on terminal:', error);

@@ -5,6 +5,7 @@
  */
 
 import type { ElectronAPI, WorktreeAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI, ShellAPI } from '../main/preload';
+import type { TerminalSessionAPI } from '@agent-orchestrator/shared';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
 
 // Declare SVG module imports (Vite handles these as URLs)
@@ -24,6 +25,7 @@ declare global {
     shellAPI?: ShellAPI;
     canvasAPI?: import('../main/preload').CanvasAPI;
     gitAPI?: GitAPI;
+    terminalSessionAPI?: TerminalSessionAPI;
   }
 }
 
