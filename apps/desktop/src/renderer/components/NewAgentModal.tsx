@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './NewAgentModal.css';
 import { worktreeService } from '../services/WorktreeService';
 import type { WorktreeInfo } from '../../main/types/worktree';
+import { BranchSwitchWarningDialog } from './BranchSwitchWarningDialog';
+import type { GitInfo } from '@agent-orchestrator/shared';
 
 interface NewAgentModalProps {
   isOpen: boolean;
@@ -31,8 +33,9 @@ export function NewAgentModal({
 }: NewAgentModalProps) {
   const [description, setDescription] = useState('');
   const [workspacePath, setWorkspacePath] = useState<string | null>(initialWorkspacePath || null);
-  const [gitInfo, setGitInfo] = useState<{ branch: string | null } | null>(null);
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [isLoadingGit, setIsLoadingGit] = useState(false);
+  const [showBranchSwitchWarning, setShowBranchSwitchWarning] = useState(false);
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
@@ -68,7 +71,7 @@ export function NewAgentModal({
     setIsLoadingGit(true);
     window.gitAPI?.getInfo(workspacePath)
       .then((info) => {
-        setGitInfo({ branch: info?.branch || null });
+        setGitInfo(info || null);
         setIsLoadingGit(false);
       })
       .catch(() => {
@@ -87,11 +90,15 @@ export function NewAgentModal({
       setWorktreeInfo(null);
       setOriginalWorkspacePath(null);
       setSelectedBranchIndex(null);
+      setShowBranchSwitchWarning(false);
       // Keep workspace path from initialWorkspacePath
       if (initialWorkspacePath) {
         setWorkspacePath(initialWorkspacePath);
         setOriginalWorkspacePath(initialWorkspacePath);
       }
+    } else if (!isOpen) {
+      // Reset warning state when modal closes
+      setShowBranchSwitchWarning(false);
     }
   }, [isOpen, initialWorkspacePath]);
 
@@ -270,7 +277,7 @@ export function NewAgentModal({
           // Refresh git info for the worktree
           const updatedInfo = await window.gitAPI?.getInfo(worktree.worktreePath);
           if (updatedInfo) {
-            setGitInfo({ branch: updatedInfo.branch });
+            setGitInfo(updatedInfo);
           }
         }
       }
@@ -305,7 +312,7 @@ export function NewAgentModal({
         // Refresh git info to get the new branch
         const updatedInfo = await window.gitAPI?.getInfo(workspacePath);
         if (updatedInfo) {
-          setGitInfo({ branch: updatedInfo.branch });
+          setGitInfo(updatedInfo);
         }
       } catch (error) {
         console.error('[NewAgentModal] Error creating branch:', error);
@@ -326,10 +333,23 @@ export function NewAgentModal({
       const availableBranches = branches.filter((branch) => branch !== gitInfo?.branch);
       const selectedBranch = availableBranches[selectedBranchIndex];
       if (selectedBranch) {
+        // Check for uncommitted changes before attempting checkout
+        const currentGitInfo = await window.gitAPI?.getInfo(originalWorkspacePath);
+        if (currentGitInfo?.status === 'dirty') {
+          // Show warning dialog and prevent checkout
+          setShowBranchSwitchWarning(true);
+          return;
+        }
+
         try {
           const result = await window.gitAPI?.checkoutBranch(originalWorkspacePath, selectedBranch);
           if (!result?.success) {
             console.error('[NewAgentModal] Failed to checkout branch:', result?.error);
+            // Check if error is due to uncommitted changes
+            if (result.error?.toLowerCase().includes('uncommitted') || result.error?.toLowerCase().includes('changes')) {
+              setShowBranchSwitchWarning(true);
+              return;
+            }
             alert(`Failed to checkout branch: ${result?.error || 'Unknown error'}`);
             return;
           }
@@ -337,11 +357,16 @@ export function NewAgentModal({
           if (finalWorkspacePath) {
             const updatedInfo = await window.gitAPI?.getInfo(finalWorkspacePath);
             if (updatedInfo) {
-              setGitInfo({ branch: updatedInfo.branch });
+              setGitInfo(updatedInfo);
             }
           }
         } catch (error) {
           console.error('[NewAgentModal] Error checking out branch:', error);
+          const errorMessage = (error as Error).message.toLowerCase();
+          if (errorMessage.includes('uncommitted') || errorMessage.includes('changes')) {
+            setShowBranchSwitchWarning(true);
+            return;
+          }
           alert(`Error checking out branch: ${(error as Error).message}`);
           return;
         }
@@ -600,7 +625,8 @@ export function NewAgentModal({
                               selectedBranchIndex === index ? 'selected' : ''
                             }`}
                             onClick={() => {
-                              // TODO: Implement branch switching
+                              // Set the selected branch index to trigger checkout on create
+                              setSelectedBranchIndex(index);
                               setIsBranchDropdownOpen(false);
                             }}
                           >
@@ -668,6 +694,10 @@ export function NewAgentModal({
           </button>
         </div>
       </div>
+      <BranchSwitchWarningDialog
+        isOpen={showBranchSwitchWarning}
+        onCancel={() => setShowBranchSwitchWarning(false)}
+      />
     </div>
   );
 }

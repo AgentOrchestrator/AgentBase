@@ -3,43 +3,16 @@
  *
  * Chat view component for AgentNode that uses the SDK-based chat.
  * Provides streaming conversation with Claude Code.
+ * Displays messages exactly like ConversationNode.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
+import { useReactFlow } from '@xyflow/react';
 import { useChatSession } from './nodes/AgentChatNode/hooks/useChatSession';
 import type { AgentChatMessage } from './types/agent-node';
-import type {
-  AgentContentBlock,
-  AgentWebSearchToolResultBlock,
-  AgentWebSearchResultBlock,
-} from '@agent-orchestrator/shared';
+import type { AgentContentBlock } from '@agent-orchestrator/shared';
 import './AgentChatView.css';
-
-// Tool icons by category
-const TOOL_ICONS: Record<string, string> = {
-  // File operations
-  Read: '📄',
-  Write: '✏️',
-  Edit: '🔧',
-  // Search operations
-  Glob: '🔍',
-  Grep: '🔎',
-  // Shell operations
-  Bash: '💻',
-  // Web operations
-  WebFetch: '🌐',
-  WebSearch: '🔗',
-  // Code intelligence
-  LSP: '🧠',
-  // Task management
-  Task: '📋',
-  TodoWrite: '✅',
-  // Other
-  AskUserQuestion: '❓',
-  NotebookEdit: '📓',
-  default: '🔧',
-};
 
 // Configure marked for tight spacing
 marked.setOptions({
@@ -59,13 +32,11 @@ interface AgentChatViewProps {
   selected?: boolean;
 }
 
-type ToolUseDisplay = {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-  result?: string;
-  error?: string;
-};
+// Represents a displayable item for assistant messages (matches ConversationNode)
+type DisplayItem =
+  | { type: 'text'; content: { text: string }; key: string }
+  | { type: 'thinking'; content: { thinking: string }; key: string }
+  | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
 
 export default function AgentChatView({
   agentId,
@@ -81,99 +52,17 @@ export default function AgentChatView({
   const [messages, setMessages] = useState<AgentChatMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
+  const [textSelection, setTextSelection] = useState<{
+    text: string;
+    position: { top: number; right: number };
+  } | null>(null);
+  const [mouseY, setMouseY] = useState<number | null>(null);
+  const [isCommandPressed, setIsCommandPressed] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Toggle tool expansion
-  const toggleToolExpanded = useCallback((toolId: string) => {
-    setExpandedTools(prev => {
-      const next = new Set(prev);
-      if (next.has(toolId)) {
-        next.delete(toolId);
-      } else {
-        next.add(toolId);
-      }
-      return next;
-    });
-  }, []);
-
-  const normalizeToolName = (toolName: string): string =>
-    toolName.replace(/[_\s-]/g, '').toLowerCase();
-
-  // Get tool icon
-  const getToolIcon = (toolName: string): string => {
-    const normalized = normalizeToolName(toolName);
-    switch (normalized) {
-      case 'read':
-        return TOOL_ICONS.Read;
-      case 'write':
-        return TOOL_ICONS.Write;
-      case 'edit':
-        return TOOL_ICONS.Edit;
-      case 'glob':
-        return TOOL_ICONS.Glob;
-      case 'grep':
-        return TOOL_ICONS.Grep;
-      case 'bash':
-        return TOOL_ICONS.Bash;
-      case 'webfetch':
-        return TOOL_ICONS.WebFetch;
-      case 'websearch':
-        return TOOL_ICONS.WebSearch;
-      case 'lsp':
-        return TOOL_ICONS.LSP;
-      case 'task':
-        return TOOL_ICONS.Task;
-      case 'todowrite':
-        return TOOL_ICONS.TodoWrite;
-      case 'askuserquestion':
-        return TOOL_ICONS.AskUserQuestion;
-      case 'notebookedit':
-        return TOOL_ICONS.NotebookEdit;
-      default:
-        return TOOL_ICONS[toolName] || TOOL_ICONS.default;
-    }
-  };
-
-  // Format tool input for display
-  const formatToolInput = (toolName: string, input: Record<string, unknown>): string => {
-    const normalized = normalizeToolName(toolName);
-    switch (normalized) {
-      case 'bash':
-        return String(input.command || '');
-      case 'read':
-      case 'write':
-      case 'edit':
-        return String(input.file_path || input.filePath || '');
-      case 'glob':
-        return String(input.pattern || '');
-      case 'grep':
-        return String(input.pattern || input.query || '');
-      case 'webfetch':
-        return String(input.url || '');
-      case 'websearch':
-        return String(input.query || input.url || '');
-      case 'lsp':
-        return String(input.action || input.method || '');
-      case 'task':
-        return String(input.description || '');
-      case 'todowrite': {
-        const todos = input.todos as Array<{ content: string }> | undefined;
-        return todos ? `${todos.length} items` : '';
-      }
-      default:
-        return Object.keys(input).slice(0, 2).join(', ');
-    }
-  };
-
-  // Truncate result for display
-  const truncateResult = (result: string, maxLength = 500): string => {
-    if (result.length <= maxLength) return result;
-    return result.substring(0, maxLength) + '\n... (truncated)';
-  };
+  const { getViewport } = useReactFlow();
 
   const {
     sendMessage,
@@ -212,6 +101,103 @@ export default function AgentChatView({
     }
   }, [messages]);
 
+  // Detect Command/Ctrl key press for cursor change
+  useEffect(() => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+      if (modifierKey) {
+        setIsCommandPressed(true);
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+      if (!modifierKey) {
+        setIsCommandPressed(false);
+      }
+    };
+
+    // Also handle when key is released outside the window
+    const handleBlur = () => {
+      setIsCommandPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  // Update button position based on mouse Y coordinate
+  const updateButtonPositionFromMouse = useCallback((clientY: number) => {
+    if (!messagesContainerRef.current) return;
+
+    const viewport = getViewport();
+    const zoom = viewport.zoom;
+    
+    // Get the content element's bounding rect (already accounts for React Flow zoom transform)
+    const contentRect = messagesContainerRef.current.getBoundingClientRect();
+    const scrollTop = messagesContainerRef.current.scrollTop;
+    
+    // Calculate mouse Y position relative to content container
+    // When React Flow zooms, it applies a CSS transform to the node
+    // getBoundingClientRect() returns coordinates in viewport space (already transformed)
+    // clientY is also in viewport space
+    // scrollTop is in content space (not transformed)
+    //
+    // The visible content area is scaled by zoom, so:
+    // - (clientY - contentRect.top) gives position in the visible viewport (scaled by zoom)
+    // - Divide by zoom to convert from viewport-scaled to content coordinates
+    // - Add scrollTop to get absolute position in the scrollable content
+    const viewportRelativeY = clientY - contentRect.top;
+    const contentRelativeY = viewportRelativeY / zoom;
+    const absoluteY = contentRelativeY + scrollTop;
+    
+    setMouseY(absoluteY);
+  }, [getViewport]);
+
+  // Detect text selection
+  const handleSelectionChange = useCallback(() => {
+    if (!messagesContainerRef.current) {
+      setTextSelection(null);
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      setTextSelection(null);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString().trim();
+
+    // Check if selection is within our content container
+    if (!messagesContainerRef.current.contains(range.commonAncestorContainer)) {
+      setTextSelection(null);
+      return;
+    }
+
+    // If no meaningful text is selected, hide button
+    if (!selectedText || selectedText.length === 0) {
+      setTextSelection(null);
+      return;
+    }
+
+    // Keep the selection text, position will be updated by mouse movement
+    setTextSelection({
+      text: selectedText,
+      position: { top: 0, right: 12 }, // Top will be overridden by mouseY
+    });
+  }, []);
+
   // Handle scroll events when node is selected
   // Only prevent canvas scrolling when node is selected (clicked)
   // This matches the behavior of other nodes like UserMessageNode and AssistantMessageNode
@@ -231,6 +217,43 @@ export default function AgentChatView({
     };
   }, [selected]);
 
+  // Track mouse movement and update button position
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // Track mouse Y position when within the content area
+      if (messagesContainerRef.current) {
+        const contentRect = messagesContainerRef.current.getBoundingClientRect();
+        // Check if mouse is over the content area
+        if (
+          e.clientX >= contentRect.left &&
+          e.clientX <= contentRect.right &&
+          e.clientY >= contentRect.top &&
+          e.clientY <= contentRect.bottom
+        ) {
+          updateButtonPositionFromMouse(e.clientY);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      // Small delay to ensure selection is updated
+      setTimeout(handleSelectionChange, 10);
+    };
+
+    // Listen for selection changes
+    document.addEventListener('selectionchange', handleSelectionChange);
+    // Track mouse movement
+    document.addEventListener('mousemove', handleMouseMove);
+    // Listen for mouseup to catch selection end
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleSelectionChange, updateButtonPositionFromMouse]);
+
   const handleSend = async () => {
     if (!isSessionReady || !inputValue.trim() || isStreaming) return;
 
@@ -248,122 +271,120 @@ export default function AgentChatView({
     }
   };
 
-  // Render a tool use block
-  const renderToolUse = (toolUse: ToolUseDisplay, index: number) => {
-    const isExpanded = expandedTools.has(toolUse.id);
-    const icon = getToolIcon(toolUse.name);
-    const summary = formatToolInput(toolUse.name, toolUse.input);
-
-    return (
-      <div key={toolUse.id || index} className="agent-chat-view-tool-use">
-        <button
-          className="agent-chat-view-tool-header"
-          onClick={() => toggleToolExpanded(toolUse.id)}
-          type="button"
-        >
-          <span className="agent-chat-view-tool-icon">{icon}</span>
-          <span className="agent-chat-view-tool-name">{toolUse.name}</span>
-          <span className="agent-chat-view-tool-summary">{summary}</span>
-          <span className="agent-chat-view-tool-toggle">
-            {isExpanded ? '▼' : '▶'}
-          </span>
-        </button>
-        {isExpanded && (
-          <div className="agent-chat-view-tool-details">
-            <div className="agent-chat-view-tool-input">
-              <div className="agent-chat-view-tool-label">INPUT</div>
-              <pre>{JSON.stringify(toolUse.input, null, 2)}</pre>
-            </div>
-            {toolUse.result && (
-              <div className="agent-chat-view-tool-result">
-                <div className="agent-chat-view-tool-label">OUTPUT</div>
-                <pre>{truncateResult(toolUse.result)}</pre>
-              </div>
-            )}
-            {toolUse.error && (
-              <div className="agent-chat-view-tool-error">
-                <div className="agent-chat-view-tool-label">ERROR</div>
-                <pre>{toolUse.error}</pre>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
+  // Get tool type (matches ConversationNode exactly)
+  const getToolType = (toolName: string): 'read' | 'edit' | 'grep' | 'glob' | null => {
+    if (toolName === 'Read') return 'read';
+    if (toolName === 'Edit' || toolName === 'Write') return 'edit';
+    if (toolName === 'Grep') return 'grep';
+    if (toolName === 'Glob') return 'glob';
+    return null; // Skip TodoWrite and other tools
   };
 
-  const formatWebSearchResults = (results: AgentWebSearchResultBlock[]): string => {
-    if (results.length === 0) return 'No results returned.';
+  // Process content blocks into display items (matches ConversationNode logic)
+  const processContentBlocks = (contentBlocks: AgentContentBlock[]): DisplayItem[] => {
+    const items: DisplayItem[] = [];
+    let currentToolType: 'read' | 'edit' | 'grep' | 'glob' | null = null;
+    let currentToolCount = 0;
+    let itemIndex = 0;
 
-    return results
-      .map((result, idx) => {
-        const age = result.pageAge ? ` (${result.pageAge})` : '';
-        return `${idx + 1}. ${result.title}${age}\n${result.url}`;
-      })
-      .join('\n\n');
-  };
+    const flushToolGroup = () => {
+      if (currentToolType && currentToolCount > 0) {
+        items.push({
+          type: 'tool_summary',
+          toolType: currentToolType,
+          count: currentToolCount,
+          key: `tool-summary-${itemIndex++}`
+        });
+        currentToolType = null;
+        currentToolCount = 0;
+      }
+    };
 
-  const renderWebSearchToolResult = (block: AgentWebSearchToolResultBlock, index: number) => {
-    const content = block.content;
-    const result = Array.isArray(content) ? formatWebSearchResults(content) : undefined;
-    const error = Array.isArray(content)
-      ? undefined
-      : `Web search error: ${content.errorCode}`;
-
-    return renderToolUse(
-      {
-        id: block.toolUseId,
-        name: 'WebSearch',
-        input: {},
-        result,
-        error,
-      },
-      index
-    );
-  };
-
-  // Render thinking block
-  const renderThinking = (thinking: string, index: number) => {
-    return (
-      <div key={`thinking-${index}`} className="agent-chat-view-thinking">
-        <span className="agent-chat-view-thinking-label">Thinking</span>
-        <span className="agent-chat-view-thinking-text">{thinking}</span>
-      </div>
-    );
-  };
-
-  // Render a content block
-  const renderContentBlock = (block: AgentContentBlock, index: number) => {
-    switch (block.type) {
-      case 'text':
-        if (!block.text) return null;
-        const html = marked.parse(block.text) as string;
-        return (
-          <div
-            key={`text-${index}`}
-            className="agent-chat-view-assistant-text-content"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        );
-      case 'tool_use':
-        return renderToolUse(block, index);
-      case 'server_tool_use':
-        return renderToolUse(block, index);
-      case 'web_search_tool_result':
-        return renderWebSearchToolResult(block, index);
-      case 'thinking':
-        return renderThinking(block.thinking, index);
-      case 'redacted_thinking':
-        return renderThinking('Thinking redacted', index);
-      default:
-        return null;
+    for (const block of contentBlocks) {
+      if (block.type === 'text') {
+        flushToolGroup();
+        if (block.text) {
+          items.push({ type: 'text', content: { text: block.text }, key: `text-${itemIndex++}` });
+        }
+      } else if (block.type === 'thinking') {
+        flushToolGroup();
+        items.push({ type: 'thinking', content: { thinking: block.thinking }, key: `thinking-${itemIndex++}` });
+      } else if (block.type === 'redacted_thinking') {
+        flushToolGroup();
+        items.push({ type: 'thinking', content: { thinking: 'Thinking redacted' }, key: `thinking-${itemIndex++}` });
+      } else if (block.type === 'tool_use' || block.type === 'server_tool_use') {
+        const toolType = getToolType(block.name);
+        if (toolType) {
+          if (currentToolType === toolType) {
+            currentToolCount++;
+          } else {
+            flushToolGroup();
+            currentToolType = toolType;
+            currentToolCount = 1;
+          }
+        }
+        // Skip web_search_tool_result and other tools
+      }
     }
+
+    flushToolGroup();
+    return items;
+  };
+
+  // Render display item (matches ConversationNode exactly)
+  const renderDisplayItem = (item: DisplayItem) => {
+    if (item.type === 'text') {
+      const html = marked.parse(item.content.text) as string;
+      return (
+        <div
+          key={item.key}
+          className="conversation-assistant-text-content"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      );
+    }
+
+    if (item.type === 'thinking') {
+      return (
+        <div 
+          key={item.key} 
+          className="conversation-thinking-content"
+        >
+          <span className="thinking-label">Thinking:</span>
+          <span className="thinking-text">{item.content.thinking}</span>
+        </div>
+      );
+    }
+
+    if (item.type === 'tool_summary') {
+      let label = '';
+      if (item.toolType === 'read') {
+        label = `Read ${item.count} file${item.count > 1 ? 's' : ''}`;
+      } else if (item.toolType === 'edit') {
+        label = `Edited ${item.count} file${item.count > 1 ? 's' : ''}`;
+      } else if (item.toolType === 'grep') {
+        label = 'Scanning the code';
+      } else if (item.toolType === 'glob') {
+        label = 'Gathering files';
+      }
+
+      return (
+        <div 
+          key={item.key} 
+          className="conversation-tool-summary"
+        >
+          {label}
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const renderUserMessage = (msg: AgentChatMessage) => {
     return (
-      <div key={msg.id} className="agent-chat-view-user-message">
-        <div className="agent-chat-view-user-content">
+      <div key={msg.id} className="conversation-user-message">
+        <div className="conversation-user-content">
           {msg.content}
         </div>
       </div>
@@ -374,12 +395,13 @@ export default function AgentChatView({
     const isLastMessage = msg === messages[messages.length - 1];
     const showCursor = isStreaming && isLastMessage && msg.role === 'assistant';
 
-    // If we have content blocks, render them
+    // If we have content blocks, process them like ConversationNode
     if (msg.contentBlocks && msg.contentBlocks.length > 0) {
+      const displayItems = processContentBlocks(msg.contentBlocks);
       return (
-        <div key={msg.id} className="agent-chat-view-assistant-message">
-          <div className="agent-chat-view-assistant-content">
-            {msg.contentBlocks.map((block, index) => renderContentBlock(block, index))}
+        <div key={msg.id} className="conversation-assistant-message">
+          <div className="conversation-assistant-content">
+            {displayItems.map(item => renderDisplayItem(item))}
             {showCursor && (
               <span className="agent-chat-view-cursor">▊</span>
             )}
@@ -391,10 +413,10 @@ export default function AgentChatView({
     // Fallback to plain text content
     const html = marked.parse(msg.content) as string;
     return (
-      <div key={msg.id} className="agent-chat-view-assistant-message">
-        <div className="agent-chat-view-assistant-content">
+      <div key={msg.id} className="conversation-assistant-message">
+        <div className="conversation-assistant-content">
           <div
-            className="agent-chat-view-assistant-text-content"
+            className="conversation-assistant-text-content"
             dangerouslySetInnerHTML={{ __html: html }}
           />
           {showCursor && (
@@ -408,7 +430,10 @@ export default function AgentChatView({
   return (
     <div className="agent-chat-view">
       {/* Messages */}
-      <div className="agent-chat-view-messages" ref={messagesContainerRef}>
+      <div 
+        className={`conversation-content ${isCommandPressed ? 'command-pressed' : ''}`}
+        ref={messagesContainerRef}
+      >
         {messages.length === 0 && (
           <div className="agent-chat-view-empty">
             {isSessionReady
@@ -424,6 +449,19 @@ export default function AgentChatView({
           }
         })}
         <div ref={messagesEndRef} />
+        
+        {/* Plus button - appears when text is selected, follows mouse */}
+        {textSelection && mouseY !== null && (
+          <div
+            className="conversation-message-plus-button"
+            style={{
+              top: `${mouseY}px`,
+              right: `${textSelection.position.right}px`,
+            }}
+          >
+            +
+          </div>
+        )}
       </div>
 
       {/* Error */}
