@@ -12,6 +12,17 @@ export type {
   ThinkingInfo,
   McpInfo,
   ErrorInfo,
+  AgentContentBlock,
+  AgentTextBlock,
+  AgentThinkingBlock,
+  AgentRedactedThinkingBlock,
+  AgentToolUseBlock,
+  AgentServerToolUseBlock,
+  AgentWebSearchToolResultBlock,
+  AgentWebSearchToolResultContent,
+  AgentWebSearchResultBlock,
+  AgentWebSearchToolResultError,
+  AgentWebSearchToolResultErrorCode,
   CodingAgentMessage,
 } from '@agent-orchestrator/shared';
 
@@ -21,6 +32,8 @@ export type {
 export interface GenerateRequest {
   /** The prompt to send to the agent */
   prompt: string;
+  /** Agent node identifier for scoping hook events */
+  agentId?: string;
   /** Working directory for the agent (affects file access) */
   workingDirectory?: string;
   /** Custom system prompt to prepend */

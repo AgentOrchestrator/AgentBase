@@ -21,20 +21,21 @@ import { forkStore } from './stores';
 import { forkService } from './services';
 import { createDefaultAgentTitle, type AgentNodeData } from './types/agent-node';
 import {
+  type TerminalAttachment,
   createLinearIssueAttachment,
   createWorkspaceMetadataAttachment,
   isWorkspaceMetadataAttachment,
 } from './types/attachments';
 import { useCanvasPersistence } from './hooks';
 import { nodeRegistry } from './nodes/registry';
-import { parseConversationFile, groupConversationMessages } from './utils/conversationParser';
-import { conversationToNodesAndEdges } from './utils/conversationToNodes';
 import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import ConversationNode from './components/ConversationNode';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { NewAgentModal } from './components/NewAgentModal';
+import { ActionPill } from './components/ActionPill';
 import { useTheme } from './context';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -88,6 +89,140 @@ type ContextMenu = {
   y: number;
 } | null;
 
+type SessionSyncPayload = {
+  sessionId?: string;
+  agentType?: string;
+  attachments?: TerminalAttachment[];
+  chatMessages?: CodingAgentMessage[];
+  workspacePath?: string;
+  status?: AgentNodeData['status'];
+  statusInfo?: AgentNodeData['statusInfo'];
+  summary?: AgentNodeData['summary'];
+  progress?: AgentNodeData['progress'];
+  titleValue?: string;
+  titleObject?: AgentNodeData['title'];
+};
+
+const isAgentTitle = (value: unknown): value is AgentNodeData['title'] => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return 'value' in value && 'isManuallySet' in value;
+};
+
+const buildSessionSyncPayload = (data: Record<string, unknown>): SessionSyncPayload => {
+  const payload: SessionSyncPayload = {};
+
+  if ('sessionId' in data && typeof data.sessionId === 'string') {
+    payload.sessionId = data.sessionId;
+  }
+
+  if ('agentType' in data && typeof data.agentType === 'string') {
+    payload.agentType = data.agentType;
+  }
+
+  if ('attachments' in data) {
+    payload.attachments = data.attachments as TerminalAttachment[] | undefined;
+  }
+
+  if ('chatMessages' in data || 'messages' in data) {
+    payload.chatMessages = (data.chatMessages ?? data.messages) as CodingAgentMessage[] | undefined;
+  }
+
+  if ('workspacePath' in data && typeof data.workspacePath === 'string') {
+    payload.workspacePath = data.workspacePath;
+  }
+
+  if ('status' in data) {
+    payload.status = data.status as AgentNodeData['status'];
+  }
+
+  if ('statusInfo' in data) {
+    payload.statusInfo = data.statusInfo as AgentNodeData['statusInfo'];
+  }
+
+  if ('summary' in data) {
+    payload.summary = data.summary as AgentNodeData['summary'];
+  }
+
+  if ('progress' in data) {
+    payload.progress = data.progress as AgentNodeData['progress'];
+  }
+
+  if ('title' in data) {
+    const titleValue = data.title;
+    if (isAgentTitle(titleValue)) {
+      payload.titleObject = titleValue;
+      payload.titleValue = titleValue.value;
+    } else if (typeof titleValue === 'string') {
+      payload.titleValue = titleValue;
+    }
+  }
+
+  if (!payload.workspacePath && payload.attachments) {
+    const workspaceAttachment = payload.attachments.find(isWorkspaceMetadataAttachment);
+    if (workspaceAttachment?.path) {
+      payload.workspacePath = workspaceAttachment.path;
+    }
+  }
+
+  return payload;
+};
+
+const applySessionSync = (node: Node, payload: SessionSyncPayload): Node => {
+  const data = node.data as Record<string, unknown>;
+  let nextData = data;
+
+  const updateField = (key: string, value: unknown) => {
+    if (value === undefined || (nextData as Record<string, unknown>)[key] === value) {
+      return;
+    }
+    if (nextData === data) {
+      nextData = { ...data };
+    }
+    (nextData as Record<string, unknown>)[key] = value;
+  };
+
+  switch (node.type) {
+    case 'agent': {
+      updateField('sessionId', payload.sessionId);
+      updateField('agentType', payload.agentType);
+      updateField('attachments', payload.attachments);
+      updateField('chatMessages', payload.chatMessages);
+      updateField('status', payload.status);
+      updateField('statusInfo', payload.statusInfo);
+      updateField('summary', payload.summary);
+      updateField('progress', payload.progress);
+      if (payload.titleObject) {
+        updateField('title', payload.titleObject);
+      }
+      break;
+    }
+    case 'agent-chat': {
+      updateField('sessionId', payload.sessionId);
+      updateField('agentType', payload.agentType);
+      updateField('workspacePath', payload.workspacePath);
+      updateField('messages', payload.chatMessages);
+      updateField('title', payload.titleValue);
+      if (payload.sessionId && (nextData as Record<string, unknown>).isDraft === true) {
+        updateField('isDraft', false);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  if (nextData === data) {
+    return node;
+  }
+
+  return {
+    ...node,
+    data: nextData,
+  };
+};
+
 function CanvasFlow() {
   // Theme hook
   const { theme, setTheme } = useTheme();
@@ -114,115 +249,16 @@ function CanvasFlow() {
 
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
-  const debugConversationNodes = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
-  const [debugNodesLoaded, setDebugNodesLoaded] = useState(false);
-
-  // DEBUG: Load conversation file early (before initial state is applied)
-  useEffect(() => {
-    if (debugConversationNodes.current) return; // Already loaded
-    
-    const conversationPath = '/Users/maxprokopp/.claude/projects/-Users-maxprokopp-CursorProjects-AgentBase-desktop-app/2cc81131-2edc-48c3-96ac-c2b3d2256c02.jsonl';
-    
-    const loadDebugConversation = async () => {
-      try {
-        const fileAPI = (window as any).fileAPI;
-        if (!fileAPI) {
-          console.warn('[Canvas] fileAPI not available');
-          return;
-        }
-        
-        console.log('[Canvas] Reading file:', conversationPath);
-        const fileContent = await fileAPI.readFile(conversationPath);
-        console.log('[Canvas] File content length:', fileContent?.length || 0);
-        
-        if (!fileContent) {
-          console.error('[Canvas] File content is empty');
-          return;
-        }
-        
-        const entries = parseConversationFile(fileContent);
-        console.log('[Canvas] Parsed entries:', entries.length);
-        
-        const groups = groupConversationMessages(entries);
-        console.log('[Canvas] All groups:', groups.length, 'User groups:', groups.filter(g => g.type === 'user').length);
-        
-        if (groups.length > 0) {
-          // Center the conversation on the canvas
-          const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 - 300 : 400;
-          const centerY = typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 300;
-          
-          console.log('[Canvas] Creating nodes at position:', centerX, centerY);
-          const { nodes: conversationNodes, edges: conversationEdges } = conversationToNodesAndEdges(
-            groups,
-            centerX,
-            centerY
-          );
-          
-          console.log('[Canvas] Created nodes:', conversationNodes.length, 'edges:', conversationEdges.length);
-          console.log('[Canvas] Node details:', conversationNodes.map(n => ({ id: n.id, type: n.type, position: n.position })));
-          
-          debugConversationNodes.current = { nodes: conversationNodes, edges: conversationEdges };
-          setDebugNodesLoaded(true); // Trigger useEffect to add nodes
-          
-          console.log('[Canvas] Loaded debug conversation:', {
-            groups: groups.length,
-            nodes: conversationNodes.length,
-            edges: conversationEdges.length
-          });
-        } else {
-          console.warn('[Canvas] No groups to display');
-        }
-      } catch (error) {
-        console.error('[Canvas] Error loading debug conversation:', error);
-      }
-    };
-    
-    loadDebugConversation();
-  }, []);
-
-  // Apply restored state when it becomes available, including debug conversation
+  // Apply restored state when it becomes available
   useEffect(() => {
     if (!isCanvasLoading) {
-      // Merge initial nodes with debug conversation nodes
-      const allNodes = debugConversationNodes.current 
-        ? [...initialNodes, ...debugConversationNodes.current.nodes]
-        : initialNodes;
-      const allEdges = debugConversationNodes.current
-        ? [...initialEdges, ...debugConversationNodes.current.edges]
-        : initialEdges;
-      
-      if (!initialStateApplied.current && (allNodes.length > 0 || allEdges.length > 0)) {
-        setNodes(allNodes);
-        setEdges(allEdges);
+      if (!initialStateApplied.current && (initialNodes.length > 0 || initialEdges.length > 0)) {
+        setNodes(initialNodes);
+        setEdges(initialEdges);
         initialStateApplied.current = true;
-        console.log('[Canvas] Applied initial state with debug conversation:', {
-          initialNodes: initialNodes.length,
-          debugNodes: debugConversationNodes.current?.nodes.length || 0,
-          totalNodes: allNodes.length
-        });
-      } else if (debugConversationNodes.current && (initialStateApplied.current || debugNodesLoaded)) {
-        // If nodes were loaded after initial state was applied, add them now
-        setNodes((prevNodes) => {
-          const existingIds = new Set(prevNodes.map(n => n.id));
-          const newNodes = debugConversationNodes.current!.nodes.filter(n => !existingIds.has(n.id));
-          if (newNodes.length > 0) {
-            console.log('[Canvas] Adding late-loaded debug nodes:', newNodes.length);
-            return [...prevNodes, ...newNodes];
-          }
-          return prevNodes;
-        });
-        setEdges((prevEdges) => {
-          const existingIds = new Set(prevEdges.map(e => e.id));
-          const newEdges = debugConversationNodes.current!.edges.filter(e => !existingIds.has(e.id));
-          if (newEdges.length > 0) {
-            console.log('[Canvas] Adding late-loaded debug edges:', newEdges.length);
-            return [...prevEdges, ...newEdges];
-          }
-          return prevEdges;
-        });
       }
     }
-  }, [isCanvasLoading, initialNodes, initialEdges, debugNodesLoaded, setNodes, setEdges]);
+  }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
 
   // Persist nodes when they change
   const prevNodesRef = useRef<Node[]>(nodes);
@@ -267,12 +303,6 @@ function CanvasFlow() {
   const [isContentVisible, setIsContentVisible] = useState(false);
   const [isTextVisible, setIsTextVisible] = useState(true);
 
-  // Empty pill copy state
-  const [isPillCopyExpanded, setIsPillCopyExpanded] = useState(false);
-  const [isPillCopySquare, setIsPillCopySquare] = useState(false);
-  const [showPillCopyContent, setShowPillCopyContent] = useState(false);
-  const [isPillCopyContentVisible, setIsPillCopyContentVisible] = useState(false);
-  const [isPillCopyTextVisible, setIsPillCopyTextVisible] = useState(true);
   const [issues, setIssues] = useState<LinearIssue[]>([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
   const [linearWorkspaceName, setLinearWorkspaceName] = useState('');
@@ -338,13 +368,39 @@ function CanvasFlow() {
   useEffect(() => {
     const handleUpdateNode = (event: CustomEvent) => {
       const { nodeId, data } = event.detail;
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...data } }
-            : node
-        )
-      );
+      setNodes((nds) => {
+        const targetNode = nds.find((node) => node.id === nodeId);
+        if (!targetNode) {
+          return nds;
+        }
+
+        const targetSessionId =
+          (data as Record<string, unknown>)?.sessionId ??
+          (targetNode.data as Record<string, unknown>)?.sessionId;
+
+        const syncPayload = buildSessionSyncPayload(data as Record<string, unknown>);
+        const resolvedSessionId = typeof targetSessionId === 'string' ? targetSessionId : undefined;
+        if (resolvedSessionId && !syncPayload.sessionId) {
+          syncPayload.sessionId = resolvedSessionId;
+        }
+
+        return nds.map((node) => {
+          if (node.id === nodeId) {
+            return { ...node, data: { ...data } };
+          }
+
+          if (!resolvedSessionId) {
+            return node;
+          }
+
+          const nodeSessionId = (node.data as Record<string, unknown>)?.sessionId;
+          if (nodeSessionId !== resolvedSessionId) {
+            return node;
+          }
+
+          return applySessionSync(node, syncPayload);
+        });
+      });
     };
 
     const handleDeleteNode = (event: CustomEvent) => {
@@ -870,52 +926,6 @@ function CanvasFlow() {
     }, 50);
   }, []);
 
-  // Empty pill copy toggle and collapse functions
-  const togglePillCopy = useCallback(() => {
-    if (!isPillCopyExpanded) {
-      // Hide text immediately when expanding
-      setIsPillCopyTextVisible(false);
-      // Both phases start simultaneously
-      setIsPillCopyExpanded(true);
-      setIsPillCopySquare(true);
-      // Show pill content after expansion completes (300ms) + 50ms delay
-      setTimeout(() => {
-        setShowPillCopyContent(true);
-        // Start content animation after pill content is shown
-        setTimeout(() => {
-          setIsPillCopyContentVisible(true);
-        }, 100);
-      }, 350);
-    } else {
-      // Hide animations immediately when collapsing
-      setIsPillCopyContentVisible(false);
-      // Hide pill content immediately when collapsing
-      setShowPillCopyContent(false);
-      // Both phases collapse simultaneously
-      setIsPillCopySquare(false);
-      setIsPillCopyExpanded(false);
-      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
-      setTimeout(() => {
-        setIsPillCopyTextVisible(true);
-      }, 350);
-    }
-  }, [isPillCopyExpanded]);
-
-  const collapsePillCopy = useCallback(() => {
-    // First hide animations immediately
-    setIsPillCopyContentVisible(false);
-    // First hide content with 50ms delay
-    setShowPillCopyContent(false);
-    setTimeout(() => {
-      // Then collapse the pill
-      setIsPillCopySquare(false);
-      setIsPillCopyExpanded(false);
-      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
-      setTimeout(() => {
-        setIsPillCopyTextVisible(true);
-      }, 350);
-    }, 50);
-  }, []);
 
   // Drag and drop handlers for issue cards
   const handleIssueDragStart = useCallback((e: React.DragEvent, issue: LinearIssue) => {
@@ -2495,36 +2505,7 @@ function CanvasFlow() {
         </div>
         )}
 
-        {/* Empty Pill Copy */}
-        <div
-          onClick={!isPillCopySquare ? togglePillCopy : undefined}
-          className={`issues-pill ${!isPillCopySquare ? 'cursor-pointer' : 'cursor-default'} ${
-            isPillCopyExpanded ? 'expanded' : ''
-          } ${isPillCopySquare ? 'square' : ''}`}
-          style={{
-            borderRadius: isPillCopySquare ? '24px' : '20px'
-          }}
-        >
-          {!isPillCopySquare ? (
-            <div className={`pill-text ${isPillCopyTextVisible ? 'visible' : ''}`}>
-              {/* Empty - no text */}
-            </div>
-          ) : showPillCopyContent ? (
-            <div className="pill-content-wrapper" onClick={(e) => e.stopPropagation()}>
-              {/* Collapse nozzle at top */}
-              <div
-                className={`collapse-nozzle ${isPillCopyContentVisible ? 'visible' : ''}`}
-                onClick={collapsePillCopy}
-                title="Collapse"
-              />
-
-              {/* Empty content area */}
-              <div className={`issues-list ${isPillCopyContentVisible ? 'visible' : ''}`}>
-                {/* Empty - no content */}
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <ActionPill />
       </div>
     </div>
   );

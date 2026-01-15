@@ -8,7 +8,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import { useChatSession } from './nodes/AgentChatNode/hooks/useChatSession';
-import type { AgentChatMessage, ContentBlock, ToolUseInfo } from './types/agent-node';
+import type { AgentChatMessage } from './types/agent-node';
+import type {
+  AgentContentBlock,
+  AgentWebSearchToolResultBlock,
+  AgentWebSearchResultBlock,
+} from '@agent-orchestrator/shared';
 import './AgentChatView.css';
 
 // Tool icons by category
@@ -54,6 +59,14 @@ interface AgentChatViewProps {
   selected?: boolean;
 }
 
+type ToolUseDisplay = {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  result?: string;
+  error?: string;
+};
+
 export default function AgentChatView({
   agentId,
   sessionId,
@@ -87,37 +100,70 @@ export default function AgentChatView({
     });
   }, []);
 
+  const normalizeToolName = (toolName: string): string =>
+    toolName.replace(/[_\s-]/g, '').toLowerCase();
+
   // Get tool icon
   const getToolIcon = (toolName: string): string => {
-    return TOOL_ICONS[toolName] || TOOL_ICONS.default;
+    const normalized = normalizeToolName(toolName);
+    switch (normalized) {
+      case 'read':
+        return TOOL_ICONS.Read;
+      case 'write':
+        return TOOL_ICONS.Write;
+      case 'edit':
+        return TOOL_ICONS.Edit;
+      case 'glob':
+        return TOOL_ICONS.Glob;
+      case 'grep':
+        return TOOL_ICONS.Grep;
+      case 'bash':
+        return TOOL_ICONS.Bash;
+      case 'webfetch':
+        return TOOL_ICONS.WebFetch;
+      case 'websearch':
+        return TOOL_ICONS.WebSearch;
+      case 'lsp':
+        return TOOL_ICONS.LSP;
+      case 'task':
+        return TOOL_ICONS.Task;
+      case 'todowrite':
+        return TOOL_ICONS.TodoWrite;
+      case 'askuserquestion':
+        return TOOL_ICONS.AskUserQuestion;
+      case 'notebookedit':
+        return TOOL_ICONS.NotebookEdit;
+      default:
+        return TOOL_ICONS[toolName] || TOOL_ICONS.default;
+    }
   };
 
   // Format tool input for display
   const formatToolInput = (toolName: string, input: Record<string, unknown>): string => {
-    switch (toolName) {
-      case 'Bash':
+    const normalized = normalizeToolName(toolName);
+    switch (normalized) {
+      case 'bash':
         return String(input.command || '');
-      case 'Read':
+      case 'read':
+      case 'write':
+      case 'edit':
         return String(input.file_path || input.filePath || '');
-      case 'Write':
-        return String(input.file_path || input.filePath || '');
-      case 'Edit':
-        return String(input.file_path || input.filePath || '');
-      case 'Glob':
+      case 'glob':
         return String(input.pattern || '');
-      case 'Grep':
-        return String(input.pattern || '');
-      case 'WebFetch':
+      case 'grep':
+        return String(input.pattern || input.query || '');
+      case 'webfetch':
         return String(input.url || '');
-      case 'WebSearch':
-        return String(input.query || '');
-      case 'LSP':
+      case 'websearch':
+        return String(input.query || input.url || '');
+      case 'lsp':
         return String(input.action || input.method || '');
-      case 'Task':
+      case 'task':
         return String(input.description || '');
-      case 'TodoWrite':
+      case 'todowrite': {
         const todos = input.todos as Array<{ content: string }> | undefined;
         return todos ? `${todos.length} items` : '';
+      }
       default:
         return Object.keys(input).slice(0, 2).join(', ');
     }
@@ -133,9 +179,11 @@ export default function AgentChatView({
     sendMessage,
     isStreaming,
   } = useChatSession({
+    agentId,
     agentType,
     sessionId,
     workspacePath,
+    currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: AgentChatMessage[]) => {
       setMessages(newMessages);
       onMessagesChange(newMessages);
@@ -201,7 +249,7 @@ export default function AgentChatView({
   };
 
   // Render a tool use block
-  const renderToolUse = (toolUse: ToolUseInfo, index: number) => {
+  const renderToolUse = (toolUse: ToolUseDisplay, index: number) => {
     const isExpanded = expandedTools.has(toolUse.id);
     const icon = getToolIcon(toolUse.name);
     const summary = formatToolInput(toolUse.name, toolUse.input);
@@ -244,6 +292,36 @@ export default function AgentChatView({
     );
   };
 
+  const formatWebSearchResults = (results: AgentWebSearchResultBlock[]): string => {
+    if (results.length === 0) return 'No results returned.';
+
+    return results
+      .map((result, idx) => {
+        const age = result.pageAge ? ` (${result.pageAge})` : '';
+        return `${idx + 1}. ${result.title}${age}\n${result.url}`;
+      })
+      .join('\n\n');
+  };
+
+  const renderWebSearchToolResult = (block: AgentWebSearchToolResultBlock, index: number) => {
+    const content = block.content;
+    const result = Array.isArray(content) ? formatWebSearchResults(content) : undefined;
+    const error = Array.isArray(content)
+      ? undefined
+      : `Web search error: ${content.errorCode}`;
+
+    return renderToolUse(
+      {
+        id: block.toolUseId,
+        name: 'WebSearch',
+        input: {},
+        result,
+        error,
+      },
+      index
+    );
+  };
+
   // Render thinking block
   const renderThinking = (thinking: string, index: number) => {
     return (
@@ -255,7 +333,7 @@ export default function AgentChatView({
   };
 
   // Render a content block
-  const renderContentBlock = (block: ContentBlock, index: number) => {
+  const renderContentBlock = (block: AgentContentBlock, index: number) => {
     switch (block.type) {
       case 'text':
         if (!block.text) return null;
@@ -268,11 +346,15 @@ export default function AgentChatView({
           />
         );
       case 'tool_use':
-        if (!block.toolUse) return null;
-        return renderToolUse(block.toolUse, index);
+        return renderToolUse(block, index);
+      case 'server_tool_use':
+        return renderToolUse(block, index);
+      case 'web_search_tool_result':
+        return renderWebSearchToolResult(block, index);
       case 'thinking':
-        if (!block.thinking) return null;
-        return renderThinking(block.thinking.thinking, index);
+        return renderThinking(block.thinking, index);
+      case 'redacted_thinking':
+        return renderThinking('Thinking redacted', index);
       default:
         return null;
     }

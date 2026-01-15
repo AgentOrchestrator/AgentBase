@@ -53,6 +53,7 @@ export function AgentChatNodePresentation({
     agentType,
     sessionId,
     workspacePath,
+    currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: CodingAgentMessage[]) => {
       setMessages(newMessages);
       onMessagesChange(newMessages);

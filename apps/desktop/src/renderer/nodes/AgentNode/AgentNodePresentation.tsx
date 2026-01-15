@@ -25,7 +25,10 @@ import {
   useWorkspaceService,
   useNodeInitialized,
 } from '../../context';
-import type { WorkspaceState, SessionReadiness } from '../../hooks/useAgentState';
+import type {
+  WorkspaceState,
+  SessionReadiness,
+} from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import '../../AgentNode.css';
 

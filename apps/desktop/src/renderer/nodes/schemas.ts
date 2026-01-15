@@ -95,6 +95,7 @@ export const ChatMessageSchema: z.ZodType<CodingAgentMessage> = z.object({
   id: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
+  contentBlocks: z.array(z.unknown()).optional(),
   timestamp: z.string(),
   messageType: z.string().optional(),
 });

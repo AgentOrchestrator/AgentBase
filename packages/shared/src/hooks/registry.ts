@@ -273,6 +273,7 @@ export function createEvent<T>(
   agent: import('../loaders/types.js').AgentType,
   payload: T,
   options?: {
+    agentId?: string;
     sessionId?: string;
     workspacePath?: string;
     raw?: unknown;

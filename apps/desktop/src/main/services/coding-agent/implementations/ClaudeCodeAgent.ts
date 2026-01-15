@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Query, SDKMessage, Options } from '@anthropic-ai/claude-agent-sdk';
+import type { Query, SDKMessage, Options, CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import {
   createEventRegistry,
   createSDKHookBridge,
@@ -36,6 +36,10 @@ import type {
   ForkOptions,
   CodingAgentMessage,
   ToolCategory,
+  AgentContentBlock,
+  AgentWebSearchToolResultContent,
+  AgentWebSearchResultBlock,
+  AgentWebSearchToolResultErrorCode,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
 import {
@@ -50,6 +54,7 @@ import {
   noResultError,
 } from '../utils/sdk-error-mapper';
 import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
+import type { AgentEvent, PermissionPayload, SessionPayload } from '@agent-orchestrator/shared';
 
 /**
  * Active query handle for tracking and cancellation
@@ -110,6 +115,81 @@ export class ClaudeCodeAgent
   private readonly debugHooks: boolean;
   private readonly activeQueries = new Map<string, QueryHandle>();
   private isInitialized = false;
+  private currentSessionId: string | null = null;
+  private currentWorkspacePath: string | null = null;
+  private readonly queryContexts = new WeakMap<
+    AbortSignal,
+    { agentId?: string; sessionId?: string; workspacePath?: string }
+  >();
+  private readonly canUseTool: CanUseTool = async (
+    toolName: string,
+    input: Record<string, unknown>,
+    options
+  ): Promise<PermissionResult> => {
+    const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
+    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
+    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    const event: AgentEvent<PermissionPayload> = {
+      id: crypto.randomUUID(),
+      type: 'permission:request',
+      agent: 'claude_code',
+      agentId: context?.agentId,
+      sessionId,
+      workspacePath,
+      timestamp: new Date().toISOString(),
+      payload: {
+        toolName,
+        command: typeof input.command === 'string' ? input.command : undefined,
+        args: Array.isArray(input.args) ? (input.args as string[]) : undefined,
+        filePath:
+          typeof input.file_path === 'string'
+            ? input.file_path
+            : typeof input.filePath === 'string'
+            ? input.filePath
+            : undefined,
+        workingDirectory: workspacePath,
+        reason: options.decisionReason,
+      },
+      raw: {
+        toolInput: input,
+        toolUseId: options.toolUseID,
+        signal: options.signal,
+        suggestions: options.suggestions,
+      },
+    };
+
+    const results = await this.eventRegistry.emit(event);
+    const denyResult = results.find((result) => result.action === 'deny');
+    if (denyResult) {
+      return {
+        behavior: 'deny',
+        message: denyResult.message || 'Permission denied',
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    const modifyResult = results.find((result) => result.action === 'modify');
+    if (modifyResult) {
+      return {
+        behavior: 'allow',
+        updatedInput: modifyResult.modifiedPayload as Record<string, unknown>,
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    const allowResult = results.find((result) => result.action === 'allow');
+    if (allowResult) {
+      return {
+        behavior: 'allow',
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    return {
+      behavior: 'allow',
+      toolUseID: options.toolUseID,
+    };
+  };
 
   constructor(config: ClaudeCodeAgentConfig) {
     super();
@@ -118,6 +198,16 @@ export class ClaudeCodeAgent
     this.eventRegistry = createEventRegistry();
     this.hookBridge = createSDKHookBridge(this.eventRegistry, {
       debug: this.debugHooks,
+    });
+    // Avoid double-emitting permission requests when canUseTool handles them.
+    delete this.hookBridge.hooks.PermissionRequest;
+    this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
+      this.currentSessionId = event.payload.sessionId;
+      return { action: 'continue' };
+    });
+    this.eventRegistry.on<SessionPayload>('session:end', async () => {
+      this.currentSessionId = null;
+      return { action: 'continue' };
     });
   }
 
@@ -329,8 +419,10 @@ export class ClaudeCodeAgent
       cwd: request.workingDirectory ?? this.config.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
     };
+    this.currentWorkspacePath = options.cwd ?? null;
 
     // Handle system prompt
     if (request.systemPrompt) {
@@ -346,6 +438,12 @@ export class ClaudeCodeAgent
     if (request.sessionId) {
       options.resume = request.sessionId;
     }
+
+    this.queryContexts.set(abortController.signal, {
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      workspacePath: options.cwd ?? undefined,
+    });
 
     // Enable streaming partial messages
     if (streaming) {
@@ -478,9 +576,11 @@ export class ClaudeCodeAgent
       cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
       systemPrompt: { type: 'preset', preset: 'claude_code' },
     };
+    this.currentWorkspacePath = options.cwd ?? null;
 
     // Map SessionIdentifier to SDK options
     switch (identifier.type) {
@@ -492,6 +592,12 @@ export class ClaudeCodeAgent
         options.resume = identifier.value;
         break;
     }
+
+    this.queryContexts.set(abortController.signal, {
+      agentId: continueOptions?.agentId,
+      sessionId: identifier.type === 'id' ? identifier.value : undefined,
+      workspacePath: options.cwd ?? undefined,
+    });
 
     if (streaming) {
       options.includePartialMessages = true;
@@ -540,6 +646,7 @@ export class ClaudeCodeAgent
         sdkOptions = {
           abortController,
           hooks: this.hookBridge.hooks,
+          canUseTool: this.canUseTool,
           tools: { type: 'preset', preset: 'claude_code' },
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           extraArgs: { session_id: parentId }
@@ -549,6 +656,7 @@ export class ClaudeCodeAgent
         sdkOptions = {
           abortController,
           hooks: this.hookBridge.hooks,
+          canUseTool: this.canUseTool,
           resume: parentId,
           forkSession: true,
           tools: { type: 'preset', preset: 'claude_code' },
@@ -977,96 +1085,189 @@ export class ClaudeCodeAgent
     const messages: CodingAgentMessage[] = [];
     const timestamp = this.normalizeTimestamp(data.timestamp);
 
-    if (data.type === 'user' && data.message?.content) {
-      const display = this.extractDisplayContent(data.message.content);
-      if (display) {
-        messages.push({
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: display,
-          timestamp,
-          messageType: 'user',
-          agentMetadata: { rawType: data.type },
-        });
-      }
+    if (!data.message?.content) {
+      return messages;
     }
 
-    if (data.type === 'assistant' && data.message?.content) {
-      const contentParts = Array.isArray(data.message.content)
-        ? data.message.content
-        : [data.message.content];
+    if (data.type === 'user' || data.type === 'assistant') {
+      const { blocks, displayText } = this.parseContentBlocks(data.message.content);
+      if (!displayText && blocks.length === 0) {
+        return messages;
+      }
 
-      for (const part of contentParts) {
-        if (typeof part === 'string') {
-          messages.push({
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: part,
-            timestamp,
-            messageType: 'assistant',
-            agentMetadata: { rawType: data.type },
+      messages.push({
+        id: crypto.randomUUID(),
+        role: data.type,
+        content: displayText,
+        contentBlocks: blocks.length > 0 ? blocks : undefined,
+        timestamp,
+        messageType: data.type,
+        agentMetadata: { rawType: data.type },
+      });
+    }
+
+    return messages;
+  }
+
+  private parseContentBlocks(content: unknown): {
+    blocks: AgentContentBlock[];
+    displayText: string;
+  } {
+    const blocks: AgentContentBlock[] = [];
+    const textParts: string[] = [];
+
+    const pushTextBlock = (text: string, citations?: unknown[] | null) => {
+      const normalized = String(text);
+      if (!normalized) return;
+      blocks.push({ type: 'text', text: normalized, citations });
+      textParts.push(normalized);
+    };
+
+    const parseToolInput = (input: unknown): Record<string, unknown> => {
+      if (input && typeof input === 'object' && !Array.isArray(input)) {
+        return input as Record<string, unknown>;
+      }
+      return {};
+    };
+
+    const parseBlock = (part: unknown) => {
+      if (typeof part === 'string') {
+        pushTextBlock(part);
+        return;
+      }
+
+      if (!part || typeof part !== 'object') return;
+
+      const obj = part as Record<string, unknown>;
+      const type = obj.type;
+
+      if (type === 'text') {
+        if (typeof obj.text === 'string') {
+          const citations = Array.isArray(obj.citations)
+            ? obj.citations
+            : obj.citations === null
+            ? null
+            : undefined;
+          pushTextBlock(obj.text, citations);
+        }
+        return;
+      }
+
+      if (type === 'thinking') {
+        if (typeof obj.thinking === 'string') {
+          blocks.push({
+            type: 'thinking',
+            thinking: obj.thinking,
+            signature: typeof obj.signature === 'string' ? obj.signature : undefined,
           });
-        } else if (typeof part === 'object' && part !== null) {
-          const partObj = part as Record<string, unknown>;
+        }
+        return;
+      }
 
-          if (partObj.type === 'text' && partObj.text) {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.text),
-              timestamp,
-              messageType: 'assistant',
-              agentMetadata: { rawType: data.type },
-            });
-          } else if (partObj.type === 'tool_use') {
-            messages.push({
-              id: String(partObj.id || crypto.randomUUID()),
-              role: 'assistant',
-              content: `Tool: ${partObj.name}`,
-              timestamp,
-              messageType: 'tool_call',
-              tool: {
-                name: String(partObj.name || 'unknown'),
-                category: this.categorizeToolByName(String(partObj.name || '')),
-                input: partObj.input as Record<string, unknown> | undefined,
-                status: 'pending',
-              },
-              agentMetadata: { rawType: 'tool_use', rawContent: part },
-            });
-          } else if (partObj.type === 'tool_result') {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.content || ''),
-              timestamp,
-              messageType: 'tool_result',
-              tool: {
-                name: 'tool_result',
-                category: 'unknown',
-                output: String(partObj.content || ''),
-                status: partObj.is_error ? 'error' : 'success',
-              },
-              agentMetadata: { rawType: 'tool_result', toolUseId: partObj.tool_use_id },
-            });
-          } else if (partObj.type === 'thinking') {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.thinking || ''),
-              timestamp,
-              messageType: 'thinking',
-              thinking: {
-                content: String(partObj.thinking || ''),
-                isRedacted: false,
-              },
-              agentMetadata: { rawType: 'thinking' },
-            });
-          }
+      if (type === 'redacted_thinking') {
+        if (typeof obj.data === 'string') {
+          blocks.push({ type: 'redacted_thinking', data: obj.data });
+        }
+        return;
+      }
+
+      if (type === 'tool_use' || type === 'server_tool_use') {
+        const id = typeof obj.id === 'string' ? obj.id : crypto.randomUUID();
+        const name = typeof obj.name === 'string' ? obj.name : 'unknown';
+        const input = parseToolInput(obj.input);
+        if (type === 'tool_use') {
+          blocks.push({ type: 'tool_use', id, name, input });
+        } else {
+          blocks.push({ type: 'server_tool_use', id, name, input });
+        }
+        return;
+      }
+
+      if (type === 'web_search_tool_result') {
+        const toolUseId =
+          typeof obj.tool_use_id === 'string'
+            ? obj.tool_use_id
+            : typeof obj.toolUseId === 'string'
+            ? obj.toolUseId
+            : crypto.randomUUID();
+        const parsedContent = this.parseWebSearchToolResultContent(obj.content);
+        if (parsedContent) {
+          blocks.push({
+            type: 'web_search_tool_result',
+            toolUseId,
+            content: parsedContent,
+          });
+        }
+        return;
+      }
+
+      if (type === 'tool_result' && obj.content !== undefined) {
+        pushTextBlock(String(obj.content));
+      }
+    };
+
+    if (typeof content === 'string') {
+      pushTextBlock(content);
+    } else if (Array.isArray(content)) {
+      for (const part of content) {
+        parseBlock(part);
+      }
+    } else {
+      parseBlock(content);
+    }
+
+    return {
+      blocks,
+      displayText: textParts.join('\n'),
+    };
+  }
+
+  private parseWebSearchToolResultContent(
+    content: unknown
+  ): AgentWebSearchToolResultContent | null {
+    if (Array.isArray(content)) {
+      const results: AgentWebSearchResultBlock[] = [];
+      for (const entry of content) {
+        if (!entry || typeof entry !== 'object') continue;
+        const obj = entry as Record<string, unknown>;
+        if (obj.type !== 'web_search_result') continue;
+        if (typeof obj.title !== 'string' || typeof obj.url !== 'string') continue;
+        results.push({
+          type: 'web_search_result',
+          encryptedContent: typeof obj.encrypted_content === 'string' ? obj.encrypted_content : '',
+          pageAge: typeof obj.page_age === 'string' ? obj.page_age : null,
+          title: obj.title,
+          url: obj.url,
+        });
+      }
+      return results;
+    }
+
+    if (content && typeof content === 'object') {
+      const obj = content as Record<string, unknown>;
+      if (obj.type === 'web_search_tool_result_error' && typeof obj.error_code === 'string') {
+        if (this.isWebSearchToolResultErrorCode(obj.error_code)) {
+          return {
+            type: 'web_search_tool_result_error',
+            errorCode: obj.error_code,
+          };
         }
       }
     }
 
-    return messages;
+    return null;
+  }
+
+  private isWebSearchToolResultErrorCode(
+    value: string
+  ): value is AgentWebSearchToolResultErrorCode {
+    return (
+      value === 'invalid_tool_input' ||
+      value === 'unavailable' ||
+      value === 'max_uses_exceeded' ||
+      value === 'too_many_requests' ||
+      value === 'query_too_long'
+    );
   }
 
   private categorizeToolByName(name: string): ToolCategory {

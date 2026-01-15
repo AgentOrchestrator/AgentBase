@@ -73,6 +73,8 @@ export interface SessionFilter {
  * Options for continuing a session
  */
 export interface ContinueOptions {
+  /** Agent node identifier for scoping hook events */
+  agentId?: string;
   workingDirectory?: string;
   timeout?: number;
 }

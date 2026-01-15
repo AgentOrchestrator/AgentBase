@@ -386,6 +386,17 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     // Return cleanup function
     return () => ipcRenderer.removeListener('coding-agent:stream-chunk', handler);
   },
+  onAgentEvent: (callback: (event: unknown) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: unknown
+    ) => callback(data);
+    ipcRenderer.on('coding-agent:event', handler);
+    return () => ipcRenderer.removeListener('coding-agent:event', handler);
+  },
+  respondToAction: async (response) => {
+    await unwrapResponse(ipcRenderer.invoke('coding-agent:respond-to-action', response));
+  },
   getLatestSession: (agentType: CodingAgentType, workspacePath: string) =>
     unwrapResponse<{ id: string; updatedAt: string } | null>(
       ipcRenderer.invoke('coding-agent:get-latest-session', agentType, workspacePath)

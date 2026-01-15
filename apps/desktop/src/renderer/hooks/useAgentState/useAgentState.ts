@@ -20,10 +20,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { WorktreeInfo } from '../../../main/types/worktree';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type {
+  AgentAction,
+  AgentEvent,
+  ClarifyingQuestion,
+  GitInfo,
+  PermissionPayload,
+} from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import { createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from '../../types/attachments';
-import { agentStore } from '../../stores';
+import { agentStore, agentActionStore } from '../../stores';
 import type {
   AgentState,
   UseAgentStateInput,
@@ -130,6 +136,11 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   const sessionReadiness: SessionReadiness = sessionId ? 'ready' : 'idle';
 
   // ---------------------------------------------------------------------------
+  // Hook-driven Action State
+  // ---------------------------------------------------------------------------
+  const actionIdsRef = useRef<Set<string>>(new Set());
+
+  // ---------------------------------------------------------------------------
   // Refs for cleanup
   // ---------------------------------------------------------------------------
   const worktreeRef = useRef<WorktreeInfo | null>(null);
@@ -145,6 +156,11 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
       setSessionId(nextSessionId);
     }
   }, [nodeData.sessionId, sessionId]);
+
+  useEffect(() => {
+    actionIdsRef.current.clear();
+    agentActionStore.clearAgent(nodeData.agentId);
+  }, [nodeData.agentId, sessionId]);
 
   // ---------------------------------------------------------------------------
   // Config (immutable)
@@ -348,6 +364,86 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     );
   }, [nodeId]);
 
+  const toClarifyingQuestions = (toolInput: Record<string, unknown> | undefined): ClarifyingQuestion[] => {
+    const questions = toolInput?.questions;
+    if (!Array.isArray(questions)) {
+      return [];
+    }
+
+    return questions
+      .map((question) => {
+        if (!question || typeof question !== 'object') {
+          return null;
+        }
+        const item = question as {
+          header?: string;
+          question?: string;
+          options?: Array<{ label?: string; description?: string }>;
+          multiSelect?: boolean;
+        };
+
+        if (!item.question) {
+          return null;
+        }
+
+        return {
+          header: item.header,
+          question: item.question,
+          options: Array.isArray(item.options)
+            ? item.options
+                .filter((option) => option && typeof option.label === 'string')
+                .map((option) => ({
+                  label: String(option.label),
+                  description: typeof option.description === 'string' ? option.description : undefined,
+                }))
+            : undefined,
+          multiSelect: item.multiSelect,
+        } as ClarifyingQuestion;
+      })
+      .filter((question): question is ClarifyingQuestion => Boolean(question));
+  };
+
+  const buildActionFromPermissionEvent = (
+    event: AgentEvent<PermissionPayload>
+  ): AgentAction | null => {
+    const raw = event.raw as { toolInput?: Record<string, unknown>; toolUseId?: string } | undefined;
+    const toolInput = raw?.toolInput;
+    const toolName = event.payload.toolName;
+    const resolvedAgentId = event.agentId ?? nodeData.agentId;
+
+    if (toolName && toolName.toLowerCase() === 'askuserquestion') {
+      const questions = toClarifyingQuestions(toolInput);
+      return {
+        id: event.id,
+        type: 'clarifying_question',
+        agentId: resolvedAgentId,
+        agentType: event.agent,
+        sessionId: event.sessionId,
+        workspacePath: event.workspacePath,
+        toolUseId: raw?.toolUseId,
+        createdAt: event.timestamp,
+        questions,
+      };
+    }
+
+    return {
+      id: event.id,
+      type: 'tool_approval',
+      agentId: resolvedAgentId,
+      agentType: event.agent,
+      sessionId: event.sessionId,
+      workspacePath: event.workspacePath,
+      toolUseId: raw?.toolUseId,
+      createdAt: event.timestamp,
+      toolName: toolName || 'Unknown tool',
+      command: event.payload.command,
+      filePath: event.payload.filePath,
+      workingDirectory: event.payload.workingDirectory,
+      reason: event.payload.reason,
+      input: toolInput,
+    };
+  };
+
   // ---------------------------------------------------------------------------
   // Mark as initialized once workspace is resolved
   // ---------------------------------------------------------------------------
@@ -356,6 +452,44 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
       setIsInitialized(true);
     }
   }, [workspacePath, isInitialized]);
+
+  // ---------------------------------------------------------------------------
+  // Hook Events (permission requests, questions)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!window.codingAgentAPI?.onAgentEvent) {
+      return;
+    }
+
+    const unsubscribe = window.codingAgentAPI.onAgentEvent((event) => {
+      const typedEvent = event as AgentEvent<PermissionPayload>;
+      if (typedEvent.type !== 'permission:request') {
+        return;
+      }
+
+      if (typedEvent.agentId && typedEvent.agentId !== nodeData.agentId) {
+        return;
+      }
+
+      if (!typedEvent.agentId && typedEvent.sessionId && sessionId && typedEvent.sessionId !== sessionId) {
+        return;
+      }
+
+      if (actionIdsRef.current.has(typedEvent.id)) {
+        return;
+      }
+
+      const action = buildActionFromPermissionEvent(typedEvent);
+      if (!action) {
+        return;
+      }
+
+      actionIdsRef.current.add(typedEvent.id);
+      agentActionStore.addAction(action);
+    });
+
+    return unsubscribe;
+  }, [nodeData.agentId, sessionId]);
 
   // ---------------------------------------------------------------------------
   // Return Complete State

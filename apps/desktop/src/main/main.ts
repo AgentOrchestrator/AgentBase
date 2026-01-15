@@ -19,6 +19,13 @@ import {
   isChatHistoryProvider,
 } from './services/coding-agent';
 import type {
+  AgentActionResponse,
+  AgentEvent,
+  EventRegistry,
+  EventResult,
+  PermissionPayload,
+} from '@agent-orchestrator/shared';
+import type {
   CodingAgentType,
   GenerateRequest,
   SessionIdentifier,
@@ -41,6 +48,7 @@ import {
   type ILogger,
   type IIdGenerator,
 } from './services/representation';
+import { awaitAgentActionResponse, emitAgentEvent, registerAgentActionHandlers } from './services/coding-agent/agent-event-bridge';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
@@ -66,6 +74,89 @@ const representationService = new RepresentationService(
   { defaultTimeout: 30000, initializeProvidersOnStart: true },
   { logger: representationLogger, idGenerator: representationIdGenerator }
 );
+
+registerAgentActionHandlers();
+
+interface EventRegistryProvider {
+  getEventRegistry: () => EventRegistry;
+}
+
+const bridgedAgents = new WeakSet<object>();
+
+function isEventRegistryProvider(agent: unknown): agent is EventRegistryProvider {
+  return typeof (agent as EventRegistryProvider)?.getEventRegistry === 'function';
+}
+
+function sanitizeAgentEvent(event: AgentEvent): AgentEvent {
+  if (!event.raw || typeof event.raw !== 'object') {
+    return event;
+  }
+
+  const raw = event.raw as { toolInput?: unknown; toolUseId?: string };
+  return {
+    ...event,
+    raw: {
+      toolInput: raw.toolInput,
+      toolUseId: raw.toolUseId,
+    },
+  };
+}
+
+function mapActionResponseToEventResult(
+  response: AgentActionResponse,
+  event: AgentEvent<PermissionPayload>
+): EventResult {
+  if (response.type === 'tool_approval') {
+    return response.decision === 'allow'
+      ? { action: 'allow' }
+      : { action: 'deny', message: response.message || 'Permission denied' };
+  }
+
+  if (response.type === 'clarifying_question') {
+    const toolInput = (event.raw as { toolInput?: Record<string, unknown> } | undefined)
+      ?.toolInput ?? {};
+    return {
+      action: 'modify',
+      modifiedPayload: {
+        ...toolInput,
+        answers: response.answers,
+      },
+    };
+  }
+
+  return { action: 'continue' };
+}
+
+function ensureAgentEventBridge(agent: unknown): void {
+  if (!isEventRegistryProvider(agent)) {
+    return;
+  }
+
+  const agentObject = agent as object;
+  if (bridgedAgents.has(agentObject)) {
+    return;
+  }
+
+  bridgedAgents.add(agentObject);
+  const registry = agent.getEventRegistry();
+
+  registry.on<PermissionPayload>('permission:request', async (event) => {
+    emitAgentEvent(sanitizeAgentEvent(event));
+
+    try {
+      const response = await awaitAgentActionResponse(
+        event.id,
+        (event.raw as { signal?: AbortSignal } | undefined)?.signal
+      );
+      return mapActionResponseToEventResult(response, event);
+    } catch (error) {
+      return {
+        action: 'deny',
+        message: error instanceof Error ? error.message : 'Permission request aborted',
+      };
+    }
+  });
+}
 
 const createWindow = (): void => {
   const win = new BrowserWindow({
@@ -439,6 +530,7 @@ ipcMain.handle(
         return { success: false, error: agentResult.error.message };
       }
 
+      ensureAgentEventBridge(agentResult.data);
       const result = await agentResult.data.generate(request);
       if (result.success === false) {
         console.error('[Main] Error generating response', { agentType, error: result.error });
@@ -470,6 +562,7 @@ ipcMain.handle(
       }
 
       const agent = agentResult.data;
+      ensureAgentEventBridge(agent);
       if (!isSessionResumable(agent)) {
         return { success: false, error: `${agentType} does not support session resumption` };
       }
@@ -525,6 +618,7 @@ ipcMain.handle(
       }
 
       const agent = agentResult.data;
+      ensureAgentEventBridge(agent);
       if (!isSessionResumable(agent)) {
         return { success: false, error: `${agentType} does not support session resumption` };
       }
@@ -603,6 +697,7 @@ ipcMain.handle(
       }
 
       const agent = agentResult.data;
+      ensureAgentEventBridge(agent);
       if (!isSessionForkable(agent)) {
         return { success: false, error: `${agentType} does not support session forking` };
       }
@@ -810,6 +905,7 @@ ipcMain.handle(
         timeSinceStart: `${Date.now() - startTime}ms`,
       });
 
+      ensureAgentEventBridge(agentResult.data);
       const result = await agentResult.data.generateStreaming(request, (chunk: string) => {
         chunksSent++;
         totalBytesSent += chunk.length;
