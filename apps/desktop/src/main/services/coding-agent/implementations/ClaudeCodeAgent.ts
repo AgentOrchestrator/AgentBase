@@ -7,6 +7,7 @@ import type { Query, SDKMessage, Options, CanUseTool, PermissionResult } from '@
 import {
   createEventRegistry,
   createSDKHookBridge,
+  ClaudeCodeJsonlParser,
   type EventRegistry,
   type SDKHookBridge,
 } from '@agent-orchestrator/shared';
@@ -35,11 +36,6 @@ import type {
   ContinueOptions,
   ForkOptions,
   CodingAgentMessage,
-  ToolCategory,
-  AgentContentBlock,
-  AgentWebSearchToolResultContent,
-  AgentWebSearchResultBlock,
-  AgentWebSearchToolResultErrorCode,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
 import {
@@ -84,20 +80,6 @@ interface QueryHandle {
  */
 
 /**
- * JSONL line structure from Claude Code session files
- */
-interface JsonlLine {
-  type?: string;
-  message?: {
-    role: string;
-    content: unknown;
-  };
-  timestamp?: string | number;
-  sessionId?: string;
-  summary?: string;
-}
-
-/**
  * Configuration for ClaudeCodeAgent with hook options
  */
 export interface ClaudeCodeAgentConfig extends AgentConfig {
@@ -114,6 +96,7 @@ export class ClaudeCodeAgent
   private readonly hookBridge: SDKHookBridge;
   private readonly debugHooks: boolean;
   private readonly activeQueries = new Map<string, QueryHandle>();
+  private readonly jsonlParser = new ClaudeCodeJsonlParser();
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
@@ -921,73 +904,25 @@ export class ClaudeCodeAgent
   ): SessionSummary | null {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const lines = content.trim().split('\n').filter(line => line.trim());
+      const stats = this.jsonlParser.parseStats(content);
 
-      if (lines.length === 0) return null;
+      if (stats.messageCount === 0) return null;
 
-      let messageCount = 0;
-      let toolCallCount = 0;
-      let hasThinking = false;
-      let firstUserMessage: string | undefined;
-      let lastAssistantMessage: string | undefined;
-      let lastTimestamp: string | undefined;
-
-      for (const line of lines) {
-        try {
-          const data: JsonlLine = JSON.parse(line);
-
-          if (data.timestamp) {
-            lastTimestamp = this.normalizeTimestamp(data.timestamp);
-          }
-
-          if (data.type === 'user' && data.message?.content) {
-            messageCount++;
-            if (!firstUserMessage) {
-              firstUserMessage = this.extractDisplayContent(data.message.content);
-            }
-          }
-
-          if (data.type === 'assistant' && data.message?.content) {
-            messageCount++;
-            const display = this.extractDisplayContent(data.message.content);
-            if (display) lastAssistantMessage = display;
-
-            // Check for tool use blocks
-            if (Array.isArray(data.message.content)) {
-              for (const part of data.message.content) {
-                if (typeof part === 'object' && part !== null) {
-                  if ((part as Record<string, unknown>).type === 'tool_use') {
-                    toolCallCount++;
-                  }
-                  if ((part as Record<string, unknown>).type === 'thinking') {
-                    hasThinking = true;
-                  }
-                }
-              }
-            }
-          }
-        } catch {
-          // Skip malformed lines
-        }
-      }
-
-      if (messageCount === 0) return null;
-
-      const stats = fs.statSync(filePath);
+      const fileStats = fs.statSync(filePath);
 
       return {
         id: sessionId,
         agentType: 'claude_code',
-        createdAt: stats.birthtime.toISOString(),
-        updatedAt: stats.mtime.toISOString(),
-        timestamp: lastTimestamp || stats.mtime.toISOString(),
+        createdAt: fileStats.birthtime.toISOString(),
+        updatedAt: fileStats.mtime.toISOString(),
+        timestamp: stats.lastTimestamp || fileStats.mtime.toISOString(),
         projectPath,
         projectName,
-        messageCount,
-        firstUserMessage: firstUserMessage?.substring(0, 200),
-        lastAssistantMessage: lastAssistantMessage?.substring(0, 200),
-        toolCallCount,
-        hasThinking,
+        messageCount: stats.messageCount,
+        firstUserMessage: stats.firstUserMessage?.substring(0, 200),
+        lastAssistantMessage: stats.lastAssistantMessage?.substring(0, 200),
+        toolCallCount: stats.toolCallCount,
+        hasThinking: stats.hasThinking,
       };
     } catch {
       return null;
@@ -1037,32 +972,21 @@ export class ClaudeCodeAgent
     filter?: MessageFilterOptions
   ): CodingAgentSessionContent {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
-    const messages: CodingAgentMessage[] = [];
+    const { messages: allMessages } = this.jsonlParser.parseMessages(content);
 
-    for (const line of lines) {
-      try {
-        const data: JsonlLine = JSON.parse(line);
-        const parsedMessages = this.parseJsonlLine(data);
-
-        for (const msg of parsedMessages) {
-          // Apply filters
-          if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
-            continue;
-          }
-          if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
-            continue;
-          }
-          if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
-            continue;
-          }
-
-          messages.push(msg);
-        }
-      } catch {
-        // Skip malformed lines
+    // Apply filters
+    const messages = allMessages.filter((msg) => {
+      if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
+        return false;
       }
-    }
+      if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
+        return false;
+      }
+      if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
 
     const stats = fs.statSync(filePath);
     const projectName = path.basename(projectPath);
@@ -1081,279 +1005,6 @@ export class ClaudeCodeAgent
       },
       messages,
     };
-  }
-
-  private parseJsonlLine(data: JsonlLine): CodingAgentMessage[] {
-    const messages: CodingAgentMessage[] = [];
-    const timestamp = this.normalizeTimestamp(data.timestamp);
-
-    if (!data.message?.content) {
-      return messages;
-    }
-
-    if (data.type === 'user' || data.type === 'assistant') {
-      const { blocks, displayText } = this.parseContentBlocks(data.message.content);
-      if (!displayText && blocks.length === 0) {
-        return messages;
-      }
-
-      messages.push({
-        id: crypto.randomUUID(),
-        role: data.type,
-        content: displayText,
-        contentBlocks: blocks.length > 0 ? blocks : undefined,
-        timestamp,
-        messageType: data.type,
-        agentMetadata: { rawType: data.type },
-      });
-    }
-
-    return messages;
-  }
-
-  private parseContentBlocks(content: unknown): {
-    blocks: AgentContentBlock[];
-    displayText: string;
-  } {
-    const blocks: AgentContentBlock[] = [];
-    const textParts: string[] = [];
-
-    const pushTextBlock = (text: string, citations?: unknown[] | null) => {
-      const normalized = String(text);
-      if (!normalized) return;
-      blocks.push({ type: 'text', text: normalized, citations });
-      textParts.push(normalized);
-    };
-
-    const parseToolInput = (input: unknown): Record<string, unknown> => {
-      if (input && typeof input === 'object' && !Array.isArray(input)) {
-        return input as Record<string, unknown>;
-      }
-      return {};
-    };
-
-    const parseBlock = (part: unknown) => {
-      if (typeof part === 'string') {
-        pushTextBlock(part);
-        return;
-      }
-
-      if (!part || typeof part !== 'object') return;
-
-      const obj = part as Record<string, unknown>;
-      const type = obj.type;
-
-      if (type === 'text') {
-        if (typeof obj.text === 'string') {
-          const citations = Array.isArray(obj.citations)
-            ? obj.citations
-            : obj.citations === null
-            ? null
-            : undefined;
-          pushTextBlock(obj.text, citations);
-        }
-        return;
-      }
-
-      if (type === 'thinking') {
-        if (typeof obj.thinking === 'string') {
-          blocks.push({
-            type: 'thinking',
-            thinking: obj.thinking,
-            signature: typeof obj.signature === 'string' ? obj.signature : undefined,
-          });
-        }
-        return;
-      }
-
-      if (type === 'redacted_thinking') {
-        if (typeof obj.data === 'string') {
-          blocks.push({ type: 'redacted_thinking', data: obj.data });
-        }
-        return;
-      }
-
-      if (type === 'tool_use' || type === 'server_tool_use') {
-        const id = typeof obj.id === 'string' ? obj.id : crypto.randomUUID();
-        const name = typeof obj.name === 'string' ? obj.name : 'unknown';
-        const input = parseToolInput(obj.input);
-        if (type === 'tool_use') {
-          blocks.push({ type: 'tool_use', id, name, input });
-        } else {
-          blocks.push({ type: 'server_tool_use', id, name, input });
-        }
-        return;
-      }
-
-      if (type === 'web_search_tool_result') {
-        const toolUseId =
-          typeof obj.tool_use_id === 'string'
-            ? obj.tool_use_id
-            : typeof obj.toolUseId === 'string'
-            ? obj.toolUseId
-            : crypto.randomUUID();
-        const parsedContent = this.parseWebSearchToolResultContent(obj.content);
-        if (parsedContent) {
-          blocks.push({
-            type: 'web_search_tool_result',
-            toolUseId,
-            content: parsedContent,
-          });
-        }
-        return;
-      }
-
-      if (type === 'tool_result' && obj.content !== undefined) {
-        pushTextBlock(String(obj.content));
-      }
-    };
-
-    if (typeof content === 'string') {
-      pushTextBlock(content);
-    } else if (Array.isArray(content)) {
-      for (const part of content) {
-        parseBlock(part);
-      }
-    } else {
-      parseBlock(content);
-    }
-
-    return {
-      blocks,
-      displayText: textParts.join('\n'),
-    };
-  }
-
-  private parseWebSearchToolResultContent(
-    content: unknown
-  ): AgentWebSearchToolResultContent | null {
-    if (Array.isArray(content)) {
-      const results: AgentWebSearchResultBlock[] = [];
-      for (const entry of content) {
-        if (!entry || typeof entry !== 'object') continue;
-        const obj = entry as Record<string, unknown>;
-        if (obj.type !== 'web_search_result') continue;
-        if (typeof obj.title !== 'string' || typeof obj.url !== 'string') continue;
-        results.push({
-          type: 'web_search_result',
-          encryptedContent: typeof obj.encrypted_content === 'string' ? obj.encrypted_content : '',
-          pageAge: typeof obj.page_age === 'string' ? obj.page_age : null,
-          title: obj.title,
-          url: obj.url,
-        });
-      }
-      return results;
-    }
-
-    if (content && typeof content === 'object') {
-      const obj = content as Record<string, unknown>;
-      if (obj.type === 'web_search_tool_result_error' && typeof obj.error_code === 'string') {
-        if (this.isWebSearchToolResultErrorCode(obj.error_code)) {
-          return {
-            type: 'web_search_tool_result_error',
-            errorCode: obj.error_code,
-          };
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private isWebSearchToolResultErrorCode(
-    value: string
-  ): value is AgentWebSearchToolResultErrorCode {
-    return (
-      value === 'invalid_tool_input' ||
-      value === 'unavailable' ||
-      value === 'max_uses_exceeded' ||
-      value === 'too_many_requests' ||
-      value === 'query_too_long'
-    );
-  }
-
-  private categorizeToolByName(name: string): ToolCategory {
-    const lowerName = name.toLowerCase();
-
-    if (['read', 'cat', 'head', 'tail'].some(t => lowerName.includes(t))) {
-      return 'file_read';
-    }
-    if (['write', 'edit', 'touch'].some(t => lowerName.includes(t))) {
-      return 'file_write';
-    }
-    if (['glob', 'grep', 'find', 'search'].some(t => lowerName.includes(t))) {
-      return 'file_search';
-    }
-    if (['bash', 'shell', 'terminal', 'exec'].some(t => lowerName.includes(t))) {
-      return 'shell';
-    }
-    if (['web', 'fetch', 'http', 'url'].some(t => lowerName.includes(t))) {
-      return 'web';
-    }
-    if (['lsp', 'definition', 'reference', 'hover'].some(t => lowerName.includes(t))) {
-      return 'code_intel';
-    }
-    if (lowerName.startsWith('mcp')) {
-      return 'mcp';
-    }
-
-    return 'custom';
-  }
-
-  private extractDisplayContent(content: unknown): string {
-    if (typeof content === 'string') {
-      return content;
-    }
-
-    if (Array.isArray(content)) {
-      const textParts: string[] = [];
-      for (const part of content) {
-        if (typeof part === 'string') {
-          textParts.push(part);
-        } else if (typeof part === 'object' && part !== null) {
-          const obj = part as Record<string, unknown>;
-          if (obj.type === 'text' && obj.text) {
-            textParts.push(String(obj.text));
-          }
-        }
-      }
-      return textParts.join('\n');
-    }
-
-    return '';
-  }
-
-  private normalizeTimestamp(timestamp: string | number | undefined): string {
-    if (!timestamp) return new Date().toISOString();
-
-    if (typeof timestamp === 'string') {
-      // First, try to parse as ISO date string (most common case)
-      const date = new Date(timestamp);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-
-      // If not a valid date string, try parsing as numeric timestamp
-      const num = parseInt(timestamp, 10);
-      if (!isNaN(num) && num > 0) {
-        timestamp = num;
-      } else {
-        return new Date().toISOString();
-      }
-    }
-
-    if (typeof timestamp === 'number') {
-      // If > year 2000 in ms
-      if (timestamp > 946684800000) {
-        return new Date(timestamp).toISOString();
-      }
-      // If in seconds
-      if (timestamp > 946684800) {
-        return new Date(timestamp * 1000).toISOString();
-      }
-    }
-
-    return new Date().toISOString();
   }
 
   /**
@@ -1377,30 +1028,20 @@ export class ClaudeCodeAgent
       if (!fs.existsSync(sessionFilePath)) continue;
 
       const content = fs.readFileSync(sessionFilePath, 'utf-8');
-      const lines = content.trim().split('\n').filter(line => line.trim());
 
-      for (const line of lines) {
-        try {
-          const data: JsonlLine = JSON.parse(line);
-          const parsedMessages = this.parseJsonlLine(data);
-
-          for (const msg of parsedMessages) {
-            // Apply filters
-            if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
-              continue;
-            }
-            if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
-              continue;
-            }
-            if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
-              continue;
-            }
-
-            yield msg;
-          }
-        } catch {
-          // Skip malformed lines
+      for (const msg of this.jsonlParser.streamMessages(content)) {
+        // Apply filters
+        if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
+          continue;
         }
+        if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
+          continue;
+        }
+        if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
+          continue;
+        }
+
+        yield msg;
       }
 
       return; // Found the session, done

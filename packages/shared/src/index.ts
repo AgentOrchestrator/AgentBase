@@ -6,6 +6,9 @@ export * from './types.js';
 // Chat history loaders module
 export * from './loaders/index.js';
 
+// Parser utilities (JSONL parsing, content blocks, etc.)
+export * from './parsers/index.js';
+
 // Agent hooks module (vendor-agnostic event system)
 export * from './hooks/index.js';
 
