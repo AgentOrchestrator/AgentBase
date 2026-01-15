@@ -19,6 +19,7 @@ interface AgentOverviewViewProps {
   workspacePath?: string;
   sessionId?: string;
   onTitleChange?: (newTitle: string) => void;
+  hideStatusIndicator?: boolean;
 }
 
 /**
@@ -144,6 +145,7 @@ export default function AgentOverviewView({
   workspacePath,
   sessionId,
   onTitleChange,
+  hideStatusIndicator = false,
 }: AgentOverviewViewProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title.value);
@@ -244,8 +246,8 @@ export default function AgentOverviewView({
         )}
       </div>
 
-      {/* Status Indicator */}
-      <StatusIndicator status={status} statusInfo={statusInfo} />
+      {/* Status Indicator - Hidden if moved to node header */}
+      {!hideStatusIndicator && <StatusIndicator status={status} statusInfo={statusInfo} />}
 
       {/* Summary - Hidden */}
       {/* {summary && (

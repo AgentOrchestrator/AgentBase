@@ -43,6 +43,95 @@
   transform: scale(1.01);
 }
 
+/* Status Indicator - Top Left, vertically aligned with buttons */
+.agent-node-status-indicator {
+  position: absolute;
+  top: 8px;
+  left: 16px;
+  z-index: 10;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+.agent-node-status-indicator .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  opacity: 1;
+  height: 24px;
+}
+
+.agent-node-status-indicator .status-icon {
+  font-size: 16px;
+  color: var(--status-color, #888);
+  display: inline-block;
+  position: relative;
+}
+
+.agent-node-status-indicator .status-label {
+  color: #d4d4d4;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Status-specific styles */
+.agent-node-status-indicator .status-idle .status-icon {
+  /* Dashed circle - using border instead of solid character */
+  width: 16px;
+  height: 16px;
+  border: 2px dashed var(--status-color, #888);
+  border-radius: 50%;
+  background: transparent;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-blinking .status-icon {
+  animation: status-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.agent-node-status-indicator .status-paused .status-icon {
+  width: 16px;
+  height: 16px;
+  background: rgb(255, 204, 0);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-completed .status-icon {
+  width: 16px;
+  height: 16px;
+  background: rgb(52, 199, 89);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-error .status-icon {
+  width: 16px;
+  height: 16px;
+  background: rgb(255, 56, 60);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-awaiting {
+  gap: 0;
+}
+
 /* View Switcher Buttons - Top Right */
 .agent-node-view-switcher {
   position: absolute;

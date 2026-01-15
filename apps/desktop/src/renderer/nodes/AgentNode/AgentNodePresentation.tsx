@@ -30,6 +30,7 @@ import type {
   SessionReadiness,
 } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
+import type { CodingAgentStatus, CodingAgentStatusInfo } from '../../../../types/coding-agent-status';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -315,6 +316,26 @@ export function AgentNodePresentation({
     : null;
   const branch = gitInfo?.branch || workspaceAttachment?.git?.branch;
 
+  // Status display configuration
+  const STATUS_CONFIG: Record<
+    CodingAgentStatus,
+    { label: string; color: string; icon: string; className: string }
+  > = {
+    idle: { label: 'Idle', color: '#888', icon: '○', className: 'status-idle' },
+    running: { label: 'Running', color: '#888', icon: '●', className: 'status-blinking' },
+    thinking: { label: 'Thinking', color: '#888', icon: '●', className: 'status-blinking' },
+    streaming: { label: 'Streaming', color: '#888', icon: '●', className: 'status-blinking' },
+    executing_tool: { label: 'Executing', color: '#888', icon: '●', className: 'status-blinking' },
+    awaiting_input: { label: 'Waiting for user response', color: '#888', icon: '', className: 'status-awaiting' },
+    paused: { label: 'Paused', color: 'rgb(255, 204, 0)', icon: '●', className: 'status-paused' },
+    completed: { label: 'Completed', color: 'rgb(52, 199, 89)', icon: '●', className: 'status-completed' },
+    error: { label: 'Error', color: 'rgb(255, 56, 60)', icon: '●', className: 'status-error' },
+  };
+
+  const statusConfig = STATUS_CONFIG[data.status];
+  const toolLabel = data.statusInfo?.toolName ? `: ${data.statusInfo.toolName}` : '';
+  const subagentLabel = data.statusInfo?.subagentName ? ` (${data.statusInfo.subagentName})` : '';
+
   return (
     <div className="agent-node-wrapper">
       {/* Frame Label - Folder and Branch */}
@@ -445,7 +466,8 @@ export function AgentNodePresentation({
             target.closest('textarea') ||
             target.closest('.agent-node-fork-button-wrapper') ||
             target.closest('.agent-node-bottom-buttons') ||
-            target.closest('.agent-node-view-switcher')
+            target.closest('.agent-node-view-switcher') ||
+            target.closest('.agent-node-status-indicator')
           ) {
             return;
           }
@@ -460,6 +482,27 @@ export function AgentNodePresentation({
           handleStyle={{ width: 24, height: 24, borderRadius: '50%' }}
           handleClassName="agent-node-resize-handle"
         />
+
+      {/* Status Indicator - Top Left */}
+      <div className="agent-node-status-indicator">
+        <div
+          className={`status-indicator ${statusConfig.className}`}
+          style={{ '--status-color': statusConfig.color } as React.CSSProperties}
+        >
+          {data.status === 'awaiting_input' ? (
+            <span className="status-label">{statusConfig.label}</span>
+          ) : (
+            <>
+              <span className="status-icon">{statusConfig.icon}</span>
+              <span className="status-label">
+                {statusConfig.label}
+                {toolLabel}
+                {subagentLabel}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* View Switcher Buttons - Top Right */}
       <div className="agent-node-view-switcher">
@@ -530,6 +573,7 @@ export function AgentNodePresentation({
             workspacePath={workspacePath ?? undefined}
             sessionId={data.sessionId}
             onTitleChange={handleTitleChange}
+            hideStatusIndicator={true}
           />
         </div>
         <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
