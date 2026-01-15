@@ -322,18 +322,3 @@
 .agent-node-frame-label .frame-label-folder-name:hover {
   color: var(--color-text-primary);
 }
-
-/* Debug: Big red forking indicator */
-.agent-node-forking-debug {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 120px;
-  font-weight: 900;
-  color: #ff0000;
-  z-index: 1000;
-  pointer-events: none;
-  opacity: 0.8;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}

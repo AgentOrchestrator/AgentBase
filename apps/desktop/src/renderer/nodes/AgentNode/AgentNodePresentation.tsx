@@ -417,10 +417,6 @@ export function AgentNodePresentation({
           handleNodeClick();
         }}
       >
-        {/* Debug: Big red true/false indicator */}
-        <div className="agent-node-forking-debug">
-          {forking ? 'TRUE' : 'FALSE'}
-        </div>
         <NodeResizer
           minWidth={450}
           minHeight={350}
