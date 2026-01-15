@@ -563,6 +563,8 @@ export interface GitAPI {
   listBranches: (workspacePath: string) => Promise<string[] | null>;
   /** Create and checkout a new branch */
   createBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
+  /** Checkout an existing branch */
+  checkoutBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 // Expose git API
@@ -586,6 +588,13 @@ contextBridge.exposeInMainWorld('gitAPI', {
   createBranch: async (workspacePath: string, branchName: string) => {
     try {
       return await ipcRenderer.invoke('git:create-branch', workspacePath, branchName);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+  checkoutBranch: async (workspacePath: string, branchName: string) => {
+    try {
+      return await ipcRenderer.invoke('git:checkout-branch', workspacePath, branchName);
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

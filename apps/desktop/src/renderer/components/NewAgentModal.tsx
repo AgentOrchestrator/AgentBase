@@ -317,8 +317,36 @@ export function NewAgentModal({
       }
     }
 
-    // Use worktree path if available, otherwise use workspace path
+    // Determine the workspace path to use (worktree or regular)
     const finalWorkspacePath = worktreeInfo?.worktreePath || workspacePath || undefined;
+
+    // If a branch is selected (rotated to), checkout that branch
+    // Use the original workspace path (not worktree) for checkout since branches are in the main repo
+    if (selectedBranchIndex !== null && originalWorkspacePath) {
+      const availableBranches = branches.filter((branch) => branch !== gitInfo?.branch);
+      const selectedBranch = availableBranches[selectedBranchIndex];
+      if (selectedBranch) {
+        try {
+          const result = await window.gitAPI?.checkoutBranch(originalWorkspacePath, selectedBranch);
+          if (!result?.success) {
+            console.error('[NewAgentModal] Failed to checkout branch:', result?.error);
+            alert(`Failed to checkout branch: ${result?.error || 'Unknown error'}`);
+            return;
+          }
+          // Refresh git info to get the checked out branch (use final workspace path)
+          if (finalWorkspacePath) {
+            const updatedInfo = await window.gitAPI?.getInfo(finalWorkspacePath);
+            if (updatedInfo) {
+              setGitInfo({ branch: updatedInfo.branch });
+            }
+          }
+        } catch (error) {
+          console.error('[NewAgentModal] Error checking out branch:', error);
+          alert(`Error checking out branch: ${(error as Error).message}`);
+          return;
+        }
+      }
+    }
 
     onCreate({
       title: description.trim() || 'New Agent',

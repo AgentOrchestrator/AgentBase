@@ -1376,6 +1376,32 @@ ipcMain.handle('git:create-branch', async (_event, workspacePath: string, branch
   }
 });
 
+ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Validate branch name
+    if (!branchName || !branchName.trim()) {
+      return { success: false, error: 'Branch name is required' };
+    }
+
+    try {
+      // Checkout the branch
+      await runGitCommand(workspacePath, ['checkout', branchName.trim()]);
+      console.log('[Main] Branch checked out', { workspacePath, branchName });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  } catch (error) {
+    console.error('[Main] Error checking out branch', { workspacePath, branchName, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
