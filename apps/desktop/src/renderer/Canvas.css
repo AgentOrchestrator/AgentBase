@@ -557,11 +557,6 @@
   background-color: var(--color-bg-canvas);
 }
 
-/* Hide background dots */
-.react-flow__background pattern {
-  display: none;
-}
-
 /* Hide React Flow attribution */
 .react-flow__attribution {
   display: none !important;

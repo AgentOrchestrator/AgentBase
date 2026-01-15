@@ -2127,7 +2127,12 @@ function CanvasFlow() {
         elementsSelectable={true}
         nodesFocusable={true}
       >
-        <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <Background 
+          variant={BackgroundVariant.Lines} 
+          gap={12} 
+          size={1}
+          color={theme === 'light-web' ? '#F5F6F8' : '#3a3a3a'}
+        />
         <ForkGhostNode />
       </ReactFlow>
 

@@ -36,8 +36,8 @@
 
 [data-theme="light-web"] {
   /* Light theme (web app colors) */
-  --color-bg-primary: #f9fafb;
-  --color-bg-primary-alt: #f9fafb;
+  --color-bg-primary: #ffffff;
+  --color-bg-primary-alt: #ffffff;
   --color-bg-secondary: #ffffff;
   --color-text-primary: #000000;
   --color-border: #d1d5db;
@@ -45,7 +45,7 @@
   --color-bg-hover: #f9fafb;
   --color-bg-hover-light: #f3f4f6;
   --color-bg-card: #ffffff;
-  --color-bg-canvas: #F5F5F5;
+  --color-bg-canvas: #F9FBFC;
 }
 
 html,
