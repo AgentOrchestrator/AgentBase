@@ -38,7 +38,12 @@ export function ActionPill() {
     return [...actions].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }, [actions]);
 
+  const hasActions = sortedActions.length > 0;
+
   const togglePill = useCallback(() => {
+    if (!hasActions) {
+      return;
+    }
     if (!isExpanded) {
       setIsTextVisible(false);
       setIsExpanded(true);
@@ -58,7 +63,7 @@ export function ActionPill() {
         setIsTextVisible(true);
       }, 350);
     }
-  }, [isExpanded]);
+  }, [hasActions, isExpanded]);
 
   const collapsePill = useCallback(() => {
     setIsContentVisible(false);
@@ -140,13 +145,11 @@ export function ActionPill() {
     [submitAction]
   );
 
-  if (sortedActions.length === 0) {
-    return null;
-  }
-
-  const label = sortedActions.length === 1
-    ? '1 action pending'
-    : `${sortedActions.length} actions pending`;
+  const label = hasActions
+    ? sortedActions.length === 1
+      ? '1 action pending'
+    : `${sortedActions.length} actions pending`
+    : "You're all clear";
 
   return (
     <div
@@ -170,6 +173,14 @@ export function ActionPill() {
             title="Collapse actions"
           />
           <div className={`action-pill-list ${isContentVisible ? 'visible' : ''}`}>
+            {!hasActions && (
+              <div className="action-pill-card">
+                <div className="action-pill-card-header">
+                  <span>All clear</span>
+                  <span className="action-pill-agent">No pending actions</span>
+                </div>
+              </div>
+            )}
             {sortedActions.map((action) => {
               const agentLabel = action.agentId
                 ? `Agent ${action.agentId}`
