@@ -2,13 +2,14 @@
  * AgentChatNode (Container)
  *
  * Container component for interactive chat with Claude Code via SDK.
- * Manages node data persistence and wraps presentation.
+ * Uses AgentChatView (same as agent node) wrapped in node container.
  */
 
 import { useCallback } from 'react';
-import { NodeProps } from '@xyflow/react';
-import { AgentChatNodePresentation } from './AgentChatNodePresentation';
+import { NodeProps, NodeResizer } from '@xyflow/react';
+import AgentChatView from '../../AgentChatView';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+import '../../AgentNode.css';
 
 interface AgentChatNodeData {
   sessionId?: string;
@@ -18,6 +19,7 @@ interface AgentChatNodeData {
   isExpanded?: boolean;
   messages: CodingAgentMessage[];
   isDraft: boolean;
+  agentId?: string;
 }
 
 function AgentChatNode({ data, id, selected }: NodeProps) {
@@ -49,20 +51,31 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
     [dispatchNodeUpdate]
   );
 
+  // Use agentId from data or generate one from nodeId
+  const agentId = nodeData.agentId || `agent-${id}`;
+
   return (
-    <AgentChatNodePresentation
-      selected={selected}
-      sessionId={nodeData.sessionId}
-      agentType={nodeData.agentType}
-      workspacePath={nodeData.workspacePath}
-      title={nodeData.title}
-      initialMessages={nodeData.messages || []}
-      isDraft={nodeData.isDraft ?? true}
-      initialExpanded={nodeData.isExpanded}
-      onMessagesChange={handleMessagesChange}
-      onSessionCreated={handleSessionCreated}
-      onExpandedChange={(isExpanded) => dispatchNodeUpdate({ isExpanded })}
-    />
+    <div className={`agent-node ${selected ? 'selected' : ''}`}>
+      <NodeResizer
+        minWidth={450}
+        minHeight={350}
+        isVisible={true}
+        lineStyle={{ borderColor: 'transparent' }}
+        handleStyle={{ width: 24, height: 24, borderRadius: '50%' }}
+        handleClassName="agent-node-resize-handle"
+      />
+      <AgentChatView
+        agentId={agentId}
+        sessionId={nodeData.sessionId}
+        agentType={nodeData.agentType}
+        workspacePath={nodeData.workspacePath}
+        initialMessages={nodeData.messages || []}
+        onMessagesChange={handleMessagesChange}
+        onSessionCreated={handleSessionCreated}
+        isSessionReady={true}
+        selected={selected}
+      />
+    </div>
   );
 }
 

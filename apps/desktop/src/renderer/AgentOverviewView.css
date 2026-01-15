@@ -6,7 +6,7 @@
 
 /* Overview Container */
 .agent-overview {
-  padding: 16px;
+  padding: 40px 16px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -42,8 +42,8 @@
 .overview-title {
   margin: 0;
   color: #d4d4d4;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
   cursor: pointer;
   padding: 4px 8px;
   margin: -4px -8px;
@@ -51,12 +51,19 @@
   transition: background 0.2s ease;
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .overview-title:hover {
   background: rgba(136, 136, 136, 0.15);
+}
+
+.overview-title-placeholder {
+  color: #666;
 }
 
 .overview-title-input {
@@ -66,13 +73,17 @@
   border-radius: 4px;
   padding: 6px 10px;
   color: #d4d4d4;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
   outline: none;
 }
 
 .overview-title-input:focus {
   box-shadow: 0 0 0 2px rgba(136, 136, 136, 0.3);
+}
+
+.overview-title-input::placeholder {
+  color: #666;
 }
 
 .title-auto-badge {

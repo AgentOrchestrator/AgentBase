@@ -43,38 +43,144 @@
   transform: scale(1.01);
 }
 
-/* Tab Bar */
-.agent-node-tabs {
+/* Status Indicator - Top Left, vertically aligned with buttons */
+.agent-node-status-indicator {
+  position: absolute;
+  top: 8px;
+  left: 16px;
+  z-index: 10;
+  pointer-events: auto;
   display: flex;
-  background: var(--color-bg-primary);
-  border-bottom: none;
-  padding: 0;
-  flex-shrink: 0;
+  align-items: center;
+  height: 24px;
 }
 
-.agent-tab {
-  flex: 1;
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.3);
+.agent-node-status-indicator .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
   border: none;
-  color: #888;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: 0;
+  opacity: 1;
+  height: 24px;
+}
+
+.agent-node-status-indicator .status-icon {
+  font-size: 16px;
+  color: var(--status-color, #888);
+  display: inline-block;
   position: relative;
 }
 
-.agent-tab:hover {
-  color: var(--color-text-primary);
-  background: rgba(0, 0, 0, 0.4);
+.agent-node-status-indicator .status-label {
+  color: #d4d4d4;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.agent-tab.active {
-  color: var(--color-text-primary);
+/* Status-specific styles */
+.agent-node-status-indicator .status-idle .status-icon {
+  /* Dashed circle - using border instead of solid character */
+  width: 16px;
+  height: 16px;
+  border: 2px dashed var(--status-color, #888);
+  border-radius: 50%;
   background: transparent;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-blinking .status-icon {
+  animation: status-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.agent-node-status-indicator .status-paused .status-icon {
+  width: 16px;
+  height: 16px;
+  background: rgb(255, 204, 0);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-completed .status-icon {
+  width: 16px;
+  height: 16px;
+  background: rgb(52, 199, 89);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-error .status-icon {
+  width: 16px;
+  height: 16px;
+  background: rgb(255, 56, 60);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-awaiting {
+  gap: 0;
+}
+
+/* View Switcher Buttons - Top Right */
+.agent-node-view-switcher {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.agent-view-button {
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: #000;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  padding: 0;
+}
+
+.agent-view-button svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-border);
+}
+
+.agent-node:hover .agent-view-button {
+  opacity: 1;
+}
+
+.agent-view-button:hover {
+  background: #f5f5f5;
+}
+
+.agent-view-button.active {
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.agent-view-button.active svg {
+  color: #000;
 }
 
 /* Content Area */
@@ -94,20 +200,159 @@
   border: 2px solid var(--color-bg-primary);
 }
 
+/* Resize handles - increase size and hit area (but not corner handles) - invisible but functional */
+.react-flow__node.agentNode .react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(.handle-top-right):not(.handle-bottom-left),
+.agent-node .react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(.handle-top-right):not(.handle-bottom-left) {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  box-shadow: none !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle:hover,
+.agent-node .react-flow__resize-control.handle:hover {
+  opacity: 0 !important;
+  transform: none !important;
+}
+
+/* Corner handles - 100px for easy grabbing, completely invisible */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right,
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left,
+.agent-node .react-flow__resize-control.handle-bottom-right,
+.agent-node .react-flow__resize-control.handle-top-left,
+.agent-node .react-flow__resize-control.handle-top-right,
+.agent-node .react-flow__resize-control.handle-bottom-left {
+  width: 100px !important;
+  height: 100px !important;
+  min-width: 100px !important;
+  min-height: 100px !important;
+  max-width: 100px !important;
+  max-height: 100px !important;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  box-shadow: none !important;
+  /* Override any transforms or other visual properties */
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Hide any child elements, pseudo-elements, and visual content inside corner handles */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right > *,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left > *,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right > *,
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left > *,
+.agent-node .react-flow__resize-control.handle-bottom-right > *,
+.agent-node .react-flow__resize-control.handle-top-left > *,
+.agent-node .react-flow__resize-control.handle-top-right > *,
+.agent-node .react-flow__resize-control.handle-bottom-left > * {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Visual indicator inside corner handles - hidden */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right::before,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left::before,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right::before,
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left::before,
+.agent-node .react-flow__resize-control.handle-bottom-right::before,
+.agent-node .react-flow__resize-control.handle-top-left::before,
+.agent-node .react-flow__resize-control.handle-top-right::before,
+.agent-node .react-flow__resize-control.handle-bottom-left::before {
+  display: none !important;
+}
+
+/* Ensure corner handles have proper cursor */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right,
+.agent-node .react-flow__resize-control.handle-bottom-right {
+  cursor: nwse-resize !important;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left,
+.agent-node .react-flow__resize-control.handle-top-left {
+  cursor: nwse-resize !important;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right,
+.agent-node .react-flow__resize-control.handle-top-right {
+  cursor: nesw-resize !important;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left,
+.agent-node .react-flow__resize-control.handle-bottom-left {
+  cursor: nesw-resize !important;
+}
+
 .agent-node .react-flow__handle:hover {
   background: var(--color-text-primary);
 }
 
-/* Fork button wrapper - allows click handling while preserving drag */
-.agent-node-fork-button-wrapper {
+/* Bottom buttons container */
+.agent-node-bottom-buttons {
   position: absolute;
   left: 50%;
   bottom: -12px;
   transform: translate(-50%, 0);
-  width: 24px;
-  height: 24px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
   z-index: 10;
   pointer-events: auto;
+}
+
+/* Chat button */
+.agent-node-chat-button {
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: #000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  padding: 0;
+}
+
+.agent-node-chat-button svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-border);
+}
+
+.agent-node:hover .agent-node-chat-button {
+  opacity: 1;
+}
+
+.agent-node:hover .agent-node-chat-button:hover {
+  background: #f5f5f5;
+}
+
+/* Fork button wrapper - allows click handling while preserving drag */
+.agent-node-fork-button-wrapper {
+  width: 24px;
+  height: 24px;
+  position: relative;
 }
 
 /* Bottom handle - styled as black button like conversation node plus button */
@@ -162,10 +407,7 @@
   opacity: 1;
 }
 
-/* Resize handles - hidden */
-.agent-node .react-flow__resize-control.handle {
-  display: none;
-}
+/* Resize handles - hidden (removed, using visible handles above) */
 
 /* Attachment headers within agent node */
 .agent-node .terminal-node-header {

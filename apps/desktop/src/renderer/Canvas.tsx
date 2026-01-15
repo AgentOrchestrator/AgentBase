@@ -118,11 +118,13 @@ function CanvasFlow() {
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
+  const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
   const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
 
   // =============================================================================
@@ -329,6 +331,154 @@ function CanvasFlow() {
     [screenToFlowPosition, forkModal]
   );
 
+// Keyboard shortcut: Cmd+F (Mac) / Ctrl+F (Windows/Linux) to fork selected node
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd+F (Mac) or Ctrl+F (Windows/Linux)
+      // Don't trigger if user is typing in an input/textarea
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      const isForkShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'f' &&
+        !event.shiftKey &&
+        !event.altKey;
+
+      if (!isForkShortcut) return;
+
+      event.preventDefault();
+
+      // Get current nodes from React Flow (includes up-to-date selection state)
+      const currentNodes = getNodes();
+
+      // Find selected AgentNode (type is 'agent', not 'agentNode')
+      const selectedNode = currentNodes.find(
+        (n) => n.selected && n.type === 'agent'
+      );
+
+      if (!selectedNode) {
+        console.log('[Canvas] No AgentNode selected for fork shortcut');
+        return;
+      }
+
+      // Calculate position for the forked node (placed below the source node)
+      // Get node dimensions to calculate proper offset
+      const nodeHeight = 400; // Default agent node height
+      const verticalSpacing = 100; // Space between nodes
+      const forkPosition = {
+        x: selectedNode.position?.x ?? 0,
+        y: (selectedNode.position?.y ?? 0) + nodeHeight + verticalSpacing,
+      };
+
+      console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
+      forkModal.open(selectedNode.id, forkPosition);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [getNodes, forkModal]);
+
+  // Listen for create/close chat node events
+  useEffect(() => {
+    const handleCreateChatNode = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        nodeId: string;
+        agentId: string;
+        sessionId?: string;
+        agentType: string;
+        workspacePath?: string;
+        chatMessages?: unknown[];
+        title?: string;
+      }>;
+      const { nodeId, agentId, sessionId, agentType, workspacePath, chatMessages, title } = customEvent.detail;
+
+      // Check if a chat node already exists for this agent node
+      const existingChatNode = nodes.find(
+        (n) => n.type === 'agent-chat' &&
+        (n.data as { agentId?: string })?.agentId === agentId &&
+        edges.some((e) => e.source === nodeId && e.target === n.id)
+      );
+
+      if (existingChatNode) {
+        // Remove existing chat node and its edge
+        const edgeToRemove = edges.find((e) => e.source === nodeId && e.target === existingChatNode.id);
+        setNodes((nds) => nds.filter((n) => n.id !== existingChatNode.id));
+        if (edgeToRemove) {
+          setEdges((eds) => eds.filter((e) => e.id !== edgeToRemove.id));
+        }
+        console.log('[Canvas] Removed chat node for agent node:', nodeId);
+        return;
+      }
+
+      // Find the source node
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found for create chat node:', nodeId);
+        return;
+      }
+
+      // Get node dimensions (default if not available)
+      const nodeWidth = (sourceNode.width as number) || (sourceNode.style?.width as number) || 500;
+      const nodeHeight = (sourceNode.height as number) || (sourceNode.style?.height as number) || 450;
+
+      // Calculate position below the source node
+      const chatNodePosition = {
+        x: sourceNode.position.x,
+        y: sourceNode.position.y + nodeHeight + 50, // 50px spacing
+      };
+
+      // Create new chat node
+      const chatNodeId = `chat-node-${Date.now()}`;
+      const chatNode: Node = {
+        id: chatNodeId,
+        type: 'agent-chat',
+        position: chatNodePosition,
+        data: {
+          sessionId,
+          agentType,
+          workspacePath,
+          title: title || 'Chat',
+          messages: chatMessages || [],
+          isDraft: !sessionId,
+          isExpanded: true,
+          agentId, // Pass agentId so it can use the same agent service
+        },
+        style: {
+          width: nodeWidth,
+          height: nodeHeight,
+        },
+      };
+
+      // Create edge connecting the nodes
+      const edge: Edge = {
+        id: `edge-${nodeId}-${chatNodeId}`,
+        source: nodeId,
+        target: chatNodeId,
+        type: 'smooth',
+        animated: false,
+        style: { stroke: '#4a5568', strokeWidth: 2 },
+      };
+
+      // Add the new node and edge
+      setNodes((nds) => [...nds, chatNode]);
+      setEdges((eds) => [...eds, edge]);
+
+      console.log('[Canvas] Created chat node from agent node:', {
+        sourceNodeId: nodeId,
+        chatNodeId,
+        position: chatNodePosition,
+      });
+    };
+
+    window.addEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
+    return () => {
+      window.removeEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
+    };
+  }, [nodes, edges, setNodes, setEdges]);
+
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({
@@ -525,6 +675,17 @@ function CanvasFlow() {
         return;
       }
 
+// CMD+G / CTRL+G to open agent modal with new worktree
+      if (modifierKey && event.key === 'g') {
+        event.preventDefault(); // Prevent default browser behavior
+        if (!isNewAgentModalOpen) {
+          setAutoCreateWorktree(true);
+          canvasActions.addAgentNode();
+        }
+        return;
+      }
+
+      // CMD+W / CTRL+W to add workspace
       if (modifierKey && event.key === 'w') {
         event.preventDefault();
         canvasActions.addWorkspaceNode();
@@ -553,11 +714,21 @@ function CanvasFlow() {
           setIsNodeDragEnabled(true);
         }
       }
+
+      // Track Shift key for snap-to-edge
+      if (event.key === 'Shift') {
+        setIsShiftPressed(true);
+      }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
       if ((isMac && event.key === 'Meta') || (!isMac && event.key === 'Control')) {
         setIsNodeDragEnabled(false);
+      }
+
+      // Track Shift key release
+      if (event.key === 'Shift') {
+        setIsShiftPressed(false);
       }
     };
 
@@ -573,6 +744,213 @@ function CanvasFlow() {
   // Loading state
   // =============================================================================
 
+// Snap-to-edge functionality when dragging nodes
+  const SNAP_THRESHOLD = 20; // pixels - soft snapping threshold
+  const isSnappingRef = useRef(false); // Prevent infinite loops
+
+  // Shared function to calculate and apply snapping
+  const applySnapping = useCallback(
+    (node: Node, allNodes: Node[]) => {
+      const currentNode = node;
+      const otherNodes = allNodes.filter((n) => n.id !== currentNode.id);
+
+      if (otherNodes.length === 0) {
+        return null;
+      }
+
+      // Get current node dimensions
+      const currentNodeWidth =
+        (currentNode.width as number) ||
+        (currentNode.style?.width as number) ||
+        (currentNode.measured?.width as number) ||
+        500;
+      const currentNodeHeight =
+        (currentNode.height as number) ||
+        (currentNode.style?.height as number) ||
+        (currentNode.measured?.height as number) ||
+        400;
+
+      // Calculate current node bounds
+      const currentNodeLeft = currentNode.position.x;
+      const currentNodeRight = currentNode.position.x + currentNodeWidth;
+      const currentNodeTop = currentNode.position.y;
+      const currentNodeBottom = currentNode.position.y + currentNodeHeight;
+
+      let snappedX = currentNode.position.x;
+      let snappedY = currentNode.position.y;
+      let minDistanceX = SNAP_THRESHOLD;
+      let minDistanceY = SNAP_THRESHOLD;
+
+      // Check alignment with other nodes
+      for (const otherNode of otherNodes) {
+        const otherNodeWidth =
+          (otherNode.width as number) ||
+          (otherNode.style?.width as number) ||
+          (otherNode.measured?.width as number) ||
+          500;
+        const otherNodeHeight =
+          (otherNode.height as number) ||
+          (otherNode.style?.height as number) ||
+          (otherNode.measured?.height as number) ||
+          400;
+
+        const otherNodeLeft = otherNode.position.x;
+        const otherNodeRight = otherNode.position.x + otherNodeWidth;
+        const otherNodeTop = otherNode.position.y;
+        const otherNodeBottom = otherNode.position.y + otherNodeHeight;
+
+        // Check horizontal alignment (left edges, right edges, left-right, right-left)
+        const leftToLeft = Math.abs(currentNodeLeft - otherNodeLeft);
+        const rightToRight = Math.abs(currentNodeRight - otherNodeRight);
+        const leftToRight = Math.abs(currentNodeLeft - otherNodeRight);
+        const rightToLeft = Math.abs(currentNodeRight - otherNodeLeft);
+
+        // Find closest horizontal alignment
+        const horizontalDistances = [
+          { distance: leftToLeft, snap: otherNodeLeft },
+          { distance: rightToRight, snap: otherNodeRight - currentNodeWidth },
+          { distance: leftToRight, snap: otherNodeRight },
+          { distance: rightToLeft, snap: otherNodeLeft - currentNodeWidth },
+        ];
+
+        for (const { distance, snap } of horizontalDistances) {
+          if (distance < minDistanceX) {
+            minDistanceX = distance;
+            snappedX = snap;
+          }
+        }
+
+        // Check vertical alignment (top edges, bottom edges, top-bottom, bottom-top)
+        const topToTop = Math.abs(currentNodeTop - otherNodeTop);
+        const bottomToBottom = Math.abs(currentNodeBottom - otherNodeBottom);
+        const topToBottom = Math.abs(currentNodeTop - otherNodeBottom);
+        const bottomToTop = Math.abs(currentNodeBottom - otherNodeTop);
+
+        // Find closest vertical alignment
+        const verticalDistances = [
+          { distance: topToTop, snap: otherNodeTop },
+          { distance: bottomToBottom, snap: otherNodeBottom - currentNodeHeight },
+          { distance: topToBottom, snap: otherNodeBottom },
+          { distance: bottomToTop, snap: otherNodeTop - currentNodeHeight },
+        ];
+
+        for (const { distance, snap } of verticalDistances) {
+          if (distance < minDistanceY) {
+            minDistanceY = distance;
+            snappedY = snap;
+          }
+        }
+      }
+
+      // Return snapped position if within threshold
+      if (minDistanceX < SNAP_THRESHOLD || minDistanceY < SNAP_THRESHOLD) {
+        return {
+          x: minDistanceX < SNAP_THRESHOLD ? snappedX : currentNode.position.x,
+          y: minDistanceY < SNAP_THRESHOLD ? snappedY : currentNode.position.y,
+        };
+      }
+
+      return null;
+    },
+    []
+  );
+
+  const onNodeDrag = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      // Only apply snapping if drag is enabled and not already snapping
+      if (!isNodeDragEnabled || isSnappingRef.current) {
+        return;
+      }
+
+      const allNodes = getNodes();
+      const snappedPosition = applySnapping(node, allNodes);
+
+      // Apply snapping if within threshold
+      if (snappedPosition) {
+        isSnappingRef.current = true;
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === node.id) {
+              return {
+                ...n,
+                position: snappedPosition,
+              };
+            }
+            return n;
+          })
+        );
+        // Reset flag after a short delay to allow next drag event
+        setTimeout(() => {
+          isSnappingRef.current = false;
+        }, 10);
+      }
+    },
+    [isNodeDragEnabled, getNodes, setNodes, applySnapping]
+  );
+
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, _node: Node) => {
+      isSnappingRef.current = false;
+    },
+    []
+  );
+
+  // Wrap onNodesChange to intercept position changes and apply snapping
+  const handleNodesChange = useCallback(
+    (changes: unknown[]) => {
+      // If snapping is disabled or we're already snapping, just pass through
+      if (!isNodeDragEnabled || isSnappingRef.current) {
+        onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
+        return;
+      }
+
+      const allNodes = getNodes();
+      const modifiedChanges = changes.map((change) => {
+        const posChange = change as { type?: string; position?: { x: number; y: number }; id?: string };
+        // Intercept position changes and apply snapping
+        if (posChange.type === 'position' && posChange.position) {
+          const node = allNodes.find((n) => n.id === posChange.id);
+          if (node) {
+            // Create a temporary node with the new position to check snapping
+            const tempNode = {
+              ...node,
+              position: posChange.position,
+            };
+            const snappedPosition = applySnapping(tempNode, allNodes);
+            if (snappedPosition) {
+              // Modify the change to use the snapped position
+              return {
+                ...posChange,
+                position: snappedPosition,
+              };
+            }
+          }
+        }
+        return change;
+      });
+
+      // Check if any changes were modified
+      const hasSnapping = modifiedChanges.some(
+        (change, index) => change !== changes[index]
+      );
+
+      if (hasSnapping) {
+        isSnappingRef.current = true;
+        // Apply the modified changes
+        onNodesChange(modifiedChanges as Parameters<typeof onNodesChange>[0]);
+        // Reset flag after a short delay
+        setTimeout(() => {
+          isSnappingRef.current = false;
+        }, 10);
+      } else {
+        // No snapping needed, pass through original changes
+        onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
+      }
+    },
+    [onNodesChange, isNodeDragEnabled, getNodes, applySnapping]
+  );
+
+  // Show loading state while canvas is being restored
   if (isCanvasLoading) {
     return (
       <div className="canvas-loading">
@@ -600,6 +978,7 @@ function CanvasFlow() {
         onClose={() => {
           setIsNewAgentModalOpen(false);
           setPendingAgentPosition(undefined);
+          setAutoCreateWorktree(false);
         }}
         onCreate={(data) => {
           canvasActions.createAgentWithData({
@@ -612,9 +991,12 @@ function CanvasFlow() {
             lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
           });
           setIsNewAgentModalOpen(false);
+          setPendingAgentPosition(undefined);
+          setAutoCreateWorktree(false);
         }}
         initialPosition={pendingAgentPosition}
         initialWorkspacePath={folderLock.lockedFolderPath}
+        autoCreateWorktree={autoCreateWorktree}
       />
 
       {/* Sidebar Panel */}
@@ -875,11 +1257,13 @@ function CanvasFlow() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onConnectStart={onConnectStart}
           onConnectEnd={onConnectEnd}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
           onPaneContextMenu={onPaneContextMenu}
           onPaneClick={onPaneClick}
           onDragOver={canvasDrop.handleCanvasDragOver}

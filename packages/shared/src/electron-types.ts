@@ -311,3 +311,46 @@ export interface AgentStatusAPI {
   /** Load all agent statuses */
   loadAllAgentStatuses: () => Promise<CodingAgentState[]>;
 }
+
+// =============================================================================
+// Session File Watcher Types
+// =============================================================================
+
+/**
+ * Type of change detected in a session file.
+ */
+export type SessionFileChangeType = 'created' | 'updated' | 'deleted';
+
+/**
+ * Event emitted when a session file changes.
+ * Used to synchronize views that display the same session data.
+ */
+export interface SessionFileChangeEvent {
+  /** Type of change detected */
+  type: SessionFileChangeType;
+  /** Session ID extracted from filename */
+  sessionId: string;
+  /** Full path to the session file */
+  filePath: string;
+  /** Project path decoded from directory structure */
+  projectPath: string;
+  /** Agent type that owns this session */
+  agentType: CodingAgentType;
+  /** Unix timestamp (ms) when change was detected */
+  timestamp: number;
+}
+
+/**
+ * Session watcher API for monitoring session file changes.
+ * Enables real-time synchronization between terminal and chat views.
+ */
+export interface SessionWatcherAPI {
+  /** Start watching session files for an agent type */
+  watch: (agentType: CodingAgentType) => Promise<void>;
+  /** Stop watching session files for an agent type */
+  unwatch: (agentType: CodingAgentType) => Promise<void>;
+  /** Subscribe to session file change events. Returns cleanup function. */
+  onSessionFileChanged: (
+    callback: (event: SessionFileChangeEvent) => void
+  ) => () => void;
+}

@@ -1,0 +1,71 @@
+.branch-switch-warning-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.branch-switch-warning-dialog {
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e3e;
+  border-radius: 8px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.branch-switch-warning-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #3e3e3e;
+}
+
+.branch-switch-warning-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.branch-switch-warning-content {
+  padding: 20px;
+}
+
+.branch-switch-warning-content p {
+  margin: 0;
+  color: #cccccc;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.branch-switch-warning-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #3e3e3e;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.branch-switch-warning-cancel-button {
+  background-color: #007acc;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.branch-switch-warning-cancel-button:hover {
+  background-color: #005a9e;
+}
+
+.branch-switch-warning-cancel-button:active {
+  background-color: #004578;
+}

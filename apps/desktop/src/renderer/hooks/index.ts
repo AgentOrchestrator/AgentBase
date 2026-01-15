@@ -1,4 +1,5 @@
 export { useCanvasPersistence } from './useCanvasPersistence';
+export { useSessionFileWatcher } from './useSessionFileWatcher';
 export * from './canvasConverters';
 export {
   useAgentHierarchy,

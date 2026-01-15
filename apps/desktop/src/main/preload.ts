@@ -6,7 +6,14 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 import type { CodingAgentState } from '../../types/coding-agent-status';
-import type { GitInfo, TerminalSessionState, TerminalSessionAPI } from '@agent-orchestrator/shared';
+import type {
+  GitInfo,
+  TerminalSessionState,
+  TerminalSessionAPI,
+  SessionFileChangeEvent,
+  SessionWatcherAPI,
+  CodingAgentType as SharedCodingAgentType,
+} from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
   AgentCapabilities,
@@ -577,6 +584,10 @@ export interface GitAPI {
   getInfo: (workspacePath: string) => Promise<GitInfo | null>;
   /** List all local git branches for a workspace path */
   listBranches: (workspacePath: string) => Promise<string[] | null>;
+  /** Create and checkout a new branch */
+  createBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
+  /** Checkout an existing branch */
+  checkoutBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 // Expose git API
@@ -597,6 +608,20 @@ contextBridge.exposeInMainWorld('gitAPI', {
       return null;
     }
   },
+  createBranch: async (workspacePath: string, branchName: string) => {
+    try {
+      return await ipcRenderer.invoke('git:create-branch', workspacePath, branchName);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+  checkoutBranch: async (workspacePath: string, branchName: string) => {
+    try {
+      return await ipcRenderer.invoke('git:checkout-branch', workspacePath, branchName);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
 } as GitAPI);
 
 // Type definitions for the window API (custom titlebar controls)
@@ -614,3 +639,27 @@ contextBridge.exposeInMainWorld('windowAPI', {
   close: () => ipcRenderer.send('window-close'),
   isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
 } as WindowAPI);
+
+// Expose session watcher API for real-time sync between terminal and chat views
+contextBridge.exposeInMainWorld('sessionWatcherAPI', {
+  watch: async (agentType: SharedCodingAgentType) => {
+    const result = await ipcRenderer.invoke('session-watcher:watch', agentType);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+  },
+  unwatch: async (agentType: SharedCodingAgentType) => {
+    const result = await ipcRenderer.invoke('session-watcher:unwatch', agentType);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+  },
+  onSessionFileChanged: (callback: (event: SessionFileChangeEvent) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: SessionFileChangeEvent
+    ) => callback(data);
+    ipcRenderer.on('session:file-changed', handler);
+    return () => ipcRenderer.removeListener('session:file-changed', handler);
+  },
+} as SessionWatcherAPI);

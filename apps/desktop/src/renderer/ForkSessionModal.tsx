@@ -5,7 +5,7 @@
  * Collects fork title which is used to name the git branch.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './ForkSessionModal.css';
 
 interface ForkSessionModalProps {
@@ -26,11 +26,21 @@ function ForkSessionModal({
   error = null,
 }: ForkSessionModalProps) {
   const [title, setTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Focus input when modal opens
+  useEffect(() => {
+    if (titleInputRef.current) {
+      titleInputRef.current.focus();
+      setTitle('');
+    }
+  }, []);
 
   // Handle form submission
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
+    (e?: React.FormEvent | React.MouseEvent) => {
+      e?.preventDefault();
       if (title.trim() && !isLoading) {
         onConfirm(title.trim());
       }
@@ -50,78 +60,84 @@ function ForkSessionModal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onCancel, isLoading]);
 
+  // Close on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        if (!isLoading) {
+          onCancel();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onCancel, isLoading]);
+
   return (
     <div className="fork-modal-overlay" onClick={isLoading ? undefined : onCancel}>
-      <div className="fork-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+      <div
+        className="fork-modal-container"
+        ref={containerRef}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Bar */}
         <div className="fork-modal-header">
-          <h2 className="fork-modal-title">Fork Agent Session</h2>
-          <button
-            className="fork-modal-close"
-            onClick={onCancel}
-            disabled={isLoading}
-            aria-label="Close"
-          >
-            &times;
-          </button>
+          <div className="fork-modal-header-left">
+            <span className="fork-modal-title">Fork Agent Session</span>
+          </div>
+          <div className="fork-modal-header-right">
+            <button className="fork-modal-window-control" onClick={onCancel} disabled={isLoading}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 3l6 6M9 3l-6 6" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
+        {/* Main Content */}
         <form className="fork-modal-content" onSubmit={handleSubmit}>
-          <p className="fork-modal-description">
-            Create a new agent in an isolated git worktree with the same session context.
-          </p>
-
-          <div className="fork-modal-field">
-            <label htmlFor="fork-title" className="fork-modal-label">
-              Fork Title
-            </label>
-            <input
-              id="fork-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., implement-feature-x"
-              className="fork-modal-input"
-              disabled={isLoading}
-              autoFocus
-              required
-            />
-            <span className="fork-modal-hint">
-              This will be used as the git branch name
-            </span>
-          </div>
-
-          {/* Error message */}
+          <input
+            ref={titleInputRef}
+            type="text"
+            className="fork-modal-title-input"
+            placeholder="Fork name (e.g., implement-feature-x)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={isLoading}
+            autoFocus
+            required
+            onKeyDown={(e) => {
+              // Enter: Submit
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+                return;
+              }
+              // Tab: Submit
+              if (e.key === 'Tab') {
+                e.preventDefault();
+                handleSubmit(e);
+                return;
+              }
+            }}
+          />
           {error && <div className="fork-modal-error">{error}</div>}
-
-          {/* Actions */}
-          <div className="fork-modal-actions">
-            <button
-              type="button"
-              className="fork-modal-button fork-modal-button-cancel"
-              onClick={onCancel}
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="fork-modal-button fork-modal-button-confirm"
-              disabled={!title.trim() || isLoading}
-            >
-              {isLoading ? 'Creating Fork...' : 'Create Fork'}
-            </button>
-          </div>
         </form>
 
-        {/* Loading overlay */}
-        {isLoading && (
-          <div className="fork-modal-loading">
-            <div className="fork-modal-spinner" />
-            <span>Creating worktree and forking session...</span>
-          </div>
-        )}
+        {/* Bottom Bar */}
+        <div className="fork-modal-footer">
+          <button
+            type="button"
+            className="fork-modal-create-btn"
+            onClick={handleSubmit}
+            disabled={!title.trim() || isLoading}
+          >
+            {isLoading ? 'Creating fork...' : 'Create fork'}
+          </button>
+        </div>
       </div>
     </div>
   );

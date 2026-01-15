@@ -40,6 +40,10 @@ import {
   DEFAULT_LLM_CONFIG,
 } from './services/llm';
 import {
+  registerSessionWatcherIpcHandlers,
+  disposeSessionWatcher,
+} from './services/session-watcher';
+import {
   RepresentationService,
   type RepresentationInput,
   type ImageTransformOptions,
@@ -393,6 +397,9 @@ const createWindow = (): void => {
       console.log('[Main] ⚠️ Terminal destroy requested but process not found', { terminalId });
     }
   });
+
+  // Initialize session file watcher for real-time sync between terminal and chat views
+  registerSessionWatcherIpcHandlers(win);
 
   // Clean up all terminals when window closes
   win.on('closed', () => {
@@ -1405,6 +1412,76 @@ function registerIpcHandlers(): void {
   console.log('[Main] IPC handlers registered successfully');
 }
 
+ipcMain.handle('git:create-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Validate branch name
+    if (!branchName || !branchName.trim()) {
+      return { success: false, error: 'Branch name is required' };
+    }
+
+    // Sanitize branch name (remove invalid characters)
+    const sanitizedBranchName = branchName.trim().replace(/[^a-zA-Z0-9._/-]/g, '-');
+    if (!sanitizedBranchName) {
+      return { success: false, error: 'Invalid branch name' };
+    }
+
+    try {
+      // Create and checkout the new branch
+      await runGitCommand(workspacePath, ['checkout', '-b', sanitizedBranchName]);
+      console.log('[Main] Branch created and checked out', { workspacePath, branchName: sanitizedBranchName });
+      return { success: true };
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      // Check if branch already exists
+      if (errorMessage.includes('already exists')) {
+        // Try to checkout the existing branch instead
+        try {
+          await runGitCommand(workspacePath, ['checkout', sanitizedBranchName]);
+          console.log('[Main] Branch already exists, checked out existing branch', { workspacePath, branchName: sanitizedBranchName });
+          return { success: true };
+        } catch (checkoutError) {
+          return { success: false, error: (checkoutError as Error).message };
+        }
+      }
+      return { success: false, error: errorMessage };
+    }
+  } catch (error) {
+    console.error('[Main] Error creating branch', { workspacePath, branchName, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Validate branch name
+    if (!branchName || !branchName.trim()) {
+      return { success: false, error: 'Branch name is required' };
+    }
+
+    try {
+      // Checkout the branch
+      await runGitCommand(workspacePath, ['checkout', branchName.trim()]);
+      console.log('[Main] Branch checked out', { workspacePath, branchName });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  } catch (error) {
+    console.error('[Main] Error checking out branch', { workspacePath, branchName, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
@@ -1464,9 +1541,10 @@ app.whenReady().then(async () => {
 
 // Clean up on app quit
 app.on('will-quit', async () => {
-  console.log('[Main] App quitting, closing database, worktree manager, coding agents, LLM service, and representation service');
+  console.log('[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, and representation service');
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
+  disposeSessionWatcher();
   await CodingAgentFactory.disposeAll();
   await LLMServiceFactory.dispose();
   await representationService.dispose();

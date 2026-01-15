@@ -24,6 +24,7 @@ import {
 } from '../../context';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
+import type { CodingAgentStatus } from '../../../../types/coding-agent-status';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -117,6 +118,39 @@ export function AgentNodePresentation({
     },
     [onDataChange]
   );
+
+  // Auto-update title from first user message
+  useEffect(() => {
+    // Only auto-update if title is not manually set
+    if (data.title.isManuallySet) {
+      return;
+    }
+
+    const messages = data.chatMessages || [];
+    const firstUserMessage = messages.find((msg) => msg.role === 'user');
+
+    if (firstUserMessage && firstUserMessage.content) {
+      const content = firstUserMessage.content.trim();
+      if (content && content !== data.title.value) {
+        // Truncate to reasonable length for title (will be further limited by CSS)
+        const maxLength = 100;
+        let titleText = content;
+        if (titleText.length > maxLength) {
+          titleText = titleText.slice(0, maxLength).trim();
+          // Try to cut at word boundary
+          const lastSpace = titleText.lastIndexOf(' ');
+          if (lastSpace > maxLength * 0.7) {
+            titleText = titleText.slice(0, lastSpace);
+          }
+          titleText += '...';
+        }
+
+        onDataChange({
+          title: { value: titleText, isManuallySet: false },
+        });
+      }
+    }
+  }, [data.chatMessages, data.title.isManuallySet, data.title.value, onDataChange]);
 
   // Handle attachment details click
   const handleAttachmentClick = useCallback((attachment: TerminalAttachment) => {
@@ -264,7 +298,25 @@ export function AgentNodePresentation({
     : null;
   const branch = gitInfo?.branch;
 
-  console.log(['AgentNodePresentation data:', data]);
+// Status display configuration
+  const STATUS_CONFIG: Record<
+    CodingAgentStatus,
+    { label: string; color: string; icon: string; className: string }
+  > = {
+    idle: { label: 'Idle', color: '#888', icon: '○', className: 'status-idle' },
+    running: { label: 'Running', color: '#888', icon: '●', className: 'status-blinking' },
+    thinking: { label: 'Thinking', color: '#888', icon: '●', className: 'status-blinking' },
+    streaming: { label: 'Streaming', color: '#888', icon: '●', className: 'status-blinking' },
+    executing_tool: { label: 'Executing', color: '#888', icon: '●', className: 'status-blinking' },
+    awaiting_input: { label: 'Waiting for user response', color: '#888', icon: '', className: 'status-awaiting' },
+    paused: { label: 'Paused', color: 'rgb(255, 204, 0)', icon: '●', className: 'status-paused' },
+    completed: { label: 'Completed', color: 'rgb(52, 199, 89)', icon: '●', className: 'status-completed' },
+    error: { label: 'Error', color: 'rgb(255, 56, 60)', icon: '●', className: 'status-error' },
+  };
+
+  const statusConfig = STATUS_CONFIG[data.status];
+  const toolLabel = data.statusInfo?.toolName ? `: ${data.statusInfo.toolName}` : '';
+  const subagentLabel = data.statusInfo?.subagentName ? ` (${data.statusInfo.subagentName})` : '';
   return (
     <div className="agent-node-wrapper">
       {/* Frame Label - Folder and Branch */}
@@ -393,7 +445,10 @@ export function AgentNodePresentation({
             target.closest('button') ||
             target.closest('input') ||
             target.closest('textarea') ||
-            target.closest('.agent-node-fork-button-wrapper')
+            target.closest('.agent-node-fork-button-wrapper') ||
+            target.closest('.agent-node-bottom-buttons') ||
+            target.closest('.agent-node-view-switcher') ||
+            target.closest('.agent-node-status-indicator')
           ) {
             return;
           }
@@ -405,28 +460,68 @@ export function AgentNodePresentation({
           minHeight={350}
           isVisible={true}
           lineStyle={{ borderColor: 'transparent' }}
-          handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
+          handleStyle={{ width: 24, height: 24, borderRadius: '50%' }}
+          handleClassName="agent-node-resize-handle"
         />
 
-      {/* Tab Bar */}
-      <div className="agent-node-tabs">
-        <button
-          className={`agent-tab ${activeView === 'overview' ? 'active' : ''}`}
-          onClick={() => handleViewChange('overview')}
+      {/* Status Indicator - Top Left */}
+      <div className="agent-node-status-indicator">
+        <div
+          className={`status-indicator ${statusConfig.className}`}
+          style={{ '--status-color': statusConfig.color } as React.CSSProperties}
         >
-          Overview
+          {data.status === 'awaiting_input' ? (
+            <span className="status-label">{statusConfig.label}</span>
+          ) : (
+            <>
+              <span className="status-icon">{statusConfig.icon}</span>
+              <span className="status-label">
+                {statusConfig.label}
+                {toolLabel}
+                {subagentLabel}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* View Switcher Buttons - Top Right */}
+      <div className="agent-node-view-switcher">
+        <button
+          className={`agent-view-button ${activeView === 'overview' ? 'active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewChange('overview');
+          }}
+          title="Overview"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19,11 C20.0543909,11 20.9181678,11.81585 20.9945144,12.8507339 L21,13 L21,19 C21,20.0543909 20.18415,20.9181678 19.1492661,20.9945144 L19,21 L15,21 C13.9456091,21 13.0818322,20.18415 13.0054856,19.1492661 L13,19 L13,13 C13,11.9456091 13.81585,11.0818322 14.8507339,11.0054856 L15,11 L19,11 Z M9,15 C10.1046,15 11,15.8954 11,17 L11,19 C11,20.1046 10.1046,21 9,21 L5,21 C3.89543,21 3,20.1046 3,19 L3,17 C3,15.8954 3.89543,15 5,15 L9,15 Z M19,13 L15,13 L15,19 L19,19 L19,13 Z M9,17 L5,17 L5,19 L9,19 L9,17 Z M9,3 C10.1046,3 11,3.89543 11,5 L11,11 C11,12.1046 10.1046,13 9,13 L5,13 C3.89543,13 3,12.1046 3,11 L3,5 C3,3.89543 3.89543,3 5,3 L9,3 Z M9,5 L5,5 L5,11 L9,11 L9,5 Z M19,3 C20.1046,3 21,3.89543 21,5 L21,7 C21,8.10457 20.1046,9 19,9 L15,9 C13.8954,9 13,8.10457 13,7 L13,5 C13,3.89543 13.8954,3 15,3 L19,3 Z M19,5 L15,5 L15,7 L19,7 L19,5 Z" fill="currentColor"/>
+          </svg>
         </button>
         <button
-          className={`agent-tab ${activeView === 'terminal' ? 'active' : ''}`}
-          onClick={() => handleViewChange('terminal')}
+          className={`agent-view-button ${activeView === 'terminal' ? 'active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewChange('terminal');
+          }}
+          title="Terminal"
         >
-          Terminal
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19,3 C20.1046,3 21,3.89543 21,5 L21,19 C21,20.1046 20.1046,21 19,21 L5,21 C3.89543,21 3,20.1046 3,19 L3,5 C3,3.89543 3.89543,3 5,3 L19,3 Z M19,5 L5,5 L5,19 L19,19 L19,5 Z M16.0001,14.0001 C16.5524,14.0001 17.0001,14.4478 17.0001,15.0001 C17.0001,15.51295 16.614073,15.9356092 16.1167239,15.9933725 L16.0001,16.0001 L14.0001,16.0001 C13.4478,16.0001 13.0001,15.5524 13.0001,15.0001 C13.0001,14.48725 13.386127,14.0645908 13.8834761,14.0068275 L14.0001,14.0001 L16.0001,14.0001 Z M9.05037,8.46459 L11.8788,11.293 C12.2693,11.6835 12.2693,12.3167 11.8788,12.7072 L9.05037,15.5357 C8.65985,15.9262 8.02668,15.9262 7.63616,15.5357 C7.24563,15.1451 7.24563,14.512 7.63616,14.1214 L9.75748,12.0001 L7.63616,9.8788 C7.24563,9.48828 7.24563,8.85511 7.63616,8.46459 C8.02668,8.07406 8.65985,8.07406 9.05037,8.46459 Z" fill="currentColor"/>
+          </svg>
         </button>
         <button
-          className={`agent-tab ${activeView === 'chat' ? 'active' : ''}`}
-          onClick={() => handleViewChange('chat')}
+          className={`agent-view-button ${activeView === 'chat' ? 'active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewChange('chat');
+          }}
+          title="Chat"
         >
-          Chat
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12,5 C7.40326,5 4,8.07312 4,11.5 C4,13.5136 5.14136,15.3721 7.0416,16.5964 C7.78041,17.0724 7.98058,17.9987 8.0143,18.8184 C8.76669,18.5086 9.27173,17.6587 10.1858,17.8316 C10.7677,17.9416 11.3749,18 12,18 C16.5967,18 20,14.9269 20,11.5 C20,8.07312 16.5967,5 12,5 Z M2,11.5 C2,6.64261 6.65561,3 12,3 C17.3444,3 22,6.64261 22,11.5 C22,16.3574 17.3444,20 12,20 C11.3472,20 10.708,19.9469 10.0886,19.8452 C9.99597,19.918 9.83571,20.0501 9.63851,20.1891 C9.0713,20.5887 8.24917,21 7,21 C6.44772,21 6,20.5523 6,20 C6,19.4499 6.14332,18.7663 5.90624,18.2438 C3.57701,16.7225 2,14.2978 2,11.5 Z" fill="currentColor"/>
+          </svg>
         </button>
       </div>
 
@@ -455,6 +550,7 @@ export function AgentNodePresentation({
             workspacePath={workspacePath ?? undefined}
             sessionId={data.sessionId}
             onTitleChange={handleTitleChange}
+            hideStatusIndicator={true}
           />
         </div>
         <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
@@ -475,56 +571,89 @@ export function AgentNodePresentation({
         </div>
       </div>
 
-      {/* Bottom connection button - styled like conversation node plus button */}
-      <div
-        className="agent-node-fork-button-wrapper"
-        onClick={(e) => {
-          // Prevent triggering drag when clicking
-          e.stopPropagation();
-          if (!nodeId) return;
-          // Dispatch custom event for fork on click
-          const forkEvent = new CustomEvent('agent-node:fork-click', {
-            detail: { nodeId },
-            bubbles: true,
-          });
-          e.currentTarget.dispatchEvent(forkEvent);
-        }}
-        onMouseDown={(e) => {
-          // Allow drag to still work - only prevent if it's a pure click (no drag)
-          // We'll track if mouse moves
-          if (!nodeId) return;
-          let hasMoved = false;
-          const startX = e.clientX;
-          const startY = e.clientY;
-          const handleMouseMove = (moveEvent: MouseEvent) => {
-            const deltaX = Math.abs(moveEvent.clientX - startX);
-            const deltaY = Math.abs(moveEvent.clientY - startY);
-            if (deltaX > 5 || deltaY > 5) {
-              hasMoved = true;
-            }
-          };
-          const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-            // If mouse didn't move, it was a click, not a drag
-            if (!hasMoved) {
-              e.stopPropagation();
-              const forkEvent = new CustomEvent('agent-node:fork-click', {
-                detail: { nodeId },
+      {/* Bottom buttons - chat and fork */}
+      <div className="agent-node-bottom-buttons">
+        {/* Chat button */}
+        <button
+          className="agent-node-chat-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!nodeId) return;
+            window.dispatchEvent(
+              new CustomEvent('agent-node:create-chat-node', {
+                detail: { 
+                  nodeId,
+                  agentId: data.agentId,
+                  sessionId: data.sessionId,
+                  agentType: data.agentType,
+                  workspacePath: workspaceState?.path,
+                  chatMessages: data.chatMessages || [],
+                  title: data.title.value,
+                },
                 bubbles: true,
-              });
-              e.currentTarget.dispatchEvent(forkEvent);
-            }
-          };
-          document.addEventListener('mousemove', handleMouseMove);
-          document.addEventListener('mouseup', handleMouseUp);
-        }}
-      >
-        <Handle 
-          type="source" 
-          position={Position.Bottom}
+              })
+            );
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          title="Create Chat Node"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12,5 C7.40326,5 4,8.07312 4,11.5 C4,13.5136 5.14136,15.3721 7.0416,16.5964 C7.78041,17.0724 7.98058,17.9987 8.0143,18.8184 C8.76669,18.5086 9.27173,17.6587 10.1858,17.8316 C10.7677,17.9416 11.3749,18 12,18 C16.5967,18 20,14.9269 20,11.5 C20,8.07312 16.5967,5 12,5 Z M2,11.5 C2,6.64261 6.65561,3 12,3 C17.3444,3 22,6.64261 22,11.5 C22,16.3574 17.3444,20 12,20 C11.3472,20 10.708,19.9469 10.0886,19.8452 C9.99597,19.918 9.83571,20.0501 9.63851,20.1891 C9.0713,20.5887 8.24917,21 7,21 C6.44772,21 6,20.5523 6,20 C6,19.4499 6.14332,18.7663 5.90624,18.2438 C3.57701,16.7225 2,14.2978 2,11.5 Z" fill="currentColor"/>
+          </svg>
+        </button>
+        {/* Fork button */}
+        <div
+          className="agent-node-fork-button-wrapper"
+          onClick={(e) => {
+            // Prevent triggering drag when clicking
+            e.stopPropagation();
+            if (!nodeId) return;
+            // Dispatch custom event for fork on click
+            const forkEvent = new CustomEvent('agent-node:fork-click', {
+              detail: { nodeId },
+              bubbles: true,
+            });
+            e.currentTarget.dispatchEvent(forkEvent);
+          }}
+          onMouseDown={(e) => {
+            // Allow drag to still work - only prevent if it's a pure click (no drag)
+            // We'll track if mouse moves
+            if (!nodeId) return;
+            let hasMoved = false;
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const handleMouseMove = (moveEvent: MouseEvent) => {
+              const deltaX = Math.abs(moveEvent.clientX - startX);
+              const deltaY = Math.abs(moveEvent.clientY - startY);
+              if (deltaX > 5 || deltaY > 5) {
+                hasMoved = true;
+              }
+            };
+            const handleMouseUp = () => {
+              document.removeEventListener('mousemove', handleMouseMove);
+              document.removeEventListener('mouseup', handleMouseUp);
+              // If mouse didn't move, it was a click, not a drag
+              if (!hasMoved) {
+                e.stopPropagation();
+                const forkEvent = new CustomEvent('agent-node:fork-click', {
+                  detail: { nodeId },
+                  bubbles: true,
+                });
+                e.currentTarget.dispatchEvent(forkEvent);
+              }
+            };
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+          }}
+        >
+          <Handle 
+            type="source" 
+            position={Position.Bottom}
           className="agent-node-bottom-handle"
         />
+        </div>
       </div>
 
       {/* Issue Details Modal */}

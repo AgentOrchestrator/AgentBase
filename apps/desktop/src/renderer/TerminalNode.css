@@ -238,15 +238,19 @@
 .terminal-node .react-flow__resize-control.handle {
   width: 8px;
   height: 8px;
-  border: 1px solid #666;
-  background: #888;
-  border-radius: 50%;
-  opacity: 0.5;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+  transition: none;
 }
 
 .terminal-node .react-flow__resize-control.handle:hover {
-  opacity: 1;
-  transform: scale(1.3);
+  opacity: 0;
+  transform: none;
 }
 

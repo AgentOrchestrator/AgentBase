@@ -37,15 +37,25 @@ function AgentNode({ data, id, selected }: NodeProps) {
   // ---------------------------------------------------------------------------
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
 
-  // Use workspace path from node data as initial suggestion for modal
+// Use workspace path from node data as initial suggestion for modal
   const initialWorkspacePath = initialNodeData.workspacePath || undefined;
 
-  // Show modal if no workspace is available (auto-open on mount)
+  // Check for prefilled workspace path (from Command+T modal or locked folder)
+  const prefilledWorkspacePath = (initialNodeData as unknown as { prefilledWorkspacePath?: string }).prefilledWorkspacePath;
+
+  // Automatically set workspace from prefilled path (from Command+T modal)
   useEffect(() => {
-    if (!agent.workspace.path && !showWorkspaceModal) {
+    if (prefilledWorkspacePath && !agent.workspace.path) {
+      agent.actions.setWorkspace(prefilledWorkspacePath);
+    }
+  }, [prefilledWorkspacePath, agent.workspace.path, agent.actions]);
+
+  // Show modal if no workspace is available and no prefilled path (auto-open on mount)
+  useEffect(() => {
+    if (!agent.workspace.path && !prefilledWorkspacePath && !showWorkspaceModal) {
       setShowWorkspaceModal(true);
     }
-  }, [agent.workspace.path, showWorkspaceModal]);
+  }, [agent.workspace.path, prefilledWorkspacePath, showWorkspaceModal]);
 
   // ---------------------------------------------------------------------------
   // Event Handlers
@@ -110,8 +120,9 @@ function AgentNode({ data, id, selected }: NodeProps) {
         nodeId={id}
       />
       {/* Modal overlay - UI state managed locally */}
+      {/* Don't show modal if workspace is already set or if prefilled path exists (will be auto-set) */}
       <WorkspaceSelectionModal
-        isOpen={showWorkspaceModal && !agent.workspace.path}
+        isOpen={showWorkspaceModal && !agent.workspace.path && !prefilledWorkspacePath}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
         initialPath={initialWorkspacePath || null}

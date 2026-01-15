@@ -181,12 +181,14 @@ export class ClaudeCodeAgent
     if (allowResult) {
       return {
         behavior: 'allow',
+        updatedInput: input,
         toolUseID: options.toolUseID,
       };
     }
 
     return {
       behavior: 'allow',
+      updatedInput: input,
       toolUseID: options.toolUseID,
     };
   };
