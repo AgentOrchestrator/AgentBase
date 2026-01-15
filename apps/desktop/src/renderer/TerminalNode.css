@@ -1,6 +1,6 @@
 .terminal-node {
-  background: #2a2c36;
-  border: 1px solid #475569;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
   width: 100%;
@@ -39,9 +39,9 @@
 }
 
 .terminal-node-header {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   padding: 8px 12px;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid var(--color-bg-hover);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -90,13 +90,13 @@
   font-family: 'Menlo', 'Monaco', monospace;
   font-weight: 600;
   font-size: 11px;
-  background: #2a2c36;
+  background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 3px;
 }
 
 .terminal-node-header .issue-title {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 500;
   font-size: 12px;
   white-space: nowrap;
@@ -105,7 +105,7 @@
 }
 
 .terminal-node-title {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
@@ -155,7 +155,7 @@
   background: #4a9eff;
   width: 10px;
   height: 10px;
-  border: 2px solid #2a2c36;
+  border: 2px solid var(--color-bg-tertiary);
 }
 
 .terminal-node .react-flow__handle-top {
@@ -168,7 +168,7 @@
 
 /* Workspace metadata header styles */
 .terminal-node-header.workspace-header {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
 }
 
 .terminal-node-header .workspace-info {
@@ -184,7 +184,7 @@
 }
 
 .terminal-node-header .workspace-name {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 500;
   font-size: 12px;
   white-space: nowrap;
@@ -199,7 +199,7 @@
   color: #888;
   font-family: 'Menlo', 'Monaco', monospace;
   font-size: 11px;
-  background: #2a2c36;
+  background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 3px;
 }

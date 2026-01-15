@@ -15,8 +15,8 @@
 .command-palette-container {
   width: 600px;
   max-width: 90vw;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -26,7 +26,7 @@
 
 .command-palette-input-wrapper {
   padding: 0;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .command-palette-input {
@@ -35,7 +35,7 @@
   border: none;
   border-radius: 0;
   padding: 16px;
-  color: #ffffff;
+  color: var(--color-text-primary);
   font-size: 16px;
   outline: none;
 }
@@ -58,12 +58,12 @@
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.15s ease;
-  color: #ffffff;
+  color: var(--color-text-primary);
 }
 
 .command-palette-item:hover,
 .command-palette-item.selected {
-  background: #2a2a2a;
+  background: var(--color-bg-secondary);
 }
 
 .command-palette-label {
@@ -74,10 +74,10 @@
 .command-palette-shortcut {
   font-size: 12px;
   color: #888;
-  background: #2a2a2a;
+  background: var(--color-bg-secondary);
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--color-border);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
@@ -99,14 +99,14 @@
 }
 
 .command-palette-list::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
 }
 
 .command-palette-list::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  background: var(--color-bg-hover);
   border-radius: 4px;
 }
 
 .command-palette-list::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: var(--color-bg-hover-light);
 }

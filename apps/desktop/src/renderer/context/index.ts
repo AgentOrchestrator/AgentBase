@@ -27,3 +27,6 @@ export {
   useNodeServicesRegistry,
 } from './NodeServicesRegistry';
 export type { ServiceFactories, NodeServiceConfig } from './NodeServicesRegistry';
+
+// Theme context
+export { ThemeProvider, useTheme } from './ThemeContext';

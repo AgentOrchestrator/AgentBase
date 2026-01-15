@@ -6,8 +6,8 @@
 
 /* Agent Node Container */
 .agent-node {
-  background: #1e1e1e;
-  border: 1px solid #232323;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
   width: 100%;
@@ -25,7 +25,7 @@
 }
 
 .agent-node.selected {
-  border-color: #d4d4d4;
+  border-color: var(--color-text-primary);
   box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.2);
 }
 
@@ -43,7 +43,7 @@
 /* Tab Bar */
 .agent-node-tabs {
   display: flex;
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   border-bottom: none;
   padding: 0;
   flex-shrink: 0;
@@ -63,12 +63,12 @@
 }
 
 .agent-tab:hover {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   background: rgba(0, 0, 0, 0.4);
 }
 
 .agent-tab.active {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   background: transparent;
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
@@ -88,11 +88,11 @@
   background: #888;
   width: 10px;
   height: 10px;
-  border: 2px solid #1e1e1e;
+  border: 2px solid var(--color-bg-primary);
 }
 
 .agent-node .react-flow__handle:hover {
-  background: #d4d4d4;
+  background: var(--color-text-primary);
 }
 
 /* Resize handles - hidden */
@@ -102,7 +102,7 @@
 
 /* Attachment headers within agent node */
 .agent-node .terminal-node-header {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   border-bottom: 1px solid #888;
   padding: 8px 12px;
   display: flex;
@@ -120,14 +120,14 @@
 }
 
 .agent-node .terminal-node-header .issue-id {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 600;
   font-size: 12px;
   flex-shrink: 0;
 }
 
 .agent-node .terminal-node-header .issue-title {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -145,7 +145,7 @@
 }
 
 .agent-node .terminal-node-header .issue-external-link-icon:hover {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   background: rgba(136, 136, 136, 0.15);
 }
 
@@ -165,7 +165,7 @@
 }
 
 .agent-node .workspace-name {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 12px;
   font-weight: 500;
 }

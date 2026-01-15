@@ -5,19 +5,48 @@
   font-family: 'SF UI Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+/* Theme CSS Variables */
+:root {
+  /* Dark theme (default) */
+  --color-bg-primary: #1e1e1e;
+  --color-bg-primary-alt: #131313;
+  --color-bg-secondary: #2d2d2d;
+  --color-text-primary: #d4d4d4;
+  --color-border: #232323;
+  --color-bg-tertiary: #2a2c36;
+  --color-bg-hover: #3a3c46;
+  --color-bg-hover-light: #4a4c56;
+  --color-bg-card: #252527;
+  --color-bg-canvas: #141414;
+}
+
+[data-theme="light"] {
+  /* Light theme */
+  --color-bg-primary: #f4f3f0;
+  --color-bg-primary-alt: #f4f3f0;
+  --color-bg-secondary: #e5e4de;
+  --color-text-primary: #302e26;
+  --color-border: #dfdeda;
+  --color-bg-tertiary: #e5e4de;
+  --color-bg-hover: #dfdeda;
+  --color-bg-hover-light: #d4d4d4;
+  --color-bg-card: #dfdeda;
+  --color-bg-canvas: #f4f3f0;
+}
+
 html,
 body {
   font-family: "SF UI Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
 }
 
 .app {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -32,7 +61,7 @@ body {
 
 .app-sidebar {
   width: 11px;
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   flex-shrink: 0;
   -webkit-app-region: drag;
   z-index: 1;
@@ -48,7 +77,7 @@ body {
 
 .app-bottom-bar {
   height: 11px;
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   flex-shrink: 0;
   -webkit-app-region: drag;
   z-index: 1;

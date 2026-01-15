@@ -558,6 +558,8 @@ export type { GitInfo } from '@agent-orchestrator/shared';
 export interface GitAPI {
   /** Get git information for a workspace path */
   getInfo: (workspacePath: string) => Promise<GitInfo | null>;
+  /** List all local git branches for a workspace path */
+  listBranches: (workspacePath: string) => Promise<string[] | null>;
 }
 
 // Expose git API
@@ -567,6 +569,14 @@ contextBridge.exposeInMainWorld('gitAPI', {
       return await unwrapResponse<GitInfo>(ipcRenderer.invoke('git:get-info', workspacePath));
     } catch {
       // Return null if git info cannot be retrieved
+      return null;
+    }
+  },
+  listBranches: async (workspacePath: string) => {
+    try {
+      return await unwrapResponse<string[]>(ipcRenderer.invoke('git:list-branches', workspacePath));
+    } catch {
+      // Return null if branches cannot be retrieved
       return null;
     }
   },

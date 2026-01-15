@@ -985,6 +985,32 @@ function runGitCommand(cwd: string, args: string[]): Promise<string> {
   });
 }
 
+ipcMain.handle('git:list-branches', async (_event, workspacePath: string): Promise<{ success: boolean; data?: string[]; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Get all local branches
+    try {
+      const branchesOutput = await runGitCommand(workspacePath, ['branch', '--format=%(refname:short)']);
+      const branches = branchesOutput
+        .split('\n')
+        .map((b) => b.trim())
+        .filter((b) => b.length > 0);
+      
+      console.log('[Main] Branches retrieved', { workspacePath, branches });
+      return { success: true, data: branches };
+    } catch {
+      return { success: false, error: 'Not a git repository' };
+    }
+  } catch (error) {
+    console.error('[Main] Error listing branches', { workspacePath, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 ipcMain.handle('git:get-info', async (_event, workspacePath: string): Promise<{ success: boolean; data?: GitInfo; error?: string }> => {
   try {
     // Verify path exists and is a git repo

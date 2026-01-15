@@ -25,6 +25,8 @@ import UserMessageNode from './components/UserMessageNode';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import ConsolidatedConversationNode from './components/ConsolidatedConversationNode';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
+import { NewAgentModal } from './components/NewAgentModal';
+import { useTheme } from './context';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -79,6 +81,9 @@ type ContextMenu = {
 } | null;
 
 function CanvasFlow() {
+  // Theme hook
+  const { theme, toggleTheme } = useTheme();
+
   // Canvas persistence hook - centralized save/restore logic
   const {
     isLoading: isCanvasLoading,
@@ -236,6 +241,8 @@ function CanvasFlow() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
+  const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1042,8 +1049,18 @@ function CanvasFlow() {
     setContextMenu(null);
   }, [contextMenu, screenToFlowPosition, setNodes]);
 
-  const addAgentNode = useCallback((position?: { x: number; y: number }) => {
-    let nodePosition = position;
+  // Function to actually create the agent node (called from modal)
+  const createAgentNode = useCallback((position?: { x: number; y: number }, modalData?: {
+    title: string;
+    description: string;
+    workspacePath?: string;
+    todo?: string;
+    priority?: string;
+    assignee?: string;
+    project?: string;
+    labels?: string[];
+  }) => {
+    let nodePosition = position || pendingAgentPosition;
 
     // If no position provided and context menu is open, use context menu position
     if (!nodePosition && contextMenu) {
@@ -1070,9 +1087,16 @@ function CanvasFlow() {
       agentId,
       terminalId,
       createdAt: new Date(createdAt).toISOString(),
+      modalData,
     });
 
-    // Pre-fill with locked folder path (but don't create attachment yet - let modal show with it pre-filled)
+    // Use title from modal if provided, otherwise use default
+    const nodeTitle = modalData?.title || createDefaultAgentTitle();
+
+    // Determine workspace path: use from modal data, or locked folder, or null
+    const selectedWorkspacePath = modalData?.workspacePath || lockedFolderPath || null;
+
+    // Pre-fill with workspace path (but don't create attachment yet - let agent node handle it)
     const newNode: Node = {
       id: `node-${createdAt}`,
       type: 'agent',
@@ -1082,13 +1106,13 @@ function CanvasFlow() {
         terminalId,
         agentType: 'claude_code',
         status: 'idle',
-        title: createDefaultAgentTitle(),
-        summary: null,
+        title: nodeTitle,
+        summary: modalData?.description || null,
         progress: null,
         attachments: [],
         activeView: 'overview',
-        // Add prefilled workspace path if locked folder exists
-        ...(lockedFolderPath && { prefilledWorkspacePath: lockedFolderPath }),
+        // Add prefilled workspace path if selected
+        ...(selectedWorkspacePath && { prefilledWorkspacePath: selectedWorkspacePath }),
       },
       style: {
         width: 500,
@@ -1098,7 +1122,33 @@ function CanvasFlow() {
 
     setNodes((nds) => [...nds, newNode]);
     setContextMenu(null);
-  }, [contextMenu, screenToFlowPosition, setNodes, lockedFolderPath]);
+    setPendingAgentPosition(undefined);
+  }, [contextMenu, screenToFlowPosition, setNodes, lockedFolderPath, pendingAgentPosition]);
+
+  // Function to show the modal (replaces direct node creation)
+  const addAgentNode = useCallback((position?: { x: number; y: number }) => {
+    // Calculate position if not provided
+    let nodePosition = position;
+
+    if (!nodePosition && contextMenu) {
+      nodePosition = screenToFlowPosition({
+        x: contextMenu.x,
+        y: contextMenu.y,
+      });
+    }
+
+    if (!nodePosition) {
+      nodePosition = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+    }
+
+    // Store position and show modal
+    setPendingAgentPosition(nodePosition);
+    setIsNewAgentModalOpen(true);
+    setContextMenu(null);
+  }, [contextMenu, screenToFlowPosition]);
 
   const addStarterNode = useCallback((position?: { x: number; y: number }) => {
     let nodePosition = position;
@@ -1412,10 +1462,15 @@ function CanvasFlow() {
         return;
       }
 
-      // CMD+T / CTRL+T to add agent
+      // CMD+T / CTRL+T to toggle agent modal
       if (modifierKey && event.key === 't') {
         event.preventDefault(); // Prevent default browser behavior
-        addAgentNode();
+        if (isNewAgentModalOpen) {
+          setIsNewAgentModalOpen(false);
+          setPendingAgentPosition(undefined);
+        } else {
+          addAgentNode();
+        }
         return;
       }
 
@@ -1484,6 +1539,19 @@ function CanvasFlow() {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         commands={commandActions}
+      />
+      <NewAgentModal
+        isOpen={isNewAgentModalOpen}
+        onClose={() => {
+          setIsNewAgentModalOpen(false);
+          setPendingAgentPosition(undefined);
+        }}
+        onCreate={(data) => {
+          createAgentNode(pendingAgentPosition, data);
+          setIsNewAgentModalOpen(false);
+        }}
+        initialPosition={pendingAgentPosition}
+        initialWorkspacePath={lockedFolderPath}
       />
       {/* Sidebar Panel */}
       <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
@@ -1753,7 +1821,7 @@ function CanvasFlow() {
         onDrop={handleCanvasDrop}
         nodeTypes={nodeTypes}
         fitView
-        style={{ backgroundColor: '#141414' }}
+        style={{ backgroundColor: 'var(--color-bg-canvas)' }}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.1}
         maxZoom={4}
@@ -1882,6 +1950,23 @@ function CanvasFlow() {
                       Linear Settings → API
                     </a>
                   </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Appearance</h3>
+                <div className="settings-item">
+                  <span>Color Palette</span>
+                  <label className="theme-toggle">
+                    <input
+                      type="checkbox"
+                      checked={theme === 'light'}
+                      onChange={toggleTheme}
+                    />
+                    <span className="theme-toggle-slider">
+                      <span className="theme-toggle-label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+                    </span>
+                  </label>
                 </div>
               </div>
 
