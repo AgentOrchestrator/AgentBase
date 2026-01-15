@@ -7,20 +7,13 @@
 
 import { useState, useCallback, useRef } from 'react';
 import type { CodingAgentAPI, CodingAgentType } from '../../../../main/services/coding-agent';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  messageType?: string;
-}
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 interface UseChatSessionOptions {
   agentType: string;
   sessionId?: string;
   workspacePath?: string;
-  onMessagesUpdate: (messages: ChatMessage[]) => void;
+  onMessagesUpdate: (messages: CodingAgentMessage[]) => void;
   onSessionCreated: (sessionId: string) => void;
   onError: (error: string) => void;
 }
@@ -36,7 +29,7 @@ export function useChatSession({
   console.log('useChatSession called with sessionId:', sessionId);
 
   const [isStreaming, setIsStreaming] = useState(false);
-  const messagesRef = useRef<ChatMessage[]>([]);
+  const messagesRef = useRef<CodingAgentMessage[]>([]);
 
   const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI }).codingAgentAPI;
   const resolvedAgentType = agentType as CodingAgentType;
@@ -50,7 +43,7 @@ export function useChatSession({
     setIsStreaming(true);
 
     // Add user message
-    const userMessage: ChatMessage = {
+    const userMessage: CodingAgentMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: prompt,
@@ -62,7 +55,7 @@ export function useChatSession({
 
     // Create placeholder assistant message
     let assistantContent = '';
-    const assistantMessage: ChatMessage = {
+    const assistantMessage: CodingAgentMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
       content: '',

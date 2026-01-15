@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { getUserLLMConfig, generateLLMText } from '@/lib/llm-client';
-
-interface MentionedUser {
-  id: string;
-  email: string;
-  display_name: string | null;
-  mentionText: string;
-}
+import type { MentionedUser } from '@agent-orchestrator/shared';
 
 interface ChatRequest {
   message: string;

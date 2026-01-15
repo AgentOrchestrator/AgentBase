@@ -5,6 +5,7 @@ import { MentionAutocomplete } from './mention-autocomplete';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Send, Loader2 } from 'lucide-react';
+import type { MentionedUser } from '@agent-orchestrator/shared';
 
 interface User {
   id: string;
@@ -13,17 +14,6 @@ interface User {
   avatar_url: string | null;
   x_github_name: string | null;
   x_github_avatar_url: string | null;
-}
-
-interface MentionedUser extends User {
-  mentionText: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  mentionedUsers?: MentionedUser[];
 }
 
 interface ChatInterfaceProps {

@@ -15,6 +15,6 @@ export {
   type CodingAgentAPI,
   type SessionSummary,
   type SessionContent,
-  type ChatMessage,
+  type CodingAgentMessage,
   type WorkspaceSource,
 } from './useAgentState';

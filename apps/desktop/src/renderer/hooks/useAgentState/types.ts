@@ -7,7 +7,8 @@
 
 import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agent-status';
 import type { WorktreeInfo } from '../../../main/types/worktree';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type { CodingAgentMessage, GitInfo } from '@agent-orchestrator/shared';
+export type { CodingAgentMessage } from '@agent-orchestrator/shared';
 import type { CodingAgentAPI } from '../../../main/services/coding-agent';
 import type { AgentNodeData } from '../../types/agent-node';
 import type { TerminalAttachment } from '../../types/attachments';
@@ -29,18 +30,10 @@ export interface SessionSummary {
 
 export interface SessionContent {
   id: string;
-  messages: ChatMessage[];
+  messages: CodingAgentMessage[];
   messageCount: number;
   projectPath?: string;
   projectName?: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  messageType?: string;
 }
 
 // =============================================================================
@@ -68,11 +61,15 @@ export interface WorkspaceState {
 // Session State
 // =============================================================================
 
+export type SessionReadiness = 'idle' | 'matching' | 'ready' | 'missing';
+
 export interface SessionState {
   /** Matched session ID from conversation JSON files */
-  id: string | undefined;
+  id: string | null;
   /** Whether currently polling for session match */
   isMatching: boolean;
+  /** Whether a session is ready to use */
+  readiness: SessionReadiness;
 }
 
 // =============================================================================

@@ -18,6 +18,7 @@ interface AgentChatViewProps {
   initialMessages?: AgentChatMessage[];
   onMessagesChange: (messages: AgentChatMessage[]) => void;
   onSessionCreated?: (sessionId: string) => void;
+  isSessionReady?: boolean;
 }
 
 export default function AgentChatView({
@@ -28,6 +29,7 @@ export default function AgentChatView({
   initialMessages = [],
   onMessagesChange,
   onSessionCreated,
+  isSessionReady = true,
 }: AgentChatViewProps) {
   const [messages, setMessages] = useState<AgentChatMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
@@ -66,7 +68,7 @@ export default function AgentChatView({
   }, [messages]);
 
   const handleSend = async () => {
-    if (!inputValue.trim() || isStreaming) return;
+    if (!isSessionReady || !inputValue.trim() || isStreaming) return;
 
     const userMessage = inputValue.trim();
     setInputValue('');
@@ -86,6 +88,11 @@ export default function AgentChatView({
     <div className="agent-chat-view">
       {/* Messages */}
       <div className="agent-chat-view-messages">
+        {!isSessionReady && (
+          <div className="agent-chat-view-empty">
+            Waiting for session to be ready...
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="agent-chat-view-empty">
             Start a conversation with Claude Code
@@ -126,13 +133,13 @@ export default function AgentChatView({
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
-          disabled={isStreaming}
+          disabled={!isSessionReady || isStreaming}
           rows={1}
         />
         <button
           className="agent-chat-view-send"
           onClick={handleSend}
-          disabled={!inputValue.trim() || isStreaming}
+          disabled={!isSessionReady || !inputValue.trim() || isStreaming}
         >
           {isStreaming ? '...' : 'Send'}
         </button>

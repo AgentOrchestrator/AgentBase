@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 // =============================================================================
 // Attachment Schemas
@@ -88,9 +89,9 @@ export const WorkspaceNodeDataSchema = z.object({
 });
 
 /**
- * Schema for ChatMessage data (must be before AgentNodeDataSchema)
+ * Schema for CodingAgentMessage data (must be before AgentNodeDataSchema)
  */
-export const ChatMessageSchema = z.object({
+export const ChatMessageSchema: z.ZodType<CodingAgentMessage> = z.object({
   id: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
@@ -168,5 +169,4 @@ export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
 export type MessageNodeData = z.infer<typeof MessageNodeDataSchema>;
 export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;
-export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 export type AgentChatNodeData = z.infer<typeof AgentChatNodeDataSchema>;

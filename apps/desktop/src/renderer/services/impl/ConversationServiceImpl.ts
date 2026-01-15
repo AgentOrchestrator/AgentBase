@@ -7,13 +7,13 @@
 
 import type {
   IConversationService,
-  ChatMessage,
   SessionContent,
   SessionFilter,
   MessagesLoadedListener,
   ErrorListener,
 } from '../../context/node-services';
 import type { CodingAgentAPI, CodingAgentType } from '../../../main/services/coding-agent';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 /**
  * Conversation service implementation using codingAgentAPI
@@ -23,7 +23,7 @@ export class ConversationServiceImpl implements IConversationService {
   readonly sessionId: string;
   readonly agentType: string;
 
-  private _messages: ChatMessage[] = [];
+  private _messages: CodingAgentMessage[] = [];
   private _isLoading = false;
   private _error: string | null = null;
 
@@ -76,7 +76,7 @@ export class ConversationServiceImpl implements IConversationService {
       if (session) {
         // Filter to only text messages (skip tool calls)
         const textMessages = session.messages.filter(
-          (m: ChatMessage) =>
+          (m: CodingAgentMessage) =>
             m.messageType === 'assistant' ||
             m.messageType === 'user' ||
             !m.messageType
@@ -100,7 +100,7 @@ export class ConversationServiceImpl implements IConversationService {
   /**
    * Get currently loaded messages
    */
-  getMessages(): ChatMessage[] {
+  getMessages(): CodingAgentMessage[] {
     return this._messages;
   }
 
@@ -162,7 +162,7 @@ export class ConversationServiceImpl implements IConversationService {
   // Private Helpers
   // ==========================================================================
 
-  private notifyMessagesLoaded(messages: ChatMessage[]): void {
+  private notifyMessagesLoaded(messages: CodingAgentMessage[]): void {
     this.messagesListeners.forEach((listener) => {
       try {
         listener(messages);

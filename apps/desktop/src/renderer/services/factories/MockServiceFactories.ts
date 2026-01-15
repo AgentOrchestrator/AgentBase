@@ -13,11 +13,11 @@ import type {
   IWorkspaceService,
   IAgentService,
   IConversationService,
-  ChatMessage,
   MessagesLoadedListener,
   ErrorListener,
   GitInfo,
 } from '../../context/node-services';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 /**
  * Create a mock terminal service
@@ -127,7 +127,7 @@ function createMockAgentService(
     dispose: async () => {
       statusListeners.clear();
     },
-    start: async () => {
+    start: async (_command?: string, _sessionId?: string, _initialPrompt?: string) => {
       currentStatus = { status: 'running', startedAt: Date.now() };
     },
     stop: async () => {
@@ -161,7 +161,12 @@ function createMockAgentService(
       };
       return commands[agentType] || '';
     },
-    setWorkspace: async () => {
+    setWorkspace: async (
+      _path: string,
+      _autoStartCli?: boolean,
+      _initialPrompt?: string,
+      _sessionId?: string
+    ) => {
       // No-op for mock
     },
   };
@@ -175,7 +180,7 @@ function createMockConversationService(
   sessionId: string,
   agentType: string
 ): IConversationService {
-  let messages: ChatMessage[] = [];
+  let messages: CodingAgentMessage[] = [];
   let isLoading = false;
   let error: string | null = null;
 
@@ -183,7 +188,7 @@ function createMockConversationService(
   const errorListeners = new Set<ErrorListener>();
 
   // Generate mock messages
-  const mockMessages: ChatMessage[] = [
+  const mockMessages: CodingAgentMessage[] = [
     {
       id: 'mock-msg-1',
       role: 'user',

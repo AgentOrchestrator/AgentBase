@@ -25,7 +25,7 @@ import {
   useWorkspaceService,
   useNodeInitialized,
 } from '../../context';
-import type { WorkspaceState } from '../../hooks/useAgentState';
+import type { WorkspaceState, SessionReadiness } from '../../hooks/useAgentState';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -37,6 +37,8 @@ export interface AgentNodePresentationProps {
   selected?: boolean;
   /** Workspace state from useAgentState (optional for backwards compat) */
   workspaceState?: WorkspaceState;
+  /** Session readiness from useAgentState */
+  sessionReadiness?: SessionReadiness;
 }
 
 /**
@@ -50,10 +52,12 @@ export function AgentNodePresentation({
   onDataChange,
   selected,
   workspaceState,
+  sessionReadiness = 'idle',
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const workspace = useWorkspaceService();
   const isInitialized = useNodeInitialized();
+  const isSessionReady = sessionReadiness === 'ready' || sessionReadiness === 'missing';
 
   const [activeView, setActiveView] = useState<AgentNodeView>(
     data.activeView || 'overview'
@@ -64,8 +68,8 @@ export function AgentNodePresentation({
 
   // Auto-start CLI when initialized (if enabled)
   useEffect(() => {
-    if (isInitialized && agent.isAutoStartEnabled()) {
-      agent.start().catch((err) => {
+    if (isInitialized && agent.isAutoStartEnabled() && isSessionReady) {
+      agent.start(undefined, data.sessionId, data.initialPrompt).catch((err) => {
         console.error('[AgentNode] Failed to auto-start agent:', err);
       });
     }
@@ -76,7 +80,7 @@ export function AgentNodePresentation({
         console.error('[AgentNode] Failed to stop agent:', err);
       });
     };
-  }, [isInitialized, agent]);
+  }, [isInitialized, agent, isSessionReady, data.sessionId, data.initialPrompt]);
 
   // Subscribe to status changes
   useEffect(() => {
@@ -273,6 +277,7 @@ export function AgentNodePresentation({
             initialMessages={data.chatMessages}
             onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
             onSessionCreated={(sessionId) => onDataChange({ sessionId })}
+            isSessionReady={isSessionReady}
           />
         </div>
       </div>

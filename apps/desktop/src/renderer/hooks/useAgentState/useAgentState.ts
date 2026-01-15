@@ -34,6 +34,7 @@ import type {
   UseAgentStateInput,
   WorkspaceSource,
   SessionSummary,
+  SessionReadiness,
 } from './types';
 
 // =============================================================================
@@ -122,6 +123,9 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   // ---------------------------------------------------------------------------
   const [sessionId, setSessionId] = useState<string | null>(nodeData.sessionId || null);
   const [isMatchingSession, setIsMatchingSession] = useState(false);
+  const [sessionReadiness, setSessionReadiness] = useState<SessionReadiness>(
+    nodeData.sessionId ? 'ready' : 'idle'
+  );
 
   // ---------------------------------------------------------------------------
   // Refs for cleanup
@@ -137,6 +141,19 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
 
   useEffect(() => {
     matchedSessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    const nextSessionId = nodeData.sessionId ?? null;
+    if (nextSessionId !== sessionId) {
+      setSessionId(nextSessionId);
+    }
+  }, [nodeData.sessionId, sessionId]);
+
+  useEffect(() => {
+    if (sessionId) {
+      setSessionReadiness('ready');
+    }
   }, [sessionId]);
 
   // ---------------------------------------------------------------------------
@@ -280,10 +297,16 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
 
     // Don't run if no workspace, no createdAt, or already matched
     if (!workspacePath || !createdAt || matchedSessionIdRef.current) {
+      if (matchedSessionIdRef.current) {
+        setSessionReadiness('ready');
+      } else {
+        setSessionReadiness('idle');
+      }
       return;
     }
 
     setIsMatchingSession(true);
+    setSessionReadiness('matching');
 
     const startPolling = () => {
       if (pollingIntervalRef.current) {
@@ -298,6 +321,9 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
 
         if (attempts > maxAttempts || matchedSessionIdRef.current) {
           setIsMatchingSession(false);
+          if (attempts > maxAttempts && !matchedSessionIdRef.current) {
+            setSessionReadiness('missing');
+          }
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
@@ -321,6 +347,7 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
             matchedSessionIdRef.current = match.id;
             setSessionId(match.id);
             setIsMatchingSession(false);
+            setSessionReadiness('ready');
 
             // Update node data with session ID
             dispatchNodeUpdate({ ...nodeData, sessionId: match.id });
@@ -352,6 +379,7 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   useEffect(() => {
     matchedSessionIdRef.current = null;
     setSessionId(null);
+    setSessionReadiness('idle');
   }, [nodeData.agentId]);
 
   // ---------------------------------------------------------------------------
@@ -456,6 +484,7 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     session: {
       id: sessionId,
       isMatching: isMatchingSession,
+      readiness: sessionReadiness,
     },
     nodeData,
     actions: {

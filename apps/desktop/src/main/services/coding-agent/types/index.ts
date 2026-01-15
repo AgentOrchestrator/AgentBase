@@ -38,7 +38,7 @@ export {
 
 // Message types
 export {
-  type ChatMessage,
+  type CodingAgentMessage,
   type GenerateRequest,
   type GenerateResponse,
   type StreamCallback,

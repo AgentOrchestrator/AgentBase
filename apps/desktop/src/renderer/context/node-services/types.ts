@@ -131,7 +131,7 @@ export interface IAgentService extends INodeService {
 
   // Lifecycle
   /** Start the coding agent CLI in the terminal */
-  start(command?: string): Promise<void>;
+  start(command?: string, sessionId?: string, initialPrompt?: string): Promise<void>;
   /** Stop the coding agent (sends interrupt) */
   stop(): Promise<void>;
 
@@ -158,7 +158,12 @@ export interface IAgentService extends INodeService {
    * If autoStartCli is true, also starts the CLI after navigation.
    * If initialPrompt is provided, it will be sent to the agent after CLI starts.
    */
-  setWorkspace(path: string, autoStartCli?: boolean, initialPrompt?: string): Promise<void>;
+  setWorkspace(
+    path: string,
+    autoStartCli?: boolean,
+    initialPrompt?: string,
+    sessionId?: string
+  ): Promise<void>;
 
   // Session management
   /** Get CLI command for this agent type */

@@ -202,7 +202,7 @@ export function NodeContextProvider({
     // Delegate workspace handling to the appropriate service
     if (hasAgentService(services)) {
       // Agent service handles terminal navigation + CLI start
-      services.agent.setWorkspace(workspacePath, autoStartCli, initialPrompt);
+      services.agent.setWorkspace(workspacePath, autoStartCli, initialPrompt, sessionId);
     } else if (hasTerminalService(services)) {
       // For non-agent nodes, just navigate the terminal
       const terminal = services.terminal;
@@ -214,7 +214,7 @@ export function NodeContextProvider({
         terminal.write(`cd "${workspacePath}"\n`);
       }
     }
-  }, [isInitialized, workspacePath, autoStartCli]);
+  }, [isInitialized, workspacePath, autoStartCli, initialPrompt, sessionId]);
 
   // Build context value
   const contextValue: NodeContextValue | null = servicesRef.current

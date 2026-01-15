@@ -11,6 +11,7 @@ import type {
   CodingAgentStatusInfo,
 } from '../../../types/coding-agent-status';
 import type { TerminalAttachment } from './attachments';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 // =============================================================================
 // Progress Variants (Discriminated Union)
@@ -113,13 +114,7 @@ export type AgentNodeView = 'overview' | 'terminal' | 'chat';
 /**
  * Chat message structure for agent chat view
  */
-export interface AgentChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  messageType?: string;
-}
+export type AgentChatMessage = CodingAgentMessage;
 
 // =============================================================================
 // Agent Node Data

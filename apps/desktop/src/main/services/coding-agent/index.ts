@@ -62,7 +62,7 @@ export type {
   MessageFilterOptions,
   ContinueOptions,
   ForkOptions,
-  ChatMessage,
+  CodingAgentMessage,
   GenerateRequest,
   GenerateResponse,
   StreamCallback,

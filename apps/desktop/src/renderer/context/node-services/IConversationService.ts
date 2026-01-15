@@ -6,28 +6,18 @@
  */
 
 import type { INodeService } from './types';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 // =============================================================================
 // Types
 // =============================================================================
 
 /**
- * Chat message from a conversation session
- */
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  messageType?: string;
-}
-
-/**
  * Session content returned from the API
  */
 export interface SessionContent {
   id: string;
-  messages: ChatMessage[];
+  messages: CodingAgentMessage[];
   messageCount: number;
   projectPath?: string;
   projectName?: string;
@@ -43,7 +33,7 @@ export interface SessionFilter {
 /**
  * Callback for messages loaded event
  */
-export type MessagesLoadedListener = (messages: ChatMessage[]) => void;
+export type MessagesLoadedListener = (messages: CodingAgentMessage[]) => void;
 
 /**
  * Callback for error event
@@ -76,7 +66,7 @@ export interface IConversationService extends INodeService {
    * Get currently loaded messages.
    * Returns empty array if not loaded.
    */
-  getMessages(): ChatMessage[];
+  getMessages(): CodingAgentMessage[];
 
   /**
    * Check if session is currently loading.

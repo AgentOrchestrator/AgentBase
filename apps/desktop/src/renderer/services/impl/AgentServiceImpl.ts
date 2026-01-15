@@ -66,7 +66,12 @@ export class AgentServiceImpl implements IAgentService {
    * If autoStartCli is true, also starts the CLI after navigation.
    * If initialPrompt is provided, it will be sent to the agent after CLI starts.
    */
-  async setWorkspace(path: string, autoStartCli?: boolean, initialPrompt?: string): Promise<void> {
+  async setWorkspace(
+    path: string,
+    autoStartCli?: boolean,
+    initialPrompt?: string,
+    sessionId?: string
+  ): Promise<void> {
     this.workspacePath = path;
 
     // Ensure terminal is created and running
@@ -85,14 +90,11 @@ export class AgentServiceImpl implements IAgentService {
       await new Promise((resolve) => setTimeout(resolve, 200));
       const cliCommand = this.getCliCommand();
       if (cliCommand) {
-        // If initial prompt is provided, use -p flag with stdin
-        if (initialPrompt) {
-          // Escape single quotes in the prompt for shell safety
-          const escapedPrompt = initialPrompt.replace(/'/g, "'\\''");
-          this.terminalService.write(`echo '${escapedPrompt}' | ${cliCommand} -p\n`);
-        } else {
-          this.terminalService.write(`${cliCommand}\n`);
-        }
+        const startCommand = this.buildCliStartCommand(cliCommand, {
+          sessionId,
+          initialPrompt,
+        });
+        this.terminalService.write(`${startCommand}\n`);
         this.isStarted = true;
         this.updateStatus('running');
       }
@@ -117,7 +119,7 @@ export class AgentServiceImpl implements IAgentService {
   /**
    * Start the coding agent CLI in the terminal
    */
-  async start(command?: string): Promise<void> {
+  async start(command?: string, sessionId?: string, initialPrompt?: string): Promise<void> {
     if (this.isStarted) {
       return;
     }
@@ -138,11 +140,15 @@ export class AgentServiceImpl implements IAgentService {
     // Update status
     this.updateStatus('running');
 
+    const startCommand = command
+      ? cliCommand
+      : this.buildCliStartCommand(cliCommand, { sessionId, initialPrompt });
+
     // Change to workspace directory if set
     if (this.workspacePath) {
-      this.terminalService.write(`cd "${this.workspacePath}" && ${cliCommand}\n`);
+      this.terminalService.write(`cd "${this.workspacePath}" && ${startCommand}\n`);
     } else {
-      this.terminalService.write(`${cliCommand}\n`);
+      this.terminalService.write(`${startCommand}\n`);
     }
     this.isStarted = true;
   }
@@ -227,6 +233,48 @@ export class AgentServiceImpl implements IAgentService {
    */
   getCliCommand(): string {
     return CLI_COMMANDS[this.agentType] || '';
+  }
+
+  private buildCliStartCommand(
+    cliCommand: string,
+    options: { sessionId?: string; initialPrompt?: string }
+  ): string {
+    const { sessionId, initialPrompt } = options;
+    const resumeSession = this.agentType === 'claude_code' && sessionId;
+    const resumeCommand = this.buildCliCommand(cliCommand, { sessionId, initialPrompt });
+
+    if (!resumeSession) {
+      return resumeCommand;
+    }
+
+    const fallbackCommand = this.buildCliCommand(cliCommand, { initialPrompt });
+    const logMessage = this.formatShellValue(
+      `[AgentService] Failed to resume session ${sessionId}. Starting new session.`
+    );
+    return `${resumeCommand} || (echo ${logMessage} >&2; ${fallbackCommand})`;
+  }
+
+  private buildCliCommand(
+    cliCommand: string,
+    options: { sessionId?: string; initialPrompt?: string }
+  ): string {
+    const { sessionId, initialPrompt } = options;
+    const args: string[] = [];
+
+    if (this.agentType === 'claude_code' && sessionId) {
+      args.push(`--resume ${this.formatShellValue(sessionId)}`);
+    }
+
+    if (initialPrompt) {
+      const promptValue = this.formatShellValue(initialPrompt);
+      return `echo ${promptValue} | ${cliCommand}${args.length > 0 ? ` ${args.join(' ')}` : ''} -p`;
+    }
+
+    return `${cliCommand}${args.length > 0 ? ` ${args.join(' ')}` : ''}`;
+  }
+
+  private formatShellValue(value: string): string {
+    return `'${value.replace(/'/g, "'\\''")}'`;
   }
 
   /**

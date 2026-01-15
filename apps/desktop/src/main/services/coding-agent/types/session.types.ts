@@ -1,5 +1,5 @@
 import type { CodingAgentType } from './agent.types';
-import type { ChatMessage } from './message.types';
+import type { CodingAgentMessage } from './message.types';
 
 // Re-export filter options from shared
 export type {
@@ -35,7 +35,7 @@ export interface SessionInfo {
  * Full session content including messages
  */
 export interface SessionContent extends SessionInfo {
-  messages: ChatMessage[];
+  messages: CodingAgentMessage[];
   /** Session metadata */
   metadata?: Record<string, unknown>;
 }

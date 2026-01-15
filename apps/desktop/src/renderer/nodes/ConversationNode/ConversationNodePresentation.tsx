@@ -11,7 +11,7 @@ import { Handle, Position } from '@xyflow/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useConversationService, useNodeInitialized } from '../../context';
-import type { ChatMessage } from '../../context/node-services';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 import './ConversationNode.css';
 
 export interface ConversationNodePresentationProps {
@@ -50,7 +50,7 @@ export function ConversationNodePresentation({
   const isInitialized = useNodeInitialized();
 
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<CodingAgentMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);

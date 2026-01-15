@@ -9,14 +9,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { useChatSession } from './hooks/useChatSession';
 import './AgentChatNode.css';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  messageType?: string;
-}
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 interface AgentChatNodePresentationProps {
   selected?: boolean;
@@ -24,10 +17,10 @@ interface AgentChatNodePresentationProps {
   agentType: string;
   workspacePath?: string;
   title?: string;
-  initialMessages: ChatMessage[];
+  initialMessages: CodingAgentMessage[];
   isDraft: boolean;
   initialExpanded?: boolean;
-  onMessagesChange: (messages: ChatMessage[]) => void;
+  onMessagesChange: (messages: CodingAgentMessage[]) => void;
   onSessionCreated: (sessionId: string) => void;
   onExpandedChange: (isExpanded: boolean) => void;
 }
@@ -46,7 +39,7 @@ export function AgentChatNodePresentation({
   onExpandedChange,
 }: AgentChatNodePresentationProps) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<CodingAgentMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +53,7 @@ export function AgentChatNodePresentation({
     agentType,
     sessionId,
     workspacePath,
-    onMessagesUpdate: useCallback((newMessages: ChatMessage[]) => {
+    onMessagesUpdate: useCallback((newMessages: CodingAgentMessage[]) => {
       setMessages(newMessages);
       onMessagesChange(newMessages);
     }, [onMessagesChange]),

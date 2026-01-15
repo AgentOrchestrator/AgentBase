@@ -5,23 +5,10 @@ import { ChatInterface } from '@/components/chat-interface';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2 } from 'lucide-react';
-
-interface MentionedUser {
-  id: string;
-  email: string;
-  display_name: string | null;
-  mentionText: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  mentionedUsers?: MentionedUser[];
-}
+import type { MentionedUser, WebChatMessage } from '@agent-orchestrator/shared';
 
 export function ChatPageClient() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<WebChatMessage[]>([
     {
       role: 'system',
       content:
@@ -36,7 +23,7 @@ export function ChatPageClient() {
     mentionedUsers: MentionedUser[]
   ) => {
     // Add user message to chat
-    const userMessage: ChatMessage = {
+    const userMessage: WebChatMessage = {
       role: 'user',
       content: message,
       timestamp: new Date().toISOString(),
@@ -62,7 +49,7 @@ export function ChatPageClient() {
       const data = await response.json();
 
       // Add assistant response
-      const assistantMessage: ChatMessage = {
+      const assistantMessage: WebChatMessage = {
         role: 'assistant',
         content: data.response || data.error || 'No response received',
         timestamp: new Date().toISOString(),
@@ -73,7 +60,7 @@ export function ChatPageClient() {
       console.error('Error sending message:', error);
 
       // Add error message
-      const errorMessage: ChatMessage = {
+      const errorMessage: WebChatMessage = {
         role: 'assistant',
         content: 'Sorry, I encountered an error processing your request.',
         timestamp: new Date().toISOString(),

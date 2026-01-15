@@ -5,26 +5,13 @@ import { ChatInterface } from './chat-interface';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Loader2, Settings } from 'lucide-react';
 import Link from 'next/link';
+import type { MentionedUser, WebChatMessage } from '@agent-orchestrator/shared';
 
 interface DefaultProvider {
   id: string;
   provider: string;
   is_active: boolean;
   is_default: boolean;
-}
-
-interface MentionedUser {
-  id: string;
-  email: string;
-  display_name: string | null;
-  mentionText: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  mentionedUsers?: MentionedUser[];
 }
 
 interface RightSidebarProps {
@@ -36,7 +23,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
   const [defaultProvider, setDefaultProvider] = useState<DefaultProvider | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingProvider, setFetchingProvider] = useState(true);
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<WebChatMessage[]>([
     {
       role: 'system',
       content:
@@ -77,7 +64,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
     mentionedUsers: MentionedUser[]
   ) => {
     // Add user message to chat
-    const userMessage: ChatMessage = {
+    const userMessage: WebChatMessage = {
       role: 'user',
       content: message,
       timestamp: new Date().toISOString(),
@@ -103,7 +90,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
       const data = await response.json();
 
       // Add assistant response
-      const assistantMessage: ChatMessage = {
+      const assistantMessage: WebChatMessage = {
         role: 'assistant',
         content: data.response || data.error || 'No response received',
         timestamp: new Date().toISOString(),
@@ -114,7 +101,7 @@ export function RightSidebar({ isOpen, onClose }: RightSidebarProps) {
       console.error('Error sending message:', error);
 
       // Add error message
-      const errorMessage: ChatMessage = {
+      const errorMessage: WebChatMessage = {
         role: 'assistant',
         content: 'Sorry, I encountered an error processing your request.',
         timestamp: new Date().toISOString(),

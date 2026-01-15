@@ -8,14 +8,7 @@
 import { useCallback } from 'react';
 import { NodeProps } from '@xyflow/react';
 import { AgentChatNodePresentation } from './AgentChatNodePresentation';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  messageType?: string;
-}
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 interface AgentChatNodeData {
   sessionId?: string;
@@ -23,7 +16,7 @@ interface AgentChatNodeData {
   workspacePath?: string;
   title?: string;
   isExpanded?: boolean;
-  messages: ChatMessage[];
+  messages: CodingAgentMessage[];
   isDraft: boolean;
 }
 
@@ -43,7 +36,7 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
   );
 
   const handleMessagesChange = useCallback(
-    (messages: ChatMessage[]) => {
+    (messages: CodingAgentMessage[]) => {
       dispatchNodeUpdate({ messages });
     },
     [dispatchNodeUpdate]

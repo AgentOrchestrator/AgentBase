@@ -9,6 +9,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { MentionAutocomplete } from "./mention-autocomplete";
 import { supabase } from "@/lib/supabase";
+import type { MentionedUser, WebChatMessage } from "@agent-orchestrator/shared";
 
 interface SidebarContextType {
   isCollapsed: boolean;
@@ -24,17 +25,6 @@ interface User {
   avatar_url: string | null;
   x_github_name: string | null;
   x_github_avatar_url: string | null;
-}
-
-interface MentionedUser extends User {
-  mentionText: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  mentionedUsers?: MentionedUser[];
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -65,7 +55,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   const [isTextVisible, setIsTextVisible] = useState(true);
   
   // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<WebChatMessage[]>([
     // {
     //   role: 'system',
     //   content: 'Welcome! Ask me about what your teammates are working on by mentioning them with @. For example: "What is @Max currently working on?"',
@@ -265,7 +255,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     // Reset inactivity timer on send
     resetInactivityTimer();
 
-    const userMessage: ChatMessage = {
+    const userMessage: WebChatMessage = {
       role: 'user',
       content: message,
       timestamp: new Date().toISOString(),
@@ -291,7 +281,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
 
       const data = await response.json();
 
-      const assistantMessage: ChatMessage = {
+      const assistantMessage: WebChatMessage = {
         role: 'assistant',
         content: data.response || data.error || 'No response received',
         timestamp: new Date().toISOString(),
@@ -300,7 +290,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage: ChatMessage = {
+      const errorMessage: WebChatMessage = {
         role: 'assistant',
         content: 'Sorry, I encountered an error processing your request.',
         timestamp: new Date().toISOString(),

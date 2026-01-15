@@ -28,7 +28,7 @@ import type {
   MessageFilterOptions,
   ContinueOptions,
   ForkOptions,
-  ChatMessage,
+  CodingAgentMessage,
   ToolCategory,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
@@ -814,7 +814,7 @@ export class ClaudeCodeAgent
   ): SessionContent {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(line => line.trim());
-    const messages: ChatMessage[] = [];
+    const messages: CodingAgentMessage[] = [];
 
     for (const line of lines) {
       try {
@@ -859,8 +859,8 @@ export class ClaudeCodeAgent
     };
   }
 
-  private parseJsonlLine(data: JsonlLine): ChatMessage[] {
-    const messages: ChatMessage[] = [];
+  private parseJsonlLine(data: JsonlLine): CodingAgentMessage[] {
+    const messages: CodingAgentMessage[] = [];
     const timestamp = this.normalizeTimestamp(data.timestamp);
 
     if (data.type === 'user' && data.message?.content) {
@@ -1045,7 +1045,7 @@ export class ClaudeCodeAgent
   async *streamSessionMessages(
     sessionId: string,
     filter?: MessageFilterOptions
-  ): AsyncGenerator<ChatMessage, void, unknown> {
+  ): AsyncGenerator<CodingAgentMessage, void, unknown> {
     const projectsDir = this.getProjectsDir();
 
     if (!fs.existsSync(projectsDir)) return;

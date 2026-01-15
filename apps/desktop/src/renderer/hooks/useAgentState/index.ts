@@ -12,10 +12,11 @@ export type {
   WorkspaceState,
   WorkspaceSource,
   SessionState,
+  SessionReadiness,
   AgentConfig,
   AgentActions,
   CodingAgentAPI,
   SessionSummary,
   SessionContent,
-  ChatMessage,
+  CodingAgentMessage,
 } from './types';

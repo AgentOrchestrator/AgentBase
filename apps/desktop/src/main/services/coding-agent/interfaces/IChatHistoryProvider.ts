@@ -1,7 +1,7 @@
 import type { Result, AgentError } from '../types/result.types';
 import type { SessionFilterOptions, MessageFilterOptions, SessionChange } from '../types/session.types';
 import type { SessionSummary, SessionContent } from '../types/session.types';
-import type { ChatMessage } from '../types/message.types';
+import type { CodingAgentMessage } from '../types/message.types';
 
 /**
  * Interface for chat history retrieval operations
@@ -53,12 +53,12 @@ export interface IChatHistoryProvider {
    *
    * @param sessionId - Session ID to stream
    * @param filter - Optional message filter options
-   * @yields ChatMessage objects one at a time
+   * @yields CodingAgentMessage objects one at a time
    */
   streamSessionMessages?(
     sessionId: string,
     filter?: MessageFilterOptions
-  ): AsyncGenerator<ChatMessage, void, unknown>;
+  ): AsyncGenerator<CodingAgentMessage, void, unknown>;
 
   /**
    * Watch for session changes (file modifications, new sessions, deletions)

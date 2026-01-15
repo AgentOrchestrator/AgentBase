@@ -17,7 +17,6 @@ export type {
 // Conversation service
 export type {
   IConversationService,
-  ChatMessage,
   SessionContent,
   SessionFilter,
   MessagesLoadedListener,
