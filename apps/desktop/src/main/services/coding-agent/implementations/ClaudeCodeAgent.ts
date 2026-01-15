@@ -36,6 +36,10 @@ import type {
   ForkOptions,
   CodingAgentMessage,
   ToolCategory,
+  AgentContentBlock,
+  AgentWebSearchToolResultContent,
+  AgentWebSearchResultBlock,
+  AgentWebSearchToolResultErrorCode,
 } from '../types';
 import { AgentErrorCode, ok, err, agentError } from '../types';
 import {
@@ -1061,96 +1065,189 @@ export class ClaudeCodeAgent
     const messages: CodingAgentMessage[] = [];
     const timestamp = this.normalizeTimestamp(data.timestamp);
 
-    if (data.type === 'user' && data.message?.content) {
-      const display = this.extractDisplayContent(data.message.content);
-      if (display) {
-        messages.push({
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: display,
-          timestamp,
-          messageType: 'user',
-          agentMetadata: { rawType: data.type },
-        });
-      }
+    if (!data.message?.content) {
+      return messages;
     }
 
-    if (data.type === 'assistant' && data.message?.content) {
-      const contentParts = Array.isArray(data.message.content)
-        ? data.message.content
-        : [data.message.content];
+    if (data.type === 'user' || data.type === 'assistant') {
+      const { blocks, displayText } = this.parseContentBlocks(data.message.content);
+      if (!displayText && blocks.length === 0) {
+        return messages;
+      }
 
-      for (const part of contentParts) {
-        if (typeof part === 'string') {
-          messages.push({
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: part,
-            timestamp,
-            messageType: 'assistant',
-            agentMetadata: { rawType: data.type },
+      messages.push({
+        id: crypto.randomUUID(),
+        role: data.type,
+        content: displayText,
+        contentBlocks: blocks.length > 0 ? blocks : undefined,
+        timestamp,
+        messageType: data.type,
+        agentMetadata: { rawType: data.type },
+      });
+    }
+
+    return messages;
+  }
+
+  private parseContentBlocks(content: unknown): {
+    blocks: AgentContentBlock[];
+    displayText: string;
+  } {
+    const blocks: AgentContentBlock[] = [];
+    const textParts: string[] = [];
+
+    const pushTextBlock = (text: string, citations?: unknown[] | null) => {
+      const normalized = String(text);
+      if (!normalized) return;
+      blocks.push({ type: 'text', text: normalized, citations });
+      textParts.push(normalized);
+    };
+
+    const parseToolInput = (input: unknown): Record<string, unknown> => {
+      if (input && typeof input === 'object' && !Array.isArray(input)) {
+        return input as Record<string, unknown>;
+      }
+      return {};
+    };
+
+    const parseBlock = (part: unknown) => {
+      if (typeof part === 'string') {
+        pushTextBlock(part);
+        return;
+      }
+
+      if (!part || typeof part !== 'object') return;
+
+      const obj = part as Record<string, unknown>;
+      const type = obj.type;
+
+      if (type === 'text') {
+        if (typeof obj.text === 'string') {
+          const citations = Array.isArray(obj.citations)
+            ? obj.citations
+            : obj.citations === null
+            ? null
+            : undefined;
+          pushTextBlock(obj.text, citations);
+        }
+        return;
+      }
+
+      if (type === 'thinking') {
+        if (typeof obj.thinking === 'string') {
+          blocks.push({
+            type: 'thinking',
+            thinking: obj.thinking,
+            signature: typeof obj.signature === 'string' ? obj.signature : undefined,
           });
-        } else if (typeof part === 'object' && part !== null) {
-          const partObj = part as Record<string, unknown>;
+        }
+        return;
+      }
 
-          if (partObj.type === 'text' && partObj.text) {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.text),
-              timestamp,
-              messageType: 'assistant',
-              agentMetadata: { rawType: data.type },
-            });
-          } else if (partObj.type === 'tool_use') {
-            messages.push({
-              id: String(partObj.id || crypto.randomUUID()),
-              role: 'assistant',
-              content: `Tool: ${partObj.name}`,
-              timestamp,
-              messageType: 'tool_call',
-              tool: {
-                name: String(partObj.name || 'unknown'),
-                category: this.categorizeToolByName(String(partObj.name || '')),
-                input: partObj.input as Record<string, unknown> | undefined,
-                status: 'pending',
-              },
-              agentMetadata: { rawType: 'tool_use', rawContent: part },
-            });
-          } else if (partObj.type === 'tool_result') {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.content || ''),
-              timestamp,
-              messageType: 'tool_result',
-              tool: {
-                name: 'tool_result',
-                category: 'unknown',
-                output: String(partObj.content || ''),
-                status: partObj.is_error ? 'error' : 'success',
-              },
-              agentMetadata: { rawType: 'tool_result', toolUseId: partObj.tool_use_id },
-            });
-          } else if (partObj.type === 'thinking') {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.thinking || ''),
-              timestamp,
-              messageType: 'thinking',
-              thinking: {
-                content: String(partObj.thinking || ''),
-                isRedacted: false,
-              },
-              agentMetadata: { rawType: 'thinking' },
-            });
-          }
+      if (type === 'redacted_thinking') {
+        if (typeof obj.data === 'string') {
+          blocks.push({ type: 'redacted_thinking', data: obj.data });
+        }
+        return;
+      }
+
+      if (type === 'tool_use' || type === 'server_tool_use') {
+        const id = typeof obj.id === 'string' ? obj.id : crypto.randomUUID();
+        const name = typeof obj.name === 'string' ? obj.name : 'unknown';
+        const input = parseToolInput(obj.input);
+        if (type === 'tool_use') {
+          blocks.push({ type: 'tool_use', id, name, input });
+        } else {
+          blocks.push({ type: 'server_tool_use', id, name, input });
+        }
+        return;
+      }
+
+      if (type === 'web_search_tool_result') {
+        const toolUseId =
+          typeof obj.tool_use_id === 'string'
+            ? obj.tool_use_id
+            : typeof obj.toolUseId === 'string'
+            ? obj.toolUseId
+            : crypto.randomUUID();
+        const parsedContent = this.parseWebSearchToolResultContent(obj.content);
+        if (parsedContent) {
+          blocks.push({
+            type: 'web_search_tool_result',
+            toolUseId,
+            content: parsedContent,
+          });
+        }
+        return;
+      }
+
+      if (type === 'tool_result' && obj.content !== undefined) {
+        pushTextBlock(String(obj.content));
+      }
+    };
+
+    if (typeof content === 'string') {
+      pushTextBlock(content);
+    } else if (Array.isArray(content)) {
+      for (const part of content) {
+        parseBlock(part);
+      }
+    } else {
+      parseBlock(content);
+    }
+
+    return {
+      blocks,
+      displayText: textParts.join('\n'),
+    };
+  }
+
+  private parseWebSearchToolResultContent(
+    content: unknown
+  ): AgentWebSearchToolResultContent | null {
+    if (Array.isArray(content)) {
+      const results: AgentWebSearchResultBlock[] = [];
+      for (const entry of content) {
+        if (!entry || typeof entry !== 'object') continue;
+        const obj = entry as Record<string, unknown>;
+        if (obj.type !== 'web_search_result') continue;
+        if (typeof obj.title !== 'string' || typeof obj.url !== 'string') continue;
+        results.push({
+          type: 'web_search_result',
+          encryptedContent: typeof obj.encrypted_content === 'string' ? obj.encrypted_content : '',
+          pageAge: typeof obj.page_age === 'string' ? obj.page_age : null,
+          title: obj.title,
+          url: obj.url,
+        });
+      }
+      return results;
+    }
+
+    if (content && typeof content === 'object') {
+      const obj = content as Record<string, unknown>;
+      if (obj.type === 'web_search_tool_result_error' && typeof obj.error_code === 'string') {
+        if (this.isWebSearchToolResultErrorCode(obj.error_code)) {
+          return {
+            type: 'web_search_tool_result_error',
+            errorCode: obj.error_code,
+          };
         }
       }
     }
 
-    return messages;
+    return null;
+  }
+
+  private isWebSearchToolResultErrorCode(
+    value: string
+  ): value is AgentWebSearchToolResultErrorCode {
+    return (
+      value === 'invalid_tool_input' ||
+      value === 'unavailable' ||
+      value === 'max_uses_exceeded' ||
+      value === 'too_many_requests' ||
+      value === 'query_too_long'
+    );
   }
 
   private categorizeToolByName(name: string): ToolCategory {

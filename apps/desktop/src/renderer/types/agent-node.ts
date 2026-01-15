@@ -112,64 +112,9 @@ export interface AgentTitle {
 export type AgentNodeView = 'overview' | 'terminal' | 'chat';
 
 /**
- * Tool use information for displaying in chat
- */
-export interface ToolUseInfo {
-  /** Unique tool use ID */
-  id: string;
-  /** Tool name (e.g., "Bash", "Read", "Edit", "Grep", "WebFetch") */
-  name: string;
-  /** Tool input parameters */
-  input: Record<string, unknown>;
-  /** Tool result (when available) */
-  result?: string;
-  /** Whether tool execution is complete */
-  isComplete?: boolean;
-  /** Error message if tool failed */
-  error?: string;
-}
-
-/**
- * Thinking block information
- */
-export interface ThinkingBlockInfo {
-  /** Thinking content */
-  thinking: string;
-  /** Signature for verification */
-  signature?: string;
-}
-
-/**
- * Content block types for assistant messages
- */
-export type ContentBlockType = 'text' | 'tool_use' | 'tool_result' | 'thinking';
-
-/**
- * Content block for structured message content
- */
-export interface ContentBlock {
-  type: ContentBlockType;
-  /** Text content (for type='text') */
-  text?: string;
-  /** Tool use info (for type='tool_use') */
-  toolUse?: ToolUseInfo;
-  /** Tool result content (for type='tool_result') */
-  toolResult?: {
-    toolUseId: string;
-    content: string;
-    isError?: boolean;
-  };
-  /** Thinking content (for type='thinking') */
-  thinking?: ThinkingBlockInfo;
-}
-
-/**
  * Chat message structure for agent chat view
  */
-export type AgentChatMessage = CodingAgentMessage & {
-  /** Structured content blocks for rich rendering */
-  contentBlocks?: ContentBlock[];
-};
+export type AgentChatMessage = CodingAgentMessage;
 
 // =============================================================================
 // Agent Node Data

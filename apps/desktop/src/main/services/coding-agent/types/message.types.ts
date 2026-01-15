@@ -12,6 +12,17 @@ export type {
   ThinkingInfo,
   McpInfo,
   ErrorInfo,
+  AgentContentBlock,
+  AgentTextBlock,
+  AgentThinkingBlock,
+  AgentRedactedThinkingBlock,
+  AgentToolUseBlock,
+  AgentServerToolUseBlock,
+  AgentWebSearchToolResultBlock,
+  AgentWebSearchToolResultContent,
+  AgentWebSearchResultBlock,
+  AgentWebSearchToolResultError,
+  AgentWebSearchToolResultErrorCode,
   CodingAgentMessage,
 } from '@agent-orchestrator/shared';
 

@@ -49,6 +49,79 @@ export interface LlmChatMessage {
   toolName?: string;
 }
 
+// =============================================================================
+// Agent Content Blocks (vendor-agnostic rich content)
+// =============================================================================
+
+export interface AgentTextBlock {
+  type: 'text';
+  text: string;
+  citations?: unknown[] | null;
+}
+
+export interface AgentThinkingBlock {
+  type: 'thinking';
+  thinking: string;
+  signature?: string;
+}
+
+export interface AgentRedactedThinkingBlock {
+  type: 'redacted_thinking';
+  data: string;
+}
+
+export interface AgentToolUseBlock {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface AgentServerToolUseBlock {
+  type: 'server_tool_use';
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export type AgentWebSearchToolResultErrorCode =
+  | 'invalid_tool_input'
+  | 'unavailable'
+  | 'max_uses_exceeded'
+  | 'too_many_requests'
+  | 'query_too_long';
+
+export interface AgentWebSearchToolResultError {
+  type: 'web_search_tool_result_error';
+  errorCode: AgentWebSearchToolResultErrorCode;
+}
+
+export interface AgentWebSearchResultBlock {
+  type: 'web_search_result';
+  encryptedContent: string;
+  pageAge: string | null;
+  title: string;
+  url: string;
+}
+
+export type AgentWebSearchToolResultContent =
+  | AgentWebSearchToolResultError
+  | AgentWebSearchResultBlock[];
+
+export interface AgentWebSearchToolResultBlock {
+  type: 'web_search_tool_result';
+  toolUseId: string;
+  content: AgentWebSearchToolResultContent;
+}
+
+export type AgentContentBlock =
+  | AgentTextBlock
+  | AgentThinkingBlock
+  | AgentRedactedThinkingBlock
+  | AgentToolUseBlock
+  | AgentServerToolUseBlock
+  | AgentWebSearchToolResultBlock;
+
 /**
  * Message format for coding agent sessions
  */
@@ -59,6 +132,8 @@ export interface CodingAgentMessage {
   role: ChatRole;
   /** Message content (display text) */
   content: string;
+  /** Structured content blocks for rich rendering */
+  contentBlocks?: AgentContentBlock[];
   /** ISO timestamp */
   timestamp: string;
   /** Generic metadata */
