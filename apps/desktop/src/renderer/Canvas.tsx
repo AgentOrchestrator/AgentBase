@@ -1292,6 +1292,104 @@ function CanvasFlow() {
     return () => window.removeEventListener('agent-node:fork-click', handleForkClick as EventListener);
   }, [nodes, handleForkCreate]);
 
+  // Listen for create/close chat node events
+  useEffect(() => {
+    const handleCreateChatNode = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        nodeId: string;
+        agentId: string;
+        sessionId?: string;
+        agentType: string;
+        workspacePath?: string;
+        chatMessages?: CodingAgentMessage[];
+        title?: string;
+      }>;
+      const { nodeId, agentId, sessionId, agentType, workspacePath, chatMessages, title } = customEvent.detail;
+
+      // Check if a chat node already exists for this agent node
+      const existingChatNode = nodes.find(
+        (n) => n.type === 'agent-chat' && 
+        (n.data as { agentId?: string })?.agentId === agentId &&
+        edges.some((e) => e.source === nodeId && e.target === n.id)
+      );
+
+      if (existingChatNode) {
+        // Remove existing chat node and its edge
+        const edgeToRemove = edges.find((e) => e.source === nodeId && e.target === existingChatNode.id);
+        setNodes((nds) => nds.filter((n) => n.id !== existingChatNode.id));
+        if (edgeToRemove) {
+          setEdges((eds) => eds.filter((e) => e.id !== edgeToRemove.id));
+        }
+        console.log('[Canvas] Removed chat node for agent node:', nodeId);
+        return;
+      }
+
+      // Find the source node
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found for create chat node:', nodeId);
+        return;
+      }
+
+      // Get node dimensions (default if not available)
+      const nodeWidth = (sourceNode.width as number) || (sourceNode.style?.width as number) || 500;
+      const nodeHeight = (sourceNode.height as number) || (sourceNode.style?.height as number) || 450;
+
+      // Calculate position below the source node
+      const chatNodePosition = {
+        x: sourceNode.position.x,
+        y: sourceNode.position.y + nodeHeight + 50, // 50px spacing
+      };
+
+      // Create new chat node
+      const chatNodeId = `chat-node-${Date.now()}`;
+      const chatNode: Node = {
+        id: chatNodeId,
+        type: 'agent-chat',
+        position: chatNodePosition,
+        data: {
+          sessionId,
+          agentType,
+          workspacePath,
+          title: title || 'Chat',
+          messages: chatMessages || [],
+          isDraft: !sessionId,
+          isExpanded: true,
+          agentId, // Pass agentId so it can use the same agent service
+        },
+        style: {
+          width: nodeWidth,
+          height: nodeHeight,
+        },
+      };
+
+      // Create edge connecting the nodes
+      const edge: Edge = {
+        id: `edge-${nodeId}-${chatNodeId}`,
+        source: nodeId,
+        target: chatNodeId,
+        type: 'smooth',
+        animated: false,
+        style: { stroke: '#4a5568', strokeWidth: 2 },
+      };
+
+      // Add the new node and edge
+      setNodes((nds) => [...nds, chatNode]);
+      setEdges((eds) => [...eds, edge]);
+
+      console.log('[Canvas] Created chat node from agent node:', {
+        sourceNodeId: nodeId,
+        chatNodeId,
+        position: chatNodePosition,
+      });
+    };
+
+    window.addEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
+    return () => {
+      window.removeEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
+    };
+  }, [nodes, edges, setNodes, setEdges]);
+
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({

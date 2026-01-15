@@ -6,7 +6,7 @@
 
 /* Overview Container */
 .agent-overview {
-  padding: 16px;
+  padding: 40px 16px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
