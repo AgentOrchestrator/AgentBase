@@ -7,6 +7,7 @@ import type {
   ThinkingInfo,
   McpInfo,
   ErrorInfo,
+  AgentType,
 } from './loaders/types.js';
 
 export interface BaseConfig {
@@ -104,3 +105,61 @@ export interface WebChatMessage {
   timestamp: string;
   mentionedUsers?: MentionedUser[];
 }
+
+// =============================================================================
+// Agent Action Types (UI-driven actions)
+// =============================================================================
+
+export type AgentActionType = 'clarifying_question' | 'tool_approval';
+
+export interface ClarifyingQuestionOption {
+  label: string;
+  description?: string;
+}
+
+export interface ClarifyingQuestion {
+  header?: string;
+  question: string;
+  options?: ClarifyingQuestionOption[];
+  multiSelect?: boolean;
+}
+
+export interface AgentActionBase {
+  id: string;
+  type: AgentActionType;
+  agentType?: AgentType;
+  sessionId?: string;
+  workspacePath?: string;
+  toolUseId?: string;
+  createdAt: string;
+}
+
+export interface ClarifyingQuestionAction extends AgentActionBase {
+  type: 'clarifying_question';
+  questions: ClarifyingQuestion[];
+}
+
+export interface ToolApprovalAction extends AgentActionBase {
+  type: 'tool_approval';
+  toolName: string;
+  command?: string;
+  filePath?: string;
+  workingDirectory?: string;
+  reason?: string;
+  input?: Record<string, unknown>;
+}
+
+export type AgentAction = ClarifyingQuestionAction | ToolApprovalAction;
+
+export type AgentActionResponse =
+  | {
+      actionId: string;
+      type: 'clarifying_question';
+      answers: Record<string, string>;
+    }
+  | {
+      actionId: string;
+      type: 'tool_approval';
+      decision: 'allow' | 'deny';
+      message?: string;
+    };

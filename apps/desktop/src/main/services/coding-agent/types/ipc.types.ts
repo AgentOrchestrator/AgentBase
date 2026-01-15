@@ -10,6 +10,7 @@ import type {
   ContinueOptions,
   ForkOptions,
 } from './session.types';
+import type { AgentEvent, AgentActionResponse } from '@agent-orchestrator/shared';
 
 export interface CodingAgentAPI {
   /** Generate a one-off response */
@@ -81,4 +82,10 @@ export interface CodingAgentAPI {
   onStreamChunk: (
     callback: (data: { requestId: string; chunk: string }) => void
   ) => () => void;
+
+  /** Subscribe to agent hook events */
+  onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+
+  /** Respond to pending agent actions (permissions/questions) */
+  respondToAction: (response: AgentActionResponse) => Promise<void>;
 }

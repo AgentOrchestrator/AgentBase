@@ -25,7 +25,12 @@ import {
   useWorkspaceService,
   useNodeInitialized,
 } from '../../context';
-import type { WorkspaceState, SessionReadiness } from '../../hooks/useAgentState';
+import type {
+  AgentActionHandlers,
+  AgentActionState,
+  WorkspaceState,
+  SessionReadiness,
+} from '../../hooks/useAgentState';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -39,6 +44,10 @@ export interface AgentNodePresentationProps {
   workspaceState?: WorkspaceState;
   /** Session readiness from useAgentState */
   sessionReadiness?: SessionReadiness;
+  /** Pending hook-driven actions */
+  actionState?: AgentActionState;
+  /** Handlers for hook-driven actions */
+  actionHandlers?: AgentActionHandlers;
 }
 
 /**
@@ -53,6 +62,8 @@ export function AgentNodePresentation({
   selected,
   workspaceState,
   sessionReadiness = 'idle',
+  actionState,
+  actionHandlers,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const workspace = useWorkspaceService();
@@ -279,6 +290,8 @@ export function AgentNodePresentation({
             onSessionCreated={(sessionId) => onDataChange({ sessionId })}
             isSessionReady={isSessionReady}
             selected={selected}
+            pendingActions={actionState?.pending ?? []}
+            onActionResponse={actionHandlers?.respondToAction}
           />
         </div>
       </div>

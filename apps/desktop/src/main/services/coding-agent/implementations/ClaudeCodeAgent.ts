@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Query, SDKMessage, Options } from '@anthropic-ai/claude-agent-sdk';
+import type { Query, SDKMessage, Options, CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import {
   createEventRegistry,
   createSDKHookBridge,
@@ -50,6 +50,7 @@ import {
   noResultError,
 } from '../utils/sdk-error-mapper';
 import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
+import type { AgentEvent, PermissionPayload, SessionPayload } from '@agent-orchestrator/shared';
 
 /**
  * Active query handle for tracking and cancellation
@@ -110,6 +111,73 @@ export class ClaudeCodeAgent
   private readonly debugHooks: boolean;
   private readonly activeQueries = new Map<string, QueryHandle>();
   private isInitialized = false;
+  private currentSessionId: string | null = null;
+  private currentWorkspacePath: string | null = null;
+  private readonly canUseTool: CanUseTool = async (
+    toolName: string,
+    input: Record<string, unknown>,
+    options
+  ): Promise<PermissionResult> => {
+    const event: AgentEvent<PermissionPayload> = {
+      id: crypto.randomUUID(),
+      type: 'permission:request',
+      agent: 'claude_code',
+      sessionId: this.currentSessionId ?? undefined,
+      workspacePath: this.currentWorkspacePath ?? undefined,
+      timestamp: new Date().toISOString(),
+      payload: {
+        toolName,
+        command: typeof input.command === 'string' ? input.command : undefined,
+        args: Array.isArray(input.args) ? (input.args as string[]) : undefined,
+        filePath:
+          typeof input.file_path === 'string'
+            ? input.file_path
+            : typeof input.filePath === 'string'
+            ? input.filePath
+            : undefined,
+        workingDirectory: this.currentWorkspacePath ?? undefined,
+        reason: options.decisionReason,
+      },
+      raw: {
+        toolInput: input,
+        toolUseId: options.toolUseID,
+        signal: options.signal,
+        suggestions: options.suggestions,
+      },
+    };
+
+    const results = await this.eventRegistry.emit(event);
+    const denyResult = results.find((result) => result.action === 'deny');
+    if (denyResult) {
+      return {
+        behavior: 'deny',
+        message: denyResult.message || 'Permission denied',
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    const modifyResult = results.find((result) => result.action === 'modify');
+    if (modifyResult) {
+      return {
+        behavior: 'allow',
+        updatedInput: modifyResult.modifiedPayload as Record<string, unknown>,
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    const allowResult = results.find((result) => result.action === 'allow');
+    if (allowResult) {
+      return {
+        behavior: 'allow',
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    return {
+      behavior: 'allow',
+      toolUseID: options.toolUseID,
+    };
+  };
 
   constructor(config: ClaudeCodeAgentConfig) {
     super();
@@ -118,6 +186,16 @@ export class ClaudeCodeAgent
     this.eventRegistry = createEventRegistry();
     this.hookBridge = createSDKHookBridge(this.eventRegistry, {
       debug: this.debugHooks,
+    });
+    // Avoid double-emitting permission requests when canUseTool handles them.
+    delete this.hookBridge.hooks.PermissionRequest;
+    this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
+      this.currentSessionId = event.payload.sessionId;
+      return { action: 'continue' };
+    });
+    this.eventRegistry.on<SessionPayload>('session:end', async () => {
+      this.currentSessionId = null;
+      return { action: 'continue' };
     });
   }
 
@@ -329,8 +407,10 @@ export class ClaudeCodeAgent
       cwd: request.workingDirectory ?? this.config.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
     };
+    this.currentWorkspacePath = options.cwd ?? null;
 
     // Handle system prompt
     if (request.systemPrompt) {
@@ -478,9 +558,11 @@ export class ClaudeCodeAgent
       cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
       systemPrompt: { type: 'preset', preset: 'claude_code' },
     };
+    this.currentWorkspacePath = options.cwd ?? null;
 
     // Map SessionIdentifier to SDK options
     switch (identifier.type) {
@@ -540,6 +622,7 @@ export class ClaudeCodeAgent
         sdkOptions = {
           abortController,
           hooks: this.hookBridge.hooks,
+          canUseTool: this.canUseTool,
           tools: { type: 'preset', preset: 'claude_code' },
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           extraArgs: { session_id: parentId }
@@ -549,6 +632,7 @@ export class ClaudeCodeAgent
         sdkOptions = {
           abortController,
           hooks: this.hookBridge.hooks,
+          canUseTool: this.canUseTool,
           resume: parentId,
           forkSession: true,
           tools: { type: 'preset', preset: 'claude_code' },
