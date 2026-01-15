@@ -230,15 +230,16 @@ export default function AgentOverviewView({
             onChange={(e) => setEditedTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
+            placeholder="Add Title"
             autoFocus
           />
         ) : (
           <h2
-            className="overview-title"
+            className={`overview-title ${!title.value || title.value.trim() === '' ? 'overview-title-placeholder' : ''}`}
             onDoubleClick={handleTitleDoubleClick}
             title="Double-click to edit"
           >
-            {title.value}
+            {title.value && title.value.trim() !== '' ? title.value : 'Add Title'}
           </h2>
         )}
       </div>
@@ -246,12 +247,12 @@ export default function AgentOverviewView({
       {/* Status Indicator */}
       <StatusIndicator status={status} statusInfo={statusInfo} />
 
-      {/* Summary */}
-      {summary && (
+      {/* Summary - Hidden */}
+      {/* {summary && (
         <div className="overview-summary">
           <p>{summary}</p>
         </div>
-      )}
+      )} */}
 
       {/* Progress */}
       {progress && (
@@ -294,12 +295,12 @@ export default function AgentOverviewView({
         </div>
       )} */}
 
-      {/* Footer */}
-      {sessionId && (
+      {/* Footer - Hidden */}
+      {/* {sessionId && (
         <div className="overview-footer">
           <span className="agent-session-label">Session: {sessionId}</span>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
