@@ -565,6 +565,12 @@ export interface GitAPI {
   createBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
   /** Checkout an existing branch */
   checkoutBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
+  /** Stash current changes */
+  stash: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+  /** Apply the most recent stash */
+  stashPop: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+  /** Force checkout branch (discard local changes) */
+  checkoutForce: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 // Expose git API
@@ -595,6 +601,27 @@ contextBridge.exposeInMainWorld('gitAPI', {
   checkoutBranch: async (workspacePath: string, branchName: string) => {
     try {
       return await ipcRenderer.invoke('git:checkout-branch', workspacePath, branchName);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+  stash: async (workspacePath: string) => {
+    try {
+      return await ipcRenderer.invoke('git:stash', workspacePath);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+  stashPop: async (workspacePath: string) => {
+    try {
+      return await ipcRenderer.invoke('git:stash-pop', workspacePath);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+  checkoutForce: async (workspacePath: string, branchName: string) => {
+    try {
+      return await ipcRenderer.invoke('git:checkout-force', workspacePath, branchName);
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

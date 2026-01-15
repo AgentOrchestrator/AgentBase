@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './NewAgentModal.css';
 import { worktreeService } from '../services/WorktreeService';
 import type { WorktreeInfo } from '../../main/types/worktree';
+import { CheckoutConflictModal } from './CheckoutConflictModal';
 
 interface NewAgentModalProps {
   isOpen: boolean;
@@ -44,6 +45,9 @@ export function NewAgentModal({
   const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
   const [originalWorkspacePath, setOriginalWorkspacePath] = useState<string | null>(null);
   const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(null);
+  const [checkoutConflictFiles, setCheckoutConflictFiles] = useState<string[]>([]);
+  const [showCheckoutConflictModal, setShowCheckoutConflictModal] = useState(false);
+  const [pendingCheckoutBranch, setPendingCheckoutBranch] = useState<string | null>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -87,6 +91,9 @@ export function NewAgentModal({
       setWorktreeInfo(null);
       setOriginalWorkspacePath(null);
       setSelectedBranchIndex(null);
+      setShowCheckoutConflictModal(false);
+      setCheckoutConflictFiles([]);
+      setPendingCheckoutBranch(null);
       // Keep workspace path from initialWorkspacePath
       if (initialWorkspacePath) {
         setWorkspacePath(initialWorkspacePath);
@@ -231,6 +238,172 @@ export function NewAgentModal({
     return path.split('/').pop() || 'Workspace';
   };
 
+  // Parse files from git checkout error message
+  const parseFilesFromCheckoutError = (errorMessage: string): string[] => {
+    const files: string[] = [];
+    const lines = errorMessage.split('\n');
+    let inFileList = false;
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Start collecting files after "would be overwritten by checkout:"
+      if (trimmedLine.includes('would be overwritten by checkout')) {
+        inFileList = true;
+        continue;
+      }
+      
+      // Stop collecting when we hit "Please commit" or "Aborting"
+      if (inFileList && (trimmedLine.includes('Please commit') || trimmedLine.includes('Aborting'))) {
+        break;
+      }
+      
+      // Collect file names (skip empty lines and error prefix)
+      if (inFileList && trimmedLine && !trimmedLine.startsWith('error:')) {
+        files.push(trimmedLine);
+      }
+    }
+    
+    return files;
+  };
+
+  // Handle checkout conflict actions
+  const handleStashAndCheckout = async () => {
+    if (!pendingCheckoutBranch || !originalWorkspacePath) return;
+    
+    setShowCheckoutConflictModal(false);
+    try {
+      // First stash the changes
+      const stashResult = await window.gitAPI?.stash(originalWorkspacePath);
+      if (!stashResult?.success) {
+        alert(`Failed to stash changes: ${stashResult?.error || 'Unknown error'}`);
+        setPendingCheckoutBranch(null);
+        return;
+      }
+
+      // Then checkout the branch
+      const checkoutResult = await window.gitAPI?.checkoutBranch(originalWorkspacePath, pendingCheckoutBranch);
+      if (!checkoutResult?.success) {
+        alert(`Failed to checkout branch: ${checkoutResult?.error || 'Unknown error'}`);
+        setPendingCheckoutBranch(null);
+        return;
+      }
+
+      // Refresh git info
+      const finalWorkspacePath = worktreeInfo?.worktreePath || workspacePath || undefined;
+      if (finalWorkspacePath) {
+        const updatedInfo = await window.gitAPI?.getInfo(finalWorkspacePath);
+        if (updatedInfo) {
+          setGitInfo({ branch: updatedInfo.branch });
+        }
+      }
+
+      // Continue with agent creation
+      onCreate({
+        title: description.trim() || 'New Agent',
+        description: description.trim(),
+        workspacePath: finalWorkspacePath,
+      });
+      onClose();
+    } catch (error) {
+      alert(`Error: ${(error as Error).message}`);
+    }
+    setPendingCheckoutBranch(null);
+  };
+
+  const handleMigrateChanges = async () => {
+    if (!pendingCheckoutBranch || !originalWorkspacePath) return;
+    
+    setShowCheckoutConflictModal(false);
+    // Migrate changes: stash, checkout, then apply stash to new branch
+    try {
+      // Stash the changes
+      const stashResult = await window.gitAPI?.stash(originalWorkspacePath);
+      if (!stashResult?.success) {
+        alert(`Failed to stash changes: ${stashResult?.error || 'Unknown error'}`);
+        setPendingCheckoutBranch(null);
+        return;
+      }
+
+      // Checkout the branch
+      const checkoutResult = await window.gitAPI?.checkoutBranch(originalWorkspacePath, pendingCheckoutBranch);
+      if (!checkoutResult?.success) {
+        alert(`Failed to checkout branch: ${checkoutResult?.error || 'Unknown error'}`);
+        setPendingCheckoutBranch(null);
+        return;
+      }
+
+      // Apply stash to new branch (migrate changes)
+      const stashPopResult = await window.gitAPI?.stashPop(originalWorkspacePath);
+      if (!stashPopResult?.success) {
+        // Non-fatal: stash might have conflicts or be empty, but checkout succeeded
+        console.warn('[NewAgentModal] Failed to apply stash (non-fatal):', stashPopResult?.error);
+      }
+
+      // Refresh git info
+      const finalWorkspacePath = worktreeInfo?.worktreePath || workspacePath || undefined;
+      if (finalWorkspacePath) {
+        const updatedInfo = await window.gitAPI?.getInfo(finalWorkspacePath);
+        if (updatedInfo) {
+          setGitInfo({ branch: updatedInfo.branch });
+        }
+      }
+
+      // Continue with agent creation
+      onCreate({
+        title: description.trim() || 'New Agent',
+        description: description.trim(),
+        workspacePath: finalWorkspacePath,
+      });
+      onClose();
+    } catch (error) {
+      alert(`Error: ${(error as Error).message}`);
+    }
+    setPendingCheckoutBranch(null);
+  };
+
+  const handleForceCheckout = async () => {
+    if (!pendingCheckoutBranch || !originalWorkspacePath) return;
+    
+    setShowCheckoutConflictModal(false);
+    try {
+      // Force checkout (discards local changes)
+      const result = await window.gitAPI?.checkoutForce(originalWorkspacePath, pendingCheckoutBranch);
+      if (!result?.success) {
+        alert(`Failed to force checkout branch: ${result?.error || 'Unknown error'}`);
+        setPendingCheckoutBranch(null);
+        return;
+      }
+
+      // Refresh git info
+      const finalWorkspacePath = worktreeInfo?.worktreePath || workspacePath || undefined;
+      if (finalWorkspacePath) {
+        const updatedInfo = await window.gitAPI?.getInfo(finalWorkspacePath);
+        if (updatedInfo) {
+          setGitInfo({ branch: updatedInfo.branch });
+        }
+      }
+
+      // Continue with agent creation
+      onCreate({
+        title: description.trim() || 'New Agent',
+        description: description.trim(),
+        workspacePath: finalWorkspacePath,
+      });
+      onClose();
+    } catch (error) {
+      alert(`Error: ${(error as Error).message}`);
+    }
+    setPendingCheckoutBranch(null);
+  };
+
+  const handleCancelCheckout = () => {
+    setShowCheckoutConflictModal(false);
+    setPendingCheckoutBranch(null);
+    setCheckoutConflictFiles([]);
+    setSelectedBranchIndex(null); // Reset branch selection so it doesn't try again
+  };
+
   const handleCreateWorktree = useCallback(async () => {
     if (!workspacePath) {
       alert('Please select a workspace folder first');
@@ -322,15 +495,28 @@ export function NewAgentModal({
 
     // If a branch is selected (rotated to), checkout that branch
     // Use the original workspace path (not worktree) for checkout since branches are in the main repo
-    if (selectedBranchIndex !== null && originalWorkspacePath) {
+    // Only attempt checkout if we're not already showing the conflict modal
+    if (selectedBranchIndex !== null && originalWorkspacePath && !showCheckoutConflictModal) {
       const availableBranches = branches.filter((branch) => branch !== gitInfo?.branch);
       const selectedBranch = availableBranches[selectedBranchIndex];
       if (selectedBranch) {
         try {
           const result = await window.gitAPI?.checkoutBranch(originalWorkspacePath, selectedBranch);
           if (!result?.success) {
+            // Check if error is about local changes
+            const errorMessage = result?.error || '';
+            if (errorMessage.includes('would be overwritten by checkout') || errorMessage.includes('local changes')) {
+              // Parse files from error message
+              const files = parseFilesFromCheckoutError(errorMessage);
+              setCheckoutConflictFiles(files);
+              setPendingCheckoutBranch(selectedBranch);
+              setShowCheckoutConflictModal(true);
+              return; // Don't create agent yet, wait for user action
+            }
             console.error('[NewAgentModal] Failed to checkout branch:', result?.error);
             alert(`Failed to checkout branch: ${result?.error || 'Unknown error'}`);
+            // Reset selection on error so it doesn't keep trying
+            setSelectedBranchIndex(null);
             return;
           }
           // Refresh git info to get the checked out branch (use final workspace path)
@@ -343,6 +529,8 @@ export function NewAgentModal({
         } catch (error) {
           console.error('[NewAgentModal] Error checking out branch:', error);
           alert(`Error checking out branch: ${(error as Error).message}`);
+          // Reset selection on error so it doesn't keep trying
+          setSelectedBranchIndex(null);
           return;
         }
       }
@@ -668,6 +856,14 @@ export function NewAgentModal({
           </button>
         </div>
       </div>
+      <CheckoutConflictModal
+        isOpen={showCheckoutConflictModal}
+        files={checkoutConflictFiles}
+        onStashAndCheckout={handleStashAndCheckout}
+        onMigrateChanges={handleMigrateChanges}
+        onForceCheckout={handleForceCheckout}
+        onCancel={handleCancelCheckout}
+      />
     </div>
   );
 }

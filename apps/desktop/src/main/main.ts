@@ -1402,6 +1402,74 @@ ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, bran
   }
 });
 
+ipcMain.handle('git:stash', async (_event, workspacePath: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    try {
+      // Stash current changes
+      await runGitCommand(workspacePath, ['stash', 'push', '-m', 'Stashed before branch checkout']);
+      console.log('[Main] Changes stashed', { workspacePath });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  } catch (error) {
+    console.error('[Main] Error stashing changes', { workspacePath, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('git:stash-pop', async (_event, workspacePath: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    try {
+      // Apply the most recent stash
+      await runGitCommand(workspacePath, ['stash', 'pop']);
+      console.log('[Main] Stash applied', { workspacePath });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  } catch (error) {
+    console.error('[Main] Error applying stash', { workspacePath, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('git:checkout-force', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Validate branch name
+    if (!branchName || !branchName.trim()) {
+      return { success: false, error: 'Branch name is required' };
+    }
+
+    try {
+      // Force checkout (discard local changes)
+      await runGitCommand(workspacePath, ['checkout', '-f', branchName.trim()]);
+      console.log('[Main] Branch force checked out', { workspacePath, branchName });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  } catch (error) {
+    console.error('[Main] Error force checking out branch', { workspacePath, branchName, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
