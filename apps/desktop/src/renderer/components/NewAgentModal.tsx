@@ -269,43 +269,71 @@ export function NewAgentModal({
 
   // Handle checkout conflict actions
   const handleStashAndCheckout = async () => {
-    if (!pendingCheckoutBranch || !originalWorkspacePath) return;
+    if (!pendingCheckoutBranch || !originalWorkspacePath) {
+      console.error('[NewAgentModal] Missing pendingCheckoutBranch or originalWorkspacePath', { pendingCheckoutBranch, originalWorkspacePath });
+      return;
+    }
     
+    // Check if git API methods are available
+    if (!window.gitAPI?.stash || !window.gitAPI?.checkoutBranch) {
+      console.error('[NewAgentModal] Git API methods not available', { 
+        hasStash: !!window.gitAPI?.stash, 
+        hasCheckoutBranch: !!window.gitAPI?.checkoutBranch 
+      });
+      alert('Git API methods not available. Please restart the app.');
+      return;
+    }
+    
+    console.log('[NewAgentModal] Stash and checkout started', { branch: pendingCheckoutBranch, path: originalWorkspacePath });
     setShowCheckoutConflictModal(false);
+    
     try {
       // First stash the changes
-      const stashResult = await window.gitAPI?.stash(originalWorkspacePath);
+      console.log('[NewAgentModal] Stashing changes...');
+      const stashResult = await window.gitAPI.stash(originalWorkspacePath);
+      console.log('[NewAgentModal] Stash result:', stashResult);
       if (!stashResult?.success) {
+        console.error('[NewAgentModal] Stash failed:', stashResult?.error);
         alert(`Failed to stash changes: ${stashResult?.error || 'Unknown error'}`);
         setPendingCheckoutBranch(null);
         return;
       }
+      console.log('[NewAgentModal] Stash successful');
 
       // Then checkout the branch
-      const checkoutResult = await window.gitAPI?.checkoutBranch(originalWorkspacePath, pendingCheckoutBranch);
+      console.log('[NewAgentModal] Checking out branch...', pendingCheckoutBranch);
+      const checkoutResult = await window.gitAPI.checkoutBranch(originalWorkspacePath, pendingCheckoutBranch);
+      console.log('[NewAgentModal] Checkout result:', checkoutResult);
       if (!checkoutResult?.success) {
+        console.error('[NewAgentModal] Checkout failed:', checkoutResult?.error);
         alert(`Failed to checkout branch: ${checkoutResult?.error || 'Unknown error'}`);
         setPendingCheckoutBranch(null);
         return;
       }
+      console.log('[NewAgentModal] Checkout successful');
 
       // Refresh git info
       const finalWorkspacePath = worktreeInfo?.worktreePath || workspacePath || undefined;
       if (finalWorkspacePath) {
+        console.log('[NewAgentModal] Refreshing git info...');
         const updatedInfo = await window.gitAPI?.getInfo(finalWorkspacePath);
         if (updatedInfo) {
           setGitInfo({ branch: updatedInfo.branch });
+          console.log('[NewAgentModal] Git info updated:', updatedInfo.branch);
         }
       }
 
       // Continue with agent creation
+      console.log('[NewAgentModal] Creating agent...', { finalWorkspacePath, description: description.trim() });
       onCreate({
         title: description.trim() || 'New Agent',
         description: description.trim(),
         workspacePath: finalWorkspacePath,
       });
+      console.log('[NewAgentModal] Closing modal...');
       onClose();
     } catch (error) {
+      console.error('[NewAgentModal] Error in stash and checkout:', error);
       alert(`Error: ${(error as Error).message}`);
     }
     setPendingCheckoutBranch(null);

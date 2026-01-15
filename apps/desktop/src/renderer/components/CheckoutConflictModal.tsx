@@ -21,7 +21,12 @@ export function CheckoutConflictModal({
   if (!isOpen) return null;
 
   return (
-    <div className="checkout-conflict-modal-overlay" onClick={onCancel}>
+    <div className="checkout-conflict-modal-overlay" onClick={(e) => {
+      // Only close if clicking directly on overlay, not on modal content
+      if (e.target === e.currentTarget) {
+        onCancel();
+      }
+    }}>
       <div
         className="checkout-conflict-modal-container"
         onClick={(e) => e.stopPropagation()}
@@ -44,25 +49,42 @@ export function CheckoutConflictModal({
         <div className="checkout-conflict-modal-actions">
           <button
             className="checkout-conflict-modal-button checkout-conflict-modal-button-primary"
-            onClick={onStashAndCheckout}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              console.log('[CheckoutConflictModal] Stash & Checkout clicked');
+              onStashAndCheckout();
+            }}
           >
             Stash & Checkout
           </button>
           <button
             className="checkout-conflict-modal-button checkout-conflict-modal-button-secondary"
-            onClick={onMigrateChanges}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onMigrateChanges();
+            }}
           >
             Migrate Changes
           </button>
           <button
             className="checkout-conflict-modal-button checkout-conflict-modal-button-secondary"
-            onClick={onForceCheckout}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onForceCheckout();
+            }}
           >
             Force Checkout
           </button>
           <button
             className="checkout-conflict-modal-button checkout-conflict-modal-button-secondary"
-            onClick={onCancel}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onCancel();
+            }}
           >
             Cancel
           </button>
