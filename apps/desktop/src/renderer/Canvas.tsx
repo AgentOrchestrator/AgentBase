@@ -1264,6 +1264,33 @@ function CanvasFlow() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [nodes, handleForkCreate]);
 
+  // Listen for fork button clicks from agent nodes
+  useEffect(() => {
+    const handleForkClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{ nodeId: string }>;
+      const { nodeId } = customEvent.detail;
+
+      // Find the source node
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found for fork click:', nodeId);
+        return;
+      }
+
+      // Calculate position for the forked node (offset to the right)
+      const forkPosition = {
+        x: (sourceNode.position?.x ?? 0) + 350,
+        y: (sourceNode.position?.y ?? 0) + 50,
+      };
+
+      console.log('[Canvas] Fork button clicked for node:', nodeId);
+      handleForkCreate(nodeId, forkPosition);
+    };
+
+    window.addEventListener('agent-node:fork-click', handleForkClick as EventListener);
+    return () => window.removeEventListener('agent-node:fork-click', handleForkClick as EventListener);
+  }, [nodes, handleForkCreate]);
+
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
     setContextMenu({
@@ -1412,6 +1439,7 @@ function CanvasFlow() {
         activeView: 'overview',
         sessionId,
         createdAt,
+        forking: false, // Default to false, will be set to true when JSONL file is found
         // Add prefilled workspace path if selected
         ...(selectedWorkspacePath && { prefilledWorkspacePath: selectedWorkspacePath }),
       },

@@ -121,6 +121,7 @@ export const AgentNodeDataSchema = z.object({
   initialPrompt: z.string().optional(),
   sessionId: z.string().optional(),
   chatMessages: z.array(ChatMessageSchema).optional(),
+  forking: z.boolean().optional(),
 });
 
 /**

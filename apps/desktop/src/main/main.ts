@@ -469,6 +469,16 @@ ipcMain.handle('file:read', async (_event, filePath: string) => {
   }
 });
 
+// File existence check API
+ipcMain.handle('file:exists', async (_event, filePath: string) => {
+  try {
+    return { success: true, exists: fs.existsSync(filePath) };
+  } catch (error: any) {
+    console.error('[Main] Error checking file existence', { error, filePath });
+    return { success: false, exists: false, error: error.message || 'Unknown error' };
+  }
+});
+
 ipcMain.handle('agent-status:load', async (_event, agentId: string) => {
   try {
     const state = await database.loadAgentStatus(agentId);
