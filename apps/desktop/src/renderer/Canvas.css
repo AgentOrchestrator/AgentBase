@@ -210,7 +210,7 @@
 .sidebar-folder-header {
   flex: 1;
   padding: 6px 8px;
-  padding-right: 24px; /* Make room for lock button */
+  padding-right: 48px; /* Make room for lock and eye buttons */
   background: none;
   border: none;
   color: var(--color-text-primary);
@@ -264,6 +264,43 @@
 }
 
 .sidebar-folder:not(:hover) .sidebar-folder-lock:not(.locked) {
+  opacity: 0;
+}
+
+.sidebar-folder-eye {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  opacity: 1;
+  flex-shrink: 0;
+  position: absolute;
+  right: 28px; /* Position to the left of lock button */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar-folder-eye:hover {
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--color-text-primary);
+}
+
+.sidebar-folder-eye.highlighted {
+  opacity: 1;
+  color: var(--color-text-primary);
+}
+
+.sidebar-folder:not(:hover) .sidebar-folder-eye:not(.highlighted) {
   opacity: 0;
 }
 
@@ -562,36 +599,62 @@
   display: none !important;
 }
 
-/* Settings FAB */
-.settings-fab {
+/* Highlight All FAB */
+.highlight-all-fab {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 40px;
-  height: 40px;
+  bottom: 56px; /* Above settings button */
+  left: 16px;
+  z-index: 50;
+  padding: 8px;
   background: var(--color-bg-primary);
-  backdrop-filter: blur(10px);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  color: var(--color-text-primary);
-  font-size: 16px;
+  border-radius: 6px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.highlight-all-fab:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.highlight-all-fab svg {
+  width: 16px;
+  height: 16px;
+  color: #888;
+}
+
+.highlight-all-fab[aria-label*="Unhighlight"] svg {
+  color: var(--color-text-primary);
+}
+
+/* Settings FAB */
+.settings-fab {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 50;
+  padding: 8px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 1000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
 }
 
 .settings-fab:hover {
   background: var(--color-bg-tertiary);
-  border-color: var(--color-border);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
-.settings-fab:active {
-  transform: scale(0.95);
+.settings-fab svg {
+  width: 16px;
+  height: 16px;
+  color: #888;
 }
 
 /* Settings Modal */

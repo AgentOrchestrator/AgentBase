@@ -297,6 +297,15 @@ function CanvasFlow() {
   const [workspaceGitInfo, setWorkspaceGitInfo] = useState<Record<string, { branch: string | null }>>({});
   const [lockedFolderPath, setLockedFolderPath] = useState<string | null>(null);
   const [hoveredFolderPath, setHoveredFolderPath] = useState<string | null>(null);
+  // Track if user has explicitly unlocked to prevent auto-lock from re-locking
+  const hasExplicitlyUnlocked = useRef<boolean>(false);
+  // Track highlighted folders (eye icon clicked) and their assigned colors
+  const [highlightedFolders, setHighlightedFolders] = useState<Set<string>>(new Set());
+  const [folderColors, setFolderColors] = useState<Map<string, string>>(new Map());
+  const [isHighlightAllActive, setIsHighlightAllActive] = useState(false);
+  
+  // Available colors for highlighting
+  const highlightColors = ['#F24F1F', '#FF7362', '#A259FF', '#1ABCFE', '#0ECF84', '#F5C348'];
 
   // Issues pill state
   const [isPillExpanded, setIsPillExpanded] = useState(false);
@@ -769,14 +778,85 @@ function CanvasFlow() {
     return { agentHierarchy: hierarchy, folderPathMap: pathMap };
   }, [nodes, getEdges, workspaceGitInfo]);
 
+  // Function to toggle highlight all folders
+  const toggleHighlightAll = useCallback(() => {
+    if (isHighlightAllActive) {
+      // Turn off: clear all highlights
+      setIsHighlightAllActive(false);
+      setHighlightedFolders(new Set());
+      setFolderColors(new Map());
+    } else {
+      // Turn on: highlight all folders
+      setIsHighlightAllActive(true);
+      const allFolderPaths = Object.values(folderPathMap).filter(Boolean) as string[];
+      const newHighlightedFolders = new Set<string>(allFolderPaths);
+      const newFolderColors = new Map<string, string>();
+      
+      // Assign unique colors to all folders
+      const shuffledColors = [...highlightColors].sort(() => Math.random() - 0.5);
+      allFolderPaths.forEach((folderPath, index) => {
+        const color = shuffledColors[index % highlightColors.length];
+        newFolderColors.set(folderPath, color);
+      });
+      
+      setHighlightedFolders(newHighlightedFolders);
+      setFolderColors(newFolderColors);
+    }
+  }, [isHighlightAllActive, folderPathMap]);
+
+  // Update node styles when folders are highlighted
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.type !== 'agent') return node;
+        
+        const agentData = node.data as unknown as AgentNodeData;
+        let projectPath: string | null = null;
+        
+        // Get project path from workspace attachment
+        if (agentData.attachments) {
+          const workspaceAttachment = agentData.attachments.find(isWorkspaceMetadataAttachment);
+          if (workspaceAttachment) {
+            projectPath = workspaceAttachment.path;
+          }
+        }
+        
+        // Check if this node's folder is highlighted
+        const isHighlighted = projectPath && highlightedFolders.has(projectPath);
+        const highlightColor = projectPath ? folderColors.get(projectPath) : null;
+        
+        // Apply or remove highlight style using box-shadow (doesn't affect layout)
+        const currentStyle = node.style || {};
+        if (isHighlighted && highlightColor) {
+          return {
+            ...node,
+            style: {
+              ...currentStyle,
+              boxShadow: `0 0 0 3px ${highlightColor}`,
+              borderRadius: '12px', // Match agent-node border-radius
+            },
+          };
+        } else {
+          // Remove highlight if not highlighted
+          const { boxShadow, borderRadius, ...restStyle } = currentStyle as any;
+          return {
+            ...node,
+            style: restStyle,
+          };
+        }
+      })
+    );
+  }, [highlightedFolders, folderColors, setNodes]);
+
   // Auto-lock the first folder that appears, and clear lock if no folders exist
   useEffect(() => {
     const folderNames = Object.keys(agentHierarchy);
     if (folderNames.length === 0) {
       // Clear lock if no folders exist
       setLockedFolderPath(null);
-    } else if (!lockedFolderPath) {
-      // Auto-lock first folder if none is locked
+      hasExplicitlyUnlocked.current = false;
+    } else if (!lockedFolderPath && !hasExplicitlyUnlocked.current) {
+      // Auto-lock first folder if none is locked AND user hasn't explicitly unlocked
       const firstFolderName = folderNames[0];
       const firstFolderPath = folderPathMap[firstFolderName];
       if (firstFolderPath) {
@@ -790,6 +870,8 @@ function CanvasFlow() {
       if (!lockedFolderName || !agentHierarchy[lockedFolderName]) {
         // Locked folder no longer exists, clear it
         setLockedFolderPath(null);
+        // Reset the explicit unlock flag when the locked folder disappears
+        hasExplicitlyUnlocked.current = false;
       }
     }
   }, [agentHierarchy, folderPathMap, lockedFolderPath]);
@@ -2250,6 +2332,7 @@ function CanvasFlow() {
                   const projectPath = folderPathMap[projectName];
                   const isLocked = lockedFolderPath === projectPath;
                   const isHovered = hoveredFolderPath === projectPath;
+                  const highlightColor = projectPath ? folderColors.get(projectPath) : null;
                   // Show lock if: this folder is locked (always visible), OR this folder is hovered and not locked (show open lock on hover)
                   const showLock = isLocked || (isHovered && !isLocked);
                   
@@ -2278,6 +2361,7 @@ function CanvasFlow() {
                               viewBox="0 0 800 800"
                               fill="none"
                               xmlns="http://www.w3.org/2000/svg"
+                              style={{ color: highlightColor || undefined }}
                             >
                               <path
                                 d="M100 304L100.001 187.5C100.001 170.924 106.586 155.027 118.307 143.306C130.028 131.585 145.925 125 162.501 125H281.079C293.42 125 305.484 128.654 315.751 135.5L359.251 164.5C369.519 171.346 381.583 175 393.923 175H637.501C654.077 175 669.974 181.585 681.695 193.306C693.417 205.027 700.001 220.924 700.001 237.5V304"
@@ -2301,6 +2385,7 @@ function CanvasFlow() {
                               height="14"
                               viewBox="0 0 512 512"
                               xmlns="http://www.w3.org/2000/svg"
+                              style={{ color: highlightColor || undefined }}
                             >
                               <path
                                 d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
@@ -2320,7 +2405,7 @@ function CanvasFlow() {
                               />
                             </svg>
                           )}
-                          <span className="sidebar-folder-name">{projectName}</span>
+                          <span className="sidebar-folder-name" style={{ color: highlightColor || undefined }}>{projectName}</span>
                         </button>
                         {showLock && projectPath && (
                           <button
@@ -2331,8 +2416,10 @@ function CanvasFlow() {
                               e.stopPropagation();
                               if (isLocked) {
                                 setLockedFolderPath(null);
+                                hasExplicitlyUnlocked.current = true;
                               } else {
                                 setLockedFolderPath(projectPath);
+                                hasExplicitlyUnlocked.current = false;
                               }
                             }}
                             onMouseDown={(e) => {
@@ -2342,12 +2429,26 @@ function CanvasFlow() {
                             title={isLocked ? 'Unlock folder' : 'Lock folder'}
                           >
                             {isLocked ? (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 5V3C3 1.34315 4.34315 0 6 0C7.65685 0 9 1.34315 9 3V5H10C10.5523 5 11 5.44772 11 6V10C11 10.5523 10.5523 11 10 11H2C1.44772 11 1 10.5523 1 10V6C1 5.44772 1.44772 5 2 5H3ZM4 3V5H8V3C8 1.89543 7.10457 1 6 1C4.89543 1 4 1.89543 4 3Z" fill="currentColor"/>
+                              <svg width="12" height="12" viewBox="0 0 134 197" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <g clipPath="url(#clip0_995_195)">
+                                  <path d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262V100.977C133.301 85.6445 125.684 77.832 111.328 77.832H21.9727C7.61719 77.832 0 85.6445 0 100.977V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336V99.9023C15.8203 95.1172 18.2617 92.5781 22.4609 92.5781H110.84C115.137 92.5781 117.48 95.1172 117.48 99.9023V169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.0898 85.3516H32.6172V52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V85.3516H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.1133 0 17.0898 17.7734 17.0898 54.4922V85.3516Z" fill="currentColor"/>
+                                </g>
+                                <defs>
+                                  <clipPath id="clip0_995_195">
+                                    <rect width="133.301" height="196.582" fill="white"/>
+                                  </clipPath>
+                                </defs>
                               </svg>
                             ) : (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 5V3C3 1.34315 4.34315 0 6 0C7.65685 0 9 1.34315 9 3V5H10C10.5523 5 11 5.44772 11 6V10C11 10.5523 10.5523 11 10 11H2C1.44772 11 1 10.5523 1 10V6C1 5.44772 1.44772 5 2 5H3ZM4 3V5H8V3C8 1.89543 7.10457 1 6 1C4.89543 1 4 1.89543 4 3ZM2 6V10H10V6H2Z" fill="currentColor"/>
+                              <svg width="12" height="12" viewBox="0 0 134 197" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <g clipPath="url(#clip0_995_200)">
+                                  <path d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262L133.301 131.899C133.301 116.566 125.684 108.754 111.328 108.754H21.9727C7.61719 108.754 0 116.566 0 131.899V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336L15.8203 130.824C15.8203 126.039 18.2617 123.5 22.4609 123.5H110.84C115.137 123.5 117.48 126.039 117.48 130.824L117.48 169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.1142 52.4792C17.0872 53.5835 17.9852 54.4922 19.0898 54.4922H30.5664C31.699 54.4922 32.6172 53.574 32.6172 52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V114H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.5835 0 17.9767 17.1236 17.1142 52.4792Z" fill="currentColor"/>
+                                </g>
+                                <defs>
+                                  <clipPath id="clip0_995_200">
+                                    <rect width="133.301" height="196.582" fill="white"/>
+                                  </clipPath>
+                                </defs>
                               </svg>
                             )}
                           </button>
@@ -2590,13 +2691,41 @@ function CanvasFlow() {
         </div>
       )}
 
+        {/* Eye Icon Button - Highlight All Folders */}
+        <button
+          className="highlight-all-fab"
+          onClick={toggleHighlightAll}
+          aria-label={isHighlightAllActive ? 'Unhighlight all folders' : 'Highlight all folders'}
+          title={isHighlightAllActive ? 'Unhighlight all folders' : 'Highlight all folders'}
+        >
+          <svg width="16" height="16" viewBox="0 0 267 168" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clipPath="url(#eye-clip-global)">
+              <path d="M133.496 167.48C212.402 167.48 266.895 103.711 266.895 83.7891C266.895 63.7695 212.305 0.0976562 133.496 0.0976562C55.6641 0.0976562 0 63.7695 0 83.7891C0 103.711 55.5664 167.48 133.496 167.48ZM133.496 152.051C69.1406 152.051 17.0898 97.5586 17.0898 83.7891C17.0898 72.168 69.1406 15.5273 133.496 15.5273C197.559 15.5273 249.805 72.168 249.805 83.7891C249.805 97.5586 197.559 152.051 133.496 152.051ZM133.496 138.379C163.77 138.379 188.281 113.867 188.281 83.5938C188.281 53.3203 163.77 28.8086 133.496 28.8086C103.223 28.8086 78.6133 53.3203 78.6133 83.5938C78.6133 113.867 103.223 138.379 133.496 138.379Z" fill="currentColor" fillOpacity={isHighlightAllActive ? "1" : "0.85"}/>
+            </g>
+            <defs>
+              <clipPath id="eye-clip-global">
+                <rect width="266.895" height="167.48" fill="white"/>
+              </clipPath>
+            </defs>
+          </svg>
+        </button>
+
         {/* Settings FAB */}
         <button
           className="settings-fab"
           onClick={() => setIsSettingsOpen(true)}
           aria-label="Settings"
         >
-          ⚙️
+          <svg width="16" height="16" viewBox="0 0 209 209" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clipPath="url(#clip0_995_232)">
+              <path d="M94.6289 208.789H114.355C121.875 208.789 127.734 204.199 129.395 196.973L133.594 178.711L136.719 177.637L152.637 187.402C158.984 191.309 166.309 190.43 171.68 185.059L185.352 171.484C190.723 166.113 191.602 158.691 187.695 152.441L177.734 136.621L178.906 133.691L197.168 129.395C204.297 127.734 208.984 121.777 208.984 114.355V95.0195C208.984 87.5977 204.395 81.7383 197.168 79.9805L179.102 75.5859L177.832 72.4609L187.793 56.6406C191.699 50.3906 190.918 43.0664 185.449 37.5977L171.777 23.9258C166.504 18.6523 159.18 17.6758 152.832 21.582L136.914 31.3477L133.594 30.0781L129.395 11.8164C127.734 4.58984 121.875 0 114.355 0H94.6289C87.1094 0 81.25 4.58984 79.5898 11.8164L75.293 30.0781L71.9727 31.3477L56.1523 21.582C49.8047 17.6758 42.3828 18.6523 37.1094 23.9258L23.5352 37.5977C18.0664 43.0664 17.1875 50.3906 21.1914 56.6406L31.0547 72.4609L29.8828 75.5859L11.8164 79.9805C4.58984 81.7383 0 87.5977 0 95.0195V114.355C0 121.777 4.6875 127.734 11.8164 129.395L30.0781 133.691L31.1523 136.621L21.2891 152.441C17.2852 158.691 18.2617 166.113 23.6328 171.484L37.207 185.059C42.5781 190.43 50 191.309 56.3477 187.402L72.168 177.637L75.293 178.711L79.5898 196.973C81.25 204.199 87.1094 208.789 94.6289 208.789ZM96.1914 193.555C94.5312 193.555 93.6523 192.871 93.3594 191.309L87.5 167.09C81.543 165.625 75.9766 163.281 71.7773 160.645L50.4883 173.73C49.3164 174.609 47.9492 174.512 46.875 173.242L35.3516 161.719C34.2773 160.645 34.1797 159.473 34.9609 158.105L48.0469 137.012C45.8008 132.91 43.2617 127.344 41.6992 121.387L17.4805 115.625C15.918 115.332 15.2344 114.453 15.2344 112.793V96.4844C15.2344 94.7266 15.8203 93.9453 17.4805 93.6523L41.6016 87.793C43.1641 81.4453 46.0938 75.6836 47.8516 72.0703L34.8633 50.9766C33.9844 49.5117 34.082 48.3398 35.1562 47.168L46.7773 35.8398C47.9492 34.668 49.0234 34.5703 50.4883 35.3516L71.582 48.1445C75.7812 45.8008 81.7383 43.3594 87.5977 41.6992L93.3594 17.4805C93.6523 15.918 94.5312 15.2344 96.1914 15.2344H112.793C114.453 15.2344 115.332 15.918 115.527 17.4805L121.484 41.8945C127.539 43.457 132.812 45.8984 137.207 48.2422L158.398 35.3516C159.961 34.5703 160.938 34.668 162.207 35.8398L173.73 47.168C174.902 48.3398 174.902 49.5117 174.023 50.9766L161.035 72.0703C162.891 75.6836 165.723 81.4453 167.285 87.793L191.504 93.6523C193.066 93.9453 193.75 94.7266 193.75 96.4844V112.793C193.75 114.453 192.969 115.332 191.504 115.625L167.188 121.387C165.625 127.344 163.184 132.91 160.84 137.012L173.926 158.105C174.707 159.473 174.707 160.645 173.535 161.719L162.109 173.242C160.938 174.512 159.668 174.609 158.398 173.73L137.109 160.645C132.91 163.281 127.441 165.625 121.484 167.09L115.527 191.309C115.332 192.871 114.453 193.555 112.793 193.555H96.1914ZM104.492 141.602C125.098 141.602 141.699 125 141.699 104.395C141.699 83.7891 125.098 67.1875 104.492 67.1875C83.8867 67.1875 67.2852 83.7891 67.2852 104.395C67.2852 125 83.8867 141.602 104.492 141.602ZM104.492 126.465C92.2852 126.465 82.4219 116.602 82.4219 104.395C82.4219 92.1875 92.2852 82.3242 104.492 82.3242C116.699 82.3242 126.562 92.1875 126.562 104.395C126.562 116.602 116.699 126.465 104.492 126.465Z" fill="currentColor" fillOpacity="0.85"/>
+            </g>
+            <defs>
+              <clipPath id="clip0_995_232">
+                <rect width="208.984" height="208.887" fill="white"/>
+              </clipPath>
+            </defs>
+          </svg>
         </button>
 
         {/* Settings Modal */}
