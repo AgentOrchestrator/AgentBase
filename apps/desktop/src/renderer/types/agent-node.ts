@@ -229,6 +229,9 @@ export interface AgentNodeData {
 
   /** Chat messages for SDK-based chat view */
   chatMessages?: AgentChatMessage[];
+
+  /** Whether the JSONL file exists (for forking capability) */
+  forking?: boolean;
 }
 
 // =============================================================================

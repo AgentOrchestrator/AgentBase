@@ -524,12 +524,20 @@ contextBridge.exposeInMainWorld('shellAPI', {
 // Type definitions for the file API
 export interface FileAPI {
   readFile: (filePath: string) => Promise<string>;
+  exists: (filePath: string) => Promise<boolean>;
 }
 
 // Expose file API for debug mode
 contextBridge.exposeInMainWorld('fileAPI', {
   readFile: (filePath: string) =>
     unwrapResponse<string>(ipcRenderer.invoke('file:read', filePath)),
+  exists: async (filePath: string) => {
+    const result = await ipcRenderer.invoke('file:exists', filePath);
+    if (result.success) {
+      return result.exists;
+    }
+    return false;
+  },
 } as FileAPI);
 
 // Git info types

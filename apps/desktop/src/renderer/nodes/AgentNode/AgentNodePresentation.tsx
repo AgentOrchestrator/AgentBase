@@ -5,7 +5,7 @@
  * Handles UI rendering, status display, and user interactions.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import AgentOverviewView from '../../AgentOverviewView';
 import AgentTerminalView from '../../AgentTerminalView';
@@ -26,6 +26,7 @@ import {
   useNodeInitialized,
 } from '../../context';
 import type { WorkspaceState, SessionReadiness } from '../../hooks/useAgentState';
+import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import '../../AgentNode.css';
 
 export interface AgentNodePresentationProps {
@@ -39,6 +40,8 @@ export interface AgentNodePresentationProps {
   workspaceState?: WorkspaceState;
   /** Session readiness from useAgentState */
   sessionReadiness?: SessionReadiness;
+  /** React Flow node ID */
+  nodeId?: string;
 }
 
 /**
@@ -53,6 +56,7 @@ export function AgentNodePresentation({
   selected,
   workspaceState,
   sessionReadiness = 'idle',
+  nodeId,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const workspace = useWorkspaceService();
@@ -65,6 +69,11 @@ export function AgentNodePresentation({
   const [isDragOver, setIsDragOver] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  
+  // Forking check state
+  const forking = data.forking ?? false;
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isCheckingRef = useRef(false);
 
   // Auto-start CLI when initialized (if enabled)
   useEffect(() => {
@@ -186,6 +195,80 @@ export function AgentNodePresentation({
   const workspacePath = workspaceState?.path ?? null;
   const workspaceSource = workspaceState?.source ?? null;
   const gitInfo = workspaceState?.gitInfo ?? null;
+
+  // Check if JSONL file exists
+  const checkJsonlFile = useCallback(async () => {
+    if (!data.sessionId || !workspacePath || forking || isCheckingRef.current) {
+      return;
+    }
+
+    isCheckingRef.current = true;
+    try {
+      const filePath = getConversationFilePath(data.sessionId, workspacePath);
+      const fileAPI = (window as any).fileAPI;
+      
+      if (!fileAPI || !fileAPI.exists) {
+        console.warn('[AgentNode] fileAPI.exists not available');
+        isCheckingRef.current = false;
+        return;
+      }
+
+      const exists = await fileAPI.exists(filePath);
+      
+      if (exists) {
+        // File exists, set forking to true and stop polling
+        onDataChange({ forking: true });
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        console.log('[AgentNode] JSONL file found, forking set to true:', filePath);
+      }
+    } catch (error) {
+      console.error('[AgentNode] Error checking JSONL file:', error);
+    } finally {
+      isCheckingRef.current = false;
+    }
+  }, [data.sessionId, workspacePath, forking, onDataChange]);
+
+  // Start polling when node is clicked and forking is false
+  const handleNodeClick = useCallback(() => {
+    if (forking || !data.sessionId || !workspacePath) {
+      return;
+    }
+
+    // Clear any existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    // Check immediately
+    checkJsonlFile();
+
+    // Then check every 5 seconds
+    pollingIntervalRef.current = setInterval(() => {
+      checkJsonlFile();
+    }, 5000);
+
+    console.log('[AgentNode] Started polling for JSONL file');
+  }, [forking, data.sessionId, workspacePath, checkJsonlFile]);
+
+  // Cleanup polling on unmount or when forking becomes true
+  useEffect(() => {
+    if (forking && pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+      console.log('[AgentNode] Stopped polling (forking is true)');
+    }
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [forking]);
 
   // Get workspace attachment for folder name
   const workspaceAttachment = attachments.find(isWorkspaceMetadataAttachment);
@@ -314,7 +397,27 @@ export function AgentNodePresentation({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onClick={(e) => {
+          // Only trigger if not clicking on interactive elements (buttons, inputs, etc.)
+          const target = e.target as HTMLElement;
+          if (
+            target.tagName === 'BUTTON' ||
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.closest('button') ||
+            target.closest('input') ||
+            target.closest('textarea') ||
+            target.closest('.agent-node-fork-button-wrapper')
+          ) {
+            return;
+          }
+          handleNodeClick();
+        }}
       >
+        {/* Debug: Big red true/false indicator */}
+        <div className="agent-node-forking-debug">
+          {forking ? 'TRUE' : 'FALSE'}
+        </div>
         <NodeResizer
           minWidth={450}
           minHeight={350}
@@ -322,7 +425,6 @@ export function AgentNodePresentation({
           lineStyle={{ borderColor: 'transparent' }}
           handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
         />
-        <Handle type="target" position={Position.Top} />
 
       {/* Tab Bar */}
       <div className="agent-node-tabs">
@@ -395,7 +497,57 @@ export function AgentNodePresentation({
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} />
+      {/* Bottom connection button - styled like conversation node plus button */}
+      <div
+        className="agent-node-fork-button-wrapper"
+        onClick={(e) => {
+          // Prevent triggering drag when clicking
+          e.stopPropagation();
+          if (!nodeId) return;
+          // Dispatch custom event for fork on click
+          const forkEvent = new CustomEvent('agent-node:fork-click', {
+            detail: { nodeId },
+            bubbles: true,
+          });
+          e.currentTarget.dispatchEvent(forkEvent);
+        }}
+        onMouseDown={(e) => {
+          // Allow drag to still work - only prevent if it's a pure click (no drag)
+          // We'll track if mouse moves
+          if (!nodeId) return;
+          let hasMoved = false;
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const handleMouseMove = (moveEvent: MouseEvent) => {
+            const deltaX = Math.abs(moveEvent.clientX - startX);
+            const deltaY = Math.abs(moveEvent.clientY - startY);
+            if (deltaX > 5 || deltaY > 5) {
+              hasMoved = true;
+            }
+          };
+          const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            // If mouse didn't move, it was a click, not a drag
+            if (!hasMoved) {
+              e.stopPropagation();
+              const forkEvent = new CustomEvent('agent-node:fork-click', {
+                detail: { nodeId },
+                bubbles: true,
+              });
+              e.currentTarget.dispatchEvent(forkEvent);
+            }
+          };
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('mouseup', handleMouseUp);
+        }}
+      >
+        <Handle 
+          type="source" 
+          position={Position.Bottom}
+          className="agent-node-bottom-handle"
+        />
+      </div>
 
       {/* Issue Details Modal */}
       {showIssueModal && selectedIssueId && (
