@@ -5,15 +5,11 @@
  * Provides streaming conversation with Claude Code.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import { useChatSession } from './nodes/AgentChatNode/hooks/useChatSession';
 import type { AgentChatMessage } from './types/agent-node';
 import type {
-  AgentAction,
-  AgentActionResponse,
-  ClarifyingQuestionAction,
-  ToolApprovalAction,
   AgentContentBlock,
   AgentWebSearchToolResultBlock,
   AgentWebSearchResultBlock,
@@ -61,8 +57,6 @@ interface AgentChatViewProps {
   onSessionCreated?: (sessionId: string) => void;
   isSessionReady?: boolean;
   selected?: boolean;
-  pendingActions?: AgentAction[];
-  onActionResponse?: (response: AgentActionResponse) => Promise<void> | void;
 }
 
 type ToolUseDisplay = {
@@ -83,15 +77,11 @@ export default function AgentChatView({
   onSessionCreated,
   isSessionReady = true,
   selected = false,
-  pendingActions = [],
-  onActionResponse,
 }: AgentChatViewProps) {
   const [messages, setMessages] = useState<AgentChatMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
-  const [actionAnswers, setActionAnswers] = useState<Record<string, Record<string, string>>>({});
-  const [submittingActions, setSubmittingActions] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -189,9 +179,11 @@ export default function AgentChatView({
     sendMessage,
     isStreaming,
   } = useChatSession({
+    agentId,
     agentType,
     sessionId,
     workspacePath,
+    currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: AgentChatMessage[]) => {
       setMessages(newMessages);
       onMessagesChange(newMessages);
@@ -255,72 +247,6 @@ export default function AgentChatView({
       handleSend();
     }
   };
-
-  const sortedActions = useMemo(() => {
-    return [...pendingActions].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }, [pendingActions]);
-
-  const updateActionAnswer = useCallback((actionId: string, question: string, value: string) => {
-    setActionAnswers((prev) => ({
-      ...prev,
-      [actionId]: {
-        ...(prev[actionId] || {}),
-        [question]: value,
-      },
-    }));
-  }, []);
-
-  const submitAction = useCallback(
-    async (response: AgentActionResponse) => {
-      if (!onActionResponse) {
-        return;
-      }
-
-      setSubmittingActions((prev) => new Set(prev).add(response.actionId));
-      try {
-        await onActionResponse(response);
-      } finally {
-        setSubmittingActions((prev) => {
-          const next = new Set(prev);
-          next.delete(response.actionId);
-          return next;
-        });
-      }
-    },
-    [onActionResponse]
-  );
-
-  const handleSubmitClarifying = useCallback(
-    async (action: ClarifyingQuestionAction) => {
-      const answers = actionAnswers[action.id] || {};
-      const normalized: Record<string, string> = {};
-
-      for (const question of action.questions) {
-        const value = answers[question.question];
-        if (value) {
-          normalized[question.question] = value;
-        }
-      }
-
-      await submitAction({
-        actionId: action.id,
-        type: 'clarifying_question',
-        answers: normalized,
-      });
-    },
-    [actionAnswers, submitAction]
-  );
-
-  const handleToolApproval = useCallback(
-    async (action: ToolApprovalAction, decision: 'allow' | 'deny') => {
-      await submitAction({
-        actionId: action.id,
-        type: 'tool_approval',
-        decision,
-      });
-    },
-    [submitAction]
-  );
 
   // Render a tool use block
   const renderToolUse = (toolUse: ToolUseDisplay, index: number) => {
@@ -504,87 +430,6 @@ export default function AgentChatView({
       {error && (
         <div className="agent-chat-view-error">
           {error}
-        </div>
-      )}
-
-      {/* Actions */}
-      {sortedActions.length > 0 && (
-        <div className="agent-chat-view-action-pill">
-          <div className="agent-chat-view-action-list">
-            {sortedActions.map((action) => {
-              if (action.type === 'clarifying_question') {
-                const questionAction = action as ClarifyingQuestionAction;
-                return (
-                  <div key={action.id} className="agent-chat-view-action-card">
-                    <div className="agent-chat-view-action-header">Clarifying question</div>
-                    <div className="agent-chat-view-action-body">
-                      {questionAction.questions.map((question) => (
-                        <div key={question.question} className="agent-chat-view-question">
-                          <div className="agent-chat-view-question-title">
-                            {question.header ? `${question.header}: ` : ''}
-                            {question.question}
-                          </div>
-                          <input
-                            className="agent-chat-view-question-input"
-                            type="text"
-                            value={actionAnswers[action.id]?.[question.question] || ''}
-                            onChange={(event) =>
-                              updateActionAnswer(action.id, question.question, event.target.value)
-                            }
-                            placeholder="Enter your response..."
-                          />
-                        </div>
-                      ))}
-                      <button
-                        className="agent-chat-view-action-submit"
-                        type="button"
-                        onClick={() => handleSubmitClarifying(questionAction)}
-                        disabled={submittingActions.has(action.id)}
-                      >
-                        Submit response
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              const approvalAction = action as ToolApprovalAction;
-              return (
-                <div key={action.id} className="agent-chat-view-action-card">
-                  <div className="agent-chat-view-action-header">Tool approval</div>
-                  <div className="agent-chat-view-action-body">
-                    <div className="agent-chat-view-action-summary">
-                      <span className="agent-chat-view-action-tool">{approvalAction.toolName}</span>
-                      {approvalAction.command && (
-                        <span className="agent-chat-view-action-command">{approvalAction.command}</span>
-                      )}
-                      {approvalAction.filePath && (
-                        <span className="agent-chat-view-action-path">{approvalAction.filePath}</span>
-                      )}
-                    </div>
-                    <div className="agent-chat-view-action-buttons">
-                      <button
-                        className="agent-chat-view-action-approve"
-                        type="button"
-                        onClick={() => handleToolApproval(approvalAction, 'allow')}
-                        disabled={submittingActions.has(action.id)}
-                      >
-                        Accept
-                      </button>
-                      <button
-                        className="agent-chat-view-action-deny"
-                        type="button"
-                        onClick={() => handleToolApproval(approvalAction, 'deny')}
-                        disabled={submittingActions.has(action.id)}
-                      >
-                        Deny
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 

@@ -75,6 +75,9 @@ export interface AgentEvent<T = unknown> {
   /** Agent that emitted the event */
   agent: AgentType;
 
+  /** Agent node identifier (if available) */
+  agentId?: string;
+
   /** Session identifier (if available) */
   sessionId?: string;
 

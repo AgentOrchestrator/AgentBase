@@ -202,6 +202,7 @@ export interface ClarifyingQuestion {
 export interface AgentActionBase {
   id: string;
   type: AgentActionType;
+  agentId?: string;
   agentType?: AgentType;
   sessionId?: string;
   workspacePath?: string;

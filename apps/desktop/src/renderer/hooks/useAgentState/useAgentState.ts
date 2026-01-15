@@ -22,7 +22,6 @@ import { useReactFlow } from '@xyflow/react';
 import type { WorktreeInfo } from '../../../main/types/worktree';
 import type {
   AgentAction,
-  AgentActionResponse,
   AgentEvent,
   ClarifyingQuestion,
   GitInfo,
@@ -30,7 +29,7 @@ import type {
 } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import { createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from '../../types/attachments';
-import { agentStore } from '../../stores';
+import { agentStore, agentActionStore } from '../../stores';
 import type {
   AgentState,
   UseAgentStateInput,
@@ -139,7 +138,6 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   // ---------------------------------------------------------------------------
   // Hook-driven Action State
   // ---------------------------------------------------------------------------
-  const [pendingActions, setPendingActions] = useState<AgentAction[]>([]);
   const actionIdsRef = useRef<Set<string>>(new Set());
 
   // ---------------------------------------------------------------------------
@@ -161,8 +159,8 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
 
   useEffect(() => {
     actionIdsRef.current.clear();
-    setPendingActions([]);
-  }, [sessionId]);
+    agentActionStore.clearAgent(nodeData.agentId);
+  }, [nodeData.agentId, sessionId]);
 
   // ---------------------------------------------------------------------------
   // Config (immutable)
@@ -366,19 +364,6 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     );
   }, [nodeId]);
 
-  const respondToAction = useCallback(
-    async (response: AgentActionResponse) => {
-      if (!window.codingAgentAPI?.respondToAction) {
-        return;
-      }
-
-      await window.codingAgentAPI.respondToAction(response);
-      setPendingActions((prev) => prev.filter((action) => action.id !== response.actionId));
-      actionIdsRef.current.delete(response.actionId);
-    },
-    []
-  );
-
   const toClarifyingQuestions = (toolInput: Record<string, unknown> | undefined): ClarifyingQuestion[] => {
     const questions = toolInput?.questions;
     if (!Array.isArray(questions)) {
@@ -424,12 +409,14 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     const raw = event.raw as { toolInput?: Record<string, unknown>; toolUseId?: string } | undefined;
     const toolInput = raw?.toolInput;
     const toolName = event.payload.toolName;
+    const resolvedAgentId = event.agentId ?? nodeData.agentId;
 
     if (toolName && toolName.toLowerCase() === 'askuserquestion') {
       const questions = toClarifyingQuestions(toolInput);
       return {
         id: event.id,
         type: 'clarifying_question',
+        agentId: resolvedAgentId,
         agentType: event.agent,
         sessionId: event.sessionId,
         workspacePath: event.workspacePath,
@@ -442,6 +429,7 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     return {
       id: event.id,
       type: 'tool_approval',
+      agentId: resolvedAgentId,
       agentType: event.agent,
       sessionId: event.sessionId,
       workspacePath: event.workspacePath,
@@ -479,7 +467,11 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
         return;
       }
 
-      if (typedEvent.sessionId && sessionId && typedEvent.sessionId !== sessionId) {
+      if (typedEvent.agentId && typedEvent.agentId !== nodeData.agentId) {
+        return;
+      }
+
+      if (!typedEvent.agentId && typedEvent.sessionId && sessionId && typedEvent.sessionId !== sessionId) {
         return;
       }
 
@@ -493,11 +485,11 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
       }
 
       actionIdsRef.current.add(typedEvent.id);
-      setPendingActions((prev) => [...prev, action]);
+      agentActionStore.addAction(action);
     });
 
     return unsubscribe;
-  }, [sessionId]);
+  }, [nodeData.agentId, sessionId]);
 
   // ---------------------------------------------------------------------------
   // Return Complete State
@@ -523,12 +515,6 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
       setWorkspace,
       updateNodeData,
       deleteNode,
-    },
-    actionState: {
-      pending: pendingActions,
-    },
-    actionHandlers: {
-      respondToAction,
     },
   };
 }

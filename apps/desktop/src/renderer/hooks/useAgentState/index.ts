@@ -15,6 +15,4 @@ export type {
   SessionReadiness,
   AgentConfig,
   AgentActions,
-  AgentActionState,
-  AgentActionHandlers,
 } from './types';

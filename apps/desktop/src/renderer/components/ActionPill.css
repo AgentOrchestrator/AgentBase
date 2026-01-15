@@ -1,0 +1,147 @@
+.action-pill-list {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+  transition: opacity 1s ease-out, filter 1s ease-out;
+  opacity: 0;
+  filter: blur(4px);
+}
+
+.action-pill-list.visible {
+  opacity: 1;
+  filter: blur(0);
+}
+
+.action-pill-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-pill-card + .action-pill-card {
+  margin-top: 12px;
+}
+
+.action-pill-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.action-pill-agent {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.action-pill-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-pill-question {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.action-pill-question-title {
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.action-pill-question-input {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.action-pill-question-input:focus {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
+}
+
+.action-pill-submit {
+  align-self: flex-start;
+  background: #4a9eff;
+  border: none;
+  color: #0b1020;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.action-pill-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-pill-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.action-pill-tool {
+  font-weight: 600;
+}
+
+.action-pill-command,
+.action-pill-path {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.action-pill-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-pill-approve,
+.action-pill-deny {
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.action-pill-approve {
+  background: #34d399;
+  color: #0b1020;
+}
+
+.action-pill-deny {
+  background: transparent;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.action-pill-approve:disabled,
+.action-pill-deny:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

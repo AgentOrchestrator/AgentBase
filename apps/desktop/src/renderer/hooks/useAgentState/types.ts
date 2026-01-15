@@ -7,7 +7,7 @@
 
 import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agent-status';
 import type { WorktreeInfo } from '../../../main/types/worktree';
-import type { AgentAction, AgentActionResponse, GitInfo } from '@agent-orchestrator/shared';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import type { TerminalAttachment } from '../../types/attachments';
 
@@ -78,20 +78,6 @@ export interface AgentActions {
 }
 
 // =============================================================================
-// Agent Action State (hook-driven UI actions)
-// =============================================================================
-
-export interface AgentActionState {
-  /** Pending actions that require user input */
-  pending: AgentAction[];
-}
-
-export interface AgentActionHandlers {
-  /** Respond to a pending action */
-  respondToAction: (response: AgentActionResponse) => Promise<void>;
-}
-
-// =============================================================================
 // Complete Agent State
 // =============================================================================
 
@@ -139,15 +125,6 @@ export interface AgentState {
   // ---------------------------------------------------------------------------
   /** Actions to mutate agent state */
   actions: AgentActions;
-
-  // ---------------------------------------------------------------------------
-  // Hook-driven Actions (permissions/questions)
-  // ---------------------------------------------------------------------------
-  /** Pending hook-driven actions to render */
-  actionState: AgentActionState;
-  /** Handlers for responding to actions */
-  actionHandlers: AgentActionHandlers;
-
 }
 
 // =============================================================================

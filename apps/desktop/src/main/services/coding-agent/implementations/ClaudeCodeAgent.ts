@@ -117,17 +117,25 @@ export class ClaudeCodeAgent
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
+  private readonly queryContexts = new WeakMap<
+    AbortSignal,
+    { agentId?: string; sessionId?: string; workspacePath?: string }
+  >();
   private readonly canUseTool: CanUseTool = async (
     toolName: string,
     input: Record<string, unknown>,
     options
   ): Promise<PermissionResult> => {
+    const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
+    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
+    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
     const event: AgentEvent<PermissionPayload> = {
       id: crypto.randomUUID(),
       type: 'permission:request',
       agent: 'claude_code',
-      sessionId: this.currentSessionId ?? undefined,
-      workspacePath: this.currentWorkspacePath ?? undefined,
+      agentId: context?.agentId,
+      sessionId,
+      workspacePath,
       timestamp: new Date().toISOString(),
       payload: {
         toolName,
@@ -139,7 +147,7 @@ export class ClaudeCodeAgent
             : typeof input.filePath === 'string'
             ? input.filePath
             : undefined,
-        workingDirectory: this.currentWorkspacePath ?? undefined,
+        workingDirectory: workspacePath,
         reason: options.decisionReason,
       },
       raw: {
@@ -431,6 +439,12 @@ export class ClaudeCodeAgent
       options.resume = request.sessionId;
     }
 
+    this.queryContexts.set(abortController.signal, {
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      workspacePath: options.cwd ?? undefined,
+    });
+
     // Enable streaming partial messages
     if (streaming) {
       options.includePartialMessages = true;
@@ -578,6 +592,12 @@ export class ClaudeCodeAgent
         options.resume = identifier.value;
         break;
     }
+
+    this.queryContexts.set(abortController.signal, {
+      agentId: continueOptions?.agentId,
+      sessionId: identifier.type === 'id' ? identifier.value : undefined,
+      workspacePath: options.cwd ?? undefined,
+    });
 
     if (streaming) {
       options.includePartialMessages = true;
