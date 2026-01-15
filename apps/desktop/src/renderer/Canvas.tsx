@@ -237,6 +237,8 @@ function CanvasFlow() {
   const [forkModalData, setForkModalData] = useState<{
     sourceNodeId: string;
     position: { x: number; y: number };
+    sessionId: string;
+    workspacePath: string;
   } | null>(null);
   const [isForkLoading, setIsForkLoading] = useState(false);
   const [forkError, setForkError] = useState<string | null>(null);
@@ -326,6 +328,7 @@ function CanvasFlow() {
       // Create a new terminal and agent node below the starter
       const terminalId = `terminal-${crypto.randomUUID()}`;
       const agentId = `agent-${Date.now()}`;
+      const sessionId = crypto.randomUUID();
       const createdAt = Date.now();
 
       console.log('[Canvas] Creating agent node from starter', {
@@ -352,6 +355,7 @@ function CanvasFlow() {
           progress: null,
           initialPrompt: message,
           workingDirectory,
+          sessionId,
           createdAt,
         },
         style: { width: 600 },
@@ -1010,8 +1014,14 @@ function CanvasFlow() {
         return;
       }
 
-      // Show fork modal
-      setForkModalData({ sourceNodeId, position });
+      if (!sessionId || !workspacePath) {
+        setForkError('Missing session or workspace');
+        setTimeout(() => setForkError(null), 5000);
+        return;
+      }
+
+      // Show fork modal with resolved session/workspace to avoid stale node data later
+      setForkModalData({ sourceNodeId, position, sessionId, workspacePath });
       setForkError(null);
     },
     [nodes, setNodes]
@@ -1029,10 +1039,10 @@ function CanvasFlow() {
       }
 
       const sourceData = sourceNode.data as AgentNodeData;
-      const workspaceAttachment = sourceData.attachments?.find(isWorkspaceMetadataAttachment);
-      const workspacePath = workspaceAttachment?.path || sourceData.workingDirectory;
+      const parentSessionId = forkModalData.sessionId;
+      const workspacePath = forkModalData.workspacePath;
 
-      if (!sourceData.sessionId || !workspacePath) {
+      if (!parentSessionId || !workspacePath) {
         setForkError('Missing session or workspace');
         return;
       }
@@ -1044,7 +1054,7 @@ function CanvasFlow() {
         // Call fork service to create worktree and fork session
         const result = await forkService.forkAgent({
           sourceAgentId: sourceData.agentId,
-          parentSessionId: sourceData.sessionId,
+          parentSessionId,
           agentType: sourceData.agentType,
           forkTitle,
           repoPath: workspacePath,
@@ -1068,7 +1078,7 @@ function CanvasFlow() {
           terminalId: newTerminalId,
           title: createDefaultAgentTitle(forkTitle),
           sessionId: result.data.sessionInfo.id,
-          parentSessionId: sourceData.sessionId,
+          parentSessionId,
           worktreeId: result.data.worktreeInfo.id,
           workingDirectory: result.data.worktreeInfo.worktreePath,
           // Update attachments to reflect new workspace
@@ -1301,6 +1311,7 @@ function CanvasFlow() {
     // Always generate unique IDs for each new node
     const agentId = `agent-${crypto.randomUUID()}`;
     const terminalId = `terminal-${crypto.randomUUID()}`;
+    const sessionId = crypto.randomUUID();
     const createdAt = Date.now();
 
     console.log('[Canvas] Creating agent node', {
@@ -1324,6 +1335,8 @@ function CanvasFlow() {
         progress: null,
         attachments: [],
         activeView: 'overview',
+        sessionId,
+        createdAt,
         // Add prefilled workspace path if locked folder exists
         ...(lockedFolderPath && { prefilledWorkspacePath: lockedFolderPath }),
       },

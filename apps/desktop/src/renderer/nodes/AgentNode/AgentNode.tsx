@@ -83,7 +83,6 @@ function AgentNode({ data, id, selected }: NodeProps) {
       },
       session: {
         id: agent.session.id,
-        isMatching: agent.session.isMatching,
       },
       isInitialized: agent.isInitialized,
     });

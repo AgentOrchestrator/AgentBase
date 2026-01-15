@@ -15,8 +15,4 @@ export type {
   SessionReadiness,
   AgentConfig,
   AgentActions,
-  CodingAgentAPI,
-  SessionSummary,
-  SessionContent,
-  CodingAgentMessage,
 } from './types';

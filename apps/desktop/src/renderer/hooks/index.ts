@@ -12,9 +12,5 @@ export {
   type SessionState,
   type AgentConfig,
   type AgentActions,
-  type CodingAgentAPI,
-  type SessionSummary,
-  type SessionContent,
-  type CodingAgentMessage,
   type WorkspaceSource,
 } from './useAgentState';

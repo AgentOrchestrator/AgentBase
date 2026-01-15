@@ -7,34 +7,9 @@
 
 import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agent-status';
 import type { WorktreeInfo } from '../../../main/types/worktree';
-import type { CodingAgentMessage, GitInfo } from '@agent-orchestrator/shared';
-export type { CodingAgentMessage } from '@agent-orchestrator/shared';
-import type { CodingAgentAPI } from '../../../main/services/coding-agent';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import type { TerminalAttachment } from '../../types/attachments';
-
-// =============================================================================
-// Session Types (from coding agent API)
-// =============================================================================
-
-export interface SessionSummary {
-  id: string;
-  agentType: string;
-  createdAt: string;
-  updatedAt: string;
-  timestamp: string;
-  projectPath?: string;
-  projectName?: string;
-  messageCount: number;
-}
-
-export interface SessionContent {
-  id: string;
-  messages: CodingAgentMessage[];
-  messageCount: number;
-  projectPath?: string;
-  projectName?: string;
-}
 
 // =============================================================================
 // Workspace State
@@ -61,13 +36,11 @@ export interface WorkspaceState {
 // Session State
 // =============================================================================
 
-export type SessionReadiness = 'idle' | 'matching' | 'ready' | 'missing';
+export type SessionReadiness = 'idle' | 'ready';
 
 export interface SessionState {
-  /** Matched session ID from conversation JSON files */
+  /** Explicit session ID for agent runs */
   id: string | null;
-  /** Whether currently polling for session match */
-  isMatching: boolean;
   /** Whether a session is ready to use */
   readiness: SessionReadiness;
 }
@@ -153,11 +126,6 @@ export interface AgentState {
   /** Actions to mutate agent state */
   actions: AgentActions;
 
-  // ---------------------------------------------------------------------------
-  // Coding Agent API
-  // ---------------------------------------------------------------------------
-  /** API for interacting with the coding agent */
-  codingAgent: Pick<CodingAgentAPI, 'listSessionSummaries' | 'getSession'>;
 }
 
 // =============================================================================
@@ -172,5 +140,3 @@ export interface UseAgentStateInput {
   /** Attachments from node data */
   attachments?: TerminalAttachment[];
 }
-
-export type { CodingAgentAPI };

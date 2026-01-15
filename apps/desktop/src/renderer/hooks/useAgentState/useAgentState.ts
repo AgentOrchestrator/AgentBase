@@ -4,7 +4,7 @@
  * THE SINGLE SOURCE OF TRUTH for agent state.
  *
  * Consolidates:
- * - useSessionId (session matching via polling)
+ * - Session state (explicit session IDs)
  * - useWorkspaceInheritance (worktree provisioning)
  * - useWorkspaceDisplay (workspace path resolution + git info)
  * - Store subscriptions
@@ -13,7 +13,7 @@
  * Usage:
  *   const agent = useAgentState({ nodeId, initialNodeData });
  *   agent.workspace.path    // workspace path
- *   agent.session.id        // matched session ID
+ *   agent.session.id        // explicit session ID
  *   agent.actions.setWorkspace(path)  // set workspace
  */
 
@@ -22,78 +22,67 @@ import { useReactFlow } from '@xyflow/react';
 import type { WorktreeInfo } from '../../../main/types/worktree';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
-import type {
-  CodingAgentType,
-  MessageFilterOptions,
-  SessionFilterOptions,
-} from '../../../main/services/coding-agent';
 import { createWorkspaceMetadataAttachment, isWorkspaceMetadataAttachment } from '../../types/attachments';
 import { agentStore } from '../../stores';
 import type {
   AgentState,
   UseAgentStateInput,
   WorkspaceSource,
-  SessionSummary,
   SessionReadiness,
 } from './types';
 
 // =============================================================================
-// Helper Functions (from useSessionId)
+// Deterministic Session ID
 // =============================================================================
 
-function normalizePath(path: string): string {
-  return path.replace(/\/$/, '').toLowerCase();
+function cyrb128(input: string): [number, number, number, number] {
+  let h1 = 1779033703;
+  let h2 = 3144134277;
+  let h3 = 1013904242;
+  let h4 = 2773480762;
+
+  for (let i = 0; i < input.length; i++) {
+    const k = input.charCodeAt(i);
+    h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+    h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+  }
+
+  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+  h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+  h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+
+  return [
+    (h1 ^ h2 ^ h3 ^ h4) >>> 0,
+    (h2 ^ h1) >>> 0,
+    (h3 ^ h1) >>> 0,
+    (h4 ^ h1) >>> 0,
+  ];
 }
 
-function pathsMatch(path1?: string, path2?: string): boolean {
-  if (!path1 || !path2) return false;
-  return normalizePath(path1) === normalizePath(path2);
-}
+function deterministicUuidFromString(input: string): string {
+  const hash = cyrb128(input);
+  const bytes = new Uint8Array(16);
 
-function findMatchingSession(
-  sessions: SessionSummary[],
-  agentCreatedAt: number,
-  workspacePath?: string
-): SessionSummary | null {
-  if (sessions.length === 0) return null;
-
-  // Filter by workspace path if provided
-  let candidateSessions = sessions;
-  if (workspacePath) {
-    candidateSessions = sessions.filter((session) =>
-      pathsMatch(session.projectPath, workspacePath)
-    );
+  for (let i = 0; i < 4; i++) {
+    const value = hash[i];
+    const offset = i * 4;
+    bytes[offset] = (value >>> 24) & 0xff;
+    bytes[offset + 1] = (value >>> 16) & 0xff;
+    bytes[offset + 2] = (value >>> 8) & 0xff;
+    bytes[offset + 3] = value & 0xff;
   }
 
-  // If no workspace-filtered matches, use all sessions (fallback)
-  if (candidateSessions.length === 0) {
-    candidateSessions = sessions;
-  }
+  // RFC 4122 variant + v4 marker for UUID shape
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
-  // Find session with closest timestamp to agent creation
-  const TIME_WINDOW_MS = 60 * 1000; // 60 seconds window
-  let bestMatch: SessionSummary | null = null;
-  let minTimeDiff = Infinity;
-
-  for (const session of candidateSessions) {
-    const sessionTime = new Date(session.updatedAt).getTime();
-    const timeDiff = Math.abs(sessionTime - agentCreatedAt);
-
-    if (timeDiff <= TIME_WINDOW_MS && timeDiff < minTimeDiff) {
-      bestMatch = session;
-      minTimeDiff = timeDiff;
-    }
-  }
-
-  // Fallback to most recent session if no close match
-  if (!bestMatch && candidateSessions.length > 0) {
-    const sorted = [...candidateSessions].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
-    bestMatch = sorted[0];
-  }
-
-  return bestMatch;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex
+    .slice(6, 8)
+    .join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
 }
 
 // =============================================================================
@@ -138,17 +127,12 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   // Session State
   // ---------------------------------------------------------------------------
   const [sessionId, setSessionId] = useState<string | null>(nodeData.sessionId || null);
-  const [isMatchingSession, setIsMatchingSession] = useState(false);
-  const [sessionReadiness, setSessionReadiness] = useState<SessionReadiness>(
-    nodeData.sessionId ? 'ready' : 'idle'
-  );
+  const sessionReadiness: SessionReadiness = sessionId ? 'ready' : 'idle';
 
   // ---------------------------------------------------------------------------
   // Refs for cleanup
   // ---------------------------------------------------------------------------
   const worktreeRef = useRef<WorktreeInfo | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const matchedSessionIdRef = useRef<string | null>(sessionId);
 
   // Keep refs in sync
   useEffect(() => {
@@ -156,21 +140,11 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   }, [worktree]);
 
   useEffect(() => {
-    matchedSessionIdRef.current = sessionId;
-  }, [sessionId]);
-
-  useEffect(() => {
     const nextSessionId = nodeData.sessionId ?? null;
     if (nextSessionId !== sessionId) {
       setSessionId(nextSessionId);
     }
   }, [nodeData.sessionId, sessionId]);
-
-  useEffect(() => {
-    if (sessionId) {
-      setSessionReadiness('ready');
-    }
-  }, [sessionId]);
 
   // ---------------------------------------------------------------------------
   // Config (immutable)
@@ -312,99 +286,6 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   }, [workspacePath]);
 
   // ---------------------------------------------------------------------------
-  // Session Matching (polling)
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const { createdAt } = nodeData;
-
-    // Don't run if no workspace, no createdAt, or already matched
-    if (!workspacePath || !createdAt || matchedSessionIdRef.current) {
-      if (matchedSessionIdRef.current) {
-        setSessionReadiness('ready');
-      } else {
-        setSessionReadiness('idle');
-      }
-      return;
-    }
-
-    setIsMatchingSession(true);
-    setSessionReadiness('matching');
-
-    const startPolling = () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-
-      const maxAttempts = 30;
-      let attempts = 0;
-
-      pollingIntervalRef.current = setInterval(async () => {
-        attempts++;
-
-        if (attempts > maxAttempts || matchedSessionIdRef.current) {
-          setIsMatchingSession(false);
-          if (attempts > maxAttempts && !matchedSessionIdRef.current) {
-            setSessionReadiness('missing');
-          }
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
-          return;
-        }
-
-        try {
-          const codingAgentAPI = (window as any).codingAgentAPI;
-          if (!codingAgentAPI) return;
-
-          const sinceTimestamp = createdAt - 30000;
-          const sessions = await codingAgentAPI.listSessionSummaries('claude_code', {
-            lookbackDays: 1,
-            sinceTimestamp,
-          });
-
-          const match = findMatchingSession(sessions, createdAt, workspacePath);
-
-          if (match) {
-            matchedSessionIdRef.current = match.id;
-            setSessionId(match.id);
-            setIsMatchingSession(false);
-            setSessionReadiness('ready');
-
-            // Update node data with session ID
-            dispatchNodeUpdate({ ...nodeData, sessionId: match.id });
-
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-              pollingIntervalRef.current = null;
-            }
-          }
-        } catch (error) {
-          console.error('[useAgentState] Error fetching sessions:', error);
-        }
-      }, 2000);
-    };
-
-    // Start polling after initial delay
-    const timeoutId = setTimeout(startPolling, 2000);
-
-    return () => {
-      clearTimeout(timeoutId);
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [workspacePath, nodeData.createdAt]);
-
-  // Reset session matching when agentId changes
-  useEffect(() => {
-    matchedSessionIdRef.current = null;
-    setSessionId(null);
-    setSessionReadiness('idle');
-  }, [nodeData.agentId]);
-
-  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   const dispatchNodeUpdate = useCallback(
@@ -418,6 +299,20 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     },
     [nodeId]
   );
+
+  useEffect(() => {
+    if (nodeData.sessionId) {
+      return;
+    }
+
+    const derivedSessionId = deterministicUuidFromString(`agent-node:${nodeId}`);
+    if (sessionId === derivedSessionId) {
+      return;
+    }
+
+    setSessionId(derivedSessionId);
+    dispatchNodeUpdate({ ...nodeData, sessionId: derivedSessionId });
+  }, [nodeId, nodeData, sessionId, dispatchNodeUpdate]);
 
   const setWorkspace = useCallback(
     (path: string) => {
@@ -454,32 +349,6 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
   }, [nodeId]);
 
   // ---------------------------------------------------------------------------
-  // Coding Agent API
-  // ---------------------------------------------------------------------------
-  const codingAgent = useMemo(
-    () => ({
-      listSessionSummaries: async (
-        agentType: CodingAgentType,
-        filter?: SessionFilterOptions
-      ) => {
-        const api = (window as any).codingAgentAPI;
-        if (!api) return [];
-        return api.listSessionSummaries(agentType, filter);
-      },
-      getSession: async (
-        agentType: CodingAgentType,
-        sid: string,
-        filter?: MessageFilterOptions
-      ) => {
-        const api = (window as any).codingAgentAPI;
-        if (!api) return null;
-        return api.getSession(agentType, sid, filter);
-      },
-    }),
-    []
-  );
-
-  // ---------------------------------------------------------------------------
   // Mark as initialized once workspace is resolved
   // ---------------------------------------------------------------------------
   useEffect(() => {
@@ -505,7 +374,6 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
     },
     session: {
       id: sessionId,
-      isMatching: isMatchingSession,
       readiness: sessionReadiness,
     },
     nodeData,
@@ -514,6 +382,5 @@ export function useAgentState({ nodeId, initialNodeData, attachments = [] }: Use
       updateNodeData,
       deleteNode,
     },
-    codingAgent,
   };
 }

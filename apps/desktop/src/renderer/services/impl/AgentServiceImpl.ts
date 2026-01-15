@@ -239,19 +239,7 @@ export class AgentServiceImpl implements IAgentService {
     cliCommand: string,
     options: { sessionId?: string; initialPrompt?: string }
   ): string {
-    const { sessionId, initialPrompt } = options;
-    const resumeSession = this.agentType === 'claude_code' && sessionId;
-    const resumeCommand = this.buildCliCommand(cliCommand, { sessionId, initialPrompt });
-
-    if (!resumeSession) {
-      return resumeCommand;
-    }
-
-    const fallbackCommand = this.buildCliCommand(cliCommand, { initialPrompt });
-    const logMessage = this.formatShellValue(
-      `[AgentService] Failed to resume session ${sessionId}. Starting new session.`
-    );
-    return `${resumeCommand} || (echo ${logMessage} >&2; ${fallbackCommand})`;
+    return this.buildCliCommand(cliCommand, options);
   }
 
   private buildCliCommand(
@@ -262,7 +250,7 @@ export class AgentServiceImpl implements IAgentService {
     const args: string[] = [];
 
     if (this.agentType === 'claude_code' && sessionId) {
-      args.push(`--resume ${this.formatShellValue(sessionId)}`);
+      args.push(`--session-id ${this.formatShellValue(sessionId)}`);
     }
 
     if (initialPrompt) {

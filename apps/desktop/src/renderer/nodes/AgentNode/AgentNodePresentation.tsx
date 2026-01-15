@@ -57,7 +57,7 @@ export function AgentNodePresentation({
   const agent = useAgentService();
   const workspace = useWorkspaceService();
   const isInitialized = useNodeInitialized();
-  const isSessionReady = sessionReadiness === 'ready' || sessionReadiness === 'missing';
+  const isSessionReady = sessionReadiness === 'ready';
 
   const [activeView, setActiveView] = useState<AgentNodeView>(
     data.activeView || 'overview'
