@@ -4,6 +4,13 @@
  * Dark theme wrapper component with tabs for switching between views.
  */
 
+/* Agent Node Wrapper - allows label to float outside */
+.agent-node-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 /* Agent Node Container */
 .agent-node {
   background: var(--color-bg-primary);
@@ -16,17 +23,14 @@
   min-height: 350px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .agent-node:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 .agent-node.selected {
   border-color: var(--color-text-primary);
-  box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.2);
 }
 
 /* Hide React Flow's default selection border/outline */
@@ -36,7 +40,6 @@
 }
 
 .agent-node.drag-over {
-  box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
   transform: scale(1.01);
 }
 
@@ -217,34 +220,41 @@
   font-size: 12px;
 }
 
-/* Minimal Footer */
-.agent-node-footer {
-  display: flex;
+/* Frame Label - Figma-style label above node */
+.agent-node-frame-label {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  color: #888;
+  gap: 4px;
+  padding: 3px 0;
   font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: auto;
+  font-weight: 500;
+}
+
+.agent-node-frame-label .frame-label-icon {
+  width: 12px;
+  height: 12px;
+  color: #888;
   flex-shrink: 0;
 }
 
-.agent-node-footer .footer-icon {
-  width: 14px;
-  height: 14px;
-  color: #888;
-  flex-shrink: 0;
-}
-
-.agent-node-footer .footer-text {
+.agent-node-frame-label .frame-label-text {
   color: #888;
   font-size: 11px;
+  line-height: 1.2;
 }
 
-.agent-node-footer .footer-folder-name {
+.agent-node-frame-label .frame-label-folder-name {
   cursor: pointer;
-  transition: text-decoration 0.2s ease;
+  transition: color 0.2s ease;
 }
 
-.agent-node-footer .footer-folder-name:hover {
-  text-decoration: underline;
+.agent-node-frame-label .frame-label-folder-name:hover {
+  color: var(--color-text-primary);
 }

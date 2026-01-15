@@ -197,20 +197,132 @@ export function AgentNodePresentation({
   const branch = gitInfo?.branch || workspaceAttachment?.git?.branch;
 
   return (
-    <div
-      className={`agent-node ${isDragOver ? 'drag-over' : ''} ${selected ? 'selected' : ''}`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <NodeResizer
-        minWidth={450}
-        minHeight={350}
-        isVisible={true}
-        lineStyle={{ borderColor: 'transparent' }}
-        handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
-      />
-      <Handle type="target" position={Position.Top} />
+    <div className="agent-node-wrapper">
+      {/* Frame Label - Folder and Branch */}
+      {(folderName || branch) && (
+        <div className="agent-node-frame-label">
+          {folderName && workspacePath && (
+            <>
+              <svg
+                className="frame-label-icon"
+                width="12"
+                height="12"
+                viewBox="0 0 512 512"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+                <path
+                  d="M479.9,226.55,463.68,392a40,40,0,0,1-39.93,40H88.25a40,40,0,0,1-39.93-40L32.1,226.55A32,32,0,0,1,64,192h384.1A32,32,0,0,1,479.9,226.55Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+              </svg>
+              <span
+                className="frame-label-text frame-label-folder-name"
+                onClick={async () => {
+                  if (workspacePath) {
+                    try {
+                      await window.shellAPI?.openWithEditor(workspacePath, 'finder');
+                    } catch (error) {
+                      console.error('Failed to open folder in Finder:', error);
+                    }
+                  }
+                }}
+                title="Open in Finder"
+              >
+                {folderName}
+              </span>
+            </>
+          )}
+          {branch && (
+            <>
+              <svg
+                className="frame-label-icon"
+                width="12"
+                height="12"
+                viewBox="0 0 512 512"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="160"
+                  cy="96"
+                  r="48"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+                <circle
+                  cx="160"
+                  cy="416"
+                  r="48"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+                <line
+                  x1="160"
+                  y1="368"
+                  x2="160"
+                  y2="144"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+                <circle
+                  cx="352"
+                  cy="160"
+                  r="48"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+                <path
+                  d="M352,208c0,128-192,48-192,160"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="32"
+                />
+              </svg>
+              <span className="frame-label-text">{branch}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      <div
+        className={`agent-node ${isDragOver ? 'drag-over' : ''} ${selected ? 'selected' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <NodeResizer
+          minWidth={450}
+          minHeight={350}
+          isVisible={true}
+          lineStyle={{ borderColor: 'transparent' }}
+          handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
+        />
+        <Handle type="target" position={Position.Top} />
 
       {/* Tab Bar */}
       <div className="agent-node-tabs">
@@ -285,117 +397,6 @@ export function AgentNodePresentation({
 
       <Handle type="source" position={Position.Bottom} />
 
-      {/* Minimal Footer - Folder and Branch */}
-      {(folderName || branch) && (
-        <div className="agent-node-footer">
-          {folderName && workspacePath && (
-            <>
-              <svg
-                className="footer-icon"
-                width="14"
-                height="14"
-                viewBox="0 0 512 512"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-                <path
-                  d="M479.9,226.55,463.68,392a40,40,0,0,1-39.93,40H88.25a40,40,0,0,1-39.93-40L32.1,226.55A32,32,0,0,1,64,192h384.1A32,32,0,0,1,479.9,226.55Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-              </svg>
-              <span
-                className="footer-text footer-folder-name"
-                onClick={async () => {
-                  if (workspacePath) {
-                    try {
-                      await window.shellAPI?.openWithEditor(workspacePath, 'finder');
-                    } catch (error) {
-                      console.error('Failed to open folder in Finder:', error);
-                    }
-                  }
-                }}
-                title="Open in Finder"
-              >
-                {folderName}
-              </span>
-            </>
-          )}
-          {branch && (
-            <>
-              <svg
-                className="footer-icon"
-                width="14"
-                height="14"
-                viewBox="0 0 512 512"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  cx="160"
-                  cy="96"
-                  r="48"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-                <circle
-                  cx="160"
-                  cy="416"
-                  r="48"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-                <line
-                  x1="160"
-                  y1="368"
-                  x2="160"
-                  y2="144"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-                <circle
-                  cx="352"
-                  cy="160"
-                  r="48"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-                <path
-                  d="M352,208c0,128-192,48-192,160"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="32"
-                />
-              </svg>
-              <span className="footer-text">{branch}</span>
-            </>
-          )}
-        </div>
-      )}
-
       {/* Issue Details Modal */}
       {showIssueModal && selectedIssueId && (
         <IssueDetailsModal
@@ -406,6 +407,7 @@ export function AgentNodePresentation({
           }}
         />
       )}
+      </div>
     </div>
   );
 }
