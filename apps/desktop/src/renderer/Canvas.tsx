@@ -286,6 +286,7 @@ function CanvasFlow() {
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
+  const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
   const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
@@ -1803,6 +1804,16 @@ function CanvasFlow() {
         return;
       }
 
+      // CMD+G / CTRL+G to open agent modal with new worktree
+      if (modifierKey && event.key === 'g') {
+        event.preventDefault(); // Prevent default browser behavior
+        if (!isNewAgentModalOpen) {
+          setAutoCreateWorktree(true);
+          addAgentNode();
+        }
+        return;
+      }
+
       // CMD+W / CTRL+W to add workspace
       if (modifierKey && event.key === 'w') {
         event.preventDefault(); // Prevent default browser behavior
@@ -1874,13 +1885,17 @@ function CanvasFlow() {
         onClose={() => {
           setIsNewAgentModalOpen(false);
           setPendingAgentPosition(undefined);
+          setAutoCreateWorktree(false);
         }}
         onCreate={(data) => {
           createAgentNode(pendingAgentPosition, data);
           setIsNewAgentModalOpen(false);
+          setPendingAgentPosition(undefined);
+          setAutoCreateWorktree(false);
         }}
         initialPosition={pendingAgentPosition}
         initialWorkspacePath={lockedFolderPath}
+        autoCreateWorktree={autoCreateWorktree}
       />
       {/* Sidebar Panel */}
       <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>

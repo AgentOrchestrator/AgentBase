@@ -38,15 +38,22 @@ function AgentNode({ data, id, selected }: NodeProps) {
   // ---------------------------------------------------------------------------
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
 
-  // Check for prefilled workspace path (from locked folder)
+  // Check for prefilled workspace path (from Command+T modal or locked folder)
   const prefilledWorkspacePath = (initialNodeData as any).prefilledWorkspacePath as string | undefined;
 
-  // Show modal if no workspace is available (auto-open on mount)
+  // Automatically set workspace from prefilled path (from Command+T modal)
   useEffect(() => {
-    if (!agent.workspace.path && !showWorkspaceModal) {
+    if (prefilledWorkspacePath && !agent.workspace.path) {
+      agent.actions.setWorkspace(prefilledWorkspacePath);
+    }
+  }, [prefilledWorkspacePath, agent.workspace.path, agent.actions]);
+
+  // Show modal if no workspace is available and no prefilled path (auto-open on mount)
+  useEffect(() => {
+    if (!agent.workspace.path && !prefilledWorkspacePath && !showWorkspaceModal) {
       setShowWorkspaceModal(true);
     }
-  }, [agent.workspace.path, showWorkspaceModal]);
+  }, [agent.workspace.path, prefilledWorkspacePath, showWorkspaceModal]);
 
   // ---------------------------------------------------------------------------
   // Event Handlers
@@ -112,8 +119,9 @@ function AgentNode({ data, id, selected }: NodeProps) {
         nodeId={id}
       />
       {/* Modal overlay - UI state managed locally */}
+      {/* Don't show modal if workspace is already set or if prefilled path exists (will be auto-set) */}
       <WorkspaceSelectionModal
-        isOpen={showWorkspaceModal && !agent.workspace.path}
+        isOpen={showWorkspaceModal && !agent.workspace.path && !prefilledWorkspacePath}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
         initialPath={prefilledWorkspacePath || null}

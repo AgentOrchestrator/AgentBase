@@ -49,6 +49,29 @@
   gap: 8px;
 }
 
+/* Worktree wrapper - displayed above branch */
+.new-agent-modal-worktree-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.new-agent-modal-worktree-icon {
+  width: 14px;
+  height: 14px;
+  color: #888;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-worktree-path {
+  color: #888;
+  font-size: 13px;
+  font-weight: 400;
+  transition: color 0.15s ease;
+}
+
 .new-agent-modal-folder-icon {
   width: 16px;
   height: 16px;
@@ -68,7 +91,7 @@
 
 .new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-icon,
 .new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-path {
-  color: #ffffff;
+  color: #000000;
 }
 
 /* Branch wrapper - completely independent */
@@ -77,6 +100,24 @@
   align-items: center;
   gap: 4px;
   margin-left: 6px;
+  position: relative;
+}
+
+.new-agent-modal-branch-command-hint {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: #888;
+  background: var(--color-bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.7;
+  z-index: 10;
 }
 
 .new-agent-modal-branch-icon {
@@ -94,9 +135,29 @@
   transition: color 0.15s ease;
 }
 
+.new-agent-modal-branch-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #888;
+  font-size: 13px;
+  font-weight: 400;
+  font-family: inherit;
+  padding: 0;
+  margin: 0;
+  width: 120px;
+  min-width: 80px;
+}
+
+.new-agent-modal-branch-input::placeholder {
+  color: #888;
+  opacity: 0.6;
+}
+
 .new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-icon,
-.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch {
-  color: #ffffff;
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch,
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-input {
+  color: #000000;
 }
 
 .new-agent-modal-branch-dropdown {
@@ -109,9 +170,12 @@
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   min-width: 200px;
-  max-height: 300px;
+  max-height: calc(5 * 36px + 8px); /* Approximately 5 items height + padding */
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
 }
 
 .new-agent-modal-branch-dropdown-item {
@@ -120,16 +184,38 @@
   font-size: 13px;
   cursor: pointer;
   transition: background-color 0.15s ease;
+  flex-shrink: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
 }
 
 .new-agent-modal-branch-dropdown-item:hover {
   background: var(--color-bg-secondary);
 }
 
-.new-agent-modal-branch-dropdown-item.active {
+.new-agent-modal-branch-dropdown-item.active,
+.new-agent-modal-branch-dropdown-item.selected {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
   font-weight: 500;
+}
+
+.new-agent-modal-branch-dropdown-item-disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.new-agent-modal-branch-dropdown-item-disabled:hover {
+  background: transparent;
+}
+
+.new-agent-modal-command-hint {
+  float: right;
+  font-size: 11px;
+  color: #888;
+  margin-left: 8px;
+  font-weight: normal;
 }
 
 .new-agent-modal-branch-dropdown-divider {
@@ -239,4 +325,9 @@
 .new-agent-modal-create-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.new-agent-modal-create-btn:disabled:hover {
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
 }

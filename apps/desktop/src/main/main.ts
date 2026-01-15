@@ -1238,15 +1238,21 @@ ipcMain.handle('git:list-branches', async (_event, workspacePath: string): Promi
       return { success: false, error: `Path does not exist: ${workspacePath}` };
     }
 
-    // Get all local branches
+    // Get all local branches sorted by most recent commit date
     try {
-      const branchesOutput = await runGitCommand(workspacePath, ['branch', '--format=%(refname:short)']);
+      // Use for-each-ref to get branches sorted by most recent commit date
+      const branchesOutput = await runGitCommand(workspacePath, [
+        'for-each-ref',
+        '--sort=-committerdate',
+        '--format=%(refname:short)',
+        'refs/heads/'
+      ]);
       const branches = branchesOutput
         .split('\n')
         .map((b) => b.trim())
         .filter((b) => b.length > 0);
       
-      console.log('[Main] Branches retrieved', { workspacePath, branches });
+      console.log('[Main] Branches retrieved (sorted by most recent)', { workspacePath, branches });
       return { success: true, data: branches };
     } catch {
       return { success: false, error: 'Not a git repository' };
@@ -1322,6 +1328,50 @@ ipcMain.handle('git:get-info', async (_event, workspacePath: string): Promise<{ 
     return { success: true, data: gitInfo };
   } catch (error) {
     console.error('[Main] Error getting git info', { workspacePath, error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('git:create-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify path exists and is a git repo
+    if (!fs.existsSync(workspacePath)) {
+      return { success: false, error: `Path does not exist: ${workspacePath}` };
+    }
+
+    // Validate branch name
+    if (!branchName || !branchName.trim()) {
+      return { success: false, error: 'Branch name is required' };
+    }
+
+    // Sanitize branch name (remove invalid characters)
+    const sanitizedBranchName = branchName.trim().replace(/[^a-zA-Z0-9._/-]/g, '-');
+    if (!sanitizedBranchName) {
+      return { success: false, error: 'Invalid branch name' };
+    }
+
+    try {
+      // Create and checkout the new branch
+      await runGitCommand(workspacePath, ['checkout', '-b', sanitizedBranchName]);
+      console.log('[Main] Branch created and checked out', { workspacePath, branchName: sanitizedBranchName });
+      return { success: true };
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      // Check if branch already exists
+      if (errorMessage.includes('already exists')) {
+        // Try to checkout the existing branch instead
+        try {
+          await runGitCommand(workspacePath, ['checkout', sanitizedBranchName]);
+          console.log('[Main] Branch already exists, checked out existing branch', { workspacePath, branchName: sanitizedBranchName });
+          return { success: true };
+        } catch (checkoutError) {
+          return { success: false, error: (checkoutError as Error).message };
+        }
+      }
+      return { success: false, error: errorMessage };
+    }
+  } catch (error) {
+    console.error('[Main] Error creating branch', { workspacePath, branchName, error });
     return { success: false, error: (error as Error).message };
   }
 });

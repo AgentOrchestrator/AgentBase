@@ -561,6 +561,8 @@ export interface GitAPI {
   getInfo: (workspacePath: string) => Promise<GitInfo | null>;
   /** List all local git branches for a workspace path */
   listBranches: (workspacePath: string) => Promise<string[] | null>;
+  /** Create and checkout a new branch */
+  createBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 // Expose git API
@@ -579,6 +581,13 @@ contextBridge.exposeInMainWorld('gitAPI', {
     } catch {
       // Return null if branches cannot be retrieved
       return null;
+    }
+  },
+  createBranch: async (workspacePath: string, branchName: string) => {
+    try {
+      return await ipcRenderer.invoke('git:create-branch', workspacePath, branchName);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
     }
   },
 } as GitAPI);
