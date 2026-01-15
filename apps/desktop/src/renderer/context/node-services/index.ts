@@ -17,7 +17,7 @@ export type {
 // Conversation service
 export type {
   IConversationService,
-  SessionContent,
+  RendererSessionContent,
   SessionFilter,
   MessagesLoadedListener,
   ErrorListener,

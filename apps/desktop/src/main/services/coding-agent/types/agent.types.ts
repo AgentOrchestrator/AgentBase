@@ -1,7 +1,15 @@
+import { AgentType } from '@agent-orchestrator/shared';
+
 /**
- * Supported coding agent types
+ * Re-export AgentType from shared package
  */
-export type CodingAgentType = 'claude_code' | 'cursor' | 'codex';
+export { AgentType };
+
+/**
+ * Alias for backwards compatibility
+ * Supported coding agent types: 'claude_code' | 'codex' | 'cursor' | 'vscode' | 'windsurf' | 'factory' | 'other'
+ */
+export type CodingAgentType = AgentType;
 
 /**
  * Agent capabilities for runtime capability checking

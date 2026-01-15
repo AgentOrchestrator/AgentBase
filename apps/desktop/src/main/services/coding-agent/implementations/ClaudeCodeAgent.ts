@@ -29,7 +29,7 @@ import type {
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
-  SessionContent,
+  CodingAgentSessionContent,
   SessionFilterOptions,
   MessageFilterOptions,
   ContinueOptions,
@@ -995,7 +995,7 @@ export class ClaudeCodeAgent
   async getFilteredSession(
     sessionId: string,
     filter?: MessageFilterOptions
-  ): Promise<Result<SessionContent | null, AgentError>> {
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
     const projectsDir = this.getProjectsDir();
 
     try {
@@ -1033,7 +1033,7 @@ export class ClaudeCodeAgent
     sessionId: string,
     projectPath: string,
     filter?: MessageFilterOptions
-  ): SessionContent {
+  ): CodingAgentSessionContent {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.trim().split('\n').filter(line => line.trim());
     const messages: CodingAgentMessage[] = [];

@@ -5,6 +5,8 @@
  * Designed for dependency injection with all implementations being swappable.
  */
 
+import type { AgentType } from '@agent-orchestrator/shared';
+
 // =============================================================================
 // Status Types
 // =============================================================================
@@ -40,16 +42,9 @@ export type ToolType =
   | 'unknown';
 
 /**
- * Coding agent types (aligned with daemon's AgentType).
+ * Coding agent types - re-exported from shared package.
  */
-export type AgentType =
-  | 'claude_code'
-  | 'cursor'
-  | 'codex'
-  | 'windsurf'
-  | 'vscode'
-  | 'factory'
-  | 'other';
+export type { AgentType } from '@agent-orchestrator/shared';
 
 // =============================================================================
 // Status Info

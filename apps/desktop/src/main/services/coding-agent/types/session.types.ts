@@ -32,13 +32,22 @@ export interface SessionInfo {
 }
 
 /**
- * Full session content including messages
+ * Full session content including messages for coding agents.
+ * Uses CodingAgentMessage (with rich content blocks) rather than ChatMessage.
+ *
+ * Note: This is distinct from the shared SessionContent which uses ChatMessage.
  */
-export interface SessionContent extends SessionInfo {
+export interface CodingAgentSessionContent extends SessionInfo {
   messages: CodingAgentMessage[];
   /** Session metadata */
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * Alias for CodingAgentSessionContent for backward compatibility.
+ * Prefer using CodingAgentSessionContent for clarity.
+ */
+export type SessionContent = CodingAgentSessionContent;
 
 /**
  * Session summary for efficient listing (without full messages)
@@ -89,6 +98,24 @@ export interface ForkOptions {
   customSessionId?: string;
   /** Working directory for the new session (defaults to current if not provided) */
   workingDirectory?: string;
+}
+
+/**
+ * Options for checking whether a session can be forked
+ */
+export interface SessionForkCheckOptions {
+  /** Workspace/project path used to locate session storage */
+  workspacePath?: string;
+}
+
+/**
+ * Result of checking whether a session can be forked
+ */
+export interface SessionForkability {
+  /** Whether the session is eligible for forking */
+  forkable: boolean;
+  /** Optional reason when forking is not allowed */
+  reason?: string;
 }
 
 /**

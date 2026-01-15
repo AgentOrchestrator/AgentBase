@@ -1,6 +1,6 @@
 import type { Result, AgentError } from '../types/result.types';
 import type { SessionFilterOptions, MessageFilterOptions, SessionChange } from '../types/session.types';
-import type { SessionSummary, SessionContent } from '../types/session.types';
+import type { SessionSummary, CodingAgentSessionContent } from '../types/session.types';
 import type { CodingAgentMessage } from '../types/message.types';
 
 /**
@@ -45,7 +45,7 @@ export interface IChatHistoryProvider {
   getFilteredSession(
     sessionId: string,
     filter?: MessageFilterOptions
-  ): Promise<Result<SessionContent | null, AgentError>>;
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>>;
 
   /**
    * Stream messages one at a time (memory efficient for large sessions)

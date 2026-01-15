@@ -4,21 +4,13 @@
  * Extends Window interface with Electron IPC APIs.
  */
 
-import type { ElectronAPI, WorktreeAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI } from '../main/preload';
+import type { ElectronAPI, WorktreeAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI, ShellAPI } from '../main/preload';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
 
 // Declare SVG module imports (Vite handles these as URLs)
 declare module '*.svg' {
   const content: string;
   export default content;
-}
-
-// Extended ShellAPI with directory dialog (added for workspace selection)
-interface ExtendedShellAPI {
-  openWithEditor: (directoryPath: string, editor: string) => Promise<void>;
-  getAvailableEditors: () => Promise<string[]>;
-  showInFolder: (path: string) => Promise<void>;
-  openDirectoryDialog: (options?: { title?: string; defaultPath?: string }) => Promise<string | null>;
 }
 
 declare global {
@@ -29,7 +21,7 @@ declare global {
     agentStatusAPI?: AgentStatusAPI;
     llmAPI?: LLMAPI;
     representationAPI?: RepresentationAPI;
-    shellAPI?: ExtendedShellAPI;
+    shellAPI?: ShellAPI;
     canvasAPI?: import('../main/preload').CanvasAPI;
     gitAPI?: GitAPI;
   }

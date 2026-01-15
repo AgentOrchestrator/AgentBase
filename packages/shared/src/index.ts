@@ -8,3 +8,6 @@ export * from './loaders/index.js';
 
 // Agent hooks module (vendor-agnostic event system)
 export * from './hooks/index.js';
+
+// Electron IPC types for desktop app
+export * from './electron-types.js';
