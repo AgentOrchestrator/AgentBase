@@ -90,7 +90,7 @@ type ContextMenu = {
 
 function CanvasFlow() {
   // Theme hook
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   // Canvas persistence hook - centralized save/restore logic
   const {
@@ -2276,16 +2276,15 @@ function CanvasFlow() {
                 <h3>Appearance</h3>
                 <div className="settings-item">
                   <span>Color Palette</span>
-                  <label className="theme-toggle">
-                    <input
-                      type="checkbox"
-                      checked={theme === 'light'}
-                      onChange={toggleTheme}
-                    />
-                    <span className="theme-toggle-slider">
-                      <span className="theme-toggle-label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
-                    </span>
-                  </label>
+                  <select
+                    className="theme-select"
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'light-web')}
+                  >
+                    <option value="dark">Dark</option>
+                    <option value="light">Light</option>
+                    <option value="light-web">Light (Web)</option>
+                  </select>
                 </div>
               </div>
 
