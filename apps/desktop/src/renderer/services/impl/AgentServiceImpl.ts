@@ -378,29 +378,44 @@ export class AgentServiceImpl implements IAgentService {
 
     // Build and send CLI command to terminal
     if (this.adapter) {
-      let cliCommand: string;
+      // Check if REPL session is already running in the terminal
+      // This can happen after a renderer refresh when main process state is restored
+      const sessionState = window.terminalSessionAPI
+        ? await window.terminalSessionAPI.getTerminalSessionState(this.terminalService.terminalId)
+        : null;
 
-      if (isResume && this.adapter.buildResumeSessionCommand) {
-        cliCommand = this.adapter.buildResumeSessionCommand(workspacePath, sessionId);
-        console.log('[AgentService] Resuming session in terminal', {
+      if (sessionState?.agentRunning && sessionState?.sessionId === sessionId) {
+        console.log('[AgentService] REPL session already running, skipping start/resume command', {
+          agentId: this.agentId,
           sessionId,
-          workspacePath,
+          terminalId: this.terminalService.terminalId,
         });
-      } else if (this.adapter.buildStartSessionCommand) {
-        cliCommand = this.adapter.buildStartSessionCommand(workspacePath, sessionId);
-        console.log('[AgentService] Starting new session in terminal', {
-          sessionId,
-          workspacePath,
-        });
+        // Session is already running, no need to send CLI command
       } else {
-        console.warn('[AgentService] Adapter does not support CLI session commands');
-        cliCommand = '';
-      }
+        let cliCommand: string;
 
-      if (cliCommand) {
-        this.terminalService.write(cliCommand);
-        // Set up terminal clear after Claude REPL is ready
-        this.setupTerminalClearOnReady();
+        if (isResume && this.adapter.buildResumeSessionCommand) {
+          cliCommand = this.adapter.buildResumeSessionCommand(workspacePath, sessionId);
+          console.log('[AgentService] Resuming session in terminal', {
+            sessionId,
+            workspacePath,
+          });
+        } else if (this.adapter.buildStartSessionCommand) {
+          cliCommand = this.adapter.buildStartSessionCommand(workspacePath, sessionId);
+          console.log('[AgentService] Starting new session in terminal', {
+            sessionId,
+            workspacePath,
+          });
+        } else {
+          console.warn('[AgentService] Adapter does not support CLI session commands');
+          cliCommand = '';
+        }
+
+        if (cliCommand) {
+          this.terminalService.write(cliCommand);
+          // Set up terminal clear after Claude REPL is ready
+          this.setupTerminalClearOnReady();
+        }
       }
     }
 
