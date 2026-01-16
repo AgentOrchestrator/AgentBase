@@ -96,6 +96,7 @@
   color: var(--color-text-primary);
   font-size: 18px;
   font-weight: 600;
+  font-family: 'Averia Serif Libre', serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -112,6 +113,7 @@
   color: var(--color-text-secondary);
   margin-top: 4px;
   font-weight: 400;
+  font-family: 'Averia Serif Libre', serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -957,7 +959,7 @@
 
 .settings-item {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid var(--color-border);
@@ -974,9 +976,9 @@
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 10px 12px;
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   cursor: pointer;
   outline: none;
@@ -1131,14 +1133,13 @@
 }
 
 .integration-link {
-  color: #4a9eff;
-  text-decoration: none;
-  transition: color 0.2s ease;
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  transition: opacity 0.2s ease;
 }
 
 .integration-link:hover {
-  color: #6bb3ff;
-  text-decoration: underline;
+  opacity: 0.7;
 }
 
 /* Issues Pill */
