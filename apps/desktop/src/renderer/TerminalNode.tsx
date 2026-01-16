@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
+import { NodeProps, NodeResizer } from '@xyflow/react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
 import IssueDetailsModal from './IssueDetailsModal';
@@ -947,7 +947,6 @@ function TerminalNode({ data, id, selected }: NodeProps) {
           borderRadius: '50%',
         }}
       />
-      <Handle type="target" position={Position.Top} />
 
       {/* Render all attachments */}
       {attachments.map((attachment, index) => (
@@ -967,7 +966,6 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         className={`terminal-node-content ${selected ? 'active' : ''}`}
         onClick={() => terminalInstanceRef.current?.focus()}
       />
-      <Handle type="source" position={Position.Bottom} />
 
       {/* Issue Details Modal */}
       {showIssueModal && linearIssue?.id && (

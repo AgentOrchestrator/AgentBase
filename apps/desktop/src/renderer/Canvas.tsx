@@ -2010,10 +2010,10 @@ function CanvasFlow() {
         return;
       }
 
-      // CMD+W / CTRL+W to add workspace
+      // CMD+W / CTRL+W to add terminal
       if (modifierKey && event.key === 'w') {
         event.preventDefault(); // Prevent default browser behavior
-        addWorkspaceNode();
+        addTerminalNode();
       }
 
       // CMD+Shift+A / CTRL+Shift+A to add agent (legacy shortcut, still works)
@@ -2647,48 +2647,48 @@ function CanvasFlow() {
       )}
 
       {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="context-menu"
-          style={{
-            position: 'fixed',
-            top: contextMenu.y,
-            left: contextMenu.x,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="context-menu-item" onClick={() => addTerminalNode()}>
-            <span>Add Terminal</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
-            </span>
+        <>
+          <div
+            className="context-menu-overlay"
+            onClick={() => setContextMenu(null)}
+          />
+          <div
+            ref={contextMenuRef}
+            className="context-menu"
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="context-menu-item" onClick={() => addTerminalNode()}>
+              <span className="context-menu-label">Add Terminal</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
+              </span>
+            </div>
+            <div className="context-menu-item" onClick={() => addAgentNode()}>
+              <span className="context-menu-label">Add Agent</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
+              </span>
+            </div>
+            <div className="context-menu-divider" />
+            <div className="context-menu-item highlight" onClick={() => addStarterNode()}>
+              <span className="context-menu-label">New Conversation</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
+              </span>
+            </div>
+            <div className="context-menu-item" onClick={() => addConversationNode()}>
+              <span className="context-menu-label">Load Conversation</span>
+              <span className="context-menu-shortcut">
+                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘L' : 'Ctrl+Shift+L'}
+              </span>
+            </div>
           </div>
-          <div className="context-menu-item" onClick={() => addWorkspaceNode()}>
-            <span>Add Workspace</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
-            </span>
-          </div>
-          <div className="context-menu-item" onClick={() => addAgentNode()}>
-            <span>Add Agent</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
-            </span>
-          </div>
-          <div className="context-menu-divider" />
-          <div className="context-menu-item highlight" onClick={() => addStarterNode()}>
-            <span>New Conversation</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
-            </span>
-          </div>
-          <div className="context-menu-item" onClick={() => addConversationNode()}>
-            <span>Load Conversation</span>
-            <span className="context-menu-shortcut">
-              {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘L' : 'Ctrl+Shift+L'}
-            </span>
-          </div>
-        </div>
+        </>
       )}
 
         {/* Eye Icon Button - Highlight All Folders */}
