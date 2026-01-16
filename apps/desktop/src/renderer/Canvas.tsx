@@ -1031,7 +1031,11 @@ function CanvasFlow() {
         y: e.clientY,
       });
 
+      // Generate unique IDs for agent node
+      const agentId = `agent-${crypto.randomUUID()}`;
       const terminalId = `terminal-${crypto.randomUUID()}`;
+      const sessionId = crypto.randomUUID();
+      const createdAt = Date.now();
 
       // Create attachment based on type
       let attachment;
@@ -1042,17 +1046,32 @@ function CanvasFlow() {
         attachment = createLinearIssueAttachment(data);
       }
 
+      // Determine title: use Linear issue title if available, otherwise default
+      const nodeTitle = data.title 
+        ? createDefaultAgentTitle(data.title)
+        : createDefaultAgentTitle();
+
       const newNode: Node = {
-        id: `node-${Date.now()}`,
-        type: 'terminal',
+        id: `node-${createdAt}`,
+        type: 'agent',
         position,
         data: {
+          agentId,
           terminalId,
+          agentType: 'claude_code',
+          status: 'idle',
+          title: nodeTitle,
+          summary: null,
+          progress: null,
           attachments: [attachment],
+          activeView: 'overview',
+          sessionId,
+          createdAt,
+          forking: false,
         },
         style: {
-          width: 600,
-          height: 400,
+          width: 500,
+          height: 450,
         },
       };
 
