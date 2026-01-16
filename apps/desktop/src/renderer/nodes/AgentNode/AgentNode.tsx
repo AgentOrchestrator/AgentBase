@@ -5,7 +5,7 @@
  * Uses useAgentState() as the single source of truth for all agent state.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { NodeProps } from '@xyflow/react';
 import type { AgentNodeData } from '../../types/agent-node';
 import { NodeContextProvider } from '../../context';
@@ -22,7 +22,12 @@ import { useAgentState } from '../../hooks/useAgentState';
  * 3. Handles workspace selection modal (UI state only)
  */
 function AgentNode({ data, id, selected }: NodeProps) {
-  const initialNodeData = data as unknown as AgentNodeData;
+  // Capture initial data only once to prevent re-renders from unstable references
+  const initialDataRef = useRef<AgentNodeData | null>(null);
+  if (!initialDataRef.current) {
+    initialDataRef.current = data as unknown as AgentNodeData;
+  }
+  const initialNodeData = initialDataRef.current;
 
   // ---------------------------------------------------------------------------
   // Single Source of Truth: useAgentState()
@@ -37,22 +42,13 @@ function AgentNode({ data, id, selected }: NodeProps) {
   // ---------------------------------------------------------------------------
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
 
-// Use workspace path from node data (from Command+T modal or locked folder)
-  const prefilledWorkspacePath = initialNodeData.workspacePath || undefined;
-
-  // Automatically set workspace from prefilled path (from Command+T modal)
+  // Show modal if no workspace is available (auto-open on mount)
+  // Workspace path should already be set in initialNodeData if created with one
   useEffect(() => {
-    if (prefilledWorkspacePath && !agent.workspace.path) {
-      agent.actions.setWorkspace(prefilledWorkspacePath);
-    }
-  }, [prefilledWorkspacePath, agent.workspace.path, agent.actions]);
-
-  // Show modal if no workspace is available and no prefilled path (auto-open on mount)
-  useEffect(() => {
-    if (!agent.workspace.path && !prefilledWorkspacePath && !showWorkspaceModal) {
+    if (!agent.workspace.path && !showWorkspaceModal) {
       setShowWorkspaceModal(true);
     }
-  }, [agent.workspace.path, prefilledWorkspacePath, showWorkspaceModal]);
+  }, [agent.workspace.path, showWorkspaceModal]);
 
   // ---------------------------------------------------------------------------
   // Event Handlers
@@ -71,9 +67,14 @@ function AgentNode({ data, id, selected }: NodeProps) {
 
   const handleDataChange = useCallback(
     (updates: Partial<AgentNodeData>) => {
-      agent.actions.updateNodeData(updates);
+      // Dispatch update directly to Canvas for node data changes
+      window.dispatchEvent(
+        new CustomEvent('update-node', {
+          detail: { nodeId: id, data: { ...agent.nodeData, ...updates } },
+        })
+      );
     },
-    [agent.actions]
+    [id, agent.nodeData]
   );
 
   // ---------------------------------------------------------------------------
@@ -117,12 +118,11 @@ function AgentNode({ data, id, selected }: NodeProps) {
         nodeId={id}
       />
       {/* Modal overlay - UI state managed locally */}
-      {/* Don't show modal if workspace is already set or if prefilled path exists (will be auto-set) */}
       <WorkspaceSelectionModal
-        isOpen={showWorkspaceModal && !agent.workspace.path && !prefilledWorkspacePath}
+        isOpen={showWorkspaceModal && !agent.workspace.path}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
-        initialPath={prefilledWorkspacePath || null}
+        initialPath={null}
       />
     </NodeContextProvider>
   );

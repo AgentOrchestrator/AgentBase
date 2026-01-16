@@ -70,8 +70,6 @@ export interface AgentConfig {
 export interface AgentActions {
   /** Set the workspace path (creates attachment) */
   setWorkspace: (path: string) => void;
-  /** Update any field on the node data */
-  updateNodeData: (updates: Partial<AgentNodeData>) => void;
   /** Dispatch node deletion */
   deleteNode: () => void;
 }

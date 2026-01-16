@@ -103,7 +103,14 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   const [nodeData, setNodeData] = useState<AgentNodeData>(initialNodeData);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  console.log('[useAgentState] Initialized for node', initialNodeData);
+  // Track if we've logged initialization (only log once per mount)
+  const hasLoggedInit = useRef(false);
+  useEffect(() => {
+    if (!hasLoggedInit.current) {
+      console.log('[useAgentState] Initialized for node', initialNodeData);
+      hasLoggedInit.current = true;
+    }
+  }, []);
 
   // COMMENTED OUT FOR DEBUGGING - Sync external node updates
   // useEffect(() => {
@@ -326,33 +333,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
-  // COMMENTED OUT FOR DEBUGGING - dispatchNodeUpdate
-  const dispatchNodeUpdate = useCallback(
-    (updatedData: AgentNodeData) => {
-      // setNodeData(updatedData);
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId, data: updatedData },
-        })
-      );
-    },
-    [nodeId]
-  );
-
-  // COMMENTED OUT FOR DEBUGGING - Derived sessionId effect
-  // useEffect(() => {
-  //   if (nodeData.sessionId) {
-  //     return;
-  //   }
-
-  //   const derivedSessionId = deterministicUuidFromString(`agent-node:${nodeId}`);
-  //   if (sessionId === derivedSessionId) {
-  //     return;
-  //   }
-
-  //   setSessionId(derivedSessionId);
-  //   dispatchNodeUpdate({ ...nodeData, sessionId: derivedSessionId });
-  // }, [nodeId, nodeData, sessionId, dispatchNodeUpdate]);
 
   const setWorkspace = useCallback(
     (path: string) => {
@@ -364,19 +344,13 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
         workspacePath: path,
       };
 
-      dispatchNodeUpdate(updatedData);
+      window.dispatchEvent(
+        new CustomEvent('update-node', {
+          detail: { nodeId, data: updatedData },
+        })
+      );
     },
-    [nodeData, dispatchNodeUpdate]
-  );
-
-  const updateNodeData = useCallback(
-    (updates: Partial<AgentNodeData>) => {
-
-      const mergedData = { ...nodeData, ...updates };
-
-      dispatchNodeUpdate(mergedData);
-    },
-    [nodeId, nodeData, dispatchNodeUpdate]
+    [nodeId, nodeData]
   );
 
   const deleteNode = useCallback(() => {
@@ -536,7 +510,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
     nodeData,
     actions: {
       setWorkspace,
-      updateNodeData,
       deleteNode,
     },
   };
