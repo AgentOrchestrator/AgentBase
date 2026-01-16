@@ -94,6 +94,7 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
           handleClassName="agent-node-resize-handle"
         />
         <AgentChatView
+          nodeId={id}
           sessionId={agent.session.id ?? undefined}
           agentType={agent.config.agentType}
           initialMessages={agent.nodeData.chatMessages || []}

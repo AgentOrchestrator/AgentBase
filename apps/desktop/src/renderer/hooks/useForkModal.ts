@@ -271,8 +271,6 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           id: newEdgeId,
           source: modalData.sourceNodeId,
           target: newNodeId,
-          sourceHandle: null,
-          targetHandle: null,
         };
 
         console.log('[useForkModal] Fork created successfully:', {

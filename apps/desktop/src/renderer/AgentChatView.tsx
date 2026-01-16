@@ -11,6 +11,7 @@ import { marked } from 'marked';
 import { useReactFlow } from '@xyflow/react';
 import { useChatSession } from './nodes/AgentChatNode/hooks/useChatSession';
 import { useAgentService } from './context';
+import { TextSelectionButton } from './components/TextSelectionButton';
 import type { AgentChatMessage } from './types/agent-node';
 import type { AgentContentBlock } from '@agent-orchestrator/shared';
 import './AgentChatView.css';
@@ -30,6 +31,8 @@ interface AgentChatViewProps {
   onSessionCreated?: (sessionId: string) => void;
   isSessionReady?: boolean;
   selected?: boolean;
+  /** Node ID for fork events */
+  nodeId: string;
 }
 
 // Represents a displayable item for assistant messages (matches ConversationNode)
@@ -47,6 +50,7 @@ export default function AgentChatView({
   onSessionCreated,
   isSessionReady = true,
   selected = false,
+  nodeId,
 }: AgentChatViewProps) {
   const [messages, setMessages] = useState<AgentChatMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
@@ -482,15 +486,13 @@ export default function AgentChatView({
         
         {/* Plus button - appears when text is selected, follows mouse */}
         {textSelection && mouseY !== null && (
-          <div
-            className="conversation-message-plus-button"
-            style={{
-              top: `${mouseY}px`,
-              right: `${textSelection.position.right}px`,
-            }}
-          >
-            +
-          </div>
+          <TextSelectionButton
+            text={textSelection.text}
+            mouseY={mouseY}
+            rightOffset={textSelection.position.right}
+            nodeId={nodeId}
+            sessionId={sessionId}
+          />
         )}
       </div>
 

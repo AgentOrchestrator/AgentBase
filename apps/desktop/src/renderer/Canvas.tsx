@@ -31,7 +31,6 @@ import {
   useSidebarState,
   usePillState,
   useCanvasDrop,
-  useChatMessageFork,
   type LinearIssue,
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
@@ -60,6 +59,22 @@ type ContextMenu = {
   x: number;
   y: number;
 } | null;
+
+const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  return edges
+    .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+    .map((edge) => {
+      const nextEdge: Edge = { ...edge };
+      if (nextEdge.sourceHandle == null) {
+        delete nextEdge.sourceHandle;
+      }
+      if (nextEdge.targetHandle == null) {
+        delete nextEdge.targetHandle;
+      }
+      return nextEdge;
+    });
+};
 
 function CanvasFlow() {
   // Theme hook
@@ -127,8 +142,9 @@ function CanvasFlow() {
           const { boxShadow, borderRadius, ...restStyle } = node.style as Record<string, unknown>;
           return { ...node, style: restStyle };
         });
+        const cleanedEdges = sanitizeEdges(initialEdges, cleanedNodes);
         setNodes(cleanedNodes);
-        setEdges(initialEdges);
+        setEdges(cleanedEdges);
         initialStateApplied.current = true;
       }
     }
@@ -230,12 +246,39 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
     },
   });
 
-  // Chat message fork - lightweight fork from text selection (positions to right)
-  useChatMessageFork({
-    nodes,
-    onAddNode: (node) => setNodes((nds) => [...nds, node]),
-    onAddEdge: (edge) => setEdges((eds) => [...eds, edge]),
-  });
+  // Chat message fork - listen for text selection fork events
+  useEffect(() => {
+    const handleChatMessageFork = (event: Event) => {
+      const customEvent = event as CustomEvent<{ nodeId: string; selectedText: string }>;
+      const { nodeId, selectedText } = customEvent.detail;
+
+      console.log('[Canvas] chat-message-fork event:', {
+        nodeId,
+        selectedText: selectedText.slice(0, 50) + (selectedText.length > 50 ? '...' : ''),
+      });
+
+      // Find the source node
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      if (!sourceNode) {
+        console.error('[Canvas] Source node not found:', nodeId);
+        return;
+      }
+
+      // Calculate position to the RIGHT of source node
+      const nodeWidth = (sourceNode.width as number) || (sourceNode.style?.width as number) || 600;
+      const horizontalSpacing = 100;
+      const forkPosition = {
+        x: sourceNode.position.x + nodeWidth + horizontalSpacing,
+        y: sourceNode.position.y,
+      };
+
+      // Open the fork modal
+      forkModal.open(nodeId, forkPosition);
+    };
+
+    window.addEventListener('chat-message-fork', handleChatMessageFork);
+    return () => window.removeEventListener('chat-message-fork', handleChatMessageFork);
+  }, [nodes, forkModal]);
 
   // Check if there are any agents
   const hasAgents = useMemo(() => {
@@ -262,21 +305,10 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
     const handleUpdateNode = (event: CustomEvent) => {
       const { nodeId, data } = event.detail;
       const existingNode = nodeStore.getNode(nodeId);
-      console.warn('[Canvas] handleUpdateNode BEFORE', {
-        nodeId,
-        agentId: (data as Record<string, unknown>)?.agentId,
-        existingData: existingNode?.data,
-        incomingData: data,
-      });
       nodeStore.updateNode(nodeId, data as Record<string, unknown>);
       setNodes((nds) =>
         nds.map((node) => (node.id === nodeId ? { ...node, data: { ...data } } : node))
       );
-      console.warn('[Canvas] handleUpdateNode AFTER', {
-        nodeId,
-        agentId: (data as Record<string, unknown>)?.agentId,
-        updatedData: data,
-      });
     };
 
     const handleDeleteNode = (event: CustomEvent) => {
@@ -356,7 +388,17 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   // =============================================================================
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    (params: Connection) =>
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...params,
+            sourceHandle: params.sourceHandle ?? undefined,
+            targetHandle: params.targetHandle ?? undefined,
+          },
+          eds
+        )
+      ),
     [setEdges]
   );
 

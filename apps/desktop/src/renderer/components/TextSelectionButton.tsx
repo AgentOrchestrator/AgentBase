@@ -6,7 +6,7 @@
  * fork of the conversation.
  */
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 
 export interface TextSelectionButtonProps {
   /** The selected text content */
@@ -40,17 +40,24 @@ export function TextSelectionButton({
   nodeId,
   sessionId,
 }: TextSelectionButtonProps) {
-  const handleClick = useCallback(() => {
-    const detail: ChatMessageForkEventDetail = {
-      nodeId,
-      sessionId,
-      selectedText: text,
-    };
+  // Use onMouseDown instead of onClick to fire before selection clears
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      // Prevent default to avoid clearing the text selection
+      e.preventDefault();
+      // Stop propagation to prevent parent handlers
+      e.stopPropagation();
 
-    window.dispatchEvent(
-      new CustomEvent('chat-message-fork', { detail })
-    );
-  }, [nodeId, sessionId, text]);
+      const detail: ChatMessageForkEventDetail = {
+        nodeId,
+        sessionId,
+        selectedText: text,
+      };
+
+      window.dispatchEvent(new CustomEvent('chat-message-fork', { detail }));
+    },
+    [nodeId, sessionId, text]
+  );
 
   return (
     <div
@@ -59,7 +66,7 @@ export function TextSelectionButton({
         top: `${mouseY}px`,
         right: `${rightOffset}px`,
       }}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
       role="button"
       aria-label="Fork conversation from selection"
     >
