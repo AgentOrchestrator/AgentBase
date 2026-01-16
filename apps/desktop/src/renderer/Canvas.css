@@ -123,6 +123,10 @@
   text-overflow: ellipsis;
 }
 
+.canvas-sidebar.collapsed .sidebar-username {
+  display: none;
+}
+
 .sidebar-error {
   font-size: 11px;
   color: #ff4444;
