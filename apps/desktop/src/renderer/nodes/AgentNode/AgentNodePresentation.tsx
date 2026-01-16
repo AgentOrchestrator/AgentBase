@@ -580,6 +580,7 @@ export function AgentNodePresentation({
         </div>
         <div style={{ display: activeView === 'chat' ? 'contents' : 'none' }}>
           <AgentChatView
+            nodeId={nodeId || ''}
             sessionId={data.sessionId}
             agentType={data.agentType}
             initialMessages={data.chatMessages}
@@ -627,53 +628,42 @@ export function AgentNodePresentation({
         {/* Fork button */}
         <div
           className="agent-node-fork-button-wrapper"
-          onClick={(e) => {
-            // Prevent triggering drag when clicking
-            e.stopPropagation();
-            if (!nodeId) return;
-            // Dispatch custom event for fork on click
-            const forkEvent = new CustomEvent('agent-node:fork-click', {
-              detail: { nodeId },
-              bubbles: true,
-            });
-            e.currentTarget.dispatchEvent(forkEvent);
-          }}
-          onMouseDown={(e) => {
-            // Allow drag to still work - only prevent if it's a pure click (no drag)
-            // We'll track if mouse moves
-            if (!nodeId) return;
-            let hasMoved = false;
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const handleMouseMove = (moveEvent: MouseEvent) => {
-              const deltaX = Math.abs(moveEvent.clientX - startX);
-              const deltaY = Math.abs(moveEvent.clientY - startY);
-              if (deltaX > 5 || deltaY > 5) {
-                hasMoved = true;
-              }
-            };
-            const handleMouseUp = () => {
-              document.removeEventListener('mousemove', handleMouseMove);
-              document.removeEventListener('mouseup', handleMouseUp);
-              // If mouse didn't move, it was a click, not a drag
-              if (!hasMoved) {
-                e.stopPropagation();
-                const forkEvent = new CustomEvent('agent-node:fork-click', {
-                  detail: { nodeId },
-                  bubbles: true,
-                });
-                e.currentTarget.dispatchEvent(forkEvent);
-              }
-            };
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-          }}
         >
           <Handle 
             type="source" 
             position={Position.Bottom}
-          className="agent-node-bottom-handle"
-        />
+            className="agent-node-bottom-handle"
+            onMouseDown={(e) => {
+              // Allow drag to still work - only treat as click if there's no movement.
+              if (!nodeId) return;
+              e.stopPropagation();
+              let hasMoved = false;
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                const deltaX = Math.abs(moveEvent.clientX - startX);
+                const deltaY = Math.abs(moveEvent.clientY - startY);
+                if (deltaX > 5 || deltaY > 5) {
+                  hasMoved = true;
+                }
+              };
+              const handleMouseUp = (upEvent: MouseEvent) => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                // If mouse didn't move, it was a click, not a drag.
+                if (!hasMoved) {
+                  upEvent.stopPropagation();
+                  window.dispatchEvent(
+                    new CustomEvent('agent-node:fork-click', {
+                      detail: { nodeId },
+                    })
+                  );
+                }
+              };
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
         </div>
       </div>
 
