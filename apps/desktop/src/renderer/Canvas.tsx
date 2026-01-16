@@ -1218,6 +1218,129 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                 })}
               </div>
             )}
+
+            {/* Linear Issues Container - Fixed at bottom */}
+            {linear.isConnected && (
+              <div className="sidebar-linear-issues-container">
+                <div className="sidebar-linear-issues-header">
+                  <h3 className="sidebar-linear-issues-title">Linear Issues</h3>
+                  <span className="sidebar-linear-issues-workspace">
+                    {linear.workspaceName || (linear.isLoading ? 'Loading...' : 'Unknown')}
+                  </span>
+                </div>
+
+                <div className="sidebar-linear-issues-filters">
+                  <div className="sidebar-linear-issues-filter">
+                    <label htmlFor="sidebar-issues-filter-project">Project</label>
+                    <select
+                      id="sidebar-issues-filter-project"
+                      className="sidebar-issues-select"
+                      value={linear.selectedProjectId}
+                      onChange={(event) => linear.setFilter('selectedProjectId', event.target.value)}
+                    >
+                      <option value="all">All projects</option>
+                      {linear.hasUnassignedProject && <option value="none">No project</option>}
+                      {linear.projectOptions.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sidebar-linear-issues-filter">
+                    <label htmlFor="sidebar-issues-filter-milestone">Milestone</label>
+                    <select
+                      id="sidebar-issues-filter-milestone"
+                      className="sidebar-issues-select"
+                      value={linear.selectedMilestoneId}
+                      onChange={(event) => linear.setFilter('selectedMilestoneId', event.target.value)}
+                    >
+                      <option value="all">All milestones</option>
+                      {linear.hasUnassignedMilestone && <option value="none">No milestone</option>}
+                      {linear.visibleMilestoneOptions.map((milestone) => (
+                        <option key={milestone.id} value={milestone.id}>
+                          {milestone.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sidebar-linear-issues-filter">
+                    <label htmlFor="sidebar-issues-filter-status">Status</label>
+                    <select
+                      id="sidebar-issues-filter-status"
+                      className="sidebar-issues-select"
+                      value={linear.selectedStatusId}
+                      onChange={(event) => linear.setFilter('selectedStatusId', event.target.value)}
+                    >
+                      <option value="all">All statuses</option>
+                      {linear.statusOptions.map((state) => (
+                        <option key={state.id} value={state.id}>
+                          {state.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="sidebar-linear-issues-list">
+                  {linear.isLoading ? (
+                    <div className="sidebar-linear-issues-loading">Loading issues...</div>
+                  ) : linear.filteredIssues.length === 0 ? (
+                    <div className="sidebar-linear-issues-empty">
+                      {linear.issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
+                    </div>
+                  ) : (
+                    linear.filteredIssues.map((issue: LinearIssue) => {
+                      const projectLabel = issue.project?.name;
+                      const milestoneLabel = issue.projectMilestone?.name;
+                      return (
+                        <div
+                          key={issue.id}
+                          className="sidebar-issue-card"
+                          draggable
+                          onDragStart={(e) => canvasDrop.handleIssueDragStart(e, issue)}
+                        >
+                          <div className="sidebar-issue-header">
+                            <span className="sidebar-issue-identifier">{issue.identifier}</span>
+                            <span
+                              className="sidebar-issue-status"
+                              style={{ backgroundColor: issue.state.color }}
+                            >
+                              {issue.state.name}
+                            </span>
+                          </div>
+                          <div className="sidebar-issue-title">{issue.title}</div>
+                          {(projectLabel || milestoneLabel) && (
+                            <div className="sidebar-issue-meta">
+                              {projectLabel && <span>Project: {projectLabel}</span>}
+                              {projectLabel && milestoneLabel && (
+                                <span className="sidebar-issue-meta-sep">|</span>
+                              )}
+                              {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
+                            </div>
+                          )}
+                          {issue.assignee && (
+                            <div className="sidebar-issue-assignee">
+                              {issue.assignee.avatarUrl && (
+                                <img
+                                  src={issue.assignee.avatarUrl}
+                                  alt={issue.assignee.name}
+                                  className="sidebar-assignee-avatar"
+                                />
+                              )}
+                              <span className="sidebar-assignee-name">{issue.assignee.name}</span>
+                            </div>
+                          )}
+                          <div className="sidebar-issue-priority">
+                            Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
