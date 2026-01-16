@@ -92,7 +92,14 @@ function CanvasFlow() {
           agentId: (n.data as Record<string, unknown>)?.agentId,
           title: ((n.data as Record<string, unknown>)?.title as { value?: string })?.value,
         })));
-        setNodes(initialNodes);
+        // Strip any persisted highlight styles (boxShadow/borderRadius on agent nodes)
+        // Highlighting is transient UI state, not meant to persist across refreshes
+        const cleanedNodes = initialNodes.map((node) => {
+          if (node.type !== 'agent' || !node.style) return node;
+          const { boxShadow, borderRadius, ...restStyle } = node.style as Record<string, unknown>;
+          return { ...node, style: restStyle };
+        });
+        setNodes(cleanedNodes);
         setEdges(initialEdges);
         initialStateApplied.current = true;
       }
@@ -1310,29 +1317,42 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
         )}
 
         {contextMenu && (
-          <div
-            ref={contextMenuRef}
-            className="context-menu"
-            style={{
-              position: 'fixed',
-              top: contextMenu.y,
-              left: contextMenu.x,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="context-menu-item" onClick={() => canvasActions.addTerminalNode()}>
-              <span>Add Terminal</span>
-              <span className="context-menu-shortcut">
-                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
-              </span>
+          <>
+            <div
+              className="context-menu-overlay"
+              onClick={() => setContextMenu(null)}
+            />
+            <div
+              ref={contextMenuRef}
+              className="context-menu"
+              style={{
+                position: 'fixed',
+                top: contextMenu.y,
+                left: contextMenu.x,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="context-menu-item" onClick={() => canvasActions.addTerminalNode()}>
+                <span className="context-menu-label">Add Terminal</span>
+                <span className="context-menu-shortcut">
+                  {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
+                </span>
+              </div>
+              <div className="context-menu-item" onClick={() => canvasActions.addAgentNode()}>
+                <span className="context-menu-label">Add Agent</span>
+                <span className="context-menu-shortcut">
+                  {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
+                </span>
+              </div>
+              <div className="context-menu-divider" />
+              <div className="context-menu-item highlight" onClick={() => canvasActions.addStarterNode()}>
+                <span className="context-menu-label">New Conversation</span>
+                <span className="context-menu-shortcut">
+                  {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
+                </span>
+              </div>
             </div>
-            <div className="context-menu-item" onClick={() => canvasActions.addAgentNode()}>
-              <span>Add Agent</span>
-              <span className="context-menu-shortcut">
-                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
-              </span>
-            </div>
-          </div>
+          </>
         )}
 
         {/* Eye Icon Button - Highlight All Folders */}
