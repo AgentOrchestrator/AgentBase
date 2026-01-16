@@ -384,6 +384,26 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   }
 
   // ============================================
+  // CLI REPL Session Commands
+  // ============================================
+
+  /**
+   * Build command to start a new CLI REPL session with a specific session ID.
+   */
+  buildStartSessionCommand(workspacePath: string, sessionId: string): string {
+    const escapedPath = workspacePath.replace(/"/g, '\\"');
+    return `cd "${escapedPath}" && claude --session-id ${sessionId}\n`;
+  }
+
+  /**
+   * Build command to resume an existing CLI REPL session.
+   */
+  buildResumeSessionCommand(workspacePath: string, sessionId: string): string {
+    const escapedPath = workspacePath.replace(/"/g, '\\"');
+    return `cd "${escapedPath}" && claude --resume ${sessionId}\n`;
+  }
+
+  // ============================================
   // Events
   // ============================================
 

@@ -764,13 +764,20 @@ export class ClaudeCodeAgent
   }
 
   /**
+   * Encode a workspace path the same way Claude Code does.
+   * Both forward slashes and spaces are replaced with hyphens.
+   * Example: /Users/foo/My Project -> -Users-foo-My-Project
+   */
+  private encodeWorkspacePath(workspacePath: string): string {
+    return workspacePath.replace(/[/ ]/g, '-');
+  }
+
+  /**
    * Check if a session file exists for the given session ID and workspace path.
    * A session is considered "active" if its JSONL file exists on disk.
    */
   async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
-    // Encode workspace path the same way Claude Code does:
-    // /Users/foo/project -> -Users-foo-project
-    const encodedPath = workspacePath.replace(/\//g, '-');
+    const encodedPath = this.encodeWorkspacePath(workspacePath);
     const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
     return fs.existsSync(sessionFilePath);
   }
@@ -854,7 +861,7 @@ export class ClaudeCodeAgent
         // For filtering, encode the filter path the same way Claude Code does
         // so we can compare encoded paths directly (avoids hyphen corruption issue)
         if (filter?.projectPath) {
-          const encodedFilterPath = filter.projectPath.replace(/\//g, '-');
+          const encodedFilterPath = this.encodeWorkspacePath(filter.projectPath);
           if (projectDir !== encodedFilterPath) continue;
         }
         if (filter?.projectName && projectName !== filter.projectName) continue;

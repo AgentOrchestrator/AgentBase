@@ -393,6 +393,28 @@ export interface ICodingAgentAdapter {
   ): Promise<Result<SessionInfo | null, AgentError>>;
 
   // ============================================
+  // CLI REPL Session Commands
+  // ============================================
+
+  /**
+   * Build command to start a new CLI REPL session with a specific session ID.
+   * Used when creating a new agent node.
+   * @param workspacePath - Directory to run the CLI in
+   * @param sessionId - UUID for the new session
+   * @returns Shell command string including newline
+   */
+  buildStartSessionCommand?(workspacePath: string, sessionId: string): string;
+
+  /**
+   * Build command to resume an existing CLI REPL session.
+   * Used when restoring a node from canvas or after page refresh.
+   * @param workspacePath - Directory to run the CLI in
+   * @param sessionId - UUID of the session to resume
+   * @returns Shell command string including newline
+   */
+  buildResumeSessionCommand?(workspacePath: string, sessionId: string): string;
+
+  // ============================================
   // Events
   // ============================================
 

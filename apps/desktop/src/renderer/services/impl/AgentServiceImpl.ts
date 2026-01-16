@@ -267,20 +267,85 @@ export class AgentServiceImpl implements IAgentService {
   }
 
   // =============================================================================
+  // Terminal Helpers
+  // =============================================================================
+
+  /**
+   * Wait for terminal to be ready (shell initialized).
+   * Resolves when first data is received or after timeout.
+   */
+  private waitForTerminalReady(timeoutMs = 2000): Promise<void> {
+    return new Promise((resolve) => {
+      let resolved = false;
+
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.log('[AgentService] Terminal ready (timeout fallback)');
+          resolve();
+        }
+      }, timeoutMs);
+
+      const unsubscribe = this.terminalService.onData(() => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          unsubscribe();
+          console.log('[AgentService] Terminal ready (data received)');
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Wait for Claude REPL to be ready, then clear terminal.
+   * Looks for indicators that Claude has started (e.g., prompt or welcome message).
+   */
+  private setupTerminalClearOnReady(timeoutMs = 3000): void {
+    let resolved = false;
+
+    const unsubscribe = this.terminalService.onData((data) => {
+      // Look for Claude's ready indicator
+      // Claude Code typically shows a welcome message or prompt
+      if (!resolved && (data.includes('Claude') || data.includes('>'))) {
+        resolved = true;
+        unsubscribe();
+        // Small delay to ensure full initialization
+        setTimeout(() => {
+          console.log('[AgentService] Clearing terminal (Claude ready)');
+          this.terminalService.write('\x1bc'); // Full terminal reset
+        }, 100);
+      }
+    });
+
+    // Fallback timeout in case detection fails
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unsubscribe();
+        console.log('[AgentService] Clearing terminal (timeout fallback)');
+        this.terminalService.write('\x1bc');
+      }
+    }, timeoutMs);
+  }
+
+  // =============================================================================
   // Public Lifecycle API
   // =============================================================================
 
   /**
-   * Start the coding agent (initializes adapter).
-   * Call setWorkspace() first if you need to navigate to a directory.
+   * Start the coding agent CLI REPL in the terminal.
+   * Call setWorkspace() first to set the working directory.
+   * @param sessionId - UUID for the session (required for new sessions, used for resume check)
+   * @param initialPrompt - Optional initial prompt (currently unused - user types in terminal)
    */
-  async start(sessionId?: string, initialPrompt?: string): Promise<void> {
+  async start(sessionId?: string, _initialPrompt?: string): Promise<void> {
     console.log('[AgentService] start() called', {
       agentId: this.agentId,
       terminalId: this.terminalService.terminalId,
       isRunning: this.isRunning,
       sessionId,
-      hasInitialPrompt: !!initialPrompt,
     });
 
     if (this.isRunning) {
@@ -290,34 +355,61 @@ export class AgentServiceImpl implements IAgentService {
       return;
     }
 
-    // Ensure terminal is ready for display
+    // Require workspace and session ID
+    const workspacePath = this.requireWorkspace();
+    if (!sessionId) {
+      console.error('[AgentService] start() requires sessionId');
+      this.updateStatus('error', {
+        errorMessage: 'Session ID is required to start the agent',
+      });
+      return;
+    }
+
+    // Ensure terminal is created
     if (!this.terminalService.isRunning()) {
       await this.terminalService.create();
-      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    // Wait for terminal to be ready (shell initialized)
+    await this.waitForTerminalReady();
+
+    // Check if this is a resume (session file exists)
+    const isResume = await this.isSessionActive(sessionId);
+
+    // Build and send CLI command to terminal
+    if (this.adapter) {
+      let cliCommand: string;
+
+      if (isResume && this.adapter.buildResumeSessionCommand) {
+        cliCommand = this.adapter.buildResumeSessionCommand(workspacePath, sessionId);
+        console.log('[AgentService] Resuming session in terminal', {
+          sessionId,
+          workspacePath,
+        });
+      } else if (this.adapter.buildStartSessionCommand) {
+        cliCommand = this.adapter.buildStartSessionCommand(workspacePath, sessionId);
+        console.log('[AgentService] Starting new session in terminal', {
+          sessionId,
+          workspacePath,
+        });
+      } else {
+        console.warn('[AgentService] Adapter does not support CLI session commands');
+        cliCommand = '';
+      }
+
+      if (cliCommand) {
+        this.terminalService.write(cliCommand);
+        // Set up terminal clear after Claude REPL is ready
+        this.setupTerminalClearOnReady();
+      }
     }
 
     this.isRunning = true;
-    this.currentSessionId = sessionId || null;
+    this.currentSessionId = sessionId;
     this.updateStatus('running');
 
     // Persist session state to main process (survives renderer refresh)
     await this.persistSessionStateToMainProcess(sessionId);
-
-    // If initial prompt provided, send it
-    if (initialPrompt) {
-      try {
-        if (sessionId) {
-          await this.resumeSessionStreaming(sessionId, initialPrompt, () => {});
-        } else {
-          await this.sendMessageStreaming(initialPrompt, () => {});
-        }
-      } catch (error) {
-        console.error('[AgentService] Failed to send initial prompt:', error);
-        this.updateStatus('error', {
-          errorMessage: error instanceof Error ? error.message : 'Failed to send initial prompt',
-        });
-      }
-    }
   }
 
   /**
