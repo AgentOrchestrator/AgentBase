@@ -20,10 +20,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type {
   AgentAction,
-  AgentEvent,
   ClarifyingQuestion,
   GitInfo,
-  PermissionPayload,
 } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import { agentActionStore } from '../../stores';
@@ -33,6 +31,7 @@ import type {
   WorkspaceSource,
   SessionReadiness,
 } from './types';
+import type { AgentAdapterEvent } from '../../context/node-services';
 
 // =============================================================================
 // Deterministic Session ID - Commented out for future use
@@ -78,7 +77,7 @@ import type {
 // Main Hook
 // =============================================================================
 
-export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): AgentState {
+export function useAgentState({ nodeId, initialNodeData, agentService }: UseAgentStateInput): AgentState {
   // const { getNodes, getEdges } = useReactFlow(); // Commented - will be used when workspace inheritance is re-enabled
   useReactFlow(); // Keep hook call for potential future use
 
@@ -338,43 +337,49 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
       .filter((question): question is ClarifyingQuestion => Boolean(question));
   };
 
-  const buildActionFromPermissionEvent = (
-    event: AgentEvent<PermissionPayload>
+  /**
+   * Build an AgentAction from a typed PermissionRequestPayload event.
+   * Used when subscribing via agentService.onAgentEvent('permission:request', handler).
+   */
+  const buildActionFromTypedPermissionEvent = (
+    event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
   ): AgentAction | null => {
-    const raw = event.raw as { toolInput?: Record<string, unknown>; toolUseId?: string } | undefined;
-    const toolInput = raw?.toolInput;
-    const toolName = event.payload.toolName;
-    const resolvedAgentId = event.agentId ?? nodeData.agentId;
+    const { payload, agentId: eventAgentId, sessionId: eventSessionId } = event;
+    const resolvedAgentId = eventAgentId ?? nodeData.agentId;
+    const toolName = payload.toolName;
+    const toolInput = payload.toolInput;
+    const actionId = `${resolvedAgentId}-${payload.toolUseId ?? Date.now()}`;
+    const timestamp = new Date().toISOString();
 
     if (toolName && toolName.toLowerCase() === 'askuserquestion') {
       const questions = toClarifyingQuestions(toolInput);
       return {
-        id: event.id,
+        id: actionId,
         type: 'clarifying_question',
         agentId: resolvedAgentId,
-        agentType: event.agent,
-        sessionId: event.sessionId,
-        workspacePath: event.workspacePath,
-        toolUseId: raw?.toolUseId,
-        createdAt: event.timestamp,
+        agentType: nodeData.agentType,
+        sessionId: eventSessionId,
+        workspacePath: payload.workingDirectory,
+        toolUseId: payload.toolUseId,
+        createdAt: timestamp,
         questions,
       };
     }
 
     return {
-      id: event.id,
+      id: actionId,
       type: 'tool_approval',
       agentId: resolvedAgentId,
-      agentType: event.agent,
-      sessionId: event.sessionId,
-      workspacePath: event.workspacePath,
-      toolUseId: raw?.toolUseId,
-      createdAt: event.timestamp,
+      agentType: nodeData.agentType,
+      sessionId: eventSessionId,
+      workspacePath: payload.workingDirectory,
+      toolUseId: payload.toolUseId,
+      createdAt: timestamp,
       toolName: toolName || 'Unknown tool',
-      command: event.payload.command,
-      filePath: event.payload.filePath,
-      workingDirectory: event.payload.workingDirectory,
-      reason: event.payload.reason,
+      command: payload.command,
+      filePath: payload.filePath,
+      workingDirectory: payload.workingDirectory,
+      reason: payload.reason,
       input: toolInput,
     };
   };
@@ -391,40 +396,41 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // ---------------------------------------------------------------------------
   // Hook Events (permission requests, questions)
   // ---------------------------------------------------------------------------
+
+  // Typed event subscription via agentService
   useEffect(() => {
-    if (!window.codingAgentAPI?.onAgentEvent) {
-      return;
-    }
+    if (!agentService) return;
 
-    const unsubscribe = window.codingAgentAPI.onAgentEvent((event) => {
-      const typedEvent = event as AgentEvent<PermissionPayload>;
-      if (typedEvent.type !== 'permission:request') {
+    const unsubscribe = agentService.onAgentEvent('permission:request', (event) => {
+      // event is now typed as Extract<AgentAdapterEvent, { type: 'permission:request' }>
+      const { agentId: eventAgentId, sessionId: eventSessionId } = event;
+
+      // Filter by agentId if present
+      if (eventAgentId && eventAgentId !== nodeData.agentId) {
         return;
       }
 
-      if (typedEvent.agentId && typedEvent.agentId !== nodeData.agentId) {
+      // Filter by sessionId if no agentId but sessionId is present
+      if (!eventAgentId && eventSessionId && sessionId && eventSessionId !== sessionId) {
         return;
       }
 
-      if (!typedEvent.agentId && typedEvent.sessionId && sessionId && typedEvent.sessionId !== sessionId) {
+      const actionId = `${eventAgentId ?? nodeData.agentId}-${event.payload.toolUseId ?? Date.now()}`;
+      if (actionIdsRef.current.has(actionId)) {
         return;
       }
 
-      if (actionIdsRef.current.has(typedEvent.id)) {
-        return;
-      }
-
-      const action = buildActionFromPermissionEvent(typedEvent);
+      const action = buildActionFromTypedPermissionEvent(event);
       if (!action) {
         return;
       }
 
-      actionIdsRef.current.add(typedEvent.id);
+      actionIdsRef.current.add(actionId);
       agentActionStore.addAction(action);
     });
 
     return unsubscribe;
-  }, [nodeData.agentId, sessionId]);
+  }, [agentService, nodeData.agentId, sessionId]);
 
   // ---------------------------------------------------------------------------
   // Return Complete State

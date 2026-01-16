@@ -72,7 +72,7 @@ export function AgentNodePresentation({
   // Auto-start CLI when initialized (if enabled)
   useEffect(() => {
     if (isInitialized && agent.isAutoStartEnabled() && isSessionReady) {
-      agent.start(undefined, data.sessionId, data.initialPrompt).catch((err) => {
+      agent.start(data.sessionId, data.initialPrompt).catch((err) => {
         console.error('[AgentNode] Failed to auto-start agent:', err);
       });
     }
@@ -430,6 +430,13 @@ export function AgentNodePresentation({
         </div>
       )}
 
+      {/* Session Label - Bottom */}
+      {data.sessionId && (
+        <div className="agent-node-session-label">
+          Session: {data.sessionId.slice(0, 8)}...
+        </div>
+      )}
+
       <div
         className={`agent-node ${isDragOver ? 'drag-over' : ''} ${selected ? 'selected' : ''}`}
         onDragOver={handleDragOver}
@@ -572,10 +579,8 @@ export function AgentNodePresentation({
         </div>
         <div style={{ display: activeView === 'chat' ? 'contents' : 'none' }}>
           <AgentChatView
-            agentId={data.agentId}
             sessionId={data.sessionId}
             agentType={data.agentType}
-            workspacePath={workspacePath ?? undefined}
             initialMessages={data.chatMessages}
             onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
             onSessionCreated={(sessionId) => onDataChange({ sessionId })}

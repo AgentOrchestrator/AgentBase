@@ -2,80 +2,108 @@
  * AgentChatNode (Container)
  *
  * Container component for interactive chat with Claude Code via SDK.
- * Uses AgentChatView (same as agent node) wrapped in node container.
+ * Uses NodeContextProvider to provide agentService to AgentChatView.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { NodeProps, NodeResizer } from '@xyflow/react';
 import AgentChatView from '../../AgentChatView';
-import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+import { NodeContextProvider } from '../../context';
+import { useAgentState } from '../../hooks/useAgentState';
+import type { AgentNodeData } from '../../types/agent-node';
 import '../../AgentNode.css';
 
-interface AgentChatNodeData {
-  sessionId?: string;
-  agentType: string;
-  workspacePath?: string;
-  title?: string;
-  isExpanded?: boolean;
-  messages: CodingAgentMessage[];
-  isDraft: boolean;
-  agentId?: string;
-}
-
+/**
+ * AgentChatNode
+ *
+ * Container component that:
+ * 1. Uses useAgentState() for state management
+ * 2. Sets up NodeContextProvider with agent-specific services
+ * 3. Renders AgentChatView for chat functionality
+ */
 function AgentChatNode({ data, id, selected }: NodeProps) {
-  const nodeData = data as unknown as AgentChatNodeData;
+  // Capture initial data only once to prevent re-renders from unstable references
+  const initialDataRef = useRef<AgentNodeData | null>(null);
+  if (!initialDataRef.current) {
+    initialDataRef.current = data as unknown as AgentNodeData;
+  }
+  const initialNodeData = initialDataRef.current;
 
-  const dispatchNodeUpdate = useCallback(
-    (updates: Partial<AgentChatNodeData>) => {
-      const updatedData = { ...nodeData, ...updates };
+  // ---------------------------------------------------------------------------
+  // Single Source of Truth: useAgentState()
+  // ---------------------------------------------------------------------------
+  const agent = useAgentState({
+    nodeId: id,
+    initialNodeData,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Event Handlers
+  // ---------------------------------------------------------------------------
+  const handleDataChange = useCallback(
+    (updates: Partial<AgentNodeData>) => {
       window.dispatchEvent(
         new CustomEvent('update-node', {
-          detail: { nodeId: id, data: updatedData },
+          detail: { nodeId: id, data: { ...agent.nodeData, ...updates } },
         })
       );
     },
-    [id, nodeData]
+    [id, agent.nodeData]
   );
 
-  const handleMessagesChange = useCallback(
-    (messages: CodingAgentMessage[]) => {
-      dispatchNodeUpdate({ messages });
-    },
-    [dispatchNodeUpdate]
-  );
+  // If no workspace, show message
+  if (!agent.workspace.path) {
+    return (
+      <div className={`agent-node ${selected ? 'selected' : ''}`}>
+        <NodeResizer
+          minWidth={450}
+          minHeight={350}
+          isVisible={true}
+          lineStyle={{ borderColor: 'transparent' }}
+          handleStyle={{ width: 24, height: 24, borderRadius: '50%' }}
+          handleClassName="agent-node-resize-handle"
+        />
+        <div style={{ padding: 20, color: '#888' }}>
+          No workspace selected
+        </div>
+      </div>
+    );
+  }
 
-  const handleSessionCreated = useCallback(
-    (sessionId: string) => {
-      dispatchNodeUpdate({ sessionId, isDraft: false });
-    },
-    [dispatchNodeUpdate]
-  );
-
-  // Use agentId from data or generate one from nodeId
-  const agentId = nodeData.agentId || `agent-${id}`;
-
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
-    <div className={`agent-node ${selected ? 'selected' : ''}`}>
-      <NodeResizer
-        minWidth={450}
-        minHeight={350}
-        isVisible={true}
-        lineStyle={{ borderColor: 'transparent' }}
-        handleStyle={{ width: 24, height: 24, borderRadius: '50%' }}
-        handleClassName="agent-node-resize-handle"
-      />
-      <AgentChatView
-        agentId={agentId}
-        sessionId={nodeData.sessionId}
-        agentType={nodeData.agentType}
-        workspacePath={nodeData.workspacePath}
-        initialMessages={nodeData.messages || []}
-        onMessagesChange={handleMessagesChange}
-        onSessionCreated={handleSessionCreated}
-        isSessionReady={true}
-        selected={selected}
-      />
-    </div>
+    <NodeContextProvider
+      nodeId={id}
+      nodeType="agent"
+      terminalId={agent.config.terminalId}
+      agentId={agent.config.agentId}
+      sessionId={agent.session.id ?? undefined}
+      agentType={agent.config.agentType}
+      workspacePath={agent.workspace.path}
+      autoStartCli={!!agent.workspace.path}
+    >
+      <div className={`agent-node ${selected ? 'selected' : ''}`}>
+        <NodeResizer
+          minWidth={450}
+          minHeight={350}
+          isVisible={true}
+          lineStyle={{ borderColor: 'transparent' }}
+          handleStyle={{ width: 24, height: 24, borderRadius: '50%' }}
+          handleClassName="agent-node-resize-handle"
+        />
+        <AgentChatView
+          sessionId={agent.session.id ?? undefined}
+          agentType={agent.config.agentType}
+          initialMessages={agent.nodeData.chatMessages || []}
+          onMessagesChange={(messages) => handleDataChange({ chatMessages: messages })}
+          onSessionCreated={(sessionId) => handleDataChange({ sessionId })}
+          isSessionReady={agent.session.readiness === 'ready'}
+          selected={selected}
+        />
+      </div>
+    </NodeContextProvider>
   );
 }
 

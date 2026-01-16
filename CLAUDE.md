@@ -90,3 +90,21 @@ Wrong pattern:
 interface ElectronAPI {
   createTerminal(...): void;
 }
+
+Type design:
+- When designing interfaces/classes/type properties, default to required fields.
+- Never assume a property is optional; only make it optional with a clear, explicit reason (document it in the code or the PR description).
+
+## Agent integration guidelines (do/don't)
+
+Do:
+- Go through AgentService + vendor adapter for all lifecycle/session actions (start/resume/stop/history). Example: `const agent = useAgentService(); await agent.start();`
+- Keep transport details inside adapters (CLI/SDK/IPC). Example: Claude adapter builds the CLI command or SDK call; UI never sees it.
+- Let ITerminalService manage terminals. Example: render xterm bound to ITerminalService streams; do not call `window.electronAPI.createTerminal` directly.
+- Scope per node/workspace/session. Example: create an agent via registry with `agentId`, `terminalId`, `workspacePath` specific to that node.
+
+Don't:
+- Build CLI strings or run vendor binaries from renderer components or hooks.
+- Call `window.codingAgentAPI` / `window.electronAPI` from views; route through services.
+- Start/stop terminals or agents in UI components; NodeContext/AgentService own lifecycle.
+- Share singleton agent instances across nodes; always go through the registry/factories.

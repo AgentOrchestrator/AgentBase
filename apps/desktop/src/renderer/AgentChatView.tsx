@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import { useReactFlow } from '@xyflow/react';
 import { useChatSession } from './nodes/AgentChatNode/hooks/useChatSession';
+import { useAgentService } from './context';
 import type { AgentChatMessage } from './types/agent-node';
 import type { AgentContentBlock } from '@agent-orchestrator/shared';
 import './AgentChatView.css';
@@ -21,10 +22,8 @@ marked.setOptions({
 });
 
 interface AgentChatViewProps {
-  agentId: string;
   sessionId?: string;
   agentType: string;
-  workspacePath?: string;
   initialMessages?: AgentChatMessage[];
   onMessagesChange: (messages: AgentChatMessage[]) => void;
   onSessionCreated?: (sessionId: string) => void;
@@ -39,10 +38,8 @@ type DisplayItem =
   | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
 
 export default function AgentChatView({
-  agentId,
   sessionId,
   agentType,
-  workspacePath,
   initialMessages = [],
   onMessagesChange,
   onSessionCreated,
@@ -64,14 +61,15 @@ export default function AgentChatView({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { getViewport } = useReactFlow();
 
+  // Get agentService from context
+  const agentService = useAgentService();
+
   const {
     sendMessage,
     isStreaming,
   } = useChatSession({
-    agentId,
     agentType,
     sessionId,
-    workspacePath,
     currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: AgentChatMessage[]) => {
       setMessages(newMessages);
@@ -81,6 +79,7 @@ export default function AgentChatView({
       onSessionCreated?.(newSessionId);
     }, [onSessionCreated]),
     onError: setError,
+    agentService,
   });
 
   // Sync messages from props

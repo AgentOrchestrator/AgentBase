@@ -1,8 +1,12 @@
 /**
  * AgentServiceImpl
  *
- * Implementation of IAgentService that manages coding agent CLI lifecycle.
- * Orchestrates terminal service to start/stop the agent binary.
+ * Implementation of IAgentService that manages coding agent lifecycle via adapter.
+ * Orchestrates terminal display + adapter-driven agent operations.
+ *
+ * The service layer unwraps Result types from the adapter and throws
+ * exceptions for cleaner consumer API, while maintaining status updates
+ * and session persistence.
  */
 
 import type {
@@ -12,33 +16,34 @@ import type {
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
 import type { IAgentService, ITerminalService } from '../../context/node-services';
+import type {
+  ICodingAgentAdapter,
+  GenerateResponse,
+  StreamCallback,
+  SessionInfo,
+  CodingAgentSessionContent,
+  MessageFilterOptions,
+  AgentAdapterEventType,
+  AgentEventHandler,
+  Result,
+  AgentError,
+} from '../../context/node-services/coding-agent-adapter';
 
 /**
- * CLI command mapping for different agent types
- */
-const CLI_COMMANDS: Record<AgentType, string> = {
-  claude_code: 'claude',
-  cursor: 'cursor',
-  codex: 'codex',
-  windsurf: 'windsurf',
-  vscode: 'code',
-  factory: 'factory',
-  other: '',
-};
-
-/**
- * Agent service implementation
+ * Agent service implementation using adapter pattern
  */
 export class AgentServiceImpl implements IAgentService {
   readonly nodeId: string;
   readonly agentId: string;
   readonly agentType: AgentType;
 
+  private adapter: ICodingAgentAdapter | null;
   private terminalService: ITerminalService;
   private statusListeners: Set<StatusChangeListener> = new Set();
   private currentStatus: CodingAgentStatusInfo | null = null;
   private autoStartEnabled = false;
-  private isStarted = false;
+  private isRunning = false;
+  private currentSessionId: string | null = null;
   private workspacePathValue: string | null = null;
 
   constructor(
@@ -46,12 +51,14 @@ export class AgentServiceImpl implements IAgentService {
     agentId: string,
     agentType: AgentType,
     terminalService: ITerminalService,
+    adapter: ICodingAgentAdapter | null,
     workspacePath?: string
   ) {
     this.nodeId = nodeId;
     this.agentId = agentId;
     this.agentType = agentType;
     this.terminalService = terminalService;
+    this.adapter = adapter;
     this.workspacePathValue = workspacePath || null;
 
     // Initialize status
@@ -59,6 +66,43 @@ export class AgentServiceImpl implements IAgentService {
       status: 'idle',
       startedAt: Date.now(),
     };
+  }
+
+  // =============================================================================
+  // Helper Methods
+  // =============================================================================
+
+  /**
+   * Require workspace to be set, throw if not
+   */
+  private requireWorkspace(): string {
+    if (!this.workspacePathValue) {
+      throw new Error('Workspace path not set. Call setWorkspace() first.');
+    }
+    return this.workspacePathValue;
+  }
+
+  /**
+   * Require adapter to be set, throw if not
+   */
+  private requireAdapter(): ICodingAgentAdapter {
+    if (!this.adapter) {
+      throw new Error('Adapter not configured for this agent service.');
+    }
+    return this.adapter;
+  }
+
+  /**
+   * Unwrap a Result type, throwing on error
+   */
+  private unwrapResult<T>(result: Result<T, AgentError>): T {
+    if (!result.success) {
+      const error = new Error(result.error.message);
+      (error as Error & { code?: string; cause?: unknown }).code = result.error.code;
+      (error as Error & { cause?: unknown }).cause = result.error.cause;
+      throw error;
+    }
+    return result.data;
   }
 
   // =============================================================================
@@ -71,170 +115,8 @@ export class AgentServiceImpl implements IAgentService {
   }
 
   // =============================================================================
-  // Centralized Terminal Operations
+  // Lifecycle
   // =============================================================================
-
-  /**
-   * Write to shell (only when CLI is NOT running).
-   * Guards against accidentally piping shell commands into the REPL.
-   */
-  private writeToShell(data: string): void {
-    if (this.isStarted) {
-      console.warn('[AgentService] writeToShell() blocked - CLI is running, cannot write shell commands', {
-        agentId: this.agentId,
-        terminalId: this.terminalService.terminalId,
-        data: data.length > 100 ? data.substring(0, 100) + '...' : data,
-      });
-      return;
-    }
-
-    console.log('[AgentService] writeToShell()', {
-      agentId: this.agentId,
-      terminalId: this.terminalService.terminalId,
-      dataLength: data.length,
-      data: data.length > 100 ? data.substring(0, 100) + '...' : data,
-    });
-    this.terminalService.write(data);
-  }
-
-  /**
-   * Write to CLI REPL (only when CLI IS running).
-   * Use this for sending prompts or Ctrl+C to the running agent.
-   */
-  private writeToCli(data: string): void {
-    if (!this.isStarted) {
-      console.warn('[AgentService] writeToCli() blocked - CLI is not running', {
-        agentId: this.agentId,
-        terminalId: this.terminalService.terminalId,
-        data: data.length > 100 ? data.substring(0, 100) + '...' : data,
-      });
-      return;
-    }
-
-    console.log('[AgentService] writeToCli()', {
-      agentId: this.agentId,
-      terminalId: this.terminalService.terminalId,
-      dataLength: data.length,
-      data: data.length > 100 ? data.substring(0, 100) + '...' : data,
-    });
-    this.terminalService.write(data);
-  }
-
-  /**
-   * Ensure terminal is created and ready for input
-   */
-  private async ensureTerminalReady(): Promise<void> {
-    if (!this.terminalService.isRunning()) {
-      await this.terminalService.create();
-      // Wait for shell to initialize
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    }
-  }
-
-  /**
-   * Start the CLI process (single entry point for CLI startup)
-   * This is the ONLY place that writes the CLI command to terminal.
-   */
-  private async startCli(options: {
-    sessionId?: string;
-    initialPrompt?: string;
-    customCommand?: string;
-  }): Promise<void> {
-    const { sessionId, initialPrompt, customCommand } = options;
-
-    // ALWAYS check main process as source of truth (not renderer-side isStarted)
-    // This handles React StrictMode double-mount where dispose() may reset isStarted
-    if (window.terminalSessionAPI) {
-      const state = await window.terminalSessionAPI.getTerminalSessionState(
-        this.terminalService.terminalId
-      );
-      if (state?.agentRunning) {
-        console.log('[AgentService] startCli() skipped - main process says agent is running', {
-          agentId: this.agentId,
-          terminalId: this.terminalService.terminalId,
-          state,
-        });
-        this.isStarted = true; // Sync local state with main process
-        this.updateStatus('running');
-        return;
-      }
-    }
-
-    // Fallback to local state check (for when main process API unavailable)
-    if (this.isStarted) {
-      console.log('[AgentService] startCli() skipped - already started (local state)', {
-        agentId: this.agentId,
-      });
-      return;
-    }
-
-    const cliCommand = customCommand || this.getCliCommand();
-    if (!cliCommand) {
-      throw new Error(`No CLI command configured for agent type: ${this.agentType}`);
-    }
-
-    const startCommand = customCommand
-      ? cliCommand
-      : this.buildCliStartCommand(cliCommand, { sessionId, initialPrompt });
-
-    console.log('[AgentService] startCli() - writing CLI command', {
-      agentId: this.agentId,
-      terminalId: this.terminalService.terminalId,
-      startCommand,
-    });
-
-    // Write to shell (not CLI) - we're starting the CLI
-    this.writeToShell(`${startCommand}\n`);
-    this.isStarted = true;
-    this.updateStatus('running');
-
-    // Persist session state to main process (survives renderer refresh)
-    await this.persistSessionStateToMainProcess(sessionId);
-  }
-
-  // =============================================================================
-  // Public API
-  // =============================================================================
-
-  /**
-   * Set workspace path and navigate terminal to it.
-   * Does NOT start the CLI - use start() for that.
-   * IMPORTANT: Must be called BEFORE start() - cannot change workspace while CLI is running.
-   */
-  async setWorkspace(path: string): Promise<void> {
-    console.log('[AgentService] setWorkspace() called', {
-      agentId: this.agentId,
-      terminalId: this.terminalService.terminalId,
-      path,
-      isStarted: this.isStarted,
-    });
-
-    // Check main process as source of truth (handles React StrictMode race conditions)
-    if (window.terminalSessionAPI) {
-      const state = await window.terminalSessionAPI.getTerminalSessionState(
-        this.terminalService.terminalId
-      );
-      if (state?.agentRunning) {
-        console.warn('[AgentService] setWorkspace() skipped - CLI is running per main process. Stop the CLI first to change workspace.');
-        this.isStarted = true; // Sync local state
-        return;
-      }
-    }
-
-    // Fallback to local state check
-    if (this.isStarted) {
-      console.warn('[AgentService] setWorkspace() skipped - CLI is already running (local state). Stop the CLI first to change workspace.');
-      return;
-    }
-
-    this.workspacePathValue = path;
-
-    // Ensure terminal is ready
-    await this.ensureTerminalReady();
-
-    // Navigate to workspace (shell command, not CLI)
-    this.writeToShell(`cd "${path}"\n`);
-  }
 
   /**
    * Initialize the service
@@ -243,20 +125,29 @@ export class AgentServiceImpl implements IAgentService {
     console.log('[AgentService] initialize() START', {
       agentId: this.agentId,
       terminalId: this.terminalService.terminalId,
+      hasAdapter: !!this.adapter,
     });
+
+    // Initialize adapter if available
+    if (this.adapter) {
+      const result = await this.adapter.initialize();
+      if (!result.success) {
+        console.warn('[AgentService] Adapter initialization failed:', result.error);
+      }
+    }
 
     // Check main process for existing session state (survives renderer refresh)
     await this.restoreSessionStateFromMainProcess();
 
-    console.log('[AgentService] initialize() AFTER restore, isStarted=', this.isStarted, {
+    console.log('[AgentService] initialize() AFTER restore, isRunning=', this.isRunning, {
       agentId: this.agentId,
       terminalId: this.terminalService.terminalId,
     });
 
     // Listen to terminal exit to update status
     this.terminalService.onExit((code) => {
-      if (this.isStarted) {
-        this.isStarted = false;
+      if (this.isRunning) {
+        this.isRunning = false;
         this.updateStatus(code === 0 ? 'completed' : 'error', {
           errorMessage: code !== 0 ? `Process exited with code ${code}` : undefined,
         });
@@ -265,6 +156,29 @@ export class AgentServiceImpl implements IAgentService {
       }
     });
   }
+
+  /**
+   * Dispose the service
+   */
+  async dispose(): Promise<void> {
+    // Stop agent if running
+    if (this.isRunning) {
+      await this.stop();
+    }
+
+    // Dispose adapter if available
+    if (this.adapter) {
+      await this.adapter.dispose();
+    }
+
+    // Clear listeners
+    this.statusListeners.clear();
+    this.currentStatus = null;
+  }
+
+  // =============================================================================
+  // Session State Persistence
+  // =============================================================================
 
   /**
    * Restore session state from main process after renderer refresh
@@ -293,11 +207,12 @@ export class AgentServiceImpl implements IAgentService {
       });
 
       if (state && state.agentRunning) {
-        console.log('[AgentService] ✅ Restoring isStarted=true from main process state', {
+        console.log('[AgentService] Restoring isRunning=true from main process state', {
           agentId: this.agentId,
           terminalId: this.terminalService.terminalId,
         });
-        this.isStarted = true;
+        this.isRunning = true;
+        this.currentSessionId = state.sessionId || null;
         this.updateStatus('running');
       } else {
         console.log('[AgentService] No active agent session to restore', {
@@ -351,47 +266,112 @@ export class AgentServiceImpl implements IAgentService {
     }
   }
 
+  // =============================================================================
+  // Public Lifecycle API
+  // =============================================================================
+
   /**
-   * Start the coding agent CLI in the terminal.
+   * Start the coding agent (initializes adapter).
    * Call setWorkspace() first if you need to navigate to a directory.
    */
-  async start(command?: string, sessionId?: string, initialPrompt?: string): Promise<void> {
+  async start(sessionId?: string, initialPrompt?: string): Promise<void> {
     console.log('[AgentService] start() called', {
       agentId: this.agentId,
       terminalId: this.terminalService.terminalId,
-      isStarted: this.isStarted,
-      command,
+      isRunning: this.isRunning,
       sessionId,
       hasInitialPrompt: !!initialPrompt,
     });
 
-    // Ensure terminal is ready
-    await this.ensureTerminalReady();
-
-    // Delegate to centralized startCli
-    await this.startCli({ sessionId, initialPrompt, customCommand: command });
-  }
-
-  /**
-   * Stop the coding agent
-   */
-  async stop(): Promise<void> {
-    if (!this.isStarted) {
+    if (this.isRunning) {
+      console.log('[AgentService] start() skipped - already running', {
+        agentId: this.agentId,
+      });
       return;
     }
 
-    // Send Ctrl+C to interrupt the CLI
-    this.writeToCli('\x03');
+    // Ensure terminal is ready for display
+    if (!this.terminalService.isRunning()) {
+      await this.terminalService.create();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    this.isRunning = true;
+    this.currentSessionId = sessionId || null;
+    this.updateStatus('running');
+
+    // Persist session state to main process (survives renderer refresh)
+    await this.persistSessionStateToMainProcess(sessionId);
+
+    // If initial prompt provided, send it
+    if (initialPrompt) {
+      try {
+        if (sessionId) {
+          await this.resumeSessionStreaming(sessionId, initialPrompt, () => {});
+        } else {
+          await this.sendMessageStreaming(initialPrompt, () => {});
+        }
+      } catch (error) {
+        console.error('[AgentService] Failed to send initial prompt:', error);
+        this.updateStatus('error', {
+          errorMessage: error instanceof Error ? error.message : 'Failed to send initial prompt',
+        });
+      }
+    }
+  }
+
+  /**
+   * Stop the coding agent (cancels operations)
+   */
+  async stop(): Promise<void> {
+    if (!this.isRunning) {
+      return;
+    }
+
+    // Cancel all adapter operations
+    if (this.adapter) {
+      await this.adapter.cancelAll();
+    }
 
     // Update status
     this.updateStatus('idle');
-    this.isStarted = false;
+    this.isRunning = false;
+    this.currentSessionId = null;
 
     // NOTE: We intentionally do NOT clear session state here.
     // The session state is cleared in onExit when the terminal process actually exits.
     // This prevents race conditions during browser refresh where stop() is called
     // but the pty process is still running in the main process.
   }
+
+  // =============================================================================
+  // Workspace
+  // =============================================================================
+
+  /**
+   * Set workspace path.
+   * Does NOT start generation - use sendMessage/resumeSession for that.
+   */
+  async setWorkspace(path: string): Promise<void> {
+    console.log('[AgentService] setWorkspace() called', {
+      agentId: this.agentId,
+      terminalId: this.terminalService.terminalId,
+      path,
+      isRunning: this.isRunning,
+    });
+
+    this.workspacePathValue = path;
+
+    // Ensure terminal is ready for display
+    if (!this.terminalService.isRunning()) {
+      await this.terminalService.create();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+
+  // =============================================================================
+  // Status
+  // =============================================================================
 
   /**
    * Get current agent status
@@ -438,82 +418,239 @@ export class AgentServiceImpl implements IAgentService {
     };
   }
 
+  // =============================================================================
+  // Configuration
+  // =============================================================================
+
   /**
-   * Check if CLI auto-start is enabled
+   * Check if auto-start is enabled
    */
   isAutoStartEnabled(): boolean {
     return this.autoStartEnabled;
   }
 
   /**
-   * Enable/disable CLI auto-start
+   * Enable/disable auto-start
    */
   setAutoStart(enabled: boolean): void {
     this.autoStartEnabled = enabled;
   }
 
+  // =============================================================================
+  // Generation (Adapter-driven)
+  // =============================================================================
+
   /**
-   * Get CLI command for this agent type
+   * Send a message and get response (non-streaming).
+   * Creates a new session if no active session exists.
+   * @throws Error if workspace not set or adapter fails
    */
-  getCliCommand(): string {
-    return CLI_COMMANDS[this.agentType] || '';
-  }
+  async sendMessage(prompt: string): Promise<GenerateResponse> {
+    const workspacePath = this.requireWorkspace();
+    const adapter = this.requireAdapter();
 
-  private buildCliStartCommand(
-    cliCommand: string,
-    options: { sessionId?: string; initialPrompt?: string }
-  ): string {
-    const { sessionId } = options;
+    this.updateStatus('running');
 
-    if (this.agentType !== 'claude_code' || !sessionId) {
-      return this.buildCliCommand(cliCommand, options);
+    try {
+      const result = await adapter.generate({
+        prompt,
+        workingDirectory: workspacePath,
+        sessionId: this.currentSessionId || undefined,
+        agentId: this.agentId,
+      });
+
+      const response = this.unwrapResult(result);
+
+      // Update session ID if returned
+      if (response.sessionId) {
+        this.currentSessionId = response.sessionId;
+        await this.persistSessionStateToMainProcess(response.sessionId);
+      }
+
+      this.updateStatus('idle');
+      return response;
+    } catch (error) {
+      this.updateStatus('error', {
+        errorMessage: error instanceof Error ? error.message : 'Generation failed',
+      });
+      throw error;
     }
-
-    const sessionIdCommand = this.buildCliCommand(cliCommand, options, 'session-id');
-    const resumeCommand = this.buildCliCommand(cliCommand, options, 'resume');
-    const logMessage = this.formatShellValue(
-      `[AgentService] Failed to create session ${sessionId}. Falling back to --resume.`
-    );
-
-    return `${sessionIdCommand} || (echo ${logMessage} >&2; ${resumeCommand})`;
-  }
-
-  private buildCliCommand(
-    cliCommand: string,
-    options: { sessionId?: string; initialPrompt?: string },
-    sessionMode: 'session-id' | 'resume' = 'session-id'
-  ): string {
-    const { sessionId, initialPrompt } = options;
-    const args: string[] = [];
-
-    if (this.agentType === 'claude_code' && sessionId) {
-      const flag = sessionMode === 'resume' ? '--resume' : '--session-id';
-      args.push(`${flag} ${this.formatShellValue(sessionId)}`);
-    }
-
-    if (initialPrompt) {
-      const promptValue = this.formatShellValue(initialPrompt);
-      return `echo ${promptValue} | ${cliCommand}${args.length > 0 ? ` ${args.join(' ')}` : ''} -p`;
-    }
-
-    return `${cliCommand}${args.length > 0 ? ` ${args.join(' ')}` : ''}`;
-  }
-
-  private formatShellValue(value: string): string {
-    return `'${value.replace(/'/g, "'\\''")}'`;
   }
 
   /**
-   * Dispose the service
+   * Send a message with streaming (chunks emitted via callback).
+   * Returns the final complete response.
+   * @throws Error if workspace not set or adapter fails
    */
-  async dispose(): Promise<void> {
-    // Stop agent if running
-    if (this.isStarted) {
-      await this.stop();
+  async sendMessageStreaming(prompt: string, onChunk: StreamCallback): Promise<GenerateResponse> {
+    const workspacePath = this.requireWorkspace();
+    const adapter = this.requireAdapter();
+
+    this.updateStatus('running');
+
+    try {
+      const result = await adapter.generateStreaming(
+        {
+          prompt,
+          workingDirectory: workspacePath,
+          sessionId: this.currentSessionId || undefined,
+          agentId: this.agentId,
+        },
+        onChunk
+      );
+
+      const response = this.unwrapResult(result);
+
+      // Update session ID if returned
+      if (response.sessionId) {
+        this.currentSessionId = response.sessionId;
+        await this.persistSessionStateToMainProcess(response.sessionId);
+      }
+
+      this.updateStatus('idle');
+      return response;
+    } catch (error) {
+      this.updateStatus('error', {
+        errorMessage: error instanceof Error ? error.message : 'Generation failed',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Resume an existing session with a new message (non-streaming).
+   * @throws Error if workspace not set, session not found, or adapter fails
+   */
+  async resumeSession(sessionId: string, prompt: string): Promise<GenerateResponse> {
+    const workspacePath = this.requireWorkspace();
+    const adapter = this.requireAdapter();
+
+    this.updateStatus('running');
+
+    try {
+      const result = await adapter.continueSession(
+        { type: 'id', value: sessionId },
+        prompt,
+        { workingDirectory: workspacePath, agentId: this.agentId }
+      );
+
+      const response = this.unwrapResult(result);
+
+      // Update current session
+      this.currentSessionId = sessionId;
+      await this.persistSessionStateToMainProcess(sessionId);
+
+      this.updateStatus('idle');
+      return response;
+    } catch (error) {
+      this.updateStatus('error', {
+        errorMessage: error instanceof Error ? error.message : 'Resume session failed',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Resume an existing session with streaming.
+   * Returns the final complete response.
+   * @throws Error if workspace not set, session not found, or adapter fails
+   */
+  async resumeSessionStreaming(
+    sessionId: string,
+    prompt: string,
+    onChunk: StreamCallback
+  ): Promise<GenerateResponse> {
+    const workspacePath = this.requireWorkspace();
+    const adapter = this.requireAdapter();
+
+    this.updateStatus('running');
+
+    try {
+      const result = await adapter.continueSessionStreaming(
+        { type: 'id', value: sessionId },
+        prompt,
+        onChunk,
+        { workingDirectory: workspacePath, agentId: this.agentId }
+      );
+
+      const response = this.unwrapResult(result);
+
+      // Update current session
+      this.currentSessionId = sessionId;
+      await this.persistSessionStateToMainProcess(sessionId);
+
+      this.updateStatus('idle');
+      return response;
+    } catch (error) {
+      this.updateStatus('error', {
+        errorMessage: error instanceof Error ? error.message : 'Resume session failed',
+      });
+      throw error;
+    }
+  }
+
+  // =============================================================================
+  // Session Queries
+  // =============================================================================
+
+  /**
+   * Get session content with optional message filtering.
+   * @throws Error if adapter fails
+   */
+  async getSession(
+    sessionId: string,
+    filter?: MessageFilterOptions
+  ): Promise<CodingAgentSessionContent | null> {
+    const adapter = this.requireAdapter();
+
+    const result = await adapter.getFilteredSession(sessionId, filter);
+    return this.unwrapResult(result);
+  }
+
+  /**
+   * Check if a session is active (file exists).
+   * @throws Error if workspace not set
+   */
+  async isSessionActive(sessionId: string): Promise<boolean> {
+    const workspacePath = this.requireWorkspace();
+    const adapter = this.requireAdapter();
+
+    return adapter.checkSessionActive(sessionId, workspacePath);
+  }
+
+  /**
+   * Get the latest session for the current workspace.
+   * Returns null if no sessions exist or capability not supported.
+   * @throws Error if workspace not set
+   */
+  async getLatestSession(): Promise<SessionInfo | null> {
+    const workspacePath = this.requireWorkspace();
+    const adapter = this.requireAdapter();
+
+    // Check if adapter supports this capability
+    if (!adapter.getLatestSession) {
+      return null;
     }
 
-    // Clear listeners
-    this.statusListeners.clear();
-    this.currentStatus = null;
+    const result = await adapter.getLatestSession(workspacePath);
+    return this.unwrapResult(result);
+  }
+
+  // =============================================================================
+  // Events
+  // =============================================================================
+
+  /**
+   * Subscribe to typed agent events (permission requests, session events, etc.)
+   * @param type - Event type to subscribe to
+   * @param handler - Handler called when event occurs
+   * @returns Unsubscribe function
+   */
+  onAgentEvent<T extends AgentAdapterEventType>(
+    type: T,
+    handler: AgentEventHandler<T>
+  ): () => void {
+    const adapter = this.requireAdapter();
+    return adapter.onEvent(type, handler);
   }
 }

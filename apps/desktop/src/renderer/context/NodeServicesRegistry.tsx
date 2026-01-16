@@ -32,7 +32,7 @@ export interface ServiceFactories {
   createTerminalService: (nodeId: string, terminalId: string) => ITerminalService;
   /** Create a workspace service */
   createWorkspaceService: (nodeId: string, workspacePath?: string) => IWorkspaceService;
-  /** Create an agent service */
+  /** Create an agent service (creates adapter internally based on agentType) */
   createAgentService: (
     nodeId: string,
     agentId: string,

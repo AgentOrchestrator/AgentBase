@@ -10,6 +10,7 @@ import type {
   ContinueOptions,
   ForkOptions,
 } from './session.types';
+import type { Result, AgentError } from './result.types';
 import type { AgentEvent, AgentActionResponse } from '@agent-orchestrator/shared';
 
 export interface CodingAgentAPI {
@@ -48,7 +49,7 @@ export interface CodingAgentAPI {
     agentType: CodingAgentType,
     parentIdentifier: SessionIdentifier,
     options?: ForkOptions
-  ) => Promise<SessionInfo>;
+  ) => Promise<Result<SessionInfo, AgentError>>;
 
   /** Get list of available agent types */
   getAvailableAgents: () => Promise<CodingAgentType[]>;
