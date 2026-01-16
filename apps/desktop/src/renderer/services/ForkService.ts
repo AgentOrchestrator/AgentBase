@@ -12,7 +12,7 @@
 
 import type { CodingAgentType, SessionInfo, SessionIdentifier, ForkOptions } from '../../main/services/coding-agent';
 import type { WorktreeInfo } from '../../main/types/worktree';
-import type { AgentType } from '@agent-orchestrator/shared';
+import type { AgentType, JsonlFilterOptions } from '@agent-orchestrator/shared';
 import { worktreeService } from './WorktreeService';
 import { sessionProvider } from './SessionProvider';
 
@@ -42,6 +42,8 @@ export interface ForkRequest {
   forkTitle: string;
   /** Path to the source repository */
   repoPath: string;
+  /** Optional filter to include only messages up to a specific point */
+  filterOptions?: JsonlFilterOptions;
 }
 
 /**
@@ -229,9 +231,11 @@ export class ForkService implements IForkService {
     };
 
     // Pass worktree path as workingDirectory for cross-directory fork detection
+    // Include filterOptions if provided (for partial context fork)
     const forkOptions: ForkOptions = {
       newSessionName: request.forkTitle,
       workingDirectory: worktreeInfo.worktreePath,
+      filterOptions: request.filterOptions,
     };
 
     console.log('[ForkService] Fork options:', forkOptions);

@@ -59,6 +59,8 @@ export default function AgentChatView({
     text: string;
     /** Y position in content coordinates (accounts for scroll) */
     contentY: number;
+    /** Message ID from the selected message (for fork filtering) */
+    messageId?: string;
   } | null>(null);
   const [isCommandPressed, setIsCommandPressed] = useState(false);
   const hasSentInitialPrompt = useRef(false);
@@ -195,6 +197,25 @@ export default function AgentChatView({
     return contentRelativeY + scrollTop;
   }, [getViewport]);
 
+  // Find the message ID from the current selection by walking up the DOM tree
+  const findMessageIdFromSelection = useCallback((): string | undefined => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return undefined;
+
+    const range = selection.getRangeAt(0);
+    let node: Node | null = range.commonAncestorContainer;
+
+    // Walk up the DOM tree to find element with data-message-id
+    while (node && node !== messagesContainerRef.current) {
+      if (node instanceof Element) {
+        const messageId = node.getAttribute('data-message-id');
+        if (messageId) return messageId;
+      }
+      node = node.parentNode;
+    }
+    return undefined;
+  }, []);
+
   // Detect text selection and calculate position from selection bounds
   const handleSelectionChange = useCallback(() => {
     if (!messagesContainerRef.current) {
@@ -228,11 +249,15 @@ export default function AgentChatView({
     // Use the bottom of the selection (end of selected text)
     const contentY = viewportYToContentY(selectionRect.bottom);
 
+    // Extract message ID from the selected message element
+    const messageId = findMessageIdFromSelection();
+
     setTextSelection({
       text: selectedText,
       contentY,
+      messageId,
     });
-  }, [viewportYToContentY]);
+  }, [viewportYToContentY, findMessageIdFromSelection]);
 
   // Handle scroll events when node is selected
   // Only prevent canvas scrolling when node is selected (clicked)
@@ -400,7 +425,7 @@ export default function AgentChatView({
 
   const renderUserMessage = (msg: AgentChatMessage) => {
     return (
-      <div key={msg.id} className="conversation-user-message">
+      <div key={msg.id} className="conversation-user-message" data-message-id={msg.id}>
         <div className="conversation-user-content">
           {msg.content}
         </div>
@@ -416,7 +441,7 @@ export default function AgentChatView({
     if (msg.contentBlocks && msg.contentBlocks.length > 0) {
       const displayItems = processContentBlocks(msg.contentBlocks);
       return (
-        <div key={msg.id} className="conversation-assistant-message">
+        <div key={msg.id} className="conversation-assistant-message" data-message-id={msg.id}>
           <div className="conversation-assistant-content">
             {displayItems.map(item => renderDisplayItem(item))}
             {showCursor && (
@@ -430,7 +455,7 @@ export default function AgentChatView({
     // Fallback to plain text content
     const html = marked.parse(msg.content) as string;
     return (
-      <div key={msg.id} className="conversation-assistant-message">
+      <div key={msg.id} className="conversation-assistant-message" data-message-id={msg.id}>
         <div className="conversation-assistant-content">
           <div
             className="conversation-assistant-text-content"
@@ -475,6 +500,7 @@ export default function AgentChatView({
             rightOffset={12}
             nodeId={nodeId}
             sessionId={sessionId}
+            messageId={textSelection.messageId}
           />
         )}
       </div>

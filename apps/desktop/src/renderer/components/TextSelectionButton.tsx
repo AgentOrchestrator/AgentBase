@@ -19,6 +19,8 @@ export interface TextSelectionButtonProps {
   nodeId: string;
   /** Current session ID (if available) */
   sessionId?: string;
+  /** Message ID where text was selected (for fork filtering) */
+  messageId?: string;
 }
 
 /**
@@ -31,6 +33,8 @@ export interface ChatMessageForkEventDetail {
   sessionId?: string;
   /** Text that was selected */
   selectedText: string;
+  /** Message ID where text was selected (for fork filtering) */
+  messageId?: string;
 }
 
 export function TextSelectionButton({
@@ -39,6 +43,7 @@ export function TextSelectionButton({
   rightOffset,
   nodeId,
   sessionId,
+  messageId,
 }: TextSelectionButtonProps) {
   // Use onMouseDown instead of onClick to fire before selection clears
   const handleMouseDown = useCallback(
@@ -52,11 +57,12 @@ export function TextSelectionButton({
         nodeId,
         sessionId,
         selectedText: text,
+        messageId,
       };
 
       window.dispatchEvent(new CustomEvent('chat-message-fork', { detail }));
     },
-    [nodeId, sessionId, text]
+    [nodeId, sessionId, text, messageId]
   );
 
   return (

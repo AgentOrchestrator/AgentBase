@@ -1,11 +1,12 @@
 import type { CodingAgentType } from './agent.types';
 import type { CodingAgentMessage } from './message.types';
 
-// Re-export filter options from shared
+// Re-export types from shared (source of truth)
 export type {
   MessageFilterOptions,
   SessionFilterOptions,
   SessionChange,
+  ForkOptions,
 } from '@agent-orchestrator/shared';
 
 /**
@@ -86,18 +87,6 @@ export interface ContinueOptions {
   agentId?: string;
   workingDirectory?: string;
   timeout?: number;
-}
-
-/**
- * Options for forking a session
- */
-export interface ForkOptions {
-  /** Human-readable name for the new session */
-  newSessionName?: string;
-  /** Custom session ID (auto-generated if not provided) */
-  customSessionId?: string;
-  /** Working directory for the new session (defaults to current if not provided) */
-  workingDirectory?: string;
 }
 
 /**

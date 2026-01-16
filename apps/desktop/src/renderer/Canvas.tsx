@@ -255,12 +255,13 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   // Chat message fork - listen for text selection fork events
   useEffect(() => {
     const handleChatMessageFork = (event: Event) => {
-      const customEvent = event as CustomEvent<{ nodeId: string; selectedText: string }>;
-      const { nodeId, selectedText } = customEvent.detail;
+      const customEvent = event as CustomEvent<{ nodeId: string; selectedText: string; messageId?: string }>;
+      const { nodeId, selectedText, messageId } = customEvent.detail;
 
       console.log('[Canvas] chat-message-fork event:', {
         nodeId,
         selectedText: selectedText.slice(0, 50) + (selectedText.length > 50 ? '...' : ''),
+        messageId,
       });
 
       // Find the source node
@@ -278,8 +279,8 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         y: sourceNode.position.y,
       };
 
-      // Open the fork modal
-      forkModal.open(nodeId, forkPosition);
+      // Open the fork modal with messageId for context filtering
+      forkModal.open(nodeId, forkPosition, messageId);
     };
 
     window.addEventListener('chat-message-fork', handleChatMessageFork);
@@ -310,7 +311,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   useEffect(() => {
     const handleUpdateNode = (event: CustomEvent) => {
       const { nodeId, data } = event.detail;
-      const existingNode = nodeStore.getNode(nodeId);
       nodeStore.updateNode(nodeId, data as Record<string, unknown>);
       setNodes((nds) =>
         nds.map((node) => (node.id === nodeId ? { ...node, data: { ...data } } : node))
@@ -401,11 +401,11 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
             ...params,
             sourceHandle:
               params.sourceHandle == null || params.sourceHandle === 'null'
-                ? undefined
+                ? null
                 : params.sourceHandle,
             targetHandle:
               params.targetHandle == null || params.targetHandle === 'null'
-                ? undefined
+                ? null
                 : params.targetHandle,
           },
           eds

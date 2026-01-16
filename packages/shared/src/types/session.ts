@@ -127,6 +127,8 @@ export interface ForkOptions {
   customSessionId?: string;
   /** Working directory for the new session (defaults to current if not provided) */
   workingDirectory?: string;
+  /** Filter options for partial context fork (include messages up to a specific point) */
+  filterOptions?: JsonlFilterOptions;
 }
 
 /**

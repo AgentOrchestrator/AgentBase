@@ -26,6 +26,8 @@ export interface ForkModalData {
   sessionId: string;
   /** Workspace path for the fork operation */
   workspacePath: string;
+  /** Target message ID for filtering fork context (optional) */
+  targetMessageId?: string;
 }
 
 /**
@@ -68,8 +70,9 @@ export interface UseForkModalReturn {
    * Open the fork modal for a source node
    * @param sourceNodeId - ID of the node to fork
    * @param position - Position for the new forked node
+   * @param targetMessageId - Optional message ID for filtering fork context
    */
-  open: (sourceNodeId: string, position: { x: number; y: number }) => Promise<void>;
+  open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string) => Promise<void>;
   /**
    * Confirm the fork operation with a title
    * @param forkTitle - Title for the forked agent
@@ -127,7 +130,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
    * Open the fork modal for a source node
    */
   const open = useCallback(
-    async (sourceNodeId: string, position: { x: number; y: number }) => {
+    async (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string) => {
       // Find the source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) {
@@ -185,8 +188,8 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         return;
       }
 
-      // Show fork modal with resolved session/workspace
-      setModalData({ sourceNodeId, position, sessionId, workspacePath });
+      // Show fork modal with resolved session/workspace and optional message filter
+      setModalData({ sourceNodeId, position, sessionId, workspacePath, targetMessageId });
       setError(null);
     },
     [nodes, onNodeUpdate]
@@ -220,6 +223,11 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
       setError(null);
 
       try {
+        // Build filterOptions if targetMessageId is set (for partial context fork)
+        const filterOptions = modalData.targetMessageId
+          ? { targetMessageId: modalData.targetMessageId }
+          : undefined;
+
         // Call fork service to create worktree and fork session
         const result = await forkService.forkAgent({
           sourceAgentId: sourceData.agentId,
@@ -227,6 +235,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           agentType: sourceData.agentType,
           forkTitle,
           repoPath: workspacePath,
+          filterOptions,
         });
 
         if (!result.success) {

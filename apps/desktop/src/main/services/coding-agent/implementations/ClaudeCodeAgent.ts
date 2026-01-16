@@ -704,7 +704,8 @@ export class ClaudeCodeAgent
           parentId,
           parentId, // Use same session ID - file will be in different project directory
           sourceCwd,
-          resolvedTargetCwd
+          resolvedTargetCwd,
+          options?.filterOptions // Pass filter options for partial context fork
         );
 
         if (!forkResult.success) {
