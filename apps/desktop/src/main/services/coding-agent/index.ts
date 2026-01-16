@@ -41,6 +41,7 @@ export type {
   ISessionResumable,
   ISessionForkable,
   IProcessLifecycle,
+  ISessionValidator,
   IFullCodingAgent,
   IMinimalCodingAgent,
 } from './interfaces';
@@ -88,6 +89,7 @@ export {
   hasSessionManager,
   supportsStreaming,
   isChatHistoryProvider,
+  isSessionValidator,
   getMissingCapabilities,
 } from './utils/capability-checker';
 

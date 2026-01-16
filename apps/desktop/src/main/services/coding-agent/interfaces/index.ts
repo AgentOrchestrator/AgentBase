@@ -4,6 +4,7 @@ export type { ISessionResumable } from './ISessionResumable';
 export type { ISessionForkable } from './ISessionForkable';
 export type { IProcessLifecycle } from './IProcessLifecycle';
 export type { IChatHistoryProvider } from './IChatHistoryProvider';
+export type { ISessionValidator } from './ISessionValidator';
 
 /**
  * Combined interface for full-featured agents
@@ -31,3 +32,4 @@ import type { ISessionResumable } from './ISessionResumable';
 import type { ISessionForkable } from './ISessionForkable';
 import type { IProcessLifecycle } from './IProcessLifecycle';
 import type { IChatHistoryProvider } from './IChatHistoryProvider';
+import type { ISessionValidator } from './ISessionValidator';

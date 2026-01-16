@@ -86,9 +86,8 @@ export function useChatSession({
 
       if (session?.messages) {
         publishMessages(session.messages, sessionId);
-      } else {
-        onError('Session not found');
       }
+      // If session not found, don't show error - sendMessage will create a new session
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to load session');
     } finally {
@@ -175,8 +174,13 @@ export function useChatSession({
         publishMessages(updatedMessages);
       };
 
-      if (sessionId) {
-        // Continue existing session
+      // Check if session file exists before deciding to resume or create new
+      const isSessionActive = sessionId && workspacePath
+        ? await codingAgentAPI.checkSessionActive(resolvedAgentType, sessionId, workspacePath)
+        : false;
+
+      if (isSessionActive && sessionId) {
+        // Continue existing session (file exists)
         result = await codingAgentAPI.continueSessionStreaming(
           resolvedAgentType,
           { type: 'id', value: sessionId },
@@ -185,7 +189,7 @@ export function useChatSession({
           { workingDirectory: workspacePath, agentId }
         );
       } else {
-        // Start new session
+        // Start new session (no sessionId, or session file doesn't exist)
         result = await codingAgentAPI.generateStreaming(
           resolvedAgentType,
           { prompt, workingDirectory: workspacePath, agentId },

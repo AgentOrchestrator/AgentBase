@@ -17,6 +17,7 @@ import {
   isSessionResumable,
   isSessionForkable,
   isChatHistoryProvider,
+  isSessionValidator,
 } from './services/coding-agent';
 import type {
   AgentActionResponse,
@@ -1003,6 +1004,30 @@ function registerIpcHandlers(): void {
         return { success: true, data: { id: latestSession.id, updatedAt: latestSession.updatedAt } };
       } catch (error) {
         console.error('[Main] Error getting latest session', { agentType, workspacePath, error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  // Check if a session file exists (session is active)
+  ipcMain.handle(
+    'coding-agent:check-session-active',
+    async (_event, agentType: CodingAgentType, sessionId: string, workspacePath: string) => {
+      try {
+        const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
+        if (agentResult.success === false) {
+          return { success: false, error: agentResult.error.message };
+        }
+
+        const agent = agentResult.data;
+        if (!isSessionValidator(agent)) {
+          return { success: false, error: `${agentType} does not support session validation` };
+        }
+
+        const isActive = await agent.checkSessionActive(sessionId, workspacePath);
+        return { success: true, data: isActive };
+      } catch (error) {
+        console.error('[Main] Error checking session active', { agentType, sessionId, workspacePath, error });
         return { success: false, error: (error as Error).message };
       }
     }

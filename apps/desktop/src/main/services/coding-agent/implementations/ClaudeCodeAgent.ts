@@ -17,6 +17,7 @@ import type {
   ISessionForkable,
   IProcessLifecycle,
   IChatHistoryProvider,
+  ISessionValidator,
 } from '../interfaces';
 import type {
   Result,
@@ -89,7 +90,7 @@ export interface ClaudeCodeAgentConfig extends AgentConfig {
 
 export class ClaudeCodeAgent
   extends EventEmitter
-  implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider
+  implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider, ISessionValidator
 {
   protected readonly config: AgentConfig;
   private readonly eventRegistry: EventRegistry;
@@ -760,6 +761,18 @@ export class ClaudeCodeAgent
 
   getDataPaths(): string[] {
     return [this.getProjectsDir()];
+  }
+
+  /**
+   * Check if a session file exists for the given session ID and workspace path.
+   * A session is considered "active" if its JSONL file exists on disk.
+   */
+  async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
+    // Encode workspace path the same way Claude Code does:
+    // /Users/foo/project -> -Users-foo-project
+    const encodedPath = workspacePath.replace(/\//g, '-');
+    const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
+    return fs.existsSync(sessionFilePath);
   }
 
   async getSessionModificationTimes(

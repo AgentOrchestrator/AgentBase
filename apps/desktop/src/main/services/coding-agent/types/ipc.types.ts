@@ -65,6 +65,13 @@ export interface CodingAgentAPI {
     workspacePath: string
   ) => Promise<{ id: string; updatedAt: string } | null>;
 
+  /** Check if a session file exists (session is active) */
+  checkSessionActive: (
+    agentType: CodingAgentType,
+    sessionId: string,
+    workspacePath: string
+  ) => Promise<boolean>;
+
   /** List session summaries (without full messages) */
   listSessionSummaries: (
     agentType: CodingAgentType,

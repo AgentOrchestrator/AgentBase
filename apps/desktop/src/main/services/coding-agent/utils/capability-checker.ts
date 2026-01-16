@@ -1,4 +1,4 @@
-import type { ICodingAgentProvider, ISessionManager, ISessionResumable, ISessionForkable, IChatHistoryProvider } from '../interfaces';
+import type { ICodingAgentProvider, ISessionManager, ISessionResumable, ISessionForkable, IChatHistoryProvider, ISessionValidator } from '../interfaces';
 import type { AgentCapabilities } from '../types';
 
 /**
@@ -54,6 +54,19 @@ export function isChatHistoryProvider(
     typeof maybeProvider.listSessionSummaries === 'function' &&
     'getFilteredSession' in agent &&
     typeof maybeProvider.getFilteredSession === 'function'
+  );
+}
+
+/**
+ * Type guard to check if an agent supports session validation
+ */
+export function isSessionValidator(
+  agent: ICodingAgentProvider
+): agent is ICodingAgentProvider & ISessionValidator {
+  const maybeValidator = agent as unknown as ISessionValidator;
+  return (
+    'checkSessionActive' in agent &&
+    typeof maybeValidator.checkSessionActive === 'function'
   );
 }
 
