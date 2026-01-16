@@ -1,5 +1,3 @@
-import React from 'react';
-
 export interface AgentNodeChatHandleProps {
   nodeId?: string;
   agentId: string;
