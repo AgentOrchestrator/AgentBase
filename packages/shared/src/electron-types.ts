@@ -12,6 +12,7 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree.js';
 import type { AgentType } from './loaders/types.js';
+import type { RecentWorkspace, AddWorkspaceOptions } from './types/workspace.js';
 
 /**
  * Coding agent types - alias for AgentType from loaders.
@@ -221,4 +222,24 @@ export interface SessionWatcherAPI {
   onSessionFileChanged: (
     callback: (event: SessionFileChangeEvent) => void
   ) => () => void;
+}
+
+// =============================================================================
+// Recent Workspaces API
+// =============================================================================
+
+/**
+ * Recent Workspaces API for tracking recently opened workspace paths.
+ */
+export interface RecentWorkspacesAPI {
+  /** Add or update a workspace (updates lastOpenedAt if exists) */
+  addWorkspace: (path: string, options?: AddWorkspaceOptions) => Promise<void>;
+  /** Get recent workspaces sorted by most recent first */
+  getRecentWorkspaces: (limit?: number) => Promise<RecentWorkspace[]>;
+  /** Remove a workspace from the list */
+  removeWorkspace: (path: string) => Promise<void>;
+  /** Clear all recent workspaces */
+  clearAll: () => Promise<void>;
+  /** Check if a workspace exists in recent list */
+  hasWorkspace: (path: string) => Promise<boolean>;
 }

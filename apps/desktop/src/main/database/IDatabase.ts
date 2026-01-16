@@ -5,6 +5,7 @@
 
 import { CanvasState, CanvasMetadata } from '../types/database';
 import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type { RecentWorkspace } from '@agent-orchestrator/shared';
 
 export interface IDatabase {
   /**
@@ -84,4 +85,37 @@ export interface IDatabase {
    * @returns Array of all agent states
    */
   loadAllAgentStatuses(): Promise<CodingAgentState[]>;
+
+  // ==========================================================================
+  // Recent Workspaces Methods
+  // ==========================================================================
+
+  /**
+   * Add or update a recent workspace entry
+   * @param workspace - The workspace data to upsert
+   */
+  upsertRecentWorkspace(workspace: RecentWorkspace): Promise<void>;
+
+  /**
+   * Get recent workspaces sorted by lastOpenedAt descending
+   * @param limit - Maximum number of entries to return (default: 20)
+   */
+  getRecentWorkspaces(limit?: number): Promise<RecentWorkspace[]>;
+
+  /**
+   * Remove a workspace from the recent list
+   * @param path - Workspace path to remove
+   */
+  removeRecentWorkspace(path: string): Promise<void>;
+
+  /**
+   * Clear all recent workspaces
+   */
+  clearAllRecentWorkspaces(): Promise<void>;
+
+  /**
+   * Get a specific workspace by path
+   * @param path - Workspace path to find
+   */
+  getRecentWorkspaceByPath(path: string): Promise<RecentWorkspace | null>;
 }

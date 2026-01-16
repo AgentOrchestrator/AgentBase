@@ -13,6 +13,9 @@ import type {
   SessionFileChangeEvent,
   SessionWatcherAPI,
   CodingAgentType as SharedCodingAgentType,
+  RecentWorkspace,
+  AddWorkspaceOptions,
+  RecentWorkspacesAPI,
 } from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
@@ -663,3 +666,20 @@ contextBridge.exposeInMainWorld('sessionWatcherAPI', {
     return () => ipcRenderer.removeListener('session:file-changed', handler);
   },
 } as SessionWatcherAPI);
+
+// Expose recent workspaces API for tracking recently opened workspace paths
+contextBridge.exposeInMainWorld('recentWorkspacesAPI', {
+  addWorkspace: async (workspacePath: string, options?: AddWorkspaceOptions) => {
+    await unwrapResponse(ipcRenderer.invoke('recent-workspaces:add', workspacePath, options));
+  },
+  getRecentWorkspaces: (limit?: number) =>
+    unwrapResponse<RecentWorkspace[]>(ipcRenderer.invoke('recent-workspaces:get', limit)),
+  removeWorkspace: async (workspacePath: string) => {
+    await unwrapResponse(ipcRenderer.invoke('recent-workspaces:remove', workspacePath));
+  },
+  clearAll: async () => {
+    await unwrapResponse(ipcRenderer.invoke('recent-workspaces:clear'));
+  },
+  hasWorkspace: (workspacePath: string) =>
+    unwrapResponse<boolean>(ipcRenderer.invoke('recent-workspaces:has', workspacePath)),
+} as RecentWorkspacesAPI);

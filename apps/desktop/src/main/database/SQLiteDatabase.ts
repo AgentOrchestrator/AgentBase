@@ -7,6 +7,7 @@ import sqlite3 from 'sqlite3';
 import { IDatabase } from './IDatabase';
 import { CanvasState, CanvasMetadata, CanvasNode, CanvasEdge } from '../types/database';
 import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type { RecentWorkspace } from '@agent-orchestrator/shared';
 
 export class SQLiteDatabase implements IDatabase {
   private db: sqlite3.Database;
@@ -84,6 +85,21 @@ export class SQLiteDatabase implements IDatabase {
         updated_at INTEGER NOT NULL
       )
     `);
+
+    // Create recent_workspaces table
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS recent_workspaces (
+        path TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        last_opened_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    `);
+
+    // Create index for sorting by last opened
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_recent_workspaces_last_opened ON recent_workspaces(last_opened_at DESC)'
+    );
   }
 
   async saveCanvas(canvasId: string, state: CanvasState): Promise<void> {
@@ -419,6 +435,67 @@ export class SQLiteDatabase implements IDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
+  }
+
+  // ===========================================================================
+  // Recent Workspaces Methods
+  // ===========================================================================
+
+  async upsertRecentWorkspace(workspace: RecentWorkspace): Promise<void> {
+    await this.run(
+      `INSERT OR REPLACE INTO recent_workspaces (path, name, last_opened_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [workspace.path, workspace.name, workspace.lastOpenedAt, workspace.createdAt]
+    );
+  }
+
+  async getRecentWorkspaces(limit: number = 20): Promise<RecentWorkspace[]> {
+    const rows = await this.all<{
+      path: string;
+      name: string;
+      last_opened_at: number;
+      created_at: number;
+    }>(
+      'SELECT path, name, last_opened_at, created_at FROM recent_workspaces ORDER BY last_opened_at DESC LIMIT ?',
+      [limit]
+    );
+
+    return rows.map((row) => ({
+      path: row.path,
+      name: row.name,
+      lastOpenedAt: row.last_opened_at,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async removeRecentWorkspace(path: string): Promise<void> {
+    await this.run('DELETE FROM recent_workspaces WHERE path = ?', [path]);
+  }
+
+  async clearAllRecentWorkspaces(): Promise<void> {
+    await this.run('DELETE FROM recent_workspaces');
+  }
+
+  async getRecentWorkspaceByPath(path: string): Promise<RecentWorkspace | null> {
+    const row = await this.get<{
+      path: string;
+      name: string;
+      last_opened_at: number;
+      created_at: number;
+    }>('SELECT path, name, last_opened_at, created_at FROM recent_workspaces WHERE path = ?', [
+      path,
+    ]);
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      path: row.path,
+      name: row.name,
+      lastOpenedAt: row.last_opened_at,
+      createdAt: row.created_at,
+    };
   }
 
   // Helper methods to promisify sqlite3 callbacks

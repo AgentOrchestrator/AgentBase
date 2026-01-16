@@ -11,7 +11,12 @@ import { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
 import type { CodingAgentState } from '../../types/coding-agent-status';
-import type { GitInfo, TerminalSessionState } from '@agent-orchestrator/shared';
+import type {
+  GitInfo,
+  TerminalSessionState,
+  AddWorkspaceOptions,
+  RecentWorkspace,
+} from '@agent-orchestrator/shared';
 import {
   CodingAgentFactory,
   isSessionResumable,
@@ -652,6 +657,77 @@ function registerIpcHandlers(): void {
       return { success: true, data: states };
     } catch (error) {
       console.error('[Main] Error loading all agent statuses', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  // ============================================
+  // Recent Workspaces IPC Handlers
+  // ============================================
+
+  ipcMain.handle(
+    'recent-workspaces:add',
+    async (_event, workspacePath: string, options?: AddWorkspaceOptions) => {
+      try {
+        const now = Date.now();
+        const existing = await database.getRecentWorkspaceByPath(workspacePath);
+
+        const workspace: RecentWorkspace = {
+          path: workspacePath,
+          name: options?.name || path.basename(workspacePath),
+          lastOpenedAt: now,
+          createdAt: existing?.createdAt || now,
+        };
+
+        await database.upsertRecentWorkspace(workspace);
+        console.log('[Main] Recent workspace added/updated', { path: workspacePath });
+        return { success: true };
+      } catch (error) {
+        console.error('[Main] Error adding recent workspace', { path: workspacePath, error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle('recent-workspaces:get', async (_event, limit?: number) => {
+    try {
+      const workspaces = await database.getRecentWorkspaces(limit);
+      console.log('[Main] Retrieved recent workspaces', { count: workspaces.length });
+      return { success: true, data: workspaces };
+    } catch (error) {
+      console.error('[Main] Error getting recent workspaces', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('recent-workspaces:remove', async (_event, workspacePath: string) => {
+    try {
+      await database.removeRecentWorkspace(workspacePath);
+      console.log('[Main] Recent workspace removed', { path: workspacePath });
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error removing recent workspace', { path: workspacePath, error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('recent-workspaces:clear', async () => {
+    try {
+      await database.clearAllRecentWorkspaces();
+      console.log('[Main] All recent workspaces cleared');
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error clearing recent workspaces', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('recent-workspaces:has', async (_event, workspacePath: string) => {
+    try {
+      const workspace = await database.getRecentWorkspaceByPath(workspacePath);
+      return { success: true, data: workspace !== null };
+    } catch (error) {
+      console.error('[Main] Error checking recent workspace', { path: workspacePath, error });
       return { success: false, error: (error as Error).message };
     }
   });

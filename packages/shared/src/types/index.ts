@@ -25,3 +25,6 @@ export * from './session.js';
 
 // Conversation types (Claude Code JSONL format)
 export * from './conversation.js';
+
+// Workspace types (recent workspaces)
+export * from './workspace.js';

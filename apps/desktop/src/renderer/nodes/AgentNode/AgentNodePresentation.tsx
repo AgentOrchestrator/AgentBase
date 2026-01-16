@@ -600,7 +600,7 @@ export function AgentNodePresentation({
                   agentId: data.agentId,
                   sessionId: data.sessionId,
                   agentType: data.agentType,
-                  workspacePath: workspaceState?.path,
+                  workspacePath: data.workspacePath,
                   chatMessages: data.chatMessages || [],
                   title: data.title.value,
                 },
