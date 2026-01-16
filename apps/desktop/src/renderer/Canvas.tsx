@@ -40,6 +40,7 @@ import { CommandPalette, type CommandAction } from './components/CommandPalette'
 import { NewAgentModal } from './components/NewAgentModal';
 import { ActionPill } from './components/ActionPill';
 import { useTheme } from './context';
+import { createLinearIssueAttachment } from './types/attachments';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -135,6 +136,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
   const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
   const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+  const [pendingLinearIssue, setPendingLinearIssue] = useState<LinearIssue | undefined>(undefined);
   const [isLinearCollapsed, setIsLinearCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const resizeStartXRef = useRef<number>(0);
@@ -182,6 +184,11 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
     setNodes,
     isPillExpanded: pill.isPillExpanded,
     collapsePill: pill.collapsePill,
+    onOpenAgentModal: (position, linearIssue) => {
+      setPendingAgentPosition(position);
+      setPendingLinearIssue(linearIssue);
+      setIsNewAgentModalOpen(true);
+    },
   });
 
   // Canvas node creation actions
@@ -682,6 +689,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         if (isNewAgentModalOpen) {
           setIsNewAgentModalOpen(false);
           setPendingAgentPosition(undefined);
+          setPendingLinearIssue(undefined);
         } else {
           canvasActions.addAgentNode();
         }
@@ -1014,6 +1022,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         onClose={() => {
           setIsNewAgentModalOpen(false);
           setPendingAgentPosition(undefined);
+          setPendingLinearIssue(undefined);
           setAutoCreateWorktree(false);
         }}
         onCreate={(data) => {
@@ -1026,14 +1035,38 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
               workspacePath: data.workspacePath,
             },
             lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
+            initialAttachments: pendingLinearIssue
+              ? [
+                  createLinearIssueAttachment({
+                    id: pendingLinearIssue.id,
+                    identifier: pendingLinearIssue.identifier,
+                    title: pendingLinearIssue.title,
+                    state: {
+                      name: pendingLinearIssue.state.name,
+                      color: pendingLinearIssue.state.color,
+                    },
+                    assignee: pendingLinearIssue.assignee,
+                    // Priority is optional and LinearIssue has priority as number, not object
+                    // So we omit it for now
+                  }),
+                ]
+              : undefined,
           });
           setIsNewAgentModalOpen(false);
           setPendingAgentPosition(undefined);
+          setPendingLinearIssue(undefined);
           setAutoCreateWorktree(false);
         }}
         initialPosition={pendingAgentPosition}
         initialWorkspacePath={folderLock.lockedFolderPath}
         autoCreateWorktree={autoCreateWorktree}
+        initialDescription={
+          pendingLinearIssue
+            ? pendingLinearIssue.description
+              ? `${pendingLinearIssue.title}\n\n${pendingLinearIssue.description}`
+              : pendingLinearIssue.title
+            : undefined
+        }
       />
 
       {/* Sidebar Panel */}

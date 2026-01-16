@@ -7,7 +7,7 @@
  */
 
 import type { Node } from '@xyflow/react';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type { GitInfo, TerminalAttachment } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle, type AgentNodeData, type AgentTitle } from '../types/agent-node';
 
 // =============================================================================
@@ -47,6 +47,8 @@ export interface CreateAgentOptions extends CreateNodeOptions {
     project?: string;
     labels?: string[];
   };
+  /** Initial attachments to attach to the agent (e.g., Linear issues) */
+  initialAttachments?: TerminalAttachment[];
 }
 
 
@@ -103,7 +105,7 @@ export class CanvasNodeService {
    */
   createAgentNode(options: CreateAgentOptions): Node {
     const nodePosition = this.resolvePosition(options);
-    const { gitInfo, workspacePath, lockedFolderPath, modalData } = options;
+    const { gitInfo, workspacePath, lockedFolderPath, modalData, initialAttachments } = options;
 
     // Generate unique IDs
     const agentId = `agent-${crypto.randomUUID()}`;
@@ -135,7 +137,7 @@ export class CanvasNodeService {
       title: nodeTitle,
       summary: modalData?.description || null,
       progress: null,
-      attachments: [],
+      attachments: initialAttachments || [],
       activeView: 'overview',
       sessionId,
       createdAt,

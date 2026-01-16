@@ -31,6 +31,7 @@ export type LinearIssue = {
   id: string;
   title: string;
   identifier: string;
+  description?: string;
   state: LinearWorkflowState;
   priority: number;
   assignee?: {

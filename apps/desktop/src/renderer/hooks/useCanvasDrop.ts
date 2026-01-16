@@ -10,6 +10,7 @@ export interface LinearIssue {
   id: string;
   title: string;
   identifier: string;
+  description?: string;
   state: {
     id: string;
     name: string;
@@ -61,6 +62,8 @@ export interface UseCanvasDropOptions {
   isPillExpanded: boolean;
   /** Function to collapse the pill */
   collapsePill: () => void;
+  /** Callback to open agent modal with position and Linear issue data */
+  onOpenAgentModal?: (position: { x: number; y: number }, linearIssue: LinearIssue) => void;
 }
 
 /**
@@ -69,12 +72,12 @@ export interface UseCanvasDropOptions {
  * Supports:
  * - Dragging Linear issues from the issues pill
  * - Dropping workspace metadata to create agent nodes
- * - Dropping Linear issues to create terminal nodes
+ * - Dropping Linear issues to open agent modal (instead of creating terminal nodes)
  *
  * @param options - Configuration options for the hook
  */
 export function useCanvasDrop(options: UseCanvasDropOptions): UseCanvasDropReturn {
-  const { screenToFlowPosition, setNodes, isPillExpanded, collapsePill } = options;
+  const { screenToFlowPosition, setNodes, isPillExpanded, collapsePill, onOpenAgentModal } = options;
 
   /**
    * Handler for when a drag starts on an issue card
@@ -102,7 +105,7 @@ export function useCanvasDrop(options: UseCanvasDropOptions): UseCanvasDropRetur
    *
    * Handles two types of drops:
    * 1. workspace-metadata: Creates an agent node with workspacePath
-   * 2. Linear issue: Creates a terminal node with the issue attached
+   * 2. Linear issue: Opens agent modal with the issue data (user can then create agent)
    */
   const handleCanvasDrop = useCallback(
     (e: React.DragEvent) => {
@@ -121,11 +124,10 @@ export function useCanvasDrop(options: UseCanvasDropOptions): UseCanvasDropRetur
           y: e.clientY,
         });
 
-        const terminalId = `terminal-${crypto.randomUUID()}`;
-
         // Handle based on attachment type
         if (attachmentType === 'workspace-metadata') {
           // For workspace drops, create an agent node instead of terminal
+          const terminalId = `terminal-${crypto.randomUUID()}`;
           const agentId = crypto.randomUUID();
           const newNode: Node = {
             id: `node-${Date.now()}`,
@@ -148,22 +150,29 @@ export function useCanvasDrop(options: UseCanvasDropOptions): UseCanvasDropRetur
           };
           setNodes((nds) => [...nds, newNode]);
         } else {
-          // Create Linear issue attachment for terminal node
-          const attachment = createLinearIssueAttachment(data);
-          const newNode: Node = {
-            id: `node-${Date.now()}`,
-            type: 'terminal',
-            position,
-            data: {
-              terminalId,
-              attachments: [attachment],
-            },
-            style: {
-              width: 600,
-              height: 400,
-            },
-          };
-          setNodes((nds) => [...nds, newNode]);
+          // For Linear issues, open the agent modal instead of creating a terminal node
+          // Check if this looks like a Linear issue (has identifier field)
+          if (data.identifier && onOpenAgentModal) {
+            onOpenAgentModal(position, data as LinearIssue);
+          } else {
+            // Fallback: if no callback provided, create terminal node (backward compatibility)
+            const attachment = createLinearIssueAttachment(data);
+            const terminalId = `terminal-${crypto.randomUUID()}`;
+            const newNode: Node = {
+              id: `node-${Date.now()}`,
+              type: 'terminal',
+              position,
+              data: {
+                terminalId,
+                attachments: [attachment],
+              },
+              style: {
+                width: 600,
+                height: 400,
+              },
+            };
+            setNodes((nds) => [...nds, newNode]);
+          }
         }
 
         // Close the issues pill after dropping
@@ -174,7 +183,7 @@ export function useCanvasDrop(options: UseCanvasDropOptions): UseCanvasDropRetur
         console.error('Error handling drop:', error);
       }
     },
-    [screenToFlowPosition, setNodes, isPillExpanded, collapsePill]
+    [screenToFlowPosition, setNodes, isPillExpanded, collapsePill, onOpenAgentModal]
   );
 
   return {
