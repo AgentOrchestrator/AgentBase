@@ -1419,16 +1419,12 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     </svg>
                   </span>
                   <h3 className="sidebar-linear-issues-title">Linear</h3>
-                  <span className="sidebar-linear-issues-workspace">
-                    {linear.workspaceName || (linear.isLoading ? 'Loading...' : 'Unknown')}
-                  </span>
                 </div>
 
                 {!isLinearCollapsed && (
                   <>
                     <div className="sidebar-linear-issues-filters">
                   <div className="sidebar-linear-issues-filter">
-                    <label htmlFor="sidebar-issues-filter-project">Project</label>
                     <select
                       id="sidebar-issues-filter-project"
                       className="sidebar-issues-select"
@@ -1445,7 +1441,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     </select>
                   </div>
                   <div className="sidebar-linear-issues-filter">
-                    <label htmlFor="sidebar-issues-filter-milestone">Milestone</label>
                     <select
                       id="sidebar-issues-filter-milestone"
                       className="sidebar-issues-select"
@@ -1462,7 +1457,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     </select>
                   </div>
                   <div className="sidebar-linear-issues-filter">
-                    <label htmlFor="sidebar-issues-filter-status">Status</label>
                     <select
                       id="sidebar-issues-filter-status"
                       className="sidebar-issues-select"
