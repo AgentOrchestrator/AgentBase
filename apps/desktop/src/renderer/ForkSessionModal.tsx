@@ -3,9 +3,12 @@
  *
  * Simple modal that appears when user drags to fork an AgentNode.
  * Collects fork title which is used to name the git branch.
+ * Includes optional context preview to let users select cutoff point.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { MessagePreviewPanel } from './components/MessagePreviewPanel';
+import type { MessagePreview } from './hooks/useForkModal';
 import './ForkSessionModal.css';
 
 interface ForkSessionModalProps {
@@ -17,6 +20,18 @@ interface ForkSessionModalProps {
   isLoading?: boolean;
   /** Error message to display */
   error?: string | null;
+  /** Messages for context preview (null = not loaded) */
+  messages?: MessagePreview[] | null;
+  /** Whether messages are loading */
+  isLoadingMessages?: boolean;
+  /** Callback to load messages */
+  onLoadMessages?: () => void;
+  /** Currently selected cutoff message ID */
+  cutoffMessageId?: string | null;
+  /** Original target message ID (from text selection) */
+  originalTargetMessageId?: string | null;
+  /** Callback when cutoff changes */
+  onCutoffChange?: (messageId: string) => void;
 }
 
 function ForkSessionModal({
@@ -24,8 +39,15 @@ function ForkSessionModal({
   onCancel,
   isLoading = false,
   error = null,
+  messages = null,
+  isLoadingMessages = false,
+  onLoadMessages,
+  cutoffMessageId = null,
+  originalTargetMessageId = null,
+  onCutoffChange,
 }: ForkSessionModalProps) {
   const [title, setTitle] = useState('');
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +146,42 @@ function ForkSessionModal({
               }
             }}
           />
+
+          {/* Context Preview Section */}
+          {onLoadMessages && (
+            <div className="fork-modal-preview-section">
+              <button
+                type="button"
+                className="fork-modal-preview-toggle"
+                onClick={() => {
+                  if (!isPreviewExpanded && !messages) {
+                    onLoadMessages();
+                  }
+                  setIsPreviewExpanded(!isPreviewExpanded);
+                }}
+                disabled={isLoading}
+              >
+                {isPreviewExpanded ? '▼' : '▶'} Preview Context
+              </button>
+
+              {isPreviewExpanded && (
+                <div className="fork-modal-preview-content">
+                  {messages && onCutoffChange ? (
+                    <MessagePreviewPanel
+                      messages={messages}
+                      cutoffMessageId={cutoffMessageId}
+                      originalTargetMessageId={originalTargetMessageId}
+                      onCutoffChange={onCutoffChange}
+                      isLoading={isLoadingMessages}
+                    />
+                  ) : isLoadingMessages ? (
+                    <div className="fork-modal-preview-loading">Loading messages...</div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
+
           {error && <div className="fork-modal-error">{error}</div>}
         </form>
 

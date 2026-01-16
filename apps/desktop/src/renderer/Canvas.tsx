@@ -1673,6 +1673,12 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
             onCancel={forkModal.cancel}
             isLoading={forkModal.isLoading}
             error={forkModal.error}
+            messages={forkModal.messages}
+            isLoadingMessages={forkModal.isLoadingMessages}
+            onLoadMessages={forkModal.loadMessages}
+            cutoffMessageId={forkModal.cutoffMessageId}
+            originalTargetMessageId={forkModal.modalData?.originalTargetMessageId}
+            onCutoffChange={forkModal.setCutoffMessageId}
           />
         )}
 

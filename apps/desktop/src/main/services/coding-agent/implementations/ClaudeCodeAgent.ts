@@ -631,8 +631,6 @@ export class ClaudeCodeAgent
       if (isCrossDirectory) {
         sdkOptions = {
           abortController,
-          hooks: this.hookBridge.hooks,
-          canUseTool: this.canUseTool,
           tools: { type: 'preset', preset: 'claude_code' },
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           extraArgs: { session_id: parentId }
@@ -641,8 +639,6 @@ export class ClaudeCodeAgent
       } else {
         sdkOptions = {
           abortController,
-          hooks: this.hookBridge.hooks,
-          canUseTool: this.canUseTool,
           resume: parentId,
           forkSession: true,
           tools: { type: 'preset', preset: 'claude_code' },
@@ -661,12 +657,13 @@ export class ClaudeCodeAgent
       };
       this.activeQueries.set(queryId, handle);
 
-      for await (const message of queryResult) {
-        // Extract session_id from any message
-        if ('session_id' in message && message.session_id) {
-          parentId != message.session_id;
-        }
-      }
+      // for await (const message of queryResult) {
+      //   // Extract session_id from any message
+      //   if ('session_id' in message && message.session_id) {
+      //     parentId != message.session_id;
+      //     throw new Error('Forked session created with different ID than parent');
+      //   }
+      // }
     } catch (error) {
       console.error('[ClaudeCodeAgent] Failed to create new session', { error });
     }
@@ -947,7 +944,7 @@ export class ClaudeCodeAgent
     filter?: MessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
     const projectsDir = this.getProjectsDir();
-
+    console.log('[ClaudeCodeAgent] Getting filtered session', { sessionId, filter, projectsDir });
     try {
       if (!fs.existsSync(projectsDir)) {
         return ok(null);
@@ -957,6 +954,11 @@ export class ClaudeCodeAgent
       // This is important for forked sessions that share the same sessionId
       // but exist in different project directories (parent vs worktree workspace)
       if (filter?.workspacePath) {
+        console.log('[ClaudeCodeAgent] Searching for session in specified workspacePath', {
+          sessionId,
+          workspacePath: filter.workspacePath,
+        });
+
         const encodedPath = this.encodeWorkspacePath(filter.workspacePath);
         const targetDirPath = path.join(projectsDir, encodedPath);
         const sessionFilePath = path.join(targetDirPath, `${sessionId}.jsonl`);
@@ -965,6 +967,7 @@ export class ClaudeCodeAgent
           console.log('[ClaudeCodeAgent] Found session in target workspace', {
             sessionId,
             workspacePath: filter.workspacePath,
+            sessionFilePath
           });
           return ok(this.parseSessionContent(sessionFilePath, sessionId, filter.workspacePath, filter));
         }
@@ -975,6 +978,10 @@ export class ClaudeCodeAgent
         console.log('[ClaudeCodeAgent] Session not found in target workspace, searching all', {
           sessionId,
           workspacePath: filter.workspacePath,
+        });
+      } else {
+        console.log('[ClaudeCodeAgent] No workspacePath filter provided, searching all directories for session', {
+          sessionId,
         });
       }
 

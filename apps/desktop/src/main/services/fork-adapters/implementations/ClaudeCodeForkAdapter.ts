@@ -235,6 +235,14 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
+
+      console.log('[ClaudeCodeForkAdapter] Read source session file:', {
+        sourceFilePath,
+        sourceSessionId,
+        targetSessionId,
+        filterOptions
+      });
+
       // Apply filtering if options provided (filter by messageId or timestamp)
       let contentToTransform = sourceContent;
       if (filterOptions) {

@@ -70,6 +70,13 @@ export function useChatSession({
 
     isLoadingHistoryRef.current = true;
 
+    // Debug logging to trace workspace path used for session lookup
+    console.log('[useChatSession] loadSessionHistory called', {
+      sessionId,
+      agentServiceWorkspacePath: agentService.workspacePath,
+      agentType,
+    });
+
     try {
       const session = await agentService.getSession(sessionId, { roles: ['user', 'assistant'] });
 

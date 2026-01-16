@@ -719,6 +719,14 @@ export class AgentServiceImpl implements IAgentService {
       workspacePath: this.workspacePathValue ?? filter?.workspacePath,
     };
 
+    // Debug logging to trace workspace path being used
+    console.log('[AgentServiceImpl] getSession called', {
+      sessionId,
+      workspacePathValue: this.workspacePathValue,
+      filterWorkspacePath: filter?.workspacePath,
+      finalWorkspacePath: filterWithWorkspace.workspacePath,
+    });
+
     const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);
     return this.unwrapResult(result);
   }

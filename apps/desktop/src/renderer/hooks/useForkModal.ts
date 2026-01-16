@@ -15,6 +15,20 @@ import { createDefaultAgentTitle, type AgentNodeData } from '../types/agent-node
 // =============================================================================
 
 /**
+ * Message preview for context display in fork modal
+ */
+export interface MessagePreview {
+  /** Unique message identifier */
+  id: string;
+  /** Message role (user, assistant, system) */
+  role: 'user' | 'assistant' | 'system';
+  /** Truncated message content for preview */
+  preview: string;
+  /** ISO timestamp of the message */
+  timestamp: string;
+}
+
+/**
  * Data stored when fork modal is opened
  */
 export interface ForkModalData {
@@ -28,6 +42,10 @@ export interface ForkModalData {
   workspacePath: string;
   /** Target message ID for filtering fork context (optional) */
   targetMessageId?: string;
+  /** Original target message ID (from text selection, preserved for UI indicator) */
+  originalTargetMessageId?: string;
+  /** Agent type for API calls */
+  agentType?: string;
 }
 
 /**
@@ -64,6 +82,12 @@ export interface UseForkModalReturn {
   error: string | null;
   /** Data for the current fork operation */
   modalData: ForkModalData | null;
+  /** Messages available for preview (null = not loaded yet) */
+  messages: MessagePreview[] | null;
+  /** Whether messages are currently loading */
+  isLoadingMessages: boolean;
+  /** Currently selected cutoff message ID */
+  cutoffMessageId: string | null;
 
   // Actions
   /**
@@ -83,6 +107,10 @@ export interface UseForkModalReturn {
   cancel: () => void;
   /** Clear the current error */
   clearError: () => void;
+  /** Load messages for preview */
+  loadMessages: () => Promise<void>;
+  /** Update the cutoff message ID */
+  setCutoffMessageId: (messageId: string) => void;
 }
 
 /**
@@ -98,6 +126,15 @@ export interface UseForkModalInput {
 // =============================================================================
 // Hook Implementation
 // =============================================================================
+
+/**
+ * Truncate content for preview display
+ */
+function truncateContent(content: string, maxLength: number = 100): string {
+  const trimmed = content.trim().replace(/\s+/g, ' ');
+  if (trimmed.length <= maxLength) return trimmed;
+  return trimmed.slice(0, maxLength - 3) + '...';
+}
 
 /**
  * Hook for managing fork modal state and operations
@@ -122,6 +159,9 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
   const [modalData, setModalData] = useState<ForkModalData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<MessagePreview[] | null>(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [cutoffMessageId, setCutoffMessageIdState] = useState<string | null>(null);
 
   // Derived state
   const isOpen = modalData !== null;
@@ -189,7 +229,19 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
       }
 
       // Show fork modal with resolved session/workspace and optional message filter
-      setModalData({ sourceNodeId, position, sessionId, workspacePath, targetMessageId });
+      setModalData({
+        sourceNodeId,
+        position,
+        sessionId,
+        workspacePath,
+        targetMessageId,
+        originalTargetMessageId: targetMessageId,
+        agentType: sourceData.agentType,
+      });
+      // Initialize cutoff from targetMessageId (if provided from text selection)
+      setCutoffMessageIdState(targetMessageId || null);
+      // Reset messages when opening new modal
+      setMessages(null);
       setError(null);
     },
     [nodes, onNodeUpdate]
@@ -223,10 +275,19 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
       setError(null);
 
       try {
-        // Build filterOptions if targetMessageId is set (for partial context fork)
-        const filterOptions = modalData.targetMessageId
-          ? { targetMessageId: modalData.targetMessageId }
+        // Build filterOptions using cutoffMessageId (user's selected cutoff point)
+        // Falls back to original targetMessageId if cutoff wasn't changed
+        const effectiveCutoff = cutoffMessageId || modalData.targetMessageId;
+        const filterOptions = effectiveCutoff
+          ? { targetMessageId: effectiveCutoff }
           : undefined;
+
+        console.log('[useForkModal] Fork with filter:', {
+          cutoffMessageId,
+          targetMessageId: modalData.targetMessageId,
+          effectiveCutoff,
+          filterOptions,
+        });
 
         // Call fork service to create worktree and fork session
         const result = await forkService.forkAgent({
@@ -306,7 +367,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         return { success: false, error: errorMessage };
       }
     },
-    [modalData, nodes]
+    [modalData, nodes, cutoffMessageId]
   );
 
   /**
@@ -316,6 +377,8 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
     setModalData(null);
     setError(null);
     setIsLoading(false);
+    setMessages(null);
+    setCutoffMessageIdState(null);
   }, []);
 
   /**
@@ -325,17 +388,75 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
     setError(null);
   }, []);
 
+  /**
+   * Load messages for preview
+   */
+  const loadMessages = useCallback(async () => {
+    if (!modalData?.sessionId || !modalData?.agentType) {
+      console.warn('[useForkModal] Cannot load messages: missing sessionId or agentType');
+      return;
+    }
+
+    if (!window.codingAgentAPI) {
+      console.warn('[useForkModal] codingAgentAPI not available');
+      return;
+    }
+
+    setIsLoadingMessages(true);
+    try {
+      const session = await window.codingAgentAPI.getSession(
+        modalData.agentType as 'claude_code' | 'cursor' | 'codex',
+        modalData.sessionId,
+        { workspacePath: modalData.workspacePath }
+      );
+
+      if (session?.messages) {
+        const previews: MessagePreview[] = session.messages
+          .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+          .map((msg) => ({
+            id: msg.id,
+            role: msg.role as 'user' | 'assistant' | 'system',
+            preview: truncateContent(msg.content, 120),
+            timestamp: msg.timestamp,
+          }));
+        setMessages(previews);
+
+        // If no cutoff is set and we have messages, default to last message (include all)
+        if (!cutoffMessageId && previews.length > 0) {
+          setCutoffMessageIdState(previews[previews.length - 1].id);
+        }
+      }
+    } catch (err) {
+      console.error('[useForkModal] Failed to load messages:', err);
+      setError('Failed to load messages for preview');
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [modalData, cutoffMessageId]);
+
+  /**
+   * Update the cutoff message ID
+   */
+  const setCutoffMessageId = useCallback((messageId: string) => {
+    setCutoffMessageIdState(messageId);
+  }, []);
+
   return {
     // State
     isOpen,
     isLoading,
     error,
     modalData,
+    messages,
+    isLoadingMessages,
+    cutoffMessageId,
 
     // Actions
     open,
     confirm,
     cancel,
     clearError,
+    loadMessages,
+    setCutoffMessageId,
   };
 }
