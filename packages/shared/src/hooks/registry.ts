@@ -7,7 +7,8 @@
  * - Global subscriptions (all events)
  */
 
-import { randomUUID } from 'crypto';
+// Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
+const randomUUID = (): string => globalThis.crypto.randomUUID();
 import type {
   AgentEvent,
   AgentEventType,

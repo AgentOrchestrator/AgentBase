@@ -43,7 +43,8 @@ import type {
   HookCallbackMatcher,
 } from '@anthropic-ai/claude-agent-sdk';
 
-import { randomUUID } from 'crypto';
+// Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
+const randomUUID = (): string => globalThis.crypto.randomUUID();
 import type { EventRegistry } from '../registry.js';
 import type {
   AgentEvent,

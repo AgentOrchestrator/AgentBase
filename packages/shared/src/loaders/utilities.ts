@@ -3,8 +3,6 @@
  * These are commonly used across multiple loader implementations
  */
 
-import { createHash } from 'crypto';
-
 /**
  * Normalize timestamp to ISO 8601 format
  * Handles Unix timestamps (milliseconds), Unix timestamps (seconds), and ISO strings
@@ -129,8 +127,31 @@ export function extractProjectNameFromPath(folderPath: string): string | undefin
 }
 
 /**
+ * Simple string hash function (djb2 algorithm)
+ * Browser-compatible alternative to crypto.createHash
+ */
+function simpleHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 33) ^ str.charCodeAt(i);
+  }
+  // Convert to unsigned 32-bit integer, then to hex
+  const hex1 = (hash >>> 0).toString(16).padStart(8, '0');
+  // Create a second hash with different seed for more entropy
+  let hash2 = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash2 = (hash2 << 5) - hash2 + str.charCodeAt(i);
+    hash2 = hash2 & hash2;
+  }
+  const hex2 = (hash2 >>> 0).toString(16).padStart(8, '0');
+  // Combine and extend to 32 chars
+  const combined = hex1 + hex2;
+  return (combined + combined).substring(0, 32);
+}
+
+/**
  * Generate a deterministic UUID from an input string
- * Uses MD5 hash formatted as UUID v4
+ * Uses a simple hash formatted as UUID v4
  *
  * Useful for creating stable IDs from conversation identifiers
  * that don't have their own UUID
@@ -139,7 +160,7 @@ export function extractProjectNameFromPath(folderPath: string): string | undefin
  * @returns A UUID v4 formatted string
  */
 export function generateDeterministicUUID(input: string): string {
-  const hash = createHash('md5').update(input).digest('hex');
+  const hash = simpleHash(input);
   // Format as UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
   return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-${hash.substring(16, 20)}-${hash.substring(20, 32)}`;
 }

@@ -8,7 +8,8 @@
  * - Events: Agent-emitted events (AgentMessageDelta, ExecApprovalRequest, etc.)
  */
 
-import { randomUUID } from 'crypto';
+// Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
+const randomUUID = (): string => globalThis.crypto.randomUUID();
 import type { AgentType } from '../../loaders/types.js';
 import type {
   AgentEvent,
