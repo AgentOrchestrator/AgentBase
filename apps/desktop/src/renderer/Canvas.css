@@ -18,6 +18,10 @@
   flex-shrink: 0;
   z-index: 1;
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .canvas-sidebar.resizing {
