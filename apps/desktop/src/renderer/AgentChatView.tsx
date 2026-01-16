@@ -57,9 +57,9 @@ export default function AgentChatView({
   const [error, setError] = useState<string | null>(null);
   const [textSelection, setTextSelection] = useState<{
     text: string;
-    position: { top: number; right: number };
+    /** Y position in content coordinates (accounts for scroll) */
+    contentY: number;
   } | null>(null);
-  const [mouseY, setMouseY] = useState<number | null>(null);
   const [isCommandPressed, setIsCommandPressed] = useState(false);
   const hasSentInitialPrompt = useRef(false);
 
@@ -169,18 +169,18 @@ export default function AgentChatView({
     };
   }, []);
 
-  // Update button position based on mouse Y coordinate
-  const updateButtonPositionFromMouse = useCallback((clientY: number) => {
-    if (!messagesContainerRef.current) return;
+  // Convert a viewport Y coordinate to content coordinates (accounts for zoom and scroll)
+  const viewportYToContentY = useCallback((clientY: number): number => {
+    if (!messagesContainerRef.current) return 0;
 
     const viewport = getViewport();
     const zoom = viewport.zoom;
-    
+
     // Get the content element's bounding rect (already accounts for React Flow zoom transform)
     const contentRect = messagesContainerRef.current.getBoundingClientRect();
     const scrollTop = messagesContainerRef.current.scrollTop;
-    
-    // Calculate mouse Y position relative to content container
+
+    // Calculate Y position relative to content container
     // When React Flow zooms, it applies a CSS transform to the node
     // getBoundingClientRect() returns coordinates in viewport space (already transformed)
     // clientY is also in viewport space
@@ -192,12 +192,10 @@ export default function AgentChatView({
     // - Add scrollTop to get absolute position in the scrollable content
     const viewportRelativeY = clientY - contentRect.top;
     const contentRelativeY = viewportRelativeY / zoom;
-    const absoluteY = contentRelativeY + scrollTop;
-    
-    setMouseY(absoluteY);
+    return contentRelativeY + scrollTop;
   }, [getViewport]);
 
-  // Detect text selection
+  // Detect text selection and calculate position from selection bounds
   const handleSelectionChange = useCallback(() => {
     if (!messagesContainerRef.current) {
       setTextSelection(null);
@@ -225,12 +223,16 @@ export default function AgentChatView({
       return;
     }
 
-    // Keep the selection text, position will be updated by mouse movement
+    // Get the bounding rect of the selection to snap button to the selected line
+    const selectionRect = range.getBoundingClientRect();
+    // Use the bottom of the selection (end of selected text)
+    const contentY = viewportYToContentY(selectionRect.bottom);
+
     setTextSelection({
       text: selectedText,
-      position: { top: 0, right: 12 }, // Top will be overridden by mouseY
+      contentY,
     });
-  }, []);
+  }, [viewportYToContentY]);
 
   // Handle scroll events when node is selected
   // Only prevent canvas scrolling when node is selected (clicked)
@@ -251,24 +253,8 @@ export default function AgentChatView({
     };
   }, [selected]);
 
-  // Track mouse movement and update button position
+  // Listen for selection changes to position button at selected text
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Track mouse Y position when within the content area
-      if (messagesContainerRef.current) {
-        const contentRect = messagesContainerRef.current.getBoundingClientRect();
-        // Check if mouse is over the content area
-        if (
-          e.clientX >= contentRect.left &&
-          e.clientX <= contentRect.right &&
-          e.clientY >= contentRect.top &&
-          e.clientY <= contentRect.bottom
-        ) {
-          updateButtonPositionFromMouse(e.clientY);
-        }
-      }
-    };
-
     const handleMouseUp = () => {
       // Small delay to ensure selection is updated
       setTimeout(handleSelectionChange, 10);
@@ -276,17 +262,14 @@ export default function AgentChatView({
 
     // Listen for selection changes
     document.addEventListener('selectionchange', handleSelectionChange);
-    // Track mouse movement
-    document.addEventListener('mousemove', handleMouseMove);
     // Listen for mouseup to catch selection end
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange);
-      document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleSelectionChange, updateButtonPositionFromMouse]);
+  }, [handleSelectionChange]);
 
   const handleSend = async () => {
     if (!isSessionReady || !inputValue.trim() || isStreaming) return;
@@ -484,12 +467,12 @@ export default function AgentChatView({
         })}
         <div ref={messagesEndRef} />
         
-        {/* Plus button - appears when text is selected, follows mouse */}
-        {textSelection && mouseY !== null && (
+        {/* Plus button - appears when text is selected, snaps to selection */}
+        {textSelection && (
           <TextSelectionButton
             text={textSelection.text}
-            mouseY={mouseY}
-            rightOffset={textSelection.position.right}
+            mouseY={textSelection.contentY}
+            rightOffset={12}
             nodeId={nodeId}
             sessionId={sessionId}
           />

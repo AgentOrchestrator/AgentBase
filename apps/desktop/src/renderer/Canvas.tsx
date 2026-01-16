@@ -66,10 +66,10 @@ const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
     .map((edge) => {
       const nextEdge: Edge = { ...edge };
-      if (nextEdge.sourceHandle == null) {
+      if (nextEdge.sourceHandle == null || nextEdge.sourceHandle === 'null') {
         delete nextEdge.sourceHandle;
       }
-      if (nextEdge.targetHandle == null) {
+      if (nextEdge.targetHandle == null || nextEdge.targetHandle === 'null') {
         delete nextEdge.targetHandle;
       }
       return nextEdge;
@@ -126,6 +126,7 @@ function CanvasFlow() {
 
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
+  const restoreEdgesFrameRef = useRef<number | null>(null);
   // Apply restored state when it becomes available
   useEffect(() => {
     if (!isCanvasLoading) {
@@ -144,7 +145,12 @@ function CanvasFlow() {
         });
         const cleanedEdges = sanitizeEdges(initialEdges, cleanedNodes);
         setNodes(cleanedNodes);
-        setEdges(cleanedEdges);
+        if (restoreEdgesFrameRef.current !== null) {
+          cancelAnimationFrame(restoreEdgesFrameRef.current);
+        }
+        restoreEdgesFrameRef.current = requestAnimationFrame(() => {
+          setEdges(cleanedEdges);
+        });
         initialStateApplied.current = true;
       }
     }
@@ -298,7 +304,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   // Sync nodeStore with React Flow's nodes state
   useEffect(() => {
     nodeStore.setNodes(nodes);
-  }, []); // Only run once on mount
+  }, [nodes]);
 
   // Listen for node update events and delegate to nodeStore
   useEffect(() => {
@@ -393,8 +399,14 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         addEdge(
           {
             ...params,
-            sourceHandle: params.sourceHandle ?? undefined,
-            targetHandle: params.targetHandle ?? undefined,
+            sourceHandle:
+              params.sourceHandle == null || params.sourceHandle === 'null'
+                ? undefined
+                : params.sourceHandle,
+            targetHandle:
+              params.targetHandle == null || params.targetHandle === 'null'
+                ? undefined
+                : params.targetHandle,
           },
           eds
         )

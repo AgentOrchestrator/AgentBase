@@ -148,6 +148,56 @@ export interface SessionForkability {
 }
 
 // =============================================================================
+// JSONL Filter Options (for forking with partial context)
+// =============================================================================
+
+/**
+ * Options for filtering JSONL content when forking
+ * Allows users to include only messages up to a specific point
+ */
+export interface JsonlFilterOptions {
+  /**
+   * Filter by message ID (uuid field)
+   * Includes all messages up to and including this ID
+   */
+  targetMessageId?: string;
+
+  /**
+   * Filter by timestamp (ISO string or Date)
+   * Includes all messages up to and including this timestamp
+   */
+  targetTimestamp?: string | Date;
+}
+
+/**
+ * Result of a JSONL filtering operation
+ */
+export interface JsonlFilterResult {
+  /** The filtered lines as a string (ready to write to file) */
+  content: string;
+  /** Number of lines included */
+  includedCount: number;
+  /** Number of lines filtered out */
+  filteredCount: number;
+  /** Whether the target was found (for messageId filtering) */
+  targetFound: boolean;
+}
+
+/**
+ * Message metadata for UI display when selecting filter point
+ */
+export interface JsonlMessageMetadata {
+  /** Message identifier (uuid or messageId) */
+  id: string;
+  /** ISO timestamp when the message was created */
+  timestamp?: string;
+  /** Message type (user, assistant, summary, etc.) */
+  type?: string;
+  /** Preview of message content (truncated) */
+  preview?: string;
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 

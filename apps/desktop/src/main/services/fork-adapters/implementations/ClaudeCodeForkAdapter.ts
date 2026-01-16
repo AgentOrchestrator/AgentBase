@@ -4,6 +4,8 @@ import * as os from 'os';
 import type { IForkAdapter } from '../interfaces/IForkAdapter';
 import type { Result, AgentError } from '../../coding-agent/types';
 import { ok, err, agentError, AgentErrorCode } from '../../coding-agent/types';
+import type { JsonlFilterOptions } from '@agent-orchestrator/shared';
+import { filterJsonl } from '../filter';
 
 /**
  * JSONL line structure from Claude Code session files
@@ -205,7 +207,8 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
     sourceSessionId: string,
     targetSessionId: string,
     sourceWorkingDir: string,
-    targetWorkingDir: string
+    targetWorkingDir: string,
+    filterOptions?: JsonlFilterOptions
   ): Promise<Result<void, AgentError>> {
     try {
       // Find source session file
@@ -231,7 +234,21 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
 
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
-      const lines = sourceContent.split('\n');
+
+      // Apply filtering if options provided (filter by messageId or timestamp)
+      let contentToTransform = sourceContent;
+      if (filterOptions) {
+        const filterResult = filterJsonl(sourceContent, filterOptions);
+        contentToTransform = filterResult.content;
+
+        console.log('[ClaudeCodeForkAdapter] Filtered session content:', {
+          includedCount: filterResult.includedCount,
+          filteredCount: filterResult.filteredCount,
+          targetFound: filterResult.targetFound,
+        });
+      }
+
+      const lines = contentToTransform.split('\n');
 
       // Transform paths in each line, using resolved target path
       const transformedLines = lines.map(line => {
@@ -247,6 +264,7 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
         target: targetFilePath,
         sourceSessionId,
         targetSessionId,
+        filtered: !!filterOptions,
       });
 
       return ok(undefined);
