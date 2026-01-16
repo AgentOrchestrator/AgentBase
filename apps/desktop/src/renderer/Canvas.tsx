@@ -297,6 +297,7 @@ function CanvasFlow() {
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
+  const [isLinearCollapsed, setIsLinearCollapsed] = useState(false);
   const [workspaceGitInfo, setWorkspaceGitInfo] = useState<Record<string, { branch: string | null }>>({});
   const [lockedFolderPath, setLockedFolderPath] = useState<string | null>(null);
   const [hoveredFolderPath, setHoveredFolderPath] = useState<string | null>(null);
@@ -2541,14 +2542,25 @@ function CanvasFlow() {
             {/* Linear Issues Container - Fixed at bottom */}
             {isLinearConnected && (
               <div className="sidebar-linear-issues-container">
-                <div className="sidebar-linear-issues-header">
-                  <h3 className="sidebar-linear-issues-title">Linear Issues</h3>
+                <div 
+                  className="sidebar-linear-issues-header"
+                  onClick={() => setIsLinearCollapsed(!isLinearCollapsed)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className={`sidebar-linear-issues-chevron ${isLinearCollapsed ? 'collapsed' : 'expanded'}`}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </span>
+                  <h3 className="sidebar-linear-issues-title">Linear</h3>
                   <span className="sidebar-linear-issues-workspace">
                     {linearWorkspaceName || (loadingIssues ? 'Loading...' : 'Unknown')}
                   </span>
                 </div>
                 
-                <div className="sidebar-linear-issues-filters">
+                {!isLinearCollapsed && (
+                  <>
+                    <div className="sidebar-linear-issues-filters">
                   <div className="sidebar-linear-issues-filter">
                     <label htmlFor="sidebar-issues-filter-project">Project</label>
                     <select
@@ -2658,6 +2670,8 @@ function CanvasFlow() {
                     })
                   )}
                 </div>
+                  </>
+                )}
               </div>
             )}
           </div>

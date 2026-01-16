@@ -1331,12 +1331,33 @@
   min-width: 0;
 }
 
+.sidebar-linear-issues-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-linear-issues-chevron.collapsed {
+  transform: rotate(-180deg);
+}
+
+.sidebar-linear-issues-chevron.expanded {
+  transform: rotate(-90deg);
+}
+
+.sidebar-linear-issues-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
 .sidebar-linear-issues-title {
   margin: 0;
   color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1358,16 +1379,19 @@
 
 .sidebar-linear-issues-filters {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   margin-bottom: 12px;
   padding: 0 4px;
+  flex-wrap: wrap;
 }
 
 .sidebar-linear-issues-filter {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .sidebar-linear-issues-filter label {
@@ -1376,35 +1400,50 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-issues-select {
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  padding: 6px 8px;
+  padding: 6px 4px;
   color: var(--color-text-primary);
   font-size: 12px;
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
   cursor: pointer;
+  width: 100%;
+  min-width: 0;
+  /* Remove default dropdown arrow */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none !important;
+}
+
+/* Remove dropdown arrow in IE/Edge */
+.sidebar-issues-select::-ms-expand {
+  display: none;
 }
 
 .sidebar-issues-select:hover {
-  border-color: #4a9eff;
+  background: var(--color-bg-secondary);
 }
 
 .sidebar-issues-select:focus {
-  border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+  outline: none;
+  background: var(--color-bg-secondary);
 }
 
 .sidebar-linear-issues-list {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 4px;
+  padding: 8px 4px 0 4px;
   min-height: 0;
 }
 
@@ -1441,12 +1480,13 @@
   margin-bottom: 8px;
   cursor: grab;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .sidebar-issue-card:hover {
   background: var(--color-bg-hover);
-  border-color: #4a9eff;
-  transform: translateY(-1px);
+  border-color: #000;
+  border-width: 1px;
 }
 
 .sidebar-issue-card:active {
