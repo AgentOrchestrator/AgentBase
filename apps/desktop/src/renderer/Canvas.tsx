@@ -1102,9 +1102,13 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       >
         <div className="sidebar-header">
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="sidebar-title">Canvas</h2>
-            {githubUsername && (
-              <div className="sidebar-username">@{githubUsername}</div>
+            {githubUsername ? (
+              <>
+                <h2 className="sidebar-title">{githubUsername.replace(/^@/, '')}'s</h2>
+                <div className="sidebar-username">Agent Base</div>
+              </>
+            ) : (
+              <h2 className="sidebar-title">Canvas</h2>
             )}
             {githubError && (
               <div className="sidebar-error" title={githubError}>
@@ -1716,58 +1720,13 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                             {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} F
                           </span>
                         </div>
+                        <div className="settings-mesh-shortcut-item">
+                          <span className="settings-mesh-shortcut-label">Node Drag Mode</span>
+                          <span className="settings-mesh-shortcut-key">
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘' : 'Hold Ctrl'}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="settings-section">
-                  <h3>Integrations</h3>
-                  <div className="settings-integration">
-                    <div className="integration-header">
-                      <div className="integration-info">
-                        <span className="integration-name">Linear</span>
-                        <span className={`integration-status ${linear.isConnected ? 'connected' : 'disconnected'}`}>
-                          {linear.isConnected ? '● Connected' : '○ Not connected'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="integration-content">
-                      <input
-                        type="password"
-                        placeholder="Enter Linear API Key"
-                        value={linear.apiKey}
-                        onChange={(e) => linear.connect(e.target.value)}
-                        className="integration-input"
-                        disabled={linear.isConnected}
-                      />
-                      {linear.isConnected ? (
-                        <button
-                          onClick={linear.disconnect}
-                          className="integration-button disconnect"
-                        >
-                          Disconnect
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => linear.connect(linear.apiKey)}
-                          className="integration-button connect"
-                          disabled={!linear.apiKey.trim()}
-                        >
-                          Connect
-                        </button>
-                      )}
-                    </div>
-                    <div className="integration-help">
-                      Get your API key from{' '}
-                      <a
-                        href="https://linear.app/settings/api"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="integration-link"
-                      >
-                        Linear Settings → API
-                      </a>
                     </div>
                   </div>
                 </div>
@@ -1775,7 +1734,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                 <div className="settings-section">
                   <h3>Appearance</h3>
                   <div className="settings-item">
-                    <span>Color Palette</span>
                     <select
                       className="theme-select"
                       value={theme}
@@ -1789,18 +1747,47 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                 </div>
 
                 <div className="settings-section">
-                  <h3>Keyboard Shortcuts</h3>
-                  <div className="settings-item">
-                    <span>Add Terminal</span>
-                    <span className="settings-shortcut">
-                      {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
-                    </span>
+                  <div className="integration-header">
+                    <div className="integration-info">
+                      <span className="integration-name">Linear Integration</span>
+                    </div>
                   </div>
-                  <div className="settings-item">
-                    <span>Node Drag Mode</span>
-                    <span className="settings-shortcut">
-                      {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘' : 'Hold Ctrl'}
-                    </span>
+                  <div className="integration-content">
+                    <input
+                      type="password"
+                      placeholder="Enter Linear API Key"
+                      value={linear.apiKey}
+                      onChange={(e) => linear.connect(e.target.value)}
+                      className="integration-input"
+                      disabled={linear.isConnected}
+                    />
+                    {linear.isConnected ? (
+                      <button
+                        onClick={linear.disconnect}
+                        className="integration-button disconnect"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => linear.connect(linear.apiKey)}
+                        className="integration-button connect"
+                        disabled={!linear.apiKey.trim()}
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                  <div className="integration-help">
+                    Get your API key from{' '}
+                    <a
+                      href="https://linear.app/settings/api"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="integration-link"
+                    >
+                      Linear Settings → API
+                    </a>
                   </div>
                 </div>
               </div>
