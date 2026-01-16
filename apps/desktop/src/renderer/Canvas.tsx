@@ -156,6 +156,7 @@ function CanvasFlow() {
     }
   }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
 
+
   // Persist nodes when they change
   const prevNodesRef = useRef<Node[]>(nodes);
   useEffect(() => {
@@ -173,6 +174,74 @@ function CanvasFlow() {
       persistEdges(edges);
     }
   }, [edges, isCanvasLoading, persistEdges]);
+
+  // Handle action pill highlighting events
+  useEffect(() => {
+    const handleHighlightAgent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ agentId: string }>;
+      const { agentId } = customEvent.detail;
+
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          if (node.type !== 'agent') return node;
+          const nodeData = node.data as Record<string, unknown>;
+          const nodeAgentId = nodeData?.agentId as string | undefined;
+
+          if (nodeAgentId === agentId) {
+            // Add blue border and shadow to matching node (using command palette blue)
+            const currentStyle = node.style || {};
+            return {
+              ...node,
+              style: {
+                ...currentStyle,
+                border: '2px solid #4a9eff',
+                borderRadius: '12px',
+                boxShadow: '0 0 32px 8px rgba(74, 158, 255, 0.6)',
+              },
+            };
+          } else {
+            // Remove highlight from other nodes (preserve other styles)
+            const currentStyle = node.style || {};
+            const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<string, unknown>;
+            // Only remove if it's our highlight (check if it's the blue border/shadow)
+            if (
+              (border as string)?.includes('#4a9eff') ||
+              (boxShadow as string)?.includes('rgba(74, 158, 255')
+            ) {
+              return { ...node, style: restStyle };
+            }
+            return node;
+          }
+        })
+      );
+    };
+
+    const handleUnhighlightAgent = () => {
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          if (node.type !== 'agent') return node;
+          const currentStyle = node.style || {};
+          const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<string, unknown>;
+          // Only remove if it's our highlight (check if it's the blue border/shadow)
+          if (
+            (border as string)?.includes('#4a9eff') ||
+            (boxShadow as string)?.includes('rgba(74, 158, 255')
+          ) {
+            return { ...node, style: restStyle };
+          }
+          return node;
+        })
+      );
+    };
+
+    window.addEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
+    window.addEventListener('action-pill:unhighlight-agent', handleUnhighlightAgent as EventListener);
+
+    return () => {
+      window.removeEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
+      window.removeEventListener('action-pill:unhighlight-agent', handleUnhighlightAgent as EventListener);
+    };
+  }, [setNodes]);
 
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
@@ -1412,16 +1481,12 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     </svg>
                   </span>
                   <h3 className="sidebar-linear-issues-title">Linear</h3>
-                  <span className="sidebar-linear-issues-workspace">
-                    {linear.workspaceName || (linear.isLoading ? 'Loading...' : 'Unknown')}
-                  </span>
                 </div>
 
                 {!isLinearCollapsed && (
                   <>
                     <div className="sidebar-linear-issues-filters">
                   <div className="sidebar-linear-issues-filter">
-                    <label htmlFor="sidebar-issues-filter-project">Project</label>
                     <select
                       id="sidebar-issues-filter-project"
                       className="sidebar-issues-select"
@@ -1438,7 +1503,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     </select>
                   </div>
                   <div className="sidebar-linear-issues-filter">
-                    <label htmlFor="sidebar-issues-filter-milestone">Milestone</label>
                     <select
                       id="sidebar-issues-filter-milestone"
                       className="sidebar-issues-select"
@@ -1455,7 +1519,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     </select>
                   </div>
                   <div className="sidebar-linear-issues-filter">
-                    <label htmlFor="sidebar-issues-filter-status">Status</label>
                     <select
                       id="sidebar-issues-filter-status"
                       className="sidebar-issues-select"
@@ -1563,17 +1626,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         {/* Save status indicator */}
         <div className={`save-indicator ${isSaving ? 'saving' : ''}`}>
           {isSaving ? 'Saving...' : lastSavedAt ? `Saved` : ''}
-        </div>
-
-        {/* Mode indicator */}
-        <div className={`mode-indicator ${isNodeDragEnabled ? 'drag-mode' : 'terminal-mode'}`}>
-          <span className="mode-icon">{isNodeDragEnabled ? '🔄' : '⌨️'}</span>
-          <span className="mode-text">
-            {isNodeDragEnabled ? 'Node Drag Mode' : 'Terminal Mode'}
-          </span>
-          <span className="mode-hint">
-            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘ to drag nodes' : 'Hold Ctrl to drag nodes'}
-          </span>
         </div>
 
         <ReactFlow

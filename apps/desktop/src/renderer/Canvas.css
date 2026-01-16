@@ -4,7 +4,7 @@
   position: relative;
   display: flex;
   overflow: visible;
-  z-index: 10;
+  z-index: 100;
 }
 
 /* Sidebar Panel */
@@ -18,6 +18,10 @@
   flex-shrink: 0;
   z-index: 1;
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .canvas-sidebar.resizing {
@@ -119,6 +123,10 @@
   text-overflow: ellipsis;
 }
 
+.canvas-sidebar.collapsed .sidebar-username {
+  display: none;
+}
+
 .sidebar-error {
   font-size: 11px;
   color: #ff4444;
@@ -155,11 +163,11 @@
 
 .sidebar-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   padding: 8px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .canvas-sidebar.collapsed .sidebar-content {
@@ -169,6 +177,10 @@
 .sidebar-section {
   margin-bottom: 24px;
   flex-shrink: 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 .sidebar-section:last-child {
@@ -389,7 +401,8 @@
 }
 
 .sidebar-folder-svg,
-.sidebar-branch-svg {
+.sidebar-branch-svg,
+.sidebar-linear-svg {
   flex-shrink: 0;
   color: #888;
 }
@@ -429,7 +442,7 @@
   border-radius: 12px;
   margin-bottom: 11px;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
-  z-index: 10;
+  z-index: 100;
 }
 
 .canvas-content.sidebar-collapsed {
@@ -1151,7 +1164,7 @@
   z-index: 30;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease-in-out;
 }
 
@@ -1459,8 +1472,8 @@
 
 /* Sidebar Linear Issues Container */
 .sidebar-linear-issues-container {
-  margin-top: 16px;
-  flex-shrink: 1;
+  margin-top: auto;
+  flex-shrink: 0;
   max-height: 50%;
   min-height: 0; /* Allow shrinking below content size */
   display: flex;
@@ -1470,11 +1483,10 @@
 
 .sidebar-linear-issues-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  padding: 0 4px;
-  gap: 8px;
+  padding: 6px 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -1504,8 +1516,7 @@
   margin: 0;
   color: var(--color-text-primary);
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1558,7 +1569,8 @@
   border-radius: 4px;
   padding: 6px 4px;
   color: var(--color-text-primary);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 400;
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;

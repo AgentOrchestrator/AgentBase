@@ -69,7 +69,7 @@ body {
 .app-content {
   flex: 1;
   display: flex;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   min-height: 0; /* Allow flex item to shrink below content size */
 }
@@ -79,7 +79,8 @@ body {
   background: var(--color-bg-primary);
   flex-shrink: 0;
   -webkit-app-region: drag;
-  z-index: 1;
+  position: relative;
+  z-index: -1;
 }
 
 .app-sidebar-left {
@@ -95,7 +96,8 @@ body {
   background: var(--color-bg-primary);
   flex-shrink: 0;
   -webkit-app-region: drag;
-  z-index: 1;
+  position: relative;
+  z-index: -1;
 }
 
 .terminal-container {

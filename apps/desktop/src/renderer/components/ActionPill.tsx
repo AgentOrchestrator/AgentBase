@@ -77,6 +77,44 @@ export function ActionPill() {
     }, 50);
   }, []);
 
+  // Keyboard shortcuts: Tab to open, Shift+Tab to close
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't interfere if user is typing in an input/textarea
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Tab to open pill (only if not already expanded)
+      if (event.key === 'Tab' && !event.shiftKey) {
+        if (!isExpanded && hasActions) {
+          event.preventDefault();
+          togglePill();
+        }
+        return;
+      }
+
+      // Shift+Tab to close pill (only if expanded)
+      if (event.key === 'Tab' && event.shiftKey) {
+        if (isExpanded) {
+          event.preventDefault();
+          collapsePill();
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isExpanded, hasActions, togglePill, collapsePill]);
+
   const updateActionAnswer = useCallback((actionId: string, question: string, value: string) => {
     setActionAnswers((prev) => ({
       ...prev,
@@ -88,14 +126,20 @@ export function ActionPill() {
   }, []);
 
   const submitAction = useCallback(async (response: AgentActionResponse) => {
-    if (!window.codingAgentAPI?.respondToAction) {
-      return;
-    }
-
+    const isDummyAction = response.actionId.startsWith('dummy-action-');
+    
     setSubmittingActions((prev) => new Set(prev).add(response.actionId));
     try {
-      await window.codingAgentAPI.respondToAction(response);
-      agentActionStore.removeAction(response.actionId);
+      // For dummy actions, just remove them from the store
+      if (isDummyAction) {
+        agentActionStore.removeAction(response.actionId);
+      } else if (window.codingAgentAPI?.respondToAction) {
+        await window.codingAgentAPI.respondToAction(response);
+        agentActionStore.removeAction(response.actionId);
+      } else {
+        return;
+      }
+      
       setActionAnswers((prev) => {
         if (!prev[response.actionId]) {
           return prev;
@@ -145,11 +189,69 @@ export function ActionPill() {
     [submitAction]
   );
 
+  // Keyboard shortcuts: Enter to accept, Delete/Backspace to deny (topmost action)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't interfere if user is typing in an input/textarea
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Enter to accept topmost tool approval action
+      if (event.key === 'Enter' && isExpanded && sortedActions.length > 0) {
+        const topAction = sortedActions[0];
+        if (topAction.type === 'tool_approval' && !submittingActions.has(topAction.id)) {
+          event.preventDefault();
+          handleToolApproval(topAction as ToolApprovalAction, 'allow');
+        }
+        return;
+      }
+
+      // Delete/Backspace to deny topmost tool approval action
+      if ((event.key === 'Delete' || event.key === 'Backspace') && isExpanded && sortedActions.length > 0) {
+        const topAction = sortedActions[0];
+        if (topAction.type === 'tool_approval' && !submittingActions.has(topAction.id)) {
+          event.preventDefault();
+          handleToolApproval(topAction as ToolApprovalAction, 'deny');
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isExpanded, sortedActions, submittingActions, handleToolApproval]);
+
   const label = hasActions
     ? sortedActions.length === 1
       ? '1 action pending'
     : `${sortedActions.length} actions pending`
     : "You're all clear";
+
+  // Get the topmost action (first in sorted list)
+  const topmostAction = sortedActions.length > 0 ? sortedActions[0] : null;
+
+  // Dispatch event when pill expands/collapses to highlight corresponding agent node
+  useEffect(() => {
+    if (isExpanded && topmostAction?.agentId) {
+      window.dispatchEvent(
+        new CustomEvent('action-pill:highlight-agent', {
+          detail: { agentId: topmostAction.agentId },
+        })
+      );
+    } else {
+      window.dispatchEvent(
+        new CustomEvent('action-pill:unhighlight-agent', {})
+      );
+    }
+  }, [isExpanded, topmostAction?.agentId]);
 
   return (
     <div
@@ -175,27 +277,24 @@ export function ActionPill() {
           <div className={`action-pill-list ${isContentVisible ? 'visible' : ''}`}>
             {!hasActions && (
               <div className="action-pill-card">
-                <div className="action-pill-card-header">
-                  <span>All clear</span>
-                  <span className="action-pill-agent">No pending actions</span>
-                </div>
+                <div className="action-pill-agent-label">No pending actions</div>
               </div>
             )}
-            {sortedActions.map((action) => {
+            {sortedActions.map((action, index) => {
               const agentLabel = action.agentId
-                ? `Agent ${action.agentId}`
+                ? action.agentId
                 : action.agentType
-                ? `Agent ${action.agentType}`
-                : 'Agent action';
+                ? action.agentType
+                : 'Unknown agent';
+              
+              // Highlight the topmost action (index 0)
+              const isTopmost = index === 0 && isExpanded;
 
               if (action.type === 'clarifying_question') {
                 const questionAction = action as ClarifyingQuestionAction;
                 return (
-                  <div key={action.id} className="action-pill-card">
-                    <div className="action-pill-card-header">
-                      <span>Clarifying question</span>
-                      <span className="action-pill-agent">{agentLabel}</span>
-                    </div>
+                  <div key={action.id} className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}>
+                    <div className="action-pill-agent-label">{agentLabel}</div>
                     <div className="action-pill-card-body">
                       {questionAction.questions.map((question) => (
                         <div key={question.question} className="action-pill-question">
@@ -229,11 +328,11 @@ export function ActionPill() {
 
               const approvalAction = action as ToolApprovalAction;
               return (
-                <div key={action.id} className="action-pill-card">
-                  <div className="action-pill-card-header">
-                    <span>Tool approval</span>
-                    <span className="action-pill-agent">{agentLabel}</span>
-                  </div>
+                <div 
+                  key={action.id} 
+                  className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}
+                >
+                  <div className="action-pill-agent-label">{agentLabel}</div>
                   <div className="action-pill-card-body">
                     <div className="action-pill-summary">
                       <span className="action-pill-tool">{approvalAction.toolName}</span>

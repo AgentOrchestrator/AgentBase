@@ -47,6 +47,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.new-agent-modal-folder-wrapper.keyboard-selected {
+  border-color: #000000;
 }
 
 /* Worktree wrapper - displayed above branch */
@@ -90,7 +98,9 @@
 }
 
 .new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-icon,
-.new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-path {
+.new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-path,
+.new-agent-modal-folder-wrapper.keyboard-selected .new-agent-modal-folder-icon,
+.new-agent-modal-folder-wrapper.keyboard-selected .new-agent-modal-folder-path {
   color: #000000;
 }
 
@@ -101,6 +111,14 @@
   gap: 4px;
   margin-left: 6px;
   position: relative;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.new-agent-modal-branch-wrapper.keyboard-selected {
+  border-color: #000000;
 }
 
 .new-agent-modal-branch-command-hint {
@@ -156,7 +174,10 @@
 
 .new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-icon,
 .new-agent-modal-branch-wrapper:hover .new-agent-modal-branch,
-.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-input {
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-input,
+.new-agent-modal-branch-wrapper.keyboard-selected .new-agent-modal-branch-icon,
+.new-agent-modal-branch-wrapper.keyboard-selected .new-agent-modal-branch,
+.new-agent-modal-branch-wrapper.keyboard-selected .new-agent-modal-branch-input {
   color: #000000;
 }
 
@@ -198,6 +219,12 @@
 .new-agent-modal-branch-dropdown-item.selected {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.new-agent-modal-branch-dropdown-item.keyboard-selected {
+  background: #000000;
+  color: #ffffff;
   font-weight: 500;
 }
 

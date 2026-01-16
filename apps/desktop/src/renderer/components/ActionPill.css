@@ -24,28 +24,29 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-pill-card.highlighted {
+  border: 2px solid #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
 }
 
 .action-pill-card + .action-pill-card {
   margin-top: 12px;
 }
 
-.action-pill-card-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  font-weight: 600;
+.action-pill-agent-label {
+  font-size: 13px;
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.action-pill-agent {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  text-transform: none;
-  letter-spacing: 0;
+  font-weight: 500;
+  margin-bottom: 4px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .action-pill-card-body {
@@ -118,6 +119,7 @@
 .action-pill-buttons {
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .action-pill-approve,
@@ -130,14 +132,14 @@
 }
 
 .action-pill-approve {
-  background: #34d399;
-  color: #0b1020;
+  background: #000000;
+  color: #ffffff;
 }
 
 .action-pill-deny {
-  background: transparent;
-  border-color: #ef4444;
-  color: #ef4444;
+  background: #ffffff;
+  border-color: #000000;
+  color: #000000;
 }
 
 .action-pill-approve:disabled,

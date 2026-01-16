@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './NewAgentModal.css';
 import { worktreeService } from '../services/WorktreeService';
 import type { WorktreeInfo } from '../../main/types/worktree';
@@ -50,6 +50,8 @@ export function NewAgentModal({
   const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
   const [originalWorkspacePath, setOriginalWorkspacePath] = useState<string | null>(null);
   const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(null);
+  const [keyboardFocus, setKeyboardFocus] = useState<'input' | 'folder' | 'branch'>('input');
+  const [dropdownItemIndex, setDropdownItemIndex] = useState<number | null>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,6 +98,9 @@ export function NewAgentModal({
       setOriginalWorkspacePath(null);
       setSelectedBranchIndex(null);
       setShowBranchSwitchWarning(false);
+      setKeyboardFocus('input');
+      setDropdownItemIndex(null);
+      setIsBranchDropdownOpen(false);
       // Keep workspace path from initialWorkspacePath
       if (initialWorkspacePath) {
         setWorkspacePath(initialWorkspacePath);
@@ -104,6 +109,8 @@ export function NewAgentModal({
     } else if (!isOpen) {
       // Reset warning state when modal closes
       setShowBranchSwitchWarning(false);
+      setKeyboardFocus('input');
+      setDropdownItemIndex(null);
     }
   }, [isOpen, initialWorkspacePath, initialDescription]);
 
@@ -114,13 +121,179 @@ export function NewAgentModal({
     }
   }, [isCreatingNewBranch]);
 
-  // Handle Escape key and Command+F for branch cycling
+  // Get available branches for dropdown (excluding current branch)
+  const availableBranches = branches.filter((branch) => branch !== gitInfo?.branch);
+  
+  // Define handleBrowseFolder before it's used in useEffect
+  const handleBrowseFolder = useCallback(async () => {
+    setIsSelectingFolder(true);
+    try {
+      if (!window.shellAPI?.openDirectoryDialog) {
+        throw new Error('openDirectoryDialog not available in shellAPI');
+      }
+
+      const path = await window.shellAPI.openDirectoryDialog({
+        title: 'Select Workspace Directory',
+      });
+      if (path) {
+        setWorkspacePath(path);
+        setOriginalWorkspacePath(path);
+        // Clear worktree if user selects a new folder
+        setWorktreeInfo(null);
+        // Git info will be fetched automatically via useEffect
+      }
+    } catch (err) {
+      console.error('[NewAgentModal] Failed to open directory dialog:', err);
+    } finally {
+      setIsSelectingFolder(false);
+    }
+  }, []);
+  
+  // Get dropdown items (actions + branches) - only actionable items, no dividers
+  const dropdownItems = useMemo(() => {
+    const items: Array<{ type: 'action' | 'branch'; label?: string; branch?: string; action?: () => void }> = [];
+    if (workspacePath && gitInfo?.branch) {
+      items.push(
+        { type: 'action', label: 'New branch', action: () => setIsCreatingNewBranch(true) },
+        { type: 'action', label: 'New branch from', action: () => {} },
+        { type: 'action', label: 'New worktree', action: () => handleCreateWorktreeRef.current() }
+      );
+    }
+    items.push(...availableBranches.map((branch) => ({ type: 'branch' as const, branch })));
+    return items;
+  }, [workspacePath, gitInfo?.branch, availableBranches]);
+
+  // Auto-open dropdown when branch is highlighted
+  useEffect(() => {
+    if (keyboardFocus === 'branch' && gitInfo?.branch && !isCreatingNewBranch) {
+      setIsBranchDropdownOpen(true);
+      if (dropdownItems.length > 0 && dropdownItemIndex === null) {
+        setDropdownItemIndex(0);
+      }
+    } else if (keyboardFocus !== 'branch') {
+      setIsBranchDropdownOpen(false);
+      setDropdownItemIndex(null);
+    }
+  }, [keyboardFocus, gitInfo?.branch, isCreatingNewBranch, dropdownItems.length, dropdownItemIndex]);
+
+  // Handle Escape key, Tab navigation, and Command shortcuts
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Allow new branch input to handle its own keys
+      if (target === newBranchInputRef.current) {
+        if (event.key === 'Enter' || event.key === 'Escape') {
+          return; // Let new branch input handle these
+        }
+      }
+
+      // If we're in navigation mode (folder/branch), handle keys globally
+      if (keyboardFocus !== 'input') {
+        // In navigation mode - handle keys globally
+      } else if (target === descriptionInputRef.current) {
+        // Text entry box is active - only let textarea handle Enter, not Tab
+        if (event.key === 'Enter') {
+          return; // Let textarea handler take care of Enter
+        }
+        // Tab should be handled by global handler to navigate to folder
+      }
+
       if (event.key === 'Escape') {
-        onClose();
+        if (isBranchDropdownOpen) {
+          setIsBranchDropdownOpen(false);
+          setDropdownItemIndex(null);
+          setKeyboardFocus('branch');
+        } else if (isCreatingNewBranch) {
+          setIsCreatingNewBranch(false);
+          setNewBranchName('');
+          setKeyboardFocus('branch');
+        } else {
+          onClose();
+        }
+        return;
+      }
+
+      // Tab navigation: input -> folder -> branch -> input
+      if (event.key === 'Tab' && !event.shiftKey) {
+        // Always prevent default Tab behavior when modal is open
+        event.preventDefault();
+        
+        if (keyboardFocus === 'input') {
+          // Tab from input: go to folder (if visible) or branch
+          // Blur textarea first
+          if (descriptionInputRef.current) {
+            descriptionInputRef.current.blur();
+          }
+          if (!worktreeInfo) {
+            // Folder is visible - go to folder
+            setKeyboardFocus('folder');
+          } else if (gitInfo?.branch) {
+            // Worktree is active, skip folder and go to branch
+            setKeyboardFocus('branch');
+          }
+          // If neither folder nor branch available, stay on input
+        } else if (keyboardFocus === 'folder') {
+          // Tab from folder: go to branch (if available) or back to input
+          if (gitInfo?.branch) {
+            setKeyboardFocus('branch');
+          } else {
+            setKeyboardFocus('input');
+            descriptionInputRef.current?.focus();
+          }
+        } else if (keyboardFocus === 'branch') {
+          // Tab from branch: go back to input
+          setKeyboardFocus('input');
+          descriptionInputRef.current?.focus();
+        }
+        return;
+      }
+
+      // Enter key actions
+      if (event.key === 'Enter' && !event.shiftKey) {
+        if (keyboardFocus === 'folder') {
+          event.preventDefault();
+          handleBrowseFolder();
+          return;
+        } else if (keyboardFocus === 'branch') {
+          event.preventDefault();
+          if (isBranchDropdownOpen && dropdownItemIndex !== null) {
+            const item = dropdownItems[dropdownItemIndex];
+            if (item && item.type === 'action') {
+              item.action();
+              setIsBranchDropdownOpen(false);
+              setDropdownItemIndex(null);
+            } else if (item && item.type === 'branch') {
+              // Select branch for checkout
+              const branchIndex = availableBranches.indexOf(item.branch);
+              setSelectedBranchIndex(branchIndex);
+              setIsBranchDropdownOpen(false);
+              setDropdownItemIndex(null);
+            }
+          }
+          return;
+        }
+        // If keyboardFocus is 'input', let textarea handler take care of it
+        return;
+      }
+
+      // Up/Down arrow keys for dropdown navigation
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && keyboardFocus === 'branch' && isBranchDropdownOpen) {
+        event.preventDefault();
+        if (dropdownItemIndex === null) {
+          setDropdownItemIndex(event.key === 'ArrowDown' ? 0 : dropdownItems.length - 1);
+        } else {
+          setDropdownItemIndex((prev) => {
+            if (prev === null) return 0;
+            if (event.key === 'ArrowDown') {
+              return (prev + 1) % dropdownItems.length;
+            } else {
+              return (prev - 1 + dropdownItems.length) % dropdownItems.length;
+            }
+          });
+        }
         return;
       }
 
@@ -164,7 +337,7 @@ export function NewAgentModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, workspacePath, branches, gitInfo?.branch]);
+  }, [isOpen, onClose, workspacePath, branches, gitInfo?.branch, keyboardFocus, isBranchDropdownOpen, dropdownItemIndex, dropdownItems, availableBranches, worktreeInfo, isCreatingNewBranch, handleBrowseFolder]);
 
   // Close on outside click
   useEffect(() => {
@@ -212,30 +385,6 @@ export function NewAgentModal({
       handleCreateWorktreeRef.current();
     }
   }, [isOpen, autoCreateWorktree, workspacePath, worktreeInfo, isCreatingWorktree]);
-
-  const handleBrowseFolder = async () => {
-    setIsSelectingFolder(true);
-    try {
-      if (!window.shellAPI?.openDirectoryDialog) {
-        throw new Error('openDirectoryDialog not available in shellAPI');
-      }
-
-      const path = await window.shellAPI.openDirectoryDialog({
-        title: 'Select Workspace Directory',
-      });
-      if (path) {
-        setWorkspacePath(path);
-        setOriginalWorkspacePath(path);
-        // Clear worktree if user selects a new folder
-        setWorktreeInfo(null);
-        // Git info will be fetched automatically via useEffect
-      }
-    } catch (err) {
-      console.error('[NewAgentModal] Failed to open directory dialog:', err);
-    } finally {
-      setIsSelectingFolder(false);
-    }
-  };
 
   // Get folder name (last segment of path)
   const getFolderName = (path: string | null): string => {
@@ -414,7 +563,7 @@ export function NewAgentModal({
             {/* Show original folder only if no worktree is active */}
             {!worktreeInfo && (
               <div 
-                className="new-agent-modal-folder-wrapper"
+                className={`new-agent-modal-folder-wrapper ${keyboardFocus === 'folder' ? 'keyboard-selected' : ''}`}
                 onClick={handleBrowseFolder}
                 style={{ cursor: 'pointer' }}
                 title="Click to select folder"
@@ -474,7 +623,7 @@ export function NewAgentModal({
             )}
             {gitInfo?.branch && (
               <div 
-                className="new-agent-modal-branch-wrapper"
+                className={`new-agent-modal-branch-wrapper ${keyboardFocus === 'branch' ? 'keyboard-selected' : ''}`}
                 ref={branchDropdownRef}
                 style={{ position: 'relative' }}
               >
@@ -594,52 +743,66 @@ export function NewAgentModal({
                 </div>
                 {isBranchDropdownOpen && !isCreatingNewBranch && (
                   <div className="new-agent-modal-branch-dropdown">
-                    <div
-                      className="new-agent-modal-branch-dropdown-item"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsBranchDropdownOpen(false);
-                        setIsCreatingNewBranch(true);
-                      }}
-                    >
-                      New branch <span className="new-agent-modal-command-hint">⌘E</span>
-                    </div>
-                    <div
-                      className="new-agent-modal-branch-dropdown-item"
-                      onClick={() => {
-                        // TODO: Implement new branch from existing branch
-                        setIsBranchDropdownOpen(false);
-                      }}
-                    >
-                      New branch from
-                    </div>
-                    <div className="new-agent-modal-branch-dropdown-divider" />
-                    <div
-                      className="new-agent-modal-branch-dropdown-item"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateWorktree();
-                      }}
-                    >
-                      New worktree <span className="new-agent-modal-command-hint">⌘G</span>
-                    </div>
-                    <div className="new-agent-modal-branch-dropdown-divider" />
-                    <div className="new-agent-modal-branch-dropdown-item new-agent-modal-branch-dropdown-item-disabled">
-                      Rotate branches <span className="new-agent-modal-command-hint">⌘F</span>
-                    </div>
-                    <div className="new-agent-modal-branch-dropdown-divider" />
+                    {workspacePath && gitInfo?.branch && (
+                      <>
+                        <div
+                          className={`new-agent-modal-branch-dropdown-item ${
+                            dropdownItemIndex === 0 ? 'keyboard-selected' : ''
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsBranchDropdownOpen(false);
+                            setIsCreatingNewBranch(true);
+                          }}
+                        >
+                          New branch <span className="new-agent-modal-command-hint">⌘E</span>
+                        </div>
+                        <div
+                          className={`new-agent-modal-branch-dropdown-item ${
+                            dropdownItemIndex === 1 ? 'keyboard-selected' : ''
+                          }`}
+                          onClick={() => {
+                            // TODO: Implement new branch from existing branch
+                            setIsBranchDropdownOpen(false);
+                          }}
+                        >
+                          New branch from
+                        </div>
+                        <div className="new-agent-modal-branch-dropdown-divider" />
+                        <div
+                          className={`new-agent-modal-branch-dropdown-item ${
+                            dropdownItemIndex === 2 ? 'keyboard-selected' : ''
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateWorktree();
+                          }}
+                        >
+                          New worktree <span className="new-agent-modal-command-hint">⌘G</span>
+                        </div>
+                        <div className="new-agent-modal-branch-dropdown-divider" />
+                        <div className="new-agent-modal-branch-dropdown-item new-agent-modal-branch-dropdown-item-disabled">
+                          Rotate branches <span className="new-agent-modal-command-hint">⌘F</span>
+                        </div>
+                        <div className="new-agent-modal-branch-dropdown-divider" />
+                      </>
+                    )}
                     {isLoadingBranches ? (
                       <div className="new-agent-modal-branch-dropdown-item">Loading...</div>
-                    ) : branches.length === 0 ? (
+                    ) : availableBranches.length === 0 ? (
                       <div className="new-agent-modal-branch-dropdown-item">No branches found</div>
                     ) : (
-                      branches
-                        .filter((branch) => branch !== gitInfo.branch) // Exclude current branch
-                        .map((branch, index) => (
+                      availableBranches.map((branch, index) => {
+                        // Calculate the actual index in dropdownItems (after action items)
+                        const actionItemsCount = workspacePath && gitInfo?.branch ? 3 : 0; // New branch, New branch from, New worktree
+                        const itemIndex = actionItemsCount + index;
+                        return (
                           <div
                             key={branch}
                             className={`new-agent-modal-branch-dropdown-item ${
                               selectedBranchIndex === index ? 'selected' : ''
+                            } ${
+                              dropdownItemIndex === itemIndex ? 'keyboard-selected' : ''
                             }`}
                             onClick={() => {
                               // Set the selected branch index to trigger checkout on create
@@ -649,7 +812,8 @@ export function NewAgentModal({
                           >
                             {branch}
                           </div>
-                        ))
+                        );
+                      })
                     )}
                   </div>
                 )}
@@ -674,27 +838,26 @@ export function NewAgentModal({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             onKeyDown={(e) => {
-              // Shift+Enter: Allow default behavior (line break)
-              if (e.key === 'Enter' && e.shiftKey) {
-                return; // Allow default behavior
+              // Only handle Enter if keyboardFocus is 'input' (text entry box is active)
+              if (keyboardFocus === 'input') {
+                // Shift+Enter: Allow default behavior (line break)
+                if (e.key === 'Enter' && e.shiftKey) {
+                  return; // Allow default behavior
+                }
+                // Enter (without Shift): Create agent
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleCreate();
+                  return;
+                }
+                // Cmd/Ctrl+Enter: Create agent
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  handleCreate();
+                  return;
+                }
               }
-              // Enter (without Shift): Submit
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleCreate();
-                return;
-              }
-              // Tab: Submit
-              if (e.key === 'Tab') {
-                e.preventDefault();
-                handleCreate();
-                return;
-              }
-              // Cmd/Ctrl+Enter: Submit (keep existing behavior)
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                handleCreate();
-              }
+              // Tab is handled by global handler
             }}
             rows={6}
           />
