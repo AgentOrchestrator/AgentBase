@@ -31,6 +31,7 @@ import {
   useSidebarState,
   usePillState,
   useCanvasDrop,
+  useChatMessageFork,
   type LinearIssue,
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
@@ -227,6 +228,13 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       setPendingAgentPosition(pos);
       setIsNewAgentModalOpen(true);
     },
+  });
+
+  // Chat message fork - lightweight fork from text selection (positions to right)
+  useChatMessageFork({
+    nodes,
+    onAddNode: (node) => setNodes((nds) => [...nds, node]),
+    onAddEdge: (edge) => setEdges((eds) => [...eds, edge]),
   });
 
   // Check if there are any agents
