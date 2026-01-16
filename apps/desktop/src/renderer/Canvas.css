@@ -1151,7 +1151,7 @@
   z-index: 30;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease-in-out;
 }
 
