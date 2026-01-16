@@ -191,10 +191,9 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
   }, [nodes]);
 
   // Apply highlight styles to nodes when highlighting changes
+  // Always run to clear styles when toggled off (empty collections)
   useEffect(() => {
-    if (folderHighlight.highlightedFolders.size > 0 || folderHighlight.folderColors.size > 0) {
-      setNodes((nds) => applyHighlightStylesToNodes(nds, folderHighlight.highlightedFolders, folderHighlight.folderColors));
-    }
+    setNodes((nds) => applyHighlightStylesToNodes(nds, folderHighlight.highlightedFolders, folderHighlight.folderColors));
   }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, setNodes]);
 
   // =============================================================================
