@@ -7,7 +7,7 @@
  *
  * This adapter:
  * - Wraps IPC calls to maintain consistent Result types
- * - Handles event subscription via typed event system
+ * - Delegates event subscription to SharedEventDispatcher (no per-adapter IPC listeners)
  * - Provides helper methods for configuration
  * - Does NOT unwrap results - that's the service layer's responsibility
  */
@@ -27,7 +27,6 @@ import type {
   ForkOptions,
   AgentAdapterEventType,
   AgentEventHandler,
-  AgentAdapterEvent,
   Result,
   AgentError,
 } from '../../context/node-services/coding-agent-adapter';
@@ -39,6 +38,7 @@ import {
 } from '../../context/node-services/coding-agent-adapter';
 import type { AgentType } from '../../../../types/coding-agent-status';
 import type { AdapterConfig } from './types';
+import { sharedEventDispatcher } from '../SharedEventDispatcher';
 
 /**
  * Claude Code Adapter Implementation
@@ -50,8 +50,6 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   public readonly agentType: AgentType = 'claude_code';
 
   private _config: AdapterConfig;
-  private _eventListeners: Map<string, Set<AgentEventHandler<AgentAdapterEventType>>> = new Map();
-  private _cleanupFns: Array<() => void> = [];
 
   constructor(config: AdapterConfig = {}) {
     this._config = { ...config };
@@ -123,14 +121,8 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     if (apiError) {
       return err(apiError);
     }
-
-    try {
-      // Set up event forwarding from IPC to typed event system
-      this.setupEventForwarding();
-      return ok(undefined);
-    } catch (error) {
-      return err(this.wrapError(error, AgentErrorCode.AGENT_NOT_INITIALIZED));
-    }
+    // Event forwarding is now handled by SharedEventDispatcher (initialized at app startup)
+    return ok(undefined);
   }
 
   async isAvailable(): Promise<boolean> {
@@ -145,12 +137,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   }
 
   async dispose(): Promise<void> {
-    // Clean up all event listeners
-    for (const cleanup of this._cleanupFns) {
-      cleanup();
-    }
-    this._cleanupFns = [];
-    this._eventListeners.clear();
+    // No cleanup needed - event handling is managed by SharedEventDispatcher
   }
 
   async cancelAll(): Promise<void> {
@@ -411,55 +398,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     type: T,
     handler: AgentEventHandler<T>
   ): () => void {
-    // Get or create listener set for this event type
-    if (!this._eventListeners.has(type)) {
-      this._eventListeners.set(type, new Set());
-    }
-
-    const listeners = this._eventListeners.get(type)!;
-    // Use unknown as intermediate cast to satisfy TypeScript
-    listeners.add(handler as unknown as AgentEventHandler<AgentAdapterEventType>);
-
-    // Return unsubscribe function
-    return () => {
-      listeners.delete(handler as unknown as AgentEventHandler<AgentAdapterEventType>);
-    };
-  }
-
-  // ============================================
-  // Event Forwarding
-  // ============================================
-
-  private setupEventForwarding(): void {
-    if (!this.api) {
-      return;
-    }
-
-    // Subscribe to IPC agent events and forward to typed event system
-    const cleanup = this.api.onAgentEvent((event: unknown) => {
-      this.handleAgentEvent(event);
-    });
-
-    this._cleanupFns.push(cleanup);
-  }
-
-  private handleAgentEvent(event: unknown): void {
-    // Type guard and forward to appropriate listeners
-    if (!event || typeof event !== 'object') {
-      return;
-    }
-
-    const typedEvent = event as AgentAdapterEvent;
-    const listeners = this._eventListeners.get(typedEvent.type);
-
-    if (listeners) {
-      for (const handler of listeners) {
-        try {
-          handler(typedEvent as Extract<AgentAdapterEvent, { type: typeof typedEvent.type }>);
-        } catch (error) {
-          console.error(`Error in event handler for ${typedEvent.type}:`, error);
-        }
-      }
-    }
+    // Delegate to SharedEventDispatcher for centralized event handling
+    return sharedEventDispatcher.subscribe(type, handler);
   }
 }

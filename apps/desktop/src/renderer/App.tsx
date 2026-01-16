@@ -1,13 +1,19 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import Canvas from './Canvas';
 import { NodeServicesRegistryProvider, ThemeProvider } from './context';
-import { createServiceFactories } from './services';
+import { createServiceFactories, sharedEventDispatcher } from './services';
 import { TitleBar } from './components/TitleBar';
 import './App.css';
 
 function App() {
   // Create service factories once
   const factories = useMemo(() => createServiceFactories(), []);
+
+  // Initialize shared event dispatcher (single IPC listener for all agent events)
+  useEffect(() => {
+    sharedEventDispatcher.initialize();
+    return () => sharedEventDispatcher.dispose();
+  }, []);
 
   return (
     <ThemeProvider>

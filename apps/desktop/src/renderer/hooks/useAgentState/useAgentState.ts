@@ -18,11 +18,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import type {
-  AgentAction,
-  ClarifyingQuestion,
-  GitInfo,
-} from '@agent-orchestrator/shared';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import { agentActionStore } from '../../stores';
 import type {
@@ -31,7 +27,6 @@ import type {
   WorkspaceSource,
   SessionReadiness,
 } from './types';
-import type { AgentAdapterEvent } from '../../context/node-services';
 
 // =============================================================================
 // Deterministic Session ID - Commented out for future use
@@ -77,7 +72,7 @@ import type { AgentAdapterEvent } from '../../context/node-services';
 // Main Hook
 // =============================================================================
 
-export function useAgentState({ nodeId, initialNodeData, agentService }: UseAgentStateInput): AgentState {
+export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): AgentState {
   // const { getNodes, getEdges } = useReactFlow(); // Commented - will be used when workspace inheritance is re-enabled
   useReactFlow(); // Keep hook call for potential future use
 
@@ -125,12 +120,6 @@ export function useAgentState({ nodeId, initialNodeData, agentService }: UseAgen
   const [sessionId, setSessionId] = useState<string | null>(nodeData.sessionId || null);
   const sessionReadiness: SessionReadiness = sessionId ? 'ready' : 'idle';
 
-  // ---------------------------------------------------------------------------
-  // Hook-driven Action State
-  // ---------------------------------------------------------------------------
-  const actionIdsRef = useRef<Set<string>>(new Set());
-
-
   useEffect(() => {
     const nextSessionId = nodeData.sessionId ?? null;
     if (nextSessionId !== sessionId) {
@@ -138,8 +127,8 @@ export function useAgentState({ nodeId, initialNodeData, agentService }: UseAgen
     }
   }, [nodeData.sessionId, sessionId]);
 
+  // Clear actions when agent/session changes
   useEffect(() => {
-    actionIdsRef.current.clear();
     agentActionStore.clearAgent(nodeData.agentId);
   }, [nodeData.agentId, sessionId]);
 
@@ -298,92 +287,6 @@ export function useAgentState({ nodeId, initialNodeData, agentService }: UseAgen
     );
   }, [nodeId]);
 
-  const toClarifyingQuestions = (toolInput: Record<string, unknown> | undefined): ClarifyingQuestion[] => {
-    const questions = toolInput?.questions;
-    if (!Array.isArray(questions)) {
-      return [];
-    }
-
-    return questions
-      .map((question) => {
-        if (!question || typeof question !== 'object') {
-          return null;
-        }
-        const item = question as {
-          header?: string;
-          question?: string;
-          options?: Array<{ label?: string; description?: string }>;
-          multiSelect?: boolean;
-        };
-
-        if (!item.question) {
-          return null;
-        }
-
-        return {
-          header: item.header,
-          question: item.question,
-          options: Array.isArray(item.options)
-            ? item.options
-                .filter((option) => option && typeof option.label === 'string')
-                .map((option) => ({
-                  label: String(option.label),
-                  description: typeof option.description === 'string' ? option.description : undefined,
-                }))
-            : undefined,
-          multiSelect: item.multiSelect,
-        } as ClarifyingQuestion;
-      })
-      .filter((question): question is ClarifyingQuestion => Boolean(question));
-  };
-
-  /**
-   * Build an AgentAction from a typed PermissionRequestPayload event.
-   * Used when subscribing via agentService.onAgentEvent('permission:request', handler).
-   */
-  const buildActionFromTypedPermissionEvent = (
-    event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
-  ): AgentAction | null => {
-    const { payload, agentId: eventAgentId, sessionId: eventSessionId } = event;
-    const resolvedAgentId = eventAgentId ?? nodeData.agentId;
-    const toolName = payload.toolName;
-    const toolInput = payload.toolInput;
-    const actionId = `${resolvedAgentId}-${payload.toolUseId ?? Date.now()}`;
-    const timestamp = new Date().toISOString();
-
-    if (toolName && toolName.toLowerCase() === 'askuserquestion') {
-      const questions = toClarifyingQuestions(toolInput);
-      return {
-        id: actionId,
-        type: 'clarifying_question',
-        agentId: resolvedAgentId,
-        agentType: nodeData.agentType,
-        sessionId: eventSessionId,
-        workspacePath: payload.workingDirectory,
-        toolUseId: payload.toolUseId,
-        createdAt: timestamp,
-        questions,
-      };
-    }
-
-    return {
-      id: actionId,
-      type: 'tool_approval',
-      agentId: resolvedAgentId,
-      agentType: nodeData.agentType,
-      sessionId: eventSessionId,
-      workspacePath: payload.workingDirectory,
-      toolUseId: payload.toolUseId,
-      createdAt: timestamp,
-      toolName: toolName || 'Unknown tool',
-      command: payload.command,
-      filePath: payload.filePath,
-      workingDirectory: payload.workingDirectory,
-      reason: payload.reason,
-      input: toolInput,
-    };
-  };
-
   // ---------------------------------------------------------------------------
   // Mark as initialized once workspace is resolved
   // ---------------------------------------------------------------------------
@@ -393,44 +296,8 @@ export function useAgentState({ nodeId, initialNodeData, agentService }: UseAgen
     }
   }, [workspacePath, isInitialized]);
 
-  // ---------------------------------------------------------------------------
-  // Hook Events (permission requests, questions)
-  // ---------------------------------------------------------------------------
-
-  // Typed event subscription via agentService
-  useEffect(() => {
-    if (!agentService) return;
-
-    const unsubscribe = agentService.onAgentEvent('permission:request', (event) => {
-      // event is now typed as Extract<AgentAdapterEvent, { type: 'permission:request' }>
-      const { agentId: eventAgentId, sessionId: eventSessionId } = event;
-
-      // Filter by agentId if present
-      if (eventAgentId && eventAgentId !== nodeData.agentId) {
-        return;
-      }
-
-      // Filter by sessionId if no agentId but sessionId is present
-      if (!eventAgentId && eventSessionId && sessionId && eventSessionId !== sessionId) {
-        return;
-      }
-
-      const actionId = `${eventAgentId ?? nodeData.agentId}-${event.payload.toolUseId ?? Date.now()}`;
-      if (actionIdsRef.current.has(actionId)) {
-        return;
-      }
-
-      const action = buildActionFromTypedPermissionEvent(event);
-      if (!action) {
-        return;
-      }
-
-      actionIdsRef.current.add(actionId);
-      agentActionStore.addAction(action);
-    });
-
-    return unsubscribe;
-  }, [agentService, nodeData.agentId, sessionId]);
+  // Note: Permission event subscription is now handled globally by SharedEventDispatcher.
+  // Events flow directly to agentActionStore without per-hook subscriptions.
 
   // ---------------------------------------------------------------------------
   // Return Complete State

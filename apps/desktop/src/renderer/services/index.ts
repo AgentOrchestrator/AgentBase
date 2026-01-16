@@ -36,3 +36,6 @@ export type {
   LinearTeam,
   LinearViewer,
 } from './LinearService';
+
+// Shared event dispatcher (single IPC listener for agent events)
+export { sharedEventDispatcher } from './SharedEventDispatcher';

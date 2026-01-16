@@ -8,7 +8,6 @@
 import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agent-status';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
-import type { IAgentService } from '../../context/node-services';
 
 // =============================================================================
 // Workspace State
@@ -129,6 +128,5 @@ export interface UseAgentStateInput {
   nodeId: string;
   /** Initial node data from React Flow */
   initialNodeData: AgentNodeData;
-  /** Optional agent service for typed event subscription */
-  agentService?: IAgentService;
+  // Note: agentService removed - permission events now handled globally by SharedEventDispatcher
 }
