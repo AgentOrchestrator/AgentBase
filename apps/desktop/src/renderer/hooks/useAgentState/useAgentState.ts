@@ -35,70 +35,57 @@ import type {
 } from './types';
 
 // =============================================================================
-// Deterministic Session ID
+// Deterministic Session ID - Commented out for future use
 // =============================================================================
 
-function cyrb128(input: string): [number, number, number, number] {
-  let h1 = 1779033703;
-  let h2 = 3144134277;
-  let h3 = 1013904242;
-  let h4 = 2773480762;
+// function cyrb128(input: string): [number, number, number, number] {
+//   let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+//   for (let i = 0; i < input.length; i++) {
+//     const k = input.charCodeAt(i);
+//     h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+//     h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+//     h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+//     h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+//   }
+//   h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+//   h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+//   h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+//   h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+//   return [(h1 ^ h2 ^ h3 ^ h4) >>> 0, (h2 ^ h1) >>> 0, (h3 ^ h1) >>> 0, (h4 ^ h1) >>> 0];
+// }
 
-  for (let i = 0; i < input.length; i++) {
-    const k = input.charCodeAt(i);
-    h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
-    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
-    h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
-    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
-  }
-
-  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
-  h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
-  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
-  h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
-
-  return [
-    (h1 ^ h2 ^ h3 ^ h4) >>> 0,
-    (h2 ^ h1) >>> 0,
-    (h3 ^ h1) >>> 0,
-    (h4 ^ h1) >>> 0,
-  ];
-}
-
-function deterministicUuidFromString(input: string): string {
-  const hash = cyrb128(input);
-  const bytes = new Uint8Array(16);
-
-  for (let i = 0; i < 4; i++) {
-    const value = hash[i];
-    const offset = i * 4;
-    bytes[offset] = (value >>> 24) & 0xff;
-    bytes[offset + 1] = (value >>> 16) & 0xff;
-    bytes[offset + 2] = (value >>> 8) & 0xff;
-    bytes[offset + 3] = value & 0xff;
-  }
-
-  // RFC 4122 variant + v4 marker for UUID shape
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'));
-  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex
-    .slice(6, 8)
-    .join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
-}
+// Commented out - kept for potential future use in deterministic UUID generation
+// function deterministicUuidFromString(input: string): string {
+//   const hash = cyrb128(input);
+//   const bytes = new Uint8Array(16);
+//   for (let i = 0; i < 4; i++) {
+//     const value = hash[i];
+//     const offset = i * 4;
+//     bytes[offset] = (value >>> 24) & 0xff;
+//     bytes[offset + 1] = (value >>> 16) & 0xff;
+//     bytes[offset + 2] = (value >>> 8) & 0xff;
+//     bytes[offset + 3] = value & 0xff;
+//   }
+//   bytes[6] = (bytes[6] & 0x0f) | 0x40;
+//   bytes[8] = (bytes[8] & 0x3f) | 0x80;
+//   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'));
+//   return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex
+//     .slice(6, 8)
+//     .join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+// }
 
 // =============================================================================
 // Main Hook
 // =============================================================================
 
 export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): AgentState {
-  const { getNodes, getEdges } = useReactFlow();
+  // const { getNodes, getEdges } = useReactFlow(); // Commented - will be used when workspace inheritance is re-enabled
+  useReactFlow(); // Keep hook call for potential future use
 
   // ---------------------------------------------------------------------------
   // Core State
   // ---------------------------------------------------------------------------
-  const [nodeData, setNodeData] = useState<AgentNodeData>(initialNodeData);
+  const [nodeData] = useState<AgentNodeData>(initialNodeData);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Track if we've logged initialization (only log once per mount)
@@ -177,12 +164,11 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // ---------------------------------------------------------------------------
 
   // Find parent node (for potential inheritance - workspace nodes no longer used)
-  const edges = getEdges();
-  const nodes = getNodes();
-  const incomingEdge = edges.find((e) => e.target === nodeId);
-  const parentNode = incomingEdge ? nodes.find((n) => n.id === incomingEdge.source) : null;
-  // parentWorkspacePath is no longer used since workspace nodes were removed
-  const _parentNode = parentNode; // Keep reference for potential future use
+  // Commented out - kept for potential future use when workspace inheritance is re-enabled
+  // const edges = getEdges();
+  // const nodes = getNodes();
+  // const incomingEdge = edges.find((e) => e.target === nodeId);
+  // const parentNode = incomingEdge ? nodes.find((n) => n.id === incomingEdge.source) : null;
 
   // Resolve final workspace path and source
   // Priority: node data > manual

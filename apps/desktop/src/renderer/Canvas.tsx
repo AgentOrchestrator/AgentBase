@@ -127,9 +127,9 @@ function CanvasFlow() {
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
+const { screenToFlowPosition, getNodes } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
-  const [isShiftPressed, setIsShiftPressed] = useState(false);
+  const [_isShiftPressed, setIsShiftPressed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);

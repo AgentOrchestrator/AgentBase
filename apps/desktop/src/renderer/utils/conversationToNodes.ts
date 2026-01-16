@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { MessageGroup } from '../types/conversation';
-import { buildUuidMap } from './conversationParser';
+// import { buildUuidMap } from './conversationParser'; // Will be used for parent linking
 
 /**
  * Convert message groups to React Flow nodes and edges
@@ -9,12 +9,12 @@ export function conversationToNodesAndEdges(
   groups: MessageGroup[],
   startX: number = 100,
   startY: number = 100,
-  spacingX: number = 400,
-  spacingY: number = 200
+  _spacingX: number = 400,
+  _spacingY: number = 200
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
-  const uuidMap = buildUuidMap(groups);
+  // const uuidMap = buildUuidMap(groups); // Will be used for parent linking
   const nodePositions = new Map<string, { x: number; y: number }>();
 
   // Calculate positions for all nodes in a straight vertical column

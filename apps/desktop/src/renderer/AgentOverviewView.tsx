@@ -22,18 +22,16 @@ interface AgentOverviewViewProps {
   hideStatusIndicator?: boolean;
 }
 
-/**
- * Editor display names
- */
-const EDITOR_LABELS: Record<EditorApp, string> = {
-  vscode: 'VS Code',
-  cursor: 'Cursor',
-  zed: 'Zed',
-  sublime: 'Sublime Text',
-  atom: 'Atom',
-  webstorm: 'WebStorm',
-  finder: 'Finder',
-};
+// Editor display names - commented out, will be used when editor menu feature is re-enabled
+// const EDITOR_LABELS: Record<EditorApp, string> = {
+//   vscode: 'VS Code',
+//   cursor: 'Cursor',
+//   zed: 'Zed',
+//   sublime: 'Sublime Text',
+//   atom: 'Atom',
+//   webstorm: 'WebStorm',
+//   finder: 'Finder',
+// };
 
 /**
  * Status display configuration
@@ -138,12 +136,12 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
  */
 export default function AgentOverviewView({
   title,
-  summary,
+  summary: _summary,
   status,
   statusInfo,
   progress,
-  workspacePath,
-  sessionId,
+  workspacePath: _workspacePath,
+  sessionId: _sessionId,
   onTitleChange,
   hideStatusIndicator = false,
 }: AgentOverviewViewProps) {
@@ -209,16 +207,16 @@ export default function AgentOverviewView({
     [handleTitleBlur, title.value]
   );
 
-  const handleOpenWithEditor = useCallback(async (editor: EditorApp) => {
-    if (!workspacePath) return;
-
-    try {
-      await window.shellAPI?.openWithEditor(workspacePath, editor);
-      setShowEditorMenu(false);
-    } catch (error) {
-      console.error('Failed to open with editor:', error);
-    }
-  }, [workspacePath]);
+  // handleOpenWithEditor - commented out, will be used when editor menu feature is re-enabled
+  // const handleOpenWithEditor = useCallback(async (editor: EditorApp) => {
+  //   if (!workspacePath) return;
+  //   try {
+  //     await window.shellAPI?.openWithEditor(workspacePath, editor);
+  //     setShowEditorMenu(false);
+  //   } catch (error) {
+  //     console.error('Failed to open with editor:', error);
+  //   }
+  // }, [workspacePath]);
 
   return (
     <div className="agent-overview">

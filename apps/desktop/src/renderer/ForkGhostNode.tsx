@@ -5,7 +5,7 @@
  * Follows cursor position and indicates where the forked node will appear.
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useConnection } from '@xyflow/react';
 import { forkStore } from './stores';
 import type { ForkDragState } from './stores/IForkStore';
@@ -32,13 +32,13 @@ function ForkGhostNode() {
   }
 
   // Get the current drag position from the connection
-  const { toX, toY } = connection;
+  const { to } = connection;
 
   return (
     <div
       className="fork-ghost-node"
       style={{
-        transform: `translate(${toX - 150}px, ${toY - 50}px)`,
+        transform: `translate(${(to?.x ?? 0) - 150}px, ${(to?.y ?? 0) - 50}px)`,
       }}
     >
       <div className="fork-ghost-node-header">

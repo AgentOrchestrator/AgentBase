@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './NewAgentModal.css';
 import { worktreeService } from '../services/WorktreeService';
 import type { WorktreeInfo } from '../../main/types/worktree';
@@ -28,7 +28,7 @@ export function NewAgentModal({
   isOpen,
   onClose,
   onCreate,
-  initialPosition,
+  initialPosition: _initialPosition,
   initialWorkspacePath,
   autoCreateWorktree = false,
 }: NewAgentModalProps) {
@@ -37,7 +37,7 @@ export function NewAgentModal({
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [isLoadingGit, setIsLoadingGit] = useState(false);
   const [showBranchSwitchWarning, setShowBranchSwitchWarning] = useState(false);
-  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
+  const [_isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
@@ -348,7 +348,7 @@ export function NewAgentModal({
           if (!result?.success) {
             console.error('[NewAgentModal] Failed to checkout branch:', result?.error);
             // Check if error is due to uncommitted changes
-            if (result.error?.toLowerCase().includes('uncommitted') || result.error?.toLowerCase().includes('changes')) {
+            if (result?.error?.toLowerCase().includes('uncommitted') || result?.error?.toLowerCase().includes('changes')) {
               setShowBranchSwitchWarning(true);
               return;
             }

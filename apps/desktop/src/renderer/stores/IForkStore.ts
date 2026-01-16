@@ -5,7 +5,7 @@
  * The view delegates all fork business logic here.
  */
 
-import type { Node } from '@xyflow/react';
+import type { Node as _Node } from '@xyflow/react';
 
 /**
  * Fork drag state during connection drag

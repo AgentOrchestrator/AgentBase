@@ -24,8 +24,6 @@ export { CanvasNodeService, canvasNodeService } from './CanvasNodeService';
 export type {
   CreateNodeOptions,
   CreateAgentOptions,
-  CreateConversationOptions,
-  SessionData,
 } from './CanvasNodeService';
 
 // Linear service (GraphQL API calls)

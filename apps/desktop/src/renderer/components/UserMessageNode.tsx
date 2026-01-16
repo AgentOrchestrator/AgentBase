@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import type { UserMessageGroup } from '../types/conversation';
 import './UserMessageNode.css';
@@ -7,7 +7,7 @@ interface UserMessageNodeData {
   messageGroup: UserMessageGroup;
 }
 
-function UserMessageNode({ data, id, selected }: NodeProps) {
+function UserMessageNode({ data, id: _id, selected }: NodeProps) {
   const nodeData = data as unknown as UserMessageNodeData;
   const { messageGroup } = nodeData;
   const contentRef = useRef<HTMLDivElement>(null);

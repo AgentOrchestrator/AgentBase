@@ -18,7 +18,6 @@ import type {
   LLMCapabilities,
   ModelInfo,
   VendorId,
-  ToolCall,
 } from '../types';
 import { ok, err, llmError, LLMErrorCode, KNOWN_MODELS } from '../types';
 
@@ -30,12 +29,22 @@ type LanguageModel = ReturnType<ReturnType<typeof createOpenAI>>;
  * Provides provider-agnostic interface for chat completions with tool support.
  */
 export class VercelAILLMService implements IToolCapableLLMService {
+  private readonly toolRegistry: IToolRegistry;
+
   constructor(
     private readonly config: LLMConfig,
     private readonly apiKeyRepository: IApiKeyRepository,
-    private readonly toolRegistry: IToolRegistry,
+    toolRegistry: IToolRegistry,
     private readonly logger: ILogger
-  ) {}
+  ) {
+    // Store for future tool support implementation
+    this.toolRegistry = toolRegistry;
+  }
+
+  /** Get the tool registry for future tool support */
+  getToolRegistry(): IToolRegistry {
+    return this.toolRegistry;
+  }
 
   getCapabilities(): LLMCapabilities {
     return {
@@ -115,7 +124,7 @@ export class VercelAILLMService implements IToolCapableLLMService {
 
   async chatWithTools(
     request: ChatRequest,
-    maxIterations: number = 10
+    _maxIterations: number = 10
   ): Promise<Result<ChatResponse, LLMError>> {
     // For now, just call chat without tools
     // Tool support requires more complex Vercel AI SDK integration

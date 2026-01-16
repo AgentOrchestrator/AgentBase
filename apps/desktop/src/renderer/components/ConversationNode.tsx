@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
 import { marked } from 'marked';
 import type { MessageGroup, UserMessageGroup, AssistantMessageGroup, MessageContent, ToolUseContent, ThinkingContent } from '../types/conversation';
@@ -244,7 +244,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
     }
   };
 
-  const renderUserMessage = (group: UserMessageGroup, index: number) => {
+  const renderUserMessage = (group: UserMessageGroup, _index: number) => {
     const messageKey = `user-${group.uuid}`;
     return (
       <div
@@ -370,7 +370,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
     return null;
   };
 
-  const renderAssistantMessage = (group: AssistantMessageGroup, index: number) => {
+  const renderAssistantMessage = (group: AssistantMessageGroup, _index: number) => {
     const displayItems = processAssistantEntries(group);
     const messageKey = `assistant-${group.uuid}`;
 

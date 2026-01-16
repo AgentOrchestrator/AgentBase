@@ -6,7 +6,6 @@
  */
 
 import { z } from 'zod';
-import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 // =============================================================================
 // Attachment Schemas
@@ -30,7 +29,7 @@ const LinearIssueAttachmentSchema = z.object({
     name: z.string(),
     avatarUrl: z.string().optional(),
   }).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // TerminalAttachment is now only LinearIssueAttachment
@@ -64,15 +63,24 @@ export const TerminalNodeDataSchema = z.object({
 });
 
 /**
- * Schema for CodingAgentMessage data (must be before AgentNodeDataSchema)
+ * MessageType enum values for schema validation
  */
-export const ChatMessageSchema: z.ZodType<CodingAgentMessage> = z.object({
+const MessageTypeValues = [
+  'user', 'assistant', 'tool_call', 'tool_result', 'mcp_tool',
+  'thinking', 'reasoning', 'system', 'summary', 'metadata', 'error'
+] as const;
+
+/**
+ * Schema for CodingAgentMessage data (must be before AgentNodeDataSchema)
+ * Note: contentBlocks uses z.any() to allow the flexible AgentContentBlock union type
+ */
+export const ChatMessageSchema = z.object({
   id: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
-  contentBlocks: z.array(z.unknown()).optional(),
+  contentBlocks: z.array(z.any()).optional(),
   timestamp: z.string(),
-  messageType: z.string().optional(),
+  messageType: z.enum(MessageTypeValues).optional(),
 });
 
 /**
@@ -92,13 +100,13 @@ export const AgentNodeDataSchema = z.object({
   terminalId: z.string(),
   agentType: z.string(),
   status: z.string(),
-  statusInfo: z.record(z.unknown()).optional(),
+  statusInfo: z.record(z.string(), z.unknown()).optional(),
   title: z.object({
     value: z.string(),
     isManuallySet: z.boolean(),
   }),
   summary: z.string().nullable(),
-  progress: z.record(z.unknown()).nullable(),
+  progress: z.record(z.string(), z.unknown()).nullable(),
   attachments: z.array(TerminalAttachmentSchema).optional(),
   activeView: z.enum(['overview', 'terminal', 'chat']).optional(),
   conversationId: z.string().optional(),

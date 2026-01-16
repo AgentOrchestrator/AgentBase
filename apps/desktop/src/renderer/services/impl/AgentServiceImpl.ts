@@ -39,7 +39,7 @@ export class AgentServiceImpl implements IAgentService {
   private currentStatus: CodingAgentStatusInfo | null = null;
   private autoStartEnabled = false;
   private isStarted = false;
-  private workspacePath: string | null = null;
+  private workspacePathValue: string | null = null;
 
   constructor(
     nodeId: string,
@@ -52,13 +52,22 @@ export class AgentServiceImpl implements IAgentService {
     this.agentId = agentId;
     this.agentType = agentType;
     this.terminalService = terminalService;
-    this.workspacePath = workspacePath || null;
+    this.workspacePathValue = workspacePath || null;
 
     // Initialize status
     this.currentStatus = {
       status: 'idle',
       startedAt: Date.now(),
     };
+  }
+
+  // =============================================================================
+  // Getters
+  // =============================================================================
+
+  /** Get the current workspace path */
+  get workspacePath(): string | null {
+    return this.workspacePathValue;
   }
 
   // =============================================================================
@@ -218,7 +227,7 @@ export class AgentServiceImpl implements IAgentService {
       return;
     }
 
-    this.workspacePath = path;
+    this.workspacePathValue = path;
 
     // Ensure terminal is ready
     await this.ensureTerminalReady();

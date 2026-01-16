@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -233,8 +233,9 @@ export default function AgentTerminalView({ terminalId, selected = false }: Agen
       // Only destroy terminal if it had time to run
       if (isInitializedRef.current) {
         if (window.electronAPI) {
-          window.electronAPI.removeTerminalDataListener?.(handleTerminalData);
-          window.electronAPI.removeTerminalExitListener?.(handleTerminalExit);
+          // Remove listeners using the channel-based API
+          window.electronAPI.removeAllListeners?.('terminal:data');
+          window.electronAPI.removeAllListeners?.('terminal:exit');
         }
         terminal.dispose();
       }

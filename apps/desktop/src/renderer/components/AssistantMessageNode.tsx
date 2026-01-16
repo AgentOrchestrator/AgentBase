@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { marked } from 'marked';
 import type { AssistantMessageGroup, MessageContent, ToolUseContent, ThinkingContent } from '../types/conversation';
@@ -20,7 +20,7 @@ type DisplayItem =
   | { type: 'thinking'; content: ThinkingContent; key: string }
   | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
 
-function AssistantMessageNode({ data, id, selected }: NodeProps) {
+function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
   const nodeData = data as unknown as AssistantMessageNodeData;
   const { messageGroup } = nodeData;
   const contentRef = useRef<HTMLDivElement>(null);

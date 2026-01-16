@@ -3,7 +3,7 @@ import { AgentType } from '@agent-orchestrator/shared';
 /**
  * Re-export AgentType from shared package
  */
-export { AgentType };
+export type { AgentType };
 
 /**
  * Alias for backwards compatibility

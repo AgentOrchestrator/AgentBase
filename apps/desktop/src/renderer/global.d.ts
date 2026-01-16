@@ -8,11 +8,7 @@ import type { ElectronAPI, WorktreeAPI, AgentStatusAPI, LLMAPI, RepresentationAP
 import type { TerminalSessionAPI, SessionWatcherAPI, RecentWorkspacesAPI } from '@agent-orchestrator/shared';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
 
-// Declare SVG module imports (Vite handles these as URLs)
-declare module '*.svg' {
-  const content: string;
-  export default content;
-}
+// SVG module declarations moved to vite-env.d.ts
 
 declare global {
   interface Window {

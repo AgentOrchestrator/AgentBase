@@ -31,5 +31,3 @@ import type { ISessionManager } from './ISessionManager';
 import type { ISessionResumable } from './ISessionResumable';
 import type { ISessionForkable } from './ISessionForkable';
 import type { IProcessLifecycle } from './IProcessLifecycle';
-import type { IChatHistoryProvider } from './IChatHistoryProvider';
-import type { ISessionValidator } from './ISessionValidator';

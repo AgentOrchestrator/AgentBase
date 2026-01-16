@@ -1,8 +1,6 @@
 import type {
   ConversationEntry,
-  UserMessageEntry,
   AssistantMessageEntry,
-  UserMessageGroup,
   AssistantMessageGroup,
   MessageGroup,
 } from '../types/conversation';
@@ -74,7 +72,7 @@ export function groupConversationMessages(
 
       // Extract text content from user message
       const textParts: string[] = [];
-      for (const contentItem of contentArray) {
+      for (const contentItem of contentArray as Array<string | { type: string; text?: string }>) {
         // Handle string content directly
         if (typeof contentItem === 'string') {
           const text = contentItem.replace(/<ide_opened_file>.*?<\/ide_opened_file>/g, '').trim();
