@@ -292,6 +292,9 @@ function CanvasFlow() {
   const [linearApiKey, setLinearApiKey] = useState('');
   const [isLinearConnected, setIsLinearConnected] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
   const [workspaceGitInfo, setWorkspaceGitInfo] = useState<Record<string, { branch: string | null }>>({});
@@ -306,13 +309,6 @@ function CanvasFlow() {
   
   // Available colors for highlighting
   const highlightColors = ['#F24F1F', '#FF7362', '#A259FF', '#1ABCFE', '#0ECF84', '#F5C348'];
-
-  // Issues pill state
-  const [isPillExpanded, setIsPillExpanded] = useState(false);
-  const [isPillSquare, setIsPillSquare] = useState(false);
-  const [showPillContent, setShowPillContent] = useState(false);
-  const [isContentVisible, setIsContentVisible] = useState(false);
-  const [isTextVisible, setIsTextVisible] = useState(true);
 
   const [issues, setIssues] = useState<LinearIssue[]>([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
@@ -575,6 +571,52 @@ function CanvasFlow() {
     } finally {
       setLoadingIssues(false);
     }
+  }, []);
+
+  // Fetch Linear issues and projects when connected
+  useEffect(() => {
+    if (isLinearConnected) {
+      fetchLinearIssues();
+      fetchLinearProjects();
+    }
+  }, [isLinearConnected, fetchLinearIssues, fetchLinearProjects]);
+
+  // Handle sidebar resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = e.clientX;
+      const minWidth = 200;
+      const maxWidth = 600;
+      
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
   }, []);
 
   const projectOptions = useMemo(() => {
@@ -960,57 +1002,6 @@ function CanvasFlow() {
     });
   }, []);
 
-  const togglePill = useCallback(() => {
-    if (!isPillExpanded) {
-      // Fetch issues and projects when expanding
-      fetchLinearIssues();
-      fetchLinearProjects();
-
-      // Hide text immediately when expanding
-      setIsTextVisible(false);
-      // Both phases start simultaneously
-      setIsPillExpanded(true);
-      setIsPillSquare(true);
-      // Show pill content after expansion completes (300ms) + 50ms delay
-      setTimeout(() => {
-        setShowPillContent(true);
-        // Start content animation after pill content is shown
-        setTimeout(() => {
-          setIsContentVisible(true);
-        }, 100);
-      }, 350);
-    } else {
-      // Hide animations immediately when collapsing
-      setIsContentVisible(false);
-      // Hide pill content immediately when collapsing
-      setShowPillContent(false);
-      // Both phases collapse simultaneously
-      setIsPillSquare(false);
-      setIsPillExpanded(false);
-      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
-      setTimeout(() => {
-        setIsTextVisible(true);
-      }, 350);
-    }
-  }, [isPillExpanded, fetchLinearIssues, fetchLinearProjects]);
-
-  const collapsePill = useCallback(() => {
-    // First hide animations immediately
-    setIsContentVisible(false);
-    // First hide content with 50ms delay
-    setShowPillContent(false);
-    setTimeout(() => {
-      // Then collapse the pill
-      setIsPillSquare(false);
-      setIsPillExpanded(false);
-      // Start text fade-in animation after collapse completes (300ms + 50ms delay)
-      setTimeout(() => {
-        setIsTextVisible(true);
-      }, 350);
-    }, 50);
-  }, []);
-
-
   // Drag and drop handlers for issue cards
   const handleIssueDragStart = useCallback((e: React.DragEvent, issue: LinearIssue) => {
     e.dataTransfer.effectAllowed = 'copy';
@@ -1065,15 +1056,10 @@ function CanvasFlow() {
       };
 
       setNodes((nds) => [...nds, newNode]);
-
-      // Close the issues pill after dropping
-      if (isPillExpanded) {
-        collapsePill();
-      }
     } catch (error) {
       console.error('Error handling drop:', error);
     }
-  }, [screenToFlowPosition, setNodes, isPillExpanded, collapsePill]);
+  }, [screenToFlowPosition, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -2309,7 +2295,10 @@ function CanvasFlow() {
         autoCreateWorktree={autoCreateWorktree}
       />
       {/* Sidebar Panel */}
-      <div className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+      <div 
+        className={`canvas-sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isResizing ? 'resizing' : ''}`}
+        style={{ width: isSidebarCollapsed ? 0 : `${sidebarWidth}px` }}
+      >
         <div className="sidebar-header">
           <h2 className="sidebar-title">Canvas</h2>
           <button
@@ -2345,7 +2334,7 @@ function CanvasFlow() {
                     >
                       <div className="sidebar-folder-header-wrapper">
                         <button
-                          className="sidebar-folder-header"
+                          className={`sidebar-folder-header ${!showLock ? 'no-lock' : ''}`}
                           onClick={() => toggleProject(projectName)}
                         >
                           <span className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}>
@@ -2548,9 +2537,141 @@ function CanvasFlow() {
                 })}
               </div>
             )}
+
+            {/* Linear Issues Container - Fixed at bottom */}
+            {isLinearConnected && (
+              <div className="sidebar-linear-issues-container">
+                <div className="sidebar-linear-issues-header">
+                  <h3 className="sidebar-linear-issues-title">Linear Issues</h3>
+                  <span className="sidebar-linear-issues-workspace">
+                    {linearWorkspaceName || (loadingIssues ? 'Loading...' : 'Unknown')}
+                  </span>
+                </div>
+                
+                <div className="sidebar-linear-issues-filters">
+                  <div className="sidebar-linear-issues-filter">
+                    <label htmlFor="sidebar-issues-filter-project">Project</label>
+                    <select
+                      id="sidebar-issues-filter-project"
+                      className="sidebar-issues-select"
+                      value={selectedProjectId}
+                      onChange={(event) => setSelectedProjectId(event.target.value)}
+                    >
+                      <option value="all">All projects</option>
+                      {hasUnassignedProject && <option value="none">No project</option>}
+                      {projectOptions.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sidebar-linear-issues-filter">
+                    <label htmlFor="sidebar-issues-filter-milestone">Milestone</label>
+                    <select
+                      id="sidebar-issues-filter-milestone"
+                      className="sidebar-issues-select"
+                      value={selectedMilestoneId}
+                      onChange={(event) => setSelectedMilestoneId(event.target.value)}
+                    >
+                      <option value="all">All milestones</option>
+                      {hasUnassignedMilestone && <option value="none">No milestone</option>}
+                      {visibleMilestoneOptions.map((milestone) => (
+                        <option key={milestone.id} value={milestone.id}>
+                          {milestone.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sidebar-linear-issues-filter">
+                    <label htmlFor="sidebar-issues-filter-status">Status</label>
+                    <select
+                      id="sidebar-issues-filter-status"
+                      className="sidebar-issues-select"
+                      value={selectedStatusId}
+                      onChange={(event) => setSelectedStatusId(event.target.value)}
+                    >
+                      <option value="all">All statuses</option>
+                      {statusOptions.map((state) => (
+                        <option key={state.id} value={state.id}>
+                          {state.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="sidebar-linear-issues-list">
+                  {loadingIssues ? (
+                    <div className="sidebar-linear-issues-loading">Loading issues...</div>
+                  ) : filteredIssues.length === 0 ? (
+                    <div className="sidebar-linear-issues-empty">
+                      {issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
+                    </div>
+                  ) : (
+                    filteredIssues.map((issue) => {
+                      const projectLabel = issue.project?.name;
+                      const milestoneLabel = issue.projectMilestone?.name;
+                      return (
+                        <div
+                          key={issue.id}
+                          className="sidebar-issue-card"
+                          draggable
+                          onDragStart={(e) => handleIssueDragStart(e, issue)}
+                        >
+                          <div className="sidebar-issue-header">
+                            <span className="sidebar-issue-identifier">{issue.identifier}</span>
+                            <span
+                              className="sidebar-issue-status"
+                              style={{ backgroundColor: issue.state.color }}
+                            >
+                              {issue.state.name}
+                            </span>
+                          </div>
+                          <div className="sidebar-issue-title">{issue.title}</div>
+                          {(projectLabel || milestoneLabel) && (
+                            <div className="sidebar-issue-meta">
+                              {projectLabel && <span>Project: {projectLabel}</span>}
+                              {projectLabel && milestoneLabel && (
+                                <span className="sidebar-issue-meta-sep">|</span>
+                              )}
+                              {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
+                            </div>
+                          )}
+                          {issue.assignee && (
+                            <div className="sidebar-issue-assignee">
+                              {issue.assignee.avatarUrl && (
+                                <img
+                                  src={issue.assignee.avatarUrl}
+                                  alt={issue.assignee.name}
+                                  className="sidebar-assignee-avatar"
+                                />
+                              )}
+                              <span className="sidebar-assignee-name">{issue.assignee.name}</span>
+                            </div>
+                          )}
+                          <div className="sidebar-issue-priority">
+                            Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Resize Handle */}
+      {!isSidebarCollapsed && (
+        <div
+          ref={resizeHandleRef}
+          className="sidebar-resize-handle"
+          onMouseDown={handleResizeStart}
+        />
+      )}
 
       {/* Canvas Content */}
       <div className={`canvas-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -2831,154 +2952,6 @@ function CanvasFlow() {
           </div>
         </div>
       )}
-
-        {/* Issues Pill - COMMENTED OUT */}
-        {false && isLinearConnected && (
-        <div
-          onClick={!isPillSquare ? togglePill : undefined}
-          className={`issues-pill ${!isPillSquare ? 'cursor-pointer' : 'cursor-default'} ${
-            isPillExpanded ? 'expanded' : ''
-          } ${isPillSquare ? 'square' : ''}`}
-          style={{
-            borderRadius: isPillSquare ? '24px' : '20px'
-          }}
-        >
-          {!isPillSquare ? (
-            <div className={`pill-text ${isTextVisible ? 'visible' : ''}`}>
-              View Issues...
-            </div>
-          ) : showPillContent ? (
-            <div className="pill-content-wrapper" onClick={(e) => e.stopPropagation()}>
-              {/* Collapse nozzle at top */}
-              <div
-                className={`collapse-nozzle ${isContentVisible ? 'visible' : ''}`}
-                onClick={collapsePill}
-                title="Collapse issues"
-              />
-
-              {/* Issues list */}
-                <div className={`issues-list ${isContentVisible ? 'visible' : ''}`}>
-                <div className="issues-toolbar">
-                  <div className="issues-workspace">
-                    <span className="issues-workspace-label">Workspace</span>
-                    <span className="issues-workspace-name">
-                      {linearWorkspaceName || (loadingIssues ? 'Loading...' : 'Unknown')}
-                    </span>
-                  </div>
-                  <div className="issues-filters">
-                    <div className="issues-filter">
-                      <label htmlFor="issues-filter-project">Project</label>
-                      <select
-                        id="issues-filter-project"
-                        className="issues-select"
-                        value={selectedProjectId}
-                        onChange={(event) => setSelectedProjectId(event.target.value)}
-                      >
-                        <option value="all">All projects</option>
-                        {hasUnassignedProject && <option value="none">No project</option>}
-                        {projectOptions.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="issues-filter">
-                      <label htmlFor="issues-filter-milestone">Milestone</label>
-                      <select
-                        id="issues-filter-milestone"
-                        className="issues-select"
-                        value={selectedMilestoneId}
-                        onChange={(event) => setSelectedMilestoneId(event.target.value)}
-                      >
-                        <option value="all">All milestones</option>
-                        {hasUnassignedMilestone && <option value="none">No milestone</option>}
-                        {visibleMilestoneOptions.map((milestone) => (
-                          <option key={milestone.id} value={milestone.id}>
-                            {milestone.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="issues-filter">
-                      <label htmlFor="issues-filter-status">Status</label>
-                      <select
-                        id="issues-filter-status"
-                        className="issues-select"
-                        value={selectedStatusId}
-                        onChange={(event) => setSelectedStatusId(event.target.value)}
-                      >
-                        <option value="all">All statuses</option>
-                        {statusOptions.map((state) => (
-                          <option key={state.id} value={state.id}>
-                            {state.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {loadingIssues ? (
-                  <div className="loading-state">Loading issues...</div>
-                ) : filteredIssues.length === 0 ? (
-                  <div className="empty-state">
-                    {issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
-                  </div>
-                ) : (
-                  filteredIssues.map((issue) => {
-                    const projectLabel = issue.project?.name;
-                    const milestoneLabel = issue.projectMilestone?.name;
-                    return (
-                      <div
-                        key={issue.id}
-                        className="issue-card"
-                        draggable
-                        onDragStart={(e) => handleIssueDragStart(e, issue)}
-                      >
-                        <div className="issue-header">
-                          <span className="issue-identifier">{issue.identifier}</span>
-                          <span
-                            className="issue-status"
-                            style={{ backgroundColor: issue.state.color }}
-                          >
-                            {issue.state.name}
-                          </span>
-                        </div>
-                        <div className="issue-title">{issue.title}</div>
-                        {(projectLabel || milestoneLabel) && (
-                          <div className="issue-meta">
-                            {projectLabel && <span>Project: {projectLabel}</span>}
-                            {projectLabel && milestoneLabel && (
-                              <span className="issue-meta-sep">|</span>
-                            )}
-                            {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
-                          </div>
-                        )}
-                        {issue.assignee && (
-                          <div className="issue-assignee">
-                            {issue.assignee.avatarUrl && (
-                              <img
-                                src={issue.assignee.avatarUrl}
-                                alt={issue.assignee.name}
-                                className="assignee-avatar"
-                              />
-                            )}
-                            <span className="assignee-name">{issue.assignee.name}</span>
-                          </div>
-                        )}
-                        <div className="issue-priority">
-                          Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          ) : null}
-        </div>
-        )}
 
         <ActionPill />
       </div>
