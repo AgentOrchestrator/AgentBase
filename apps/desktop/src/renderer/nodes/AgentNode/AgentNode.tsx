@@ -37,11 +37,8 @@ function AgentNode({ data, id, selected }: NodeProps) {
   // ---------------------------------------------------------------------------
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
 
-// Use workspace path from node data as initial suggestion for modal
-  const initialWorkspacePath = initialNodeData.workspacePath || undefined;
-
-  // Check for prefilled workspace path (from Command+T modal or locked folder)
-  const prefilledWorkspacePath = (initialNodeData as unknown as { prefilledWorkspacePath?: string }).prefilledWorkspacePath;
+// Use workspace path from node data (from Command+T modal or locked folder)
+  const prefilledWorkspacePath = initialNodeData.workspacePath || undefined;
 
   // Automatically set workspace from prefilled path (from Command+T modal)
   useEffect(() => {
@@ -125,7 +122,7 @@ function AgentNode({ data, id, selected }: NodeProps) {
         isOpen={showWorkspaceModal && !agent.workspace.path && !prefilledWorkspacePath}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
-        initialPath={initialWorkspacePath || null}
+        initialPath={prefilledWorkspacePath || null}
       />
     </NodeContextProvider>
   );

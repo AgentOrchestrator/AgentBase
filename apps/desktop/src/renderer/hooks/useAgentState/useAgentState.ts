@@ -103,6 +103,8 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   const [nodeData, setNodeData] = useState<AgentNodeData>(initialNodeData);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  console.log('[useAgentState] Initialized for node', initialNodeData);
+
   // COMMENTED OUT FOR DEBUGGING - Sync external node updates
   // useEffect(() => {
   //   setNodeData((prev) => ({
@@ -327,21 +329,12 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // COMMENTED OUT FOR DEBUGGING - dispatchNodeUpdate
   const dispatchNodeUpdate = useCallback(
     (updatedData: AgentNodeData) => {
-      console.warn('[useAgentState] dispatchNodeUpdate BEFORE dispatch', {
-        nodeId,
-        agentId: updatedData.agentId,
-        updatedData,
-      });
       // setNodeData(updatedData);
       window.dispatchEvent(
         new CustomEvent('update-node', {
           detail: { nodeId, data: updatedData },
         })
       );
-      console.warn('[useAgentState] dispatchNodeUpdate AFTER dispatch', {
-        nodeId,
-        agentId: updatedData.agentId,
-      });
     },
     [nodeId]
   );
@@ -378,19 +371,9 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
 
   const updateNodeData = useCallback(
     (updates: Partial<AgentNodeData>) => {
-      console.warn('[useAgentState] updateNodeData BEFORE', {
-        nodeId,
-        agentId: nodeData.agentId,
-        currentData: nodeData,
-        updates,
-        stack: new Error().stack,
-      });
+
       const mergedData = { ...nodeData, ...updates };
-      console.warn('[useAgentState] updateNodeData AFTER', {
-        nodeId,
-        agentId: nodeData.agentId,
-        mergedData,
-      });
+
       dispatchNodeUpdate(mergedData);
     },
     [nodeId, nodeData, dispatchNodeUpdate]

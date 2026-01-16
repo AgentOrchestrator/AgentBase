@@ -3,6 +3,9 @@
 
 export * from './types.js';
 
+// Domain types (coding agent, canvas, session, etc.)
+export * from './types/index.js';
+
 // Chat history loaders module
 export * from './loaders/index.js';
 

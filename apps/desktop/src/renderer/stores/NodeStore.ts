@@ -40,25 +40,12 @@ export class NodeStore implements INodeStore {
       return;
     }
 
-    console.warn('[NodeStore] updateNode BEFORE', {
-      nodeId,
-      agentId: (existing.data as Record<string, unknown>)?.agentId,
-      existingData: existing.data,
-      incomingData: data,
-    });
-
     const updatedNode: Node = {
       ...existing,
       data: { ...data },
     };
 
     this.nodes.set(nodeId, updatedNode);
-
-    console.warn('[NodeStore] updateNode AFTER', {
-      nodeId,
-      agentId: (updatedNode.data as Record<string, unknown>)?.agentId,
-      updatedData: updatedNode.data,
-    });
 
     this.notifyListeners();
   }

@@ -3,6 +3,22 @@
 // Shared types for Electron main/renderer process communication
 // =============================================================================
 
+// Import domain types used in this file's interfaces
+// These types are exported from './types/index.js' via the main index
+import type { CodingAgentState } from './types/coding-agent.js';
+import type {
+  WorktreeInfo,
+  WorktreeProvisionOptions,
+  WorktreeReleaseOptions,
+} from './types/worktree.js';
+import type { AgentType } from './loaders/types.js';
+
+/**
+ * Coding agent types - alias for AgentType from loaders.
+ * This alias is kept for backwards compatibility with existing code.
+ */
+export type CodingAgentType = AgentType;
+
 // =============================================================================
 // Terminal IPC Types
 // =============================================================================
@@ -124,64 +140,8 @@ export interface ShellAPI {
 }
 
 // =============================================================================
-// Git Worktree Types
+// Git Worktree API
 // =============================================================================
-
-/**
- * Status of a git worktree.
- */
-export type WorktreeStatus =
-  | 'provisioning'
-  | 'active'
-  | 'releasing'
-  | 'orphaned'
-  | 'error';
-
-/**
- * Information about a git worktree.
- */
-export interface WorktreeInfo {
-  /** Unique identifier for the worktree */
-  id: string;
-  /** Path to the main repository */
-  repoPath: string;
-  /** Path to the worktree directory */
-  worktreePath: string;
-  /** Name of the branch associated with this worktree */
-  branchName: string;
-  /** Current status of the worktree */
-  status: WorktreeStatus;
-  /** ISO timestamp when the worktree was provisioned */
-  provisionedAt: string;
-  /** ISO timestamp of last activity */
-  lastActivityAt: string;
-  /** Agent ID associated with this worktree */
-  agentId?: string;
-  /** Error message if status is 'error' */
-  errorMessage?: string;
-}
-
-/**
- * Options for provisioning a new worktree.
- */
-export interface WorktreeProvisionOptions {
-  /** Branch to create worktree from (default: HEAD) */
-  baseBranch?: string;
-  /** Agent ID to associate with this worktree */
-  agentId?: string;
-  /** Custom subdirectory name within base worktree directory */
-  directoryName?: string;
-}
-
-/**
- * Options for releasing a worktree.
- */
-export interface WorktreeReleaseOptions {
-  /** Delete branch on release (default: false) */
-  deleteBranch?: boolean;
-  /** Force removal with uncommitted changes (default: false) */
-  force?: boolean;
-}
 
 /**
  * Worktree API for managing git worktrees.
@@ -203,100 +163,8 @@ export interface WorktreeAPI {
 }
 
 // =============================================================================
-// Agent Status Types
+// Agent Status API
 // =============================================================================
-
-/**
- * All possible status states for a coding agent.
- * Unified from Claude Code (thinking, executing_tool, awaiting_input) and
- * Cursor (idle, running, streaming, paused, completed, error).
- */
-export type CodingAgentStatus =
-  | 'idle'
-  | 'running'
-  | 'thinking'
-  | 'streaming'
-  | 'executing_tool'
-  | 'awaiting_input'
-  | 'paused'
-  | 'completed'
-  | 'error';
-
-/**
- * Categories of tools that can be executed by a coding agent.
- */
-export type ToolType =
-  | 'bash'
-  | 'read'
-  | 'write'
-  | 'edit'
-  | 'search'
-  | 'lsp'
-  | 'fetch'
-  | 'mcp'
-  | 'unknown';
-
-/**
- * Coding agent types (aligned with daemon's AgentType).
- */
-export type CodingAgentType =
-  | 'claude_code'
-  | 'cursor'
-  | 'codex'
-  | 'windsurf'
-  | 'vscode'
-  | 'factory'
-  | 'other';
-
-/**
- * Detailed status information with contextual data.
- */
-export interface CodingAgentStatusInfo {
-  /** Current status of the agent */
-  status: CodingAgentStatus;
-  /** Name of the tool being executed (when status is 'executing_tool') */
-  toolName?: string;
-  /** Category of the tool (when status is 'executing_tool') */
-  toolType?: ToolType;
-  /** Error message (when status is 'error') */
-  errorMessage?: string;
-  /** Name of subagent running (e.g., 'Plan Agent', 'Explore Agent') */
-  subagentName?: string;
-  /** Timestamp when this status was set */
-  startedAt: number;
-}
-
-/**
- * Title configuration with manual/computed tracking.
- */
-export interface TitleConfig {
-  /** The title value */
-  value: string;
-  /** Whether the title was manually set by user */
-  isManuallySet: boolean;
-  /** First N user messages used for automatic computation (if not manual) */
-  computedFrom?: string[];
-}
-
-/**
- * Complete state of a coding agent including status, title, and summary.
- */
-export interface CodingAgentState {
-  /** Unique identifier for the agent */
-  agentId: string;
-  /** Type of coding agent */
-  agentType: CodingAgentType;
-  /** Current status with context */
-  statusInfo: CodingAgentStatusInfo;
-  /** Title configuration */
-  title: TitleConfig;
-  /** Short computed summary of the agent's task */
-  summary: string | null;
-  /** Timestamp when agent was registered */
-  createdAt: number;
-  /** Timestamp of last state update */
-  updatedAt: number;
-}
 
 /**
  * Agent Status API for persisting and loading agent state.

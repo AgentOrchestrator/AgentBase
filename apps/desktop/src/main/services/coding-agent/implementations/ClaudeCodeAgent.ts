@@ -731,14 +731,6 @@ export class ClaudeCodeAgent
     });
   }
 
-  /**
-   * Extract branch name from worktree path
-   * e.g., "/repo/.git/worktrees/fork-feature-123" → "fork-feature-123"
-   */
-  private extractBranchFromPath(path: string): string | null {
-    const match = path.match(/worktrees\/([^\/]+)/);
-    return match ? match[1] : null;
-  }
 
   private resolveSessionId(identifier: SessionIdentifier): string | null {
     switch (identifier.type) {

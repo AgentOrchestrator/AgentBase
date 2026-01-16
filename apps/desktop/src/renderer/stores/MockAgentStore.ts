@@ -55,7 +55,7 @@ function createMockAgents(): AgentNodeData[] {
           title: 'Add JWT authentication to API',
           url: 'https://linear.app/team/issue/ENG-456',
           state: { name: 'In Progress', color: '#f59e0b' },
-          priority: 2,
+          priority: { label: 'High', priority: 2 },
         },
       ],
       activeView: 'overview',
