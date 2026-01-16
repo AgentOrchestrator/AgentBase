@@ -764,13 +764,20 @@ export class ClaudeCodeAgent
   }
 
   /**
+   * Encode a workspace path the same way Claude Code does.
+   * Both forward slashes and spaces are replaced with hyphens.
+   * Example: /Users/foo/My Project -> -Users-foo-My-Project
+   */
+  private encodeWorkspacePath(workspacePath: string): string {
+    return workspacePath.replace(/[/ ]/g, '-');
+  }
+
+  /**
    * Check if a session file exists for the given session ID and workspace path.
    * A session is considered "active" if its JSONL file exists on disk.
    */
   async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
-    // Encode workspace path the same way Claude Code does:
-    // /Users/foo/project -> -Users-foo-project
-    const encodedPath = workspacePath.replace(/\//g, '-');
+    const encodedPath = this.encodeWorkspacePath(workspacePath);
     const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
     return fs.existsSync(sessionFilePath);
   }
@@ -854,7 +861,7 @@ export class ClaudeCodeAgent
         // For filtering, encode the filter path the same way Claude Code does
         // so we can compare encoded paths directly (avoids hyphen corruption issue)
         if (filter?.projectPath) {
-          const encodedFilterPath = filter.projectPath.replace(/\//g, '-');
+          const encodedFilterPath = this.encodeWorkspacePath(filter.projectPath);
           if (projectDir !== encodedFilterPath) continue;
         }
         if (filter?.projectName && projectName !== filter.projectName) continue;
@@ -945,7 +952,32 @@ export class ClaudeCodeAgent
         return ok(null);
       }
 
-      // Search for the session file
+      // If workspacePath is provided, search in that specific project directory first
+      // This is important for forked sessions that share the same sessionId
+      // but exist in different project directories (parent vs worktree workspace)
+      if (filter?.workspacePath) {
+        const encodedPath = this.encodeWorkspacePath(filter.workspacePath);
+        const targetDirPath = path.join(projectsDir, encodedPath);
+        const sessionFilePath = path.join(targetDirPath, `${sessionId}.jsonl`);
+
+        if (fs.existsSync(sessionFilePath)) {
+          console.log('[ClaudeCodeAgent] Found session in target workspace', {
+            sessionId,
+            workspacePath: filter.workspacePath,
+          });
+          return ok(this.parseSessionContent(sessionFilePath, sessionId, filter.workspacePath, filter));
+        }
+
+        // If not found in target workspace and strict mode would be helpful,
+        // we could return null here. For now, fall through to search all directories
+        // to maintain backward compatibility.
+        console.log('[ClaudeCodeAgent] Session not found in target workspace, searching all', {
+          sessionId,
+          workspacePath: filter.workspacePath,
+        });
+      }
+
+      // Search for the session file across all project directories
       const projectDirs = fs.readdirSync(projectsDir);
 
       for (const projectDir of projectDirs) {

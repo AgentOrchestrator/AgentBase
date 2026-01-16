@@ -17,6 +17,15 @@ import type {
   ErrorListener,
   GitInfo,
 } from '../../context/node-services';
+import type {
+  GenerateResponse,
+  StreamCallback,
+  SessionInfo,
+  CodingAgentSessionContent,
+  MessageFilterOptions,
+  AgentAdapterEventType,
+  AgentEventHandler,
+} from '../../context/node-services/coding-agent-adapter';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 /**
@@ -113,21 +122,33 @@ function createMockAgentService(
   _workspacePath?: string
 ): IAgentService {
   let autoStart = false;
+  let workspacePath: string | null = _workspacePath || null;
   let currentStatus: CodingAgentStatusInfo = {
     status: 'idle',
     startedAt: Date.now(),
   };
   const statusListeners = new Set<StatusChangeListener>();
+  const eventListeners = new Map<AgentAdapterEventType, Set<AgentEventHandler<AgentAdapterEventType>>>();
+
+  // Mock response for generation methods
+  const mockResponse: GenerateResponse = {
+    content: 'Mock response from agent',
+    sessionId: 'mock-session-id',
+  };
 
   return {
     nodeId,
     agentId,
     agentType,
+    get workspacePath() {
+      return workspacePath;
+    },
     initialize: async () => {},
     dispose: async () => {
       statusListeners.clear();
+      eventListeners.clear();
     },
-    start: async (_command?: string, _sessionId?: string, _initialPrompt?: string) => {
+    start: async (_sessionId?: string, _initialPrompt?: string) => {
       currentStatus = { status: 'running', startedAt: Date.now() };
     },
     stop: async () => {
@@ -149,25 +170,81 @@ function createMockAgentService(
     setAutoStart: (enabled) => {
       autoStart = enabled;
     },
-    getCliCommand: () => {
-      const commands: Record<AgentType, string> = {
-        claude_code: 'claude',
-        cursor: 'cursor',
-        codex: 'codex',
-        windsurf: 'windsurf',
-        vscode: 'code',
-        factory: 'factory',
-        other: '',
-      };
-      return commands[agentType] || '';
+    setWorkspace: async (path: string) => {
+      workspacePath = path;
     },
-    setWorkspace: async (
-      _path: string,
-      _autoStartCli?: boolean,
-      _initialPrompt?: string,
-      _sessionId?: string
-    ) => {
-      // No-op for mock
+    // Generation methods
+    sendMessage: async (_prompt: string): Promise<GenerateResponse> => {
+      return mockResponse;
+    },
+    sendMessageStreaming: async (_prompt: string, onChunk: StreamCallback): Promise<GenerateResponse> => {
+      onChunk('Mock ');
+      onChunk('streaming ');
+      onChunk('response');
+      return mockResponse;
+    },
+    resumeSession: async (_sessionId: string, _prompt: string): Promise<GenerateResponse> => {
+      return mockResponse;
+    },
+    resumeSessionStreaming: async (
+      _sessionId: string,
+      _prompt: string,
+      onChunk: StreamCallback
+    ): Promise<GenerateResponse> => {
+      onChunk('Mock ');
+      onChunk('resumed ');
+      onChunk('response');
+      return mockResponse;
+    },
+    // Session queries
+    getSession: async (
+      _sessionId: string,
+      _filter?: MessageFilterOptions
+    ): Promise<CodingAgentSessionContent | null> => {
+      return {
+        id: 'mock-session-id',
+        agentType,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageCount: 2,
+        messages: [
+          {
+            id: 'msg-1',
+            role: 'user',
+            content: 'Mock user message',
+            timestamp: new Date().toISOString(),
+          },
+          {
+            id: 'msg-2',
+            role: 'assistant',
+            content: 'Mock assistant response',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+    },
+    isSessionActive: async (_sessionId: string): Promise<boolean> => {
+      return true;
+    },
+    getLatestSession: async (): Promise<SessionInfo | null> => {
+      return {
+        id: 'mock-session-id',
+        agentType,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    },
+    // Events
+    onAgentEvent: <T extends AgentAdapterEventType>(
+      type: T,
+      handler: AgentEventHandler<T>
+    ): (() => void) => {
+      if (!eventListeners.has(type)) {
+        eventListeners.set(type, new Set());
+      }
+      const handlers = eventListeners.get(type)!;
+      handlers.add(handler as unknown as AgentEventHandler<AgentAdapterEventType>);
+      return () => handlers.delete(handler as unknown as AgentEventHandler<AgentAdapterEventType>);
     },
   };
 }

@@ -564,3 +564,18 @@
 .agent-node-frame-label .frame-label-folder-name:hover {
   color: var(--color-text-primary);
 }
+
+/* Session Label - Bottom of node */
+.agent-node-session-label {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #666;
+  white-space: nowrap;
+  opacity: 0.7;
+  font-family: monospace;
+  pointer-events: none;
+  z-index: 10;
+}

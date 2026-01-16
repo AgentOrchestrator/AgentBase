@@ -12,6 +12,7 @@ import { TerminalServiceImpl } from '../impl/TerminalServiceImpl';
 import { WorkspaceServiceImpl } from '../impl/WorkspaceServiceImpl';
 import { AgentServiceImpl } from '../impl/AgentServiceImpl';
 import { ConversationServiceImpl } from '../impl/ConversationServiceImpl';
+import { createCodingAgentAdapter } from '../coding-agent-adapters';
 
 /**
  * Create production service factories
@@ -33,7 +34,20 @@ export function createServiceFactories(): ServiceFactories {
       terminalService: ITerminalService,
       workspacePath?: string
     ) => {
-      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, workspacePath);
+      // Create adapter internally based on agent type
+      // The adapter factory may return null for unsupported types or if API is unavailable
+      let adapter = null;
+      try {
+        adapter = createCodingAgentAdapter(agentType, {
+          workingDirectory: workspacePath,
+          agentId,
+        });
+      } catch (error) {
+        // Adapter creation failed (unsupported type or API unavailable)
+        // AgentServiceImpl handles null adapter gracefully
+        console.warn('[ServiceFactories] Failed to create adapter:', error);
+      }
+      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, adapter, workspacePath);
     },
 
     createConversationService: (

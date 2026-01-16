@@ -3,6 +3,11 @@
  *
  * Orchestrates fork operations by coordinating worktree creation
  * and session forking. Handles rollback if session fork fails.
+ *
+ * This is a boundary service that uses window.codingAgentAPI directly
+ * for communicating with the main process. It handles the translation
+ * between Result types from the main process and the ForkResult/ForkError
+ * types used by the renderer layer.
  */
 
 import type { CodingAgentType, SessionInfo, SessionIdentifier, ForkOptions } from '../../main/services/coding-agent';
@@ -218,38 +223,30 @@ export class ForkService implements IForkService {
       throw new Error('Worktree info not found after creation');
     }
 
-    try {
-      const parentIdentifier: SessionIdentifier = {
-        type: 'id',
-        value: request.parentSessionId,
-      };
+    const parentIdentifier: SessionIdentifier = {
+      type: 'id',
+      value: request.parentSessionId,
+    };
 
-      // Pass worktree path as workingDirectory for cross-directory fork detection
-      const forkOptions: ForkOptions = {
-        newSessionName: request.forkTitle,
-        workingDirectory: worktreeInfo.worktreePath,
-      };
+    // Pass worktree path as workingDirectory for cross-directory fork detection
+    const forkOptions: ForkOptions = {
+      newSessionName: request.forkTitle,
+      workingDirectory: worktreeInfo.worktreePath,
+    };
 
-      console.log('[ForkService] Fork options:', forkOptions);
+    console.log('[ForkService] Fork options:', forkOptions);
 
-      const sessionInfo = await window.codingAgentAPI.forkSession(
-        request.agentType,
-        parentIdentifier,
-        forkOptions
-      );
+    // Call the main process API which returns Result<SessionInfo, AgentError>
+    const result = await window.codingAgentAPI.forkSession(
+      request.agentType,
+      parentIdentifier,
+      forkOptions
+    );
 
-      console.log('[ForkService] Session forked successfully:', sessionInfo);
-
-      return {
-        success: true,
-        data: {
-          worktreeInfo,
-          sessionInfo,
-        },
-      };
-    } catch (error) {
+    // Handle Result type from main process
+    if (!result.success) {
       // Rollback: release the worktree if session fork failed
-      console.error('[ForkService] Session fork failed, rolling back worktree:', error);
+      console.error('[ForkService] Session fork failed, rolling back worktree:', result.error);
 
       try {
         await worktreeService.releaseWorktree(worktreeResult.worktreeId, { deleteBranch: true });
@@ -262,10 +259,21 @@ export class ForkService implements IForkService {
         success: false,
         error: {
           type: 'SESSION_FORK_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to fork session',
+          message: result.error.message,
         },
       };
     }
+
+    const sessionInfo = result.data;
+    console.log('[ForkService] Session forked successfully:', sessionInfo);
+
+    return {
+      success: true,
+      data: {
+        worktreeInfo,
+        sessionInfo,
+      },
+    };
   }
 }
 

@@ -293,6 +293,13 @@ export interface MessageFilterOptions {
   hasToolCalls?: boolean;
   /** Full-text search in content */
   searchText?: string;
+  /**
+   * Workspace path to scope session lookup.
+   * When provided, prioritizes searching in this workspace's project directory first.
+   * This is important for forked sessions which share the same sessionId but exist
+   * in different project directories (e.g., parent vs worktree workspace).
+   */
+  workspacePath?: string;
 }
 
 /**

@@ -2,36 +2,36 @@
  * useChatSession Hook
  *
  * Encapsulates chat logic for AgentChatNode.
- * Handles message sending, streaming, and history loading via codingAgentAPI.
+ * Handles message sending, streaming, and history loading via IAgentService.
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { CodingAgentAPI, CodingAgentType } from '../../../../main/services/coding-agent';
+import type { CodingAgentType } from '../../../../main/services/coding-agent';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 import { useSessionFileWatcher } from '../../../hooks/useSessionFileWatcher';
+import type { IAgentService } from '../../../context/node-services';
 
 interface UseChatSessionOptions {
-  agentId?: string;
   agentType: string;
   sessionId?: string;
-  workspacePath?: string;
   currentMessages?: CodingAgentMessage[];
   autoLoadHistory?: boolean;
   onMessagesUpdate: (messages: CodingAgentMessage[]) => void;
   onSessionCreated: (sessionId: string) => void;
   onError: (error: string) => void;
+  /** Agent service for all session operations (required) */
+  agentService: IAgentService;
 }
 
 export function useChatSession({
-  agentId,
   agentType,
   sessionId,
-  workspacePath,
   currentMessages,
   autoLoadHistory = true,
   onMessagesUpdate,
   onSessionCreated,
   onError,
+  agentService,
 }: UseChatSessionOptions) {
 
   const [isStreaming, setIsStreaming] = useState(false);
@@ -39,7 +39,6 @@ export function useChatSession({
   const loadedSessionIdRef = useRef<string | null>(null);
   const isLoadingHistoryRef = useRef(false);
 
-  const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI }).codingAgentAPI;
   const resolvedAgentType = agentType as CodingAgentType;
 
   useEffect(() => {
@@ -61,11 +60,6 @@ export function useChatSession({
   );
 
   const loadSessionHistory = useCallback(async () => {
-    if (!codingAgentAPI) {
-      onError('Coding agent API not available');
-      return;
-    }
-
     if (!sessionId) {
       return;
     }
@@ -77,14 +71,11 @@ export function useChatSession({
     isLoadingHistoryRef.current = true;
 
     try {
-      const session = await codingAgentAPI.getSession(
-        resolvedAgentType,
-        sessionId,
-        { roles: ['user', 'assistant'] }
-      );
+      const session = await agentService.getSession(sessionId, { roles: ['user', 'assistant'] });
 
       if (session?.messages) {
-        publishMessages(session.messages, sessionId);
+        // Cast messages to shared type (adapter type is compatible but uses string for messageType)
+        publishMessages(session.messages as CodingAgentMessage[], sessionId);
       }
       // If session not found, don't show error - sendMessage will create a new session
     } catch (err) {
@@ -92,7 +83,7 @@ export function useChatSession({
     } finally {
       isLoadingHistoryRef.current = false;
     }
-  }, [codingAgentAPI, resolvedAgentType, sessionId, onError, publishMessages]);
+  }, [agentService, sessionId, onError, publishMessages]);
 
   useEffect(() => {
     if (!autoLoadHistory || !sessionId) {
@@ -130,11 +121,6 @@ export function useChatSession({
   });
 
   const sendMessage = useCallback(async (prompt: string) => {
-    if (!codingAgentAPI) {
-      onError('Coding agent API not available');
-      return;
-    }
-
     setIsStreaming(true);
 
     // Add user message
@@ -173,29 +159,17 @@ export function useChatSession({
         publishMessages(updatedMessages);
       };
 
-      // Check if session file exists before deciding to resume or create new
-      const isSessionActive = sessionId && workspacePath
-        ? await codingAgentAPI.checkSessionActive(resolvedAgentType, sessionId, workspacePath)
-        : false;
+      // Check if session is active and resume or start new
+      const isActive = sessionId ? await agentService.isSessionActive(sessionId) : false;
 
-      if (isSessionActive && sessionId) {
-        // Continue existing session (file exists)
-        result = await codingAgentAPI.continueSessionStreaming(
-          resolvedAgentType,
-          { type: 'id', value: sessionId },
-          prompt,
-          handleChunk,
-          { workingDirectory: workspacePath, agentId }
-        );
+      if (isActive && sessionId) {
+        // Resume existing session
+        result = await agentService.resumeSessionStreaming(sessionId, prompt, handleChunk);
       } else {
-        // Start new session (no sessionId, or session file doesn't exist)
-        result = await codingAgentAPI.generateStreaming(
-          resolvedAgentType,
-          { prompt, workingDirectory: workspacePath, agentId },
-          handleChunk
-        );
+        // Start new session
+        result = await agentService.sendMessageStreaming(prompt, handleChunk);
 
-        // Capture session ID
+        // Capture session ID from response
         if (result.sessionId) {
           loadedSessionIdRef.current = result.sessionId;
           onSessionCreated(result.sessionId);
@@ -205,7 +179,7 @@ export function useChatSession({
       // Final update with complete content
       const finalMessages = [
         ...messagesRef.current.slice(0, -1),
-        { ...assistantMessage, content: result.content || assistantContent },
+        { ...assistantMessage, content: result?.content || assistantContent },
       ];
       publishMessages(finalMessages);
     } catch (err) {
@@ -216,7 +190,7 @@ export function useChatSession({
     } finally {
       setIsStreaming(false);
     }
-  }, [codingAgentAPI, agentId, agentType, sessionId, workspacePath, publishMessages, onSessionCreated, onError]);
+  }, [agentService, sessionId, publishMessages, onSessionCreated, onError]);
 
   return {
     sendMessage,

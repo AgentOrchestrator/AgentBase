@@ -43,3 +43,33 @@ export {
   hasAgentService,
   hasConversationService,
 } from './node-services.types';
+
+// Coding Agent Adapter types
+export type {
+  ICodingAgentAdapter,
+  AgentAdapterEvent,
+  AgentAdapterEventType,
+  AgentEventHandler,
+  PermissionRequestPayload,
+  PermissionResponsePayload,
+  SessionPayload,
+  StatusPayload,
+  GenerateRequest,
+  GenerateResponse,
+  StreamCallback,
+  SessionIdentifier,
+  SessionInfo,
+  SessionSummary,
+  CodingAgentSessionContent,
+  CodingAgentMessage,
+  MessageFilterOptions,
+  SessionFilterOptions,
+  ContinueOptions,
+  ForkOptions,
+  Result,
+  AgentError,
+  AgentErrorCode,
+} from './coding-agent-adapter';
+
+// Result helpers
+export { ok, err, agentError } from './coding-agent-adapter';

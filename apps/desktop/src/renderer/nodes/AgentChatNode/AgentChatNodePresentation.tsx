@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { useChatSession } from './hooks/useChatSession';
+import { useAgentService } from '../../context';
 import './AgentChatNode.css';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
@@ -29,7 +30,7 @@ export function AgentChatNodePresentation({
   selected,
   sessionId,
   agentType,
-  workspacePath,
+  workspacePath: _workspacePath,
   title,
   initialMessages,
   isDraft,
@@ -38,6 +39,7 @@ export function AgentChatNodePresentation({
   onSessionCreated,
   onExpandedChange,
 }: AgentChatNodePresentationProps) {
+  const agentService = useAgentService();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [messages, setMessages] = useState<CodingAgentMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
@@ -52,7 +54,6 @@ export function AgentChatNodePresentation({
   } = useChatSession({
     agentType,
     sessionId,
-    workspacePath,
     currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: CodingAgentMessage[]) => {
       setMessages(newMessages);
@@ -60,6 +61,7 @@ export function AgentChatNodePresentation({
     }, [onMessagesChange]),
     onSessionCreated,
     onError: setError,
+    agentService,
   });
 
   // Sync messages from props
