@@ -114,6 +114,7 @@ const FETCH_ISSUES_QUERY = `
         id
         title
         identifier
+        description
         state {
           id
           name

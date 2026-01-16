@@ -1169,12 +1169,14 @@ export class CursorLoader implements IDatabaseLoader {
     const conversations: CursorConversation[] = histories.map(h => ({
       id: h.id,
       timestamp: h.timestamp,
-      messages: h.messages.map((m, i) => ({
-        id: `${h.id}-${i}`,
-        role: m.role || 'user',
-        content: m.display,
-        timestamp: m.timestamp || h.timestamp
-      })),
+      messages: h.messages
+        .filter((m) => m.role !== 'system')
+        .map((m, i) => ({
+          id: `${h.id}-${i}`,
+          role: (m.role || 'user') as 'user' | 'assistant',
+          content: m.display,
+          timestamp: m.timestamp || h.timestamp
+        })),
       conversationType: (h.metadata?.conversationType as 'composer' | 'copilot') || 'composer',
       metadata: h.metadata
     }));

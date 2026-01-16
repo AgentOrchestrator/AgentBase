@@ -593,6 +593,8 @@ export interface GitAPI {
   createBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
   /** Checkout an existing branch */
   checkoutBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
+  /** Get GitHub username via GitHub CLI */
+  getGithubUsername: () => Promise<{ success: boolean; username?: string; error?: string }>;
 }
 
 // Expose git API
@@ -619,6 +621,17 @@ contextBridge.exposeInMainWorld('gitAPI', {
   checkoutBranch: async (workspacePath: string, branchName: string) => {
     try {
       return await ipcRenderer.invoke('git:checkout-branch', workspacePath, branchName);
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+  getGithubUsername: async () => {
+    try {
+      const response = await ipcRenderer.invoke('git:get-github-username');
+      if (response.success && response.data) {
+        return { success: true, username: response.data.username };
+      }
+      return { success: false, error: response.error || 'Failed to get GitHub username' };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

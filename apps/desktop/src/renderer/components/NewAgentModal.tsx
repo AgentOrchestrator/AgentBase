@@ -22,6 +22,7 @@ interface NewAgentModalProps {
   initialPosition?: { x: number; y: number };
   initialWorkspacePath?: string | null;
   autoCreateWorktree?: boolean;
+  initialDescription?: string;
 }
 
 export function NewAgentModal({
@@ -31,6 +32,7 @@ export function NewAgentModal({
   initialPosition: _initialPosition,
   initialWorkspacePath,
   autoCreateWorktree = false,
+  initialDescription,
 }: NewAgentModalProps) {
   const [description, setDescription] = useState('');
   const [workspacePath, setWorkspacePath] = useState<string | null>(initialWorkspacePath || null);
@@ -86,7 +88,8 @@ export function NewAgentModal({
   useEffect(() => {
     if (isOpen && descriptionInputRef.current) {
       descriptionInputRef.current.focus();
-      setDescription('');
+      // Set description from initialDescription if provided, otherwise clear it
+      setDescription(initialDescription || '');
       setIsCreatingNewBranch(false);
       setNewBranchName('');
       setWorktreeInfo(null);
@@ -102,7 +105,7 @@ export function NewAgentModal({
       // Reset warning state when modal closes
       setShowBranchSwitchWarning(false);
     }
-  }, [isOpen, initialWorkspacePath]);
+  }, [isOpen, initialWorkspacePath, initialDescription]);
 
   // Focus new branch input when entering new branch mode
   useEffect(() => {

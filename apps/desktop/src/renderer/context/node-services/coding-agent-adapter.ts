@@ -7,6 +7,7 @@
  */
 
 import type { AgentType } from '../../../../types/coding-agent-status';
+import type { MessageFilterOptions as SharedMessageFilterOptions } from '@agent-orchestrator/shared';
 
 // ============================================
 // Result Type (matches main-side contract)
@@ -163,12 +164,9 @@ export interface CodingAgentMessage {
 
 /**
  * Filter options for messages
+ * Re-exported from shared package to avoid type drift
  */
-export interface MessageFilterOptions {
-  messageTypes?: string[];
-  roles?: Array<'user' | 'assistant' | 'system'>;
-  searchText?: string;
-}
+export type MessageFilterOptions = SharedMessageFilterOptions;
 
 /**
  * Filter options for sessions

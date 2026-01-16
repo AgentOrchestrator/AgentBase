@@ -1521,6 +1521,50 @@ ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, bran
   }
 });
 
+ipcMain.handle('git:get-github-username', async (): Promise<{ success: boolean; data?: { username: string }; error?: string }> => {
+  try {
+    const gh = spawn('gh', ['api', 'user', '--jq', '.login'], { shell: true });
+    let stdout = '';
+    let stderr = '';
+
+    gh.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    gh.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    const username = await new Promise<string>((resolve, reject) => {
+      gh.on('close', (code) => {
+        if (code === 0) {
+          const trimmed = stdout.trim();
+          if (trimmed) {
+            resolve(trimmed);
+          } else {
+            reject(new Error('GitHub CLI returned empty username'));
+          }
+        } else {
+          reject(new Error(stderr.trim() || `GitHub CLI failed with code ${code}`));
+        }
+      });
+      gh.on('error', (err) => {
+        reject(new Error(`Failed to execute GitHub CLI: ${err.message}`));
+      });
+    });
+
+    if (username) {
+      console.log('[Main] GitHub username retrieved:', username);
+      return { success: true, data: { username } };
+    }
+
+    return { success: false, error: 'Could not determine GitHub username' };
+  } catch (error) {
+    console.error('[Main] Error getting GitHub username', { error });
+    return { success: false, error: (error as Error).message };
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 

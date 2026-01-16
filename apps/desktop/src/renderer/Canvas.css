@@ -24,6 +24,10 @@
   transition: none;
 }
 
+.canvas-container.resizing {
+  user-select: none;
+}
+
 .canvas-sidebar.collapsed {
   width: 0;
   overflow: hidden;
@@ -32,13 +36,23 @@
 
 /* Resize Handle */
 .sidebar-resize-handle {
-  width: 4px;
+  width: 8px;
   height: 100%;
   background: transparent;
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+  border: none;
+  margin: 0;
+  padding: 0;
+  /* Make it invisible but functional */
+  opacity: 0;
+  /* Extend the hit area */
+  margin-left: -4px;
+  margin-right: -4px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 /* Expand button when sidebar is collapsed */
@@ -91,6 +105,26 @@
 
 .canvas-sidebar.collapsed .sidebar-title {
   display: none;
+}
+
+.sidebar-username {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-error {
+  font-size: 11px;
+  color: #ff4444;
+  margin-top: 4px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-toggle {
@@ -267,7 +301,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, padding-right 0.2s ease;
   position: relative;
   z-index: 1;
   min-width: 0;
@@ -806,6 +840,119 @@
   color: var(--color-text-primary);
   font-size: 16px;
   font-weight: 500;
+}
+
+.settings-mesh-container {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.settings-mesh-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 256px;
+  height: 360px;
+  padding: 0;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #0051FF;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.settings-mesh-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-mesh-welcome-title {
+  font-family: 'Averia Serif Libre', serif;
+  color: var(--color-text-primary);
+  font-size: 25.6px;
+  font-weight: 400;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.settings-mesh-welcome-subtitle {
+  font-family: 'SF UI Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  margin-top: 4px;
+}
+
+.settings-mesh-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-mesh-shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'SF UI Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  gap: 16px;
+}
+
+.settings-mesh-shortcut-label {
+  color: var(--color-text-primary);
+  opacity: 0.8;
+}
+
+.settings-mesh-shortcut-key {
+  font-family: 'Menlo', 'Monaco', monospace;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.settings-mesh-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  background: #0051FF;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.settings-mesh-username {
+  font-family: 'Averia Serif Libre', serif;
+  color: white;
+  font-size: 25.6px;
+  font-weight: 400;
+  text-align: left;
+  margin-bottom: 3px;
+}
+
+.settings-mesh-subtitle {
+  font-family: 'Averia Serif Libre', serif;
+  color: white;
+  font-size: 14.4px;
+  font-weight: 300;
+  text-align: left;
+  opacity: 0.9;
 }
 
 .settings-item {

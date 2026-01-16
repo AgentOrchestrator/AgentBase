@@ -952,7 +952,32 @@ export class ClaudeCodeAgent
         return ok(null);
       }
 
-      // Search for the session file
+      // If workspacePath is provided, search in that specific project directory first
+      // This is important for forked sessions that share the same sessionId
+      // but exist in different project directories (parent vs worktree workspace)
+      if (filter?.workspacePath) {
+        const encodedPath = this.encodeWorkspacePath(filter.workspacePath);
+        const targetDirPath = path.join(projectsDir, encodedPath);
+        const sessionFilePath = path.join(targetDirPath, `${sessionId}.jsonl`);
+
+        if (fs.existsSync(sessionFilePath)) {
+          console.log('[ClaudeCodeAgent] Found session in target workspace', {
+            sessionId,
+            workspacePath: filter.workspacePath,
+          });
+          return ok(this.parseSessionContent(sessionFilePath, sessionId, filter.workspacePath, filter));
+        }
+
+        // If not found in target workspace and strict mode would be helpful,
+        // we could return null here. For now, fall through to search all directories
+        // to maintain backward compatibility.
+        console.log('[ClaudeCodeAgent] Session not found in target workspace, searching all', {
+          sessionId,
+          workspacePath: filter.workspacePath,
+        });
+      }
+
+      // Search for the session file across all project directories
       const projectDirs = fs.readdirSync(projectsDir);
 
       for (const projectDir of projectDirs) {

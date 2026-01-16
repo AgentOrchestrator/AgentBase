@@ -6,7 +6,7 @@
  * Handles initialization from localStorage and fetch triggers.
  */
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { linearStore } from '../stores';
 import { linearService } from '../services/LinearService';
 import type {
@@ -75,6 +75,7 @@ export type UseLinearReturn = {
 export function useLinear(): UseLinearReturn {
   // Subscribe to store state
   const [state, setState] = useState<LinearState>(() => linearStore.getState());
+  const hasAttemptedInitialFetch = useRef(false);
 
   // Subscribe to store changes
   useEffect(() => {
@@ -159,6 +160,28 @@ export function useLinear(): UseLinearReturn {
       console.error('[useLinear] Error fetching projects:', error);
     }
   }, []);
+
+  // Reset fetch attempt flag when disconnected
+  useEffect(() => {
+    if (!state.isConnected) {
+      hasAttemptedInitialFetch.current = false;
+    }
+  }, [state.isConnected]);
+
+  // Automatically fetch issues and workspace name when connected (only once on initial connection)
+  useEffect(() => {
+    if (state.isConnected && state.apiKey && !state.isLoading && !hasAttemptedInitialFetch.current) {
+      // Only fetch if we don't have workspace name yet (indicates we haven't fetched successfully)
+      if (!state.workspaceName) {
+        hasAttemptedInitialFetch.current = true;
+        fetchIssues();
+        fetchProjects();
+      } else {
+        // If we already have workspace name, mark as attempted to avoid refetching
+        hasAttemptedInitialFetch.current = true;
+      }
+    }
+  }, [state.isConnected, state.apiKey, state.workspaceName, state.isLoading, fetchIssues, fetchProjects]);
 
   const createTicket = useCallback(
     async (title: string, description?: string) => {

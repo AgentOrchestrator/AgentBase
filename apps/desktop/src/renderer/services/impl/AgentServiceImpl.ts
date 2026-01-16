@@ -687,6 +687,7 @@ export class AgentServiceImpl implements IAgentService {
 
   /**
    * Get session content with optional message filtering.
+   * Automatically includes workspacePath to scope session lookup for forked sessions.
    * @throws Error if adapter fails
    */
   async getSession(
@@ -695,7 +696,15 @@ export class AgentServiceImpl implements IAgentService {
   ): Promise<CodingAgentSessionContent | null> {
     const adapter = this.requireAdapter();
 
-    const result = await adapter.getFilteredSession(sessionId, filter);
+    // Include workspacePath in filter to scope session lookup
+    // This is critical for forked sessions which share the same sessionId
+    // but exist in different project directories (parent vs worktree)
+    const filterWithWorkspace: MessageFilterOptions = {
+      ...filter,
+      workspacePath: this.workspacePathValue ?? filter?.workspacePath,
+    };
+
+    const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);
     return this.unwrapResult(result);
   }
 

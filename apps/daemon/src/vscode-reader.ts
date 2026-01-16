@@ -498,13 +498,15 @@ export class VSCodeLoader implements IDatabaseLoader {
     const conversations: VSCodeConversation[] = histories.map(h => ({
       id: h.id,
       timestamp: h.timestamp,
-      messages: h.messages.map((m, i) => ({
-        id: `${h.id}-${i}`,
-        role: m.role || 'user',
-        content: m.display,
-        timestamp: m.timestamp || h.timestamp,
-        sessionId: h.id
-      })),
+      messages: h.messages
+        .filter((m) => m.role !== 'system')
+        .map((m, i) => ({
+          id: `${h.id}-${i}`,
+          role: (m.role || 'user') as 'user' | 'assistant',
+          content: m.display,
+          timestamp: m.timestamp || h.timestamp,
+          sessionId: h.id
+        })),
       conversationType: (h.metadata?.conversationType as 'chat' | 'inline') || 'chat',
       metadata: h.metadata
     }));

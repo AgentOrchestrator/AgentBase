@@ -69,7 +69,8 @@ export function AgentNodePresentation({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCheckingRef = useRef(false);
 
-  // Auto-start CLI when initialized (if enabled)
+  // Auto-start CLI when initialized (if enabled and has initial prompt)
+  // If no initial prompt, agent remains idle
   useEffect(() => {
     if (isInitialized && agent.isAutoStartEnabled() && isSessionReady) {
       agent.start(data.sessionId, data.initialPrompt).catch((err) => {
@@ -582,6 +583,7 @@ export function AgentNodePresentation({
             sessionId={data.sessionId}
             agentType={data.agentType}
             initialMessages={data.chatMessages}
+            initialPrompt={data.initialPrompt}
             onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
             onSessionCreated={(sessionId) => onDataChange({ sessionId })}
             isSessionReady={isSessionReady}
