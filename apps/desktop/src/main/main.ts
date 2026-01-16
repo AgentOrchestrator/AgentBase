@@ -182,6 +182,8 @@ const createWindow = (): void => {
   const win = new BrowserWindow({
     width: 1000,
     height: 700,
+    minWidth: 800,
+    minHeight: 600,
     backgroundColor: '#1e1e1e',
     frame: false,
     webPreferences: {

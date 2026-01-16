@@ -4,7 +4,7 @@
   position: relative;
   display: flex;
   overflow: visible;
-  z-index: 10;
+  z-index: 100;
 }
 
 /* Sidebar Panel */
@@ -429,7 +429,7 @@
   border-radius: 12px;
   margin-bottom: 11px;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
-  z-index: 10;
+  z-index: 100;
 }
 
 .canvas-content.sidebar-collapsed {
