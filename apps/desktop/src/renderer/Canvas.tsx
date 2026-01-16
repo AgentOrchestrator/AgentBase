@@ -14,6 +14,7 @@ import {
   OnConnectStartParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { MeshGradient } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
 import ForkSessionModal from './ForkSessionModal';
 import './Canvas.css';
@@ -63,6 +64,10 @@ function CanvasFlow() {
   // Theme hook
   const { theme, setTheme } = useTheme();
 
+  // GitHub username state
+  const [githubUsername, setGithubUsername] = useState<string | null>(null);
+  const [githubError, setGithubError] = useState<string | null>(null);
+
   // Canvas persistence hook - centralized save/restore logic
   const {
     isLoading: isCanvasLoading,
@@ -81,6 +86,27 @@ function CanvasFlow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     initialEdges.length > 0 ? initialEdges : defaultEdges
   );
+
+  // Fetch GitHub username on mount
+  useEffect(() => {
+    const fetchGithubUsername = async () => {
+      try {
+        const result = await window.gitAPI?.getGithubUsername();
+        if (result?.success && result.username) {
+          setGithubUsername(result.username);
+          setGithubError(null);
+        } else {
+          setGithubError(result?.error || 'Failed to get GitHub username');
+          setGithubUsername(null);
+        }
+      } catch (error) {
+        const errorMessage = (error as Error).message || 'Unknown error';
+        setGithubError(errorMessage);
+        setGithubUsername(null);
+      }
+    };
+    fetchGithubUsername();
+  }, []);
 
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
@@ -1075,7 +1101,17 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         style={{ width: sidebar.isSidebarCollapsed ? 0 : `${sidebar.sidebarWidth}px` }}
       >
         <div className="sidebar-header">
-          <h2 className="sidebar-title">Canvas</h2>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 className="sidebar-title">Canvas</h2>
+            {githubUsername && (
+              <div className="sidebar-username">@{githubUsername}</div>
+            )}
+            {githubError && (
+              <div className="sidebar-error" title={githubError}>
+                Error: {githubError}
+              </div>
+            )}
+          </div>
           <button
             className="sidebar-toggle"
             onClick={sidebar.toggleSidebar}
@@ -1618,6 +1654,73 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                 </button>
               </div>
               <div className="settings-modal-content">
+                <div className="settings-section">
+                  <div className="settings-mesh-container">
+                    <div className="settings-mesh-preview">
+                      <MeshGradient 
+                        speed={1.49} 
+                        distortion={0.58} 
+                        swirl={0.55} 
+                        frame={2418207.4310010453} 
+                        grainMixer={1} 
+                        grainOverlay={1} 
+                        colors={['#FFFFFF', '#0051FF']} 
+                        style={{ 
+                          width: '256px', 
+                          height: '360px', 
+                          opacity: 1, 
+                          borderRadius: 0,
+                          transformOrigin: 'center center',
+                          rotate: '0deg'
+                        }} 
+                      />
+                      <div className="settings-mesh-overlay">
+                        {githubUsername && (
+                          <>
+                            <div className="settings-mesh-username">@{githubUsername}</div>
+                            <div className="settings-mesh-subtitle">Agent Whisperer</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="settings-mesh-welcome">
+                      <div className="settings-mesh-welcome-title">Welcome back to Agent Base!</div>
+                      <div className="settings-mesh-shortcuts">
+                        <div className="settings-mesh-shortcut-item">
+                          <span className="settings-mesh-shortcut-label">New Agent</span>
+                          <span className="settings-mesh-shortcut-key">
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} T
+                          </span>
+                        </div>
+                        <div className="settings-mesh-shortcut-item">
+                          <span className="settings-mesh-shortcut-label">New Terminal</span>
+                          <span className="settings-mesh-shortcut-key">
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} K V
+                          </span>
+                        </div>
+                        <div className="settings-mesh-shortcut-item">
+                          <span className="settings-mesh-shortcut-label">New Claude Code Terminal</span>
+                          <span className="settings-mesh-shortcut-key">
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} K B
+                          </span>
+                        </div>
+                        <div className="settings-mesh-shortcut-item">
+                          <span className="settings-mesh-shortcut-label">New Forked Agent</span>
+                          <span className="settings-mesh-shortcut-key">
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} G
+                          </span>
+                        </div>
+                        <div className="settings-mesh-shortcut-item">
+                          <span className="settings-mesh-shortcut-label">Fork Existing Agent</span>
+                          <span className="settings-mesh-shortcut-key">
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} F
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="settings-section">
                   <h3>Integrations</h3>
                   <div className="settings-integration">
