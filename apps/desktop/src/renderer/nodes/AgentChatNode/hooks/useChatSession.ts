@@ -33,7 +33,6 @@ export function useChatSession({
   onSessionCreated,
   onError,
 }: UseChatSessionOptions) {
-  console.log('useChatSession called with sessionId:', sessionId);
 
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesRef = useRef<CodingAgentMessage[]>([]);

@@ -129,7 +129,12 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
       return null;
     }
 
-    return window.gitAPI.getInfo(this._workspacePath);
+    try {
+      return await window.gitAPI.getInfo(this._workspacePath);
+    } catch {
+      // Not a git repository
+      return null;
+    }
   }
 
   /**

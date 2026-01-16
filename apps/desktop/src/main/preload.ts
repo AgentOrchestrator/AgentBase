@@ -584,8 +584,8 @@ export type { GitInfo } from '@agent-orchestrator/shared';
 
 // Type definitions for the git API
 export interface GitAPI {
-  /** Get git information for a workspace path */
-  getInfo: (workspacePath: string) => Promise<GitInfo | null>;
+  /** Get git information - throws if not a git repository */
+  getInfo: (workspacePath: string) => Promise<GitInfo>;
   /** List all local git branches for a workspace path */
   listBranches: (workspacePath: string) => Promise<string[] | null>;
   /** Create and checkout a new branch */
@@ -596,13 +596,9 @@ export interface GitAPI {
 
 // Expose git API
 contextBridge.exposeInMainWorld('gitAPI', {
-  getInfo: async (workspacePath: string) => {
-    try {
-      return await unwrapResponse<GitInfo>(ipcRenderer.invoke('git:get-info', workspacePath));
-    } catch {
-      // Return null if git info cannot be retrieved
-      return null;
-    }
+  getInfo: async (workspacePath: string): Promise<GitInfo> => {
+    // This throws if not a git repo - let the error propagate
+    return ipcRenderer.invoke('git:get-info-strict', workspacePath);
   },
   listBranches: async (workspacePath: string) => {
     try {

@@ -28,7 +28,7 @@ import type {
   PermissionPayload,
 } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
-import { agentStore, agentActionStore } from '../../stores';
+import { agentActionStore } from '../../stores';
 import type {
   AgentState,
   UseAgentStateInput,
@@ -134,7 +134,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   const [manualWorkspacePath, setManualWorkspacePath] = useState<string | null>(null);
   const [worktree, setWorktree] = useState<WorktreeInfo | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
-  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(nodeData.gitInfo);
   const [isLoadingGit, setIsLoadingGit] = useState(false);
 
   // ---------------------------------------------------------------------------

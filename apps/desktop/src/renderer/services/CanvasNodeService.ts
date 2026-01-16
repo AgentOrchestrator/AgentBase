@@ -7,6 +7,7 @@
  */
 
 import type { Node } from '@xyflow/react';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle, type AgentNodeData, type AgentTitle } from '../types/agent-node';
 
 // =============================================================================
@@ -29,6 +30,8 @@ export interface CreateNodeOptions {
  * Options for creating an agent node
  */
 export interface CreateAgentOptions extends CreateNodeOptions {
+  /** Git info for the workspace (required - only git directories allowed) */
+  gitInfo: GitInfo;
   /** Pre-filled workspace path */
   workspacePath?: string;
   /** Locked folder path from canvas settings */
@@ -119,7 +122,7 @@ export class CanvasNodeService {
    */
   createAgentNode(options: CreateAgentOptions): Node {
     const nodePosition = this.resolvePosition(options);
-    const { workspacePath, lockedFolderPath, modalData } = options;
+    const { gitInfo, workspacePath, lockedFolderPath, modalData } = options;
 
     // Generate unique IDs
     const agentId = `agent-${crypto.randomUUID()}`;
@@ -131,6 +134,7 @@ export class CanvasNodeService {
       agentId,
       terminalId,
       createdAt: new Date(createdAt).toISOString(),
+      gitInfo,
       modalData,
     });
 
@@ -139,8 +143,8 @@ export class CanvasNodeService {
       ? { value: modalData.title, isManuallySet: true }
       : createDefaultAgentTitle();
 
-    // Determine workspace path: modal > explicit > locked folder > null
-    const selectedWorkspacePath = modalData?.workspacePath || workspacePath || lockedFolderPath || null;
+    // Determine workspace path: modal > explicit > locked folder
+    const selectedWorkspacePath = modalData?.workspacePath || workspacePath || lockedFolderPath || '';
 
     const data: AgentNodeData = {
       agentId,
@@ -155,7 +159,8 @@ export class CanvasNodeService {
       sessionId,
       createdAt,
       forking: false,
-      workspacePath: selectedWorkspacePath || '',
+      workspacePath: selectedWorkspacePath,
+      gitInfo,
     };
 
     return {
@@ -274,7 +279,8 @@ export class CanvasNodeService {
   createAgentNodeFromStarter(
     message: string,
     starterPosition: { x: number; y: number },
-    workingDirectory: string
+    workingDirectory: string,
+    gitInfo: GitInfo
   ): Node {
     const terminalId = `terminal-${crypto.randomUUID()}`;
     const agentId = `agent-${Date.now()}`;
@@ -286,7 +292,26 @@ export class CanvasNodeService {
       terminalId,
       createdAt: new Date(createdAt).toISOString(),
       workingDirectory,
+      gitInfo,
     });
+
+    const data: AgentNodeData = {
+      agentId,
+      terminalId,
+      agentType: 'claude_code',
+      status: 'idle',
+      title: {
+        value: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
+        isManuallySet: false,
+      },
+      summary: null,
+      progress: null,
+      initialPrompt: message,
+      workspacePath: workingDirectory,
+      sessionId,
+      createdAt,
+      gitInfo,
+    };
 
     return {
       id: `node-${createdAt}`,
@@ -295,22 +320,7 @@ export class CanvasNodeService {
         x: starterPosition.x,
         y: starterPosition.y + 150,
       },
-      data: {
-        agentId,
-        terminalId,
-        agentType: 'claude_code',
-        status: 'idle',
-        title: {
-          value: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
-          isManuallySet: false,
-        },
-        summary: null,
-        progress: null,
-        initialPrompt: message,
-        workingDirectory,
-        sessionId,
-        createdAt,
-      },
+      data: data as unknown as Record<string, unknown>,
       style: { width: 600 },
     };
   }

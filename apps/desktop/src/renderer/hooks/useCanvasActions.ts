@@ -115,25 +115,18 @@ export function useCanvasActions({
         });
       }
 
-      // If modal callback is provided, show modal instead of creating directly
+      // Always show modal - gitInfo is required for agent creation
       if (onShowAgentModal) {
         onShowAgentModal(nodePosition);
         closeContextMenu();
         return;
       }
 
-      // Create node directly if no modal callback
-      const newNode = canvasNodeService.createAgentNode({
-        position: nodePosition,
-        contextMenuPosition: null,
-        screenToFlowPosition,
-        lockedFolderPath,
-      });
-
-      setNodes((nds) => [...nds, newNode]);
+      // Modal is required for agent creation (gitInfo validation)
+      console.warn('[useCanvasActions] addAgentNode called without onShowAgentModal - cannot create agent without git validation');
       closeContextMenu();
     },
-    [contextMenu, screenToFlowPosition, setNodes, closeContextMenu, lockedFolderPath, onShowAgentModal]
+    [contextMenu, screenToFlowPosition, closeContextMenu, onShowAgentModal]
   );
 
   /**

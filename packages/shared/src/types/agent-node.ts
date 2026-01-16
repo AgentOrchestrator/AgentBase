@@ -166,8 +166,8 @@ export interface AgentNodeData {
   /** Workspace path - single source of truth for agent workspace (worktree path or original repo) */
   workspacePath: string;
 
-  /** Git info for the workspace */
-  gitInfo?: GitInfo | null;
+  /** Git info for the workspace (required - only git directories allowed) */
+  gitInfo: GitInfo;
 
   /** Initial prompt to send to the agent when it starts */
   initialPrompt?: string;

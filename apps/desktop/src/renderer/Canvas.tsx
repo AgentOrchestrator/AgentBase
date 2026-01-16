@@ -983,6 +983,7 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
         onCreate={(data) => {
           canvasActions.createAgentWithData({
             position: pendingAgentPosition,
+            gitInfo: data.gitInfo,
             modalData: {
               title: data.title,
               description: data.description,

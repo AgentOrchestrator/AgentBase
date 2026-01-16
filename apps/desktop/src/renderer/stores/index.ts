@@ -2,7 +2,6 @@
  * Store exports
  *
  * Provides singleton instances for dependency injection.
- * Swap MockAgentStore for real implementation when ready.
  */
 
 export type { IAgentStore, AgentChangeListener, AllAgentsChangeListener } from './IAgentStore';
@@ -20,27 +19,18 @@ export type {
   LinearWorkflowState,
   MilestoneOption,
 } from './ILinearStore';
-export { MockAgentStore } from './MockAgentStore';
 export { ForkStore } from './ForkStore';
 export { NodeStore } from './NodeStore';
 export { AgentActionStore } from './AgentActionStore';
 export { LinearStore } from './LinearStore';
 
-import type { IAgentStore } from './IAgentStore';
 import type { IForkStore } from './IForkStore';
 import type { INodeStore } from './INodeStore';
 import type { ILinearStore } from './ILinearStore';
-import { MockAgentStore } from './MockAgentStore';
 import { ForkStore } from './ForkStore';
 import { NodeStore } from './NodeStore';
 import { AgentActionStore } from './AgentActionStore';
 import { LinearStore } from './LinearStore';
-
-/**
- * Singleton agent store instance
- * Currently uses mock data, can be swapped for real implementation
- */
-export const agentStore: IAgentStore = new MockAgentStore();
 
 /**
  * Singleton fork store instance

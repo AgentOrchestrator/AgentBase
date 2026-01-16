@@ -44,6 +44,7 @@ import {
   registerSessionWatcherIpcHandlers,
   disposeSessionWatcher,
 } from './services/session-watcher';
+import { gitBranchService } from './services/git';
 import {
   RepresentationService,
   type RepresentationInput,
@@ -1365,73 +1366,10 @@ function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('git:get-info', async (_event, workspacePath: string): Promise<{ success: boolean; data?: GitInfo; error?: string }> => {
-    try {
-      // Verify path exists and is a git repo
-      if (!fs.existsSync(workspacePath)) {
-        return { success: false, error: `Path does not exist: ${workspacePath}` };
-      }
-
-      // Get current branch
-      let branch: string;
-      try {
-        branch = await runGitCommand(workspacePath, ['rev-parse', '--abbrev-ref', 'HEAD']);
-      } catch {
-        // Not a git repo or detached HEAD
-        return { success: false, error: 'Not a git repository' };
-      }
-
-      // Get remote (if any)
-      let remote: string | undefined;
-      try {
-        remote = await runGitCommand(workspacePath, ['config', '--get', `branch.${branch}.remote`]);
-      } catch {
-        // No remote configured
-        remote = undefined;
-      }
-
-      // Get status (clean/dirty)
-      let status: 'clean' | 'dirty' | 'unknown' = 'unknown';
-      try {
-        const statusOutput = await runGitCommand(workspacePath, ['status', '--porcelain']);
-        status = statusOutput.length === 0 ? 'clean' : 'dirty';
-      } catch {
-        status = 'unknown';
-      }
-
-      // Get ahead/behind counts
-      let ahead = 0;
-      let behind = 0;
-      if (remote) {
-        try {
-          const revList = await runGitCommand(workspacePath, [
-            'rev-list',
-            '--left-right',
-            '--count',
-            `${remote}/${branch}...HEAD`,
-          ]);
-          const [behindStr, aheadStr] = revList.split('\t');
-          behind = parseInt(behindStr, 10) || 0;
-          ahead = parseInt(aheadStr, 10) || 0;
-        } catch {
-          // Remote branch might not exist
-        }
-      }
-
-      const gitInfo: GitInfo = {
-        branch,
-        remote,
-        status,
-        ahead,
-        behind,
-      };
-
-      console.log('[Main] Git info retrieved', { workspacePath, gitInfo });
-      return { success: true, data: gitInfo };
-    } catch (error) {
-      console.error('[Main] Error getting git info', { workspacePath, error });
-      return { success: false, error: (error as Error).message };
-    }
+  // Git info handler - throws if not a git repository
+  ipcMain.handle('git:get-info-strict', async (_event, workspacePath: string): Promise<GitInfo> => {
+    // This throws if not a git repo - let the error propagate
+    return gitBranchService.getGitInfo(workspacePath);
   });
 
   console.log('[Main] IPC handlers registered successfully');

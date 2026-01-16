@@ -11,7 +11,8 @@ interface NewAgentModalProps {
   onCreate: (data: {
     title: string;
     description: string;
-    workspacePath?: string;
+    workspacePath: string;
+    gitInfo: GitInfo;
     todo?: string;
     priority?: string;
     assignee?: string;
@@ -71,10 +72,11 @@ export function NewAgentModal({
     setIsLoadingGit(true);
     window.gitAPI?.getInfo(workspacePath)
       .then((info) => {
-        setGitInfo(info || null);
+        setGitInfo(info);
         setIsLoadingGit(false);
       })
       .catch(() => {
+        // Not a git repository
         setGitInfo(null);
         setIsLoadingGit(false);
       });
@@ -373,10 +375,22 @@ export function NewAgentModal({
       }
     }
 
+    // Validate git info is available (required for agent creation)
+    if (!gitInfo) {
+      alert('Please select a git repository. Agent creation requires a git-initialized directory.');
+      return;
+    }
+
+    if (!finalWorkspacePath) {
+      alert('Please select a workspace folder.');
+      return;
+    }
+
     onCreate({
       title: description.trim() || 'New Agent',
       description: description.trim(),
       workspacePath: finalWorkspacePath,
+      gitInfo,
     });
 
     onClose();
@@ -688,9 +702,20 @@ export function NewAgentModal({
           <button
             className="new-agent-modal-create-btn"
             onClick={handleCreate}
-            disabled={(isCreatingNewBranch && !newBranchName.trim()) || isCreatingBranch || isCreatingWorktree}
+            disabled={
+              (isCreatingNewBranch && !newBranchName.trim()) ||
+              isCreatingBranch ||
+              isCreatingWorktree ||
+              isLoadingGit ||
+              !gitInfo
+            }
+            title={!gitInfo && !isLoadingGit ? 'Please select a git repository' : undefined}
           >
-            {isCreatingBranch ? 'Creating branch...' : isCreatingWorktree ? 'Creating worktree...' : 'Start agent'}
+            {isCreatingBranch ? 'Creating branch...' :
+             isCreatingWorktree ? 'Creating worktree...' :
+             isLoadingGit ? 'Checking git...' :
+             !gitInfo ? 'Git required' :
+             'Start agent'}
           </button>
         </div>
       </div>

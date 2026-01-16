@@ -78,24 +78,6 @@ function AgentNode({ data, id, selected }: NodeProps) {
   );
 
   // ---------------------------------------------------------------------------
-  // Debug Logging
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    console.log('[AgentNode] State updated', {
-      agentId: agent.config.agentId,
-      workspace: {
-        path: agent.workspace.path,
-        source: agent.workspace.source,
-        isProvisioning: agent.workspace.isProvisioning,
-      },
-      session: {
-        id: agent.session.id,
-      },
-      isInitialized: agent.isInitialized,
-    });
-  }, [agent.config.agentId, agent.workspace, agent.session, agent.isInitialized]);
-
-  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (

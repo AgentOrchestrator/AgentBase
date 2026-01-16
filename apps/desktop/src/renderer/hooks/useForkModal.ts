@@ -241,6 +241,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         const newTerminalId = `terminal-${crypto.randomUUID()}`;
 
         // Create forked node data with new session and worktree info
+        // gitInfo is inherited from parent - worktree is in the same git repo
         const forkedData: AgentNodeData = {
           ...sourceData,
           agentId: newAgentId,
@@ -250,6 +251,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           parentSessionId,
           worktreeId: result.data.worktreeInfo.id,
           workspacePath: result.data.worktreeInfo.worktreePath,
+          gitInfo: sourceData.gitInfo, // Inherit from parent - worktree is on new branch in same repo
           // Keep non-workspace attachments (Linear issues, etc.)
           attachments: sourceData.attachments || [],
         };
