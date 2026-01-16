@@ -146,9 +146,9 @@
 .agent-view-button {
   width: 24px;
   height: 24px;
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   color: #000;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -170,13 +170,13 @@
 }
 
 .agent-view-button:hover {
-  background: #f5f5f5;
+  background: transparent;
 }
 
 .agent-view-button.active {
-  background: #fff;
+  background: transparent;
   color: #000;
-  border: 1px solid #000;
+  border: none;
 }
 
 .agent-view-button.active svg {
