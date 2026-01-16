@@ -26,6 +26,7 @@ interface AgentChatViewProps {
   agentType: string;
   workspacePath?: string;
   initialMessages?: AgentChatMessage[];
+  initialPrompt?: string;
   onMessagesChange: (messages: AgentChatMessage[]) => void;
   onSessionCreated?: (sessionId: string) => void;
   isSessionReady?: boolean;
@@ -44,6 +45,7 @@ export default function AgentChatView({
   agentType,
   workspacePath,
   initialMessages = [],
+  initialPrompt,
   onMessagesChange,
   onSessionCreated,
   isSessionReady = true,
@@ -58,6 +60,7 @@ export default function AgentChatView({
   } | null>(null);
   const [mouseY, setMouseY] = useState<number | null>(null);
   const [isCommandPressed, setIsCommandPressed] = useState(false);
+  const hasSentInitialPrompt = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -89,6 +92,34 @@ export default function AgentChatView({
       setMessages(initialMessages);
     }
   }, [initialMessages, messages.length]);
+
+  // Auto-send initial prompt when session is ready and no messages exist
+  useEffect(() => {
+    // Don't send if there are already messages (from initialMessages or previous conversation)
+    const hasExistingMessages = messages.length > 0 || initialMessages.length > 0;
+    
+    if (
+      isSessionReady &&
+      initialPrompt &&
+      initialPrompt.trim() &&
+      !hasSentInitialPrompt.current &&
+      !hasExistingMessages &&
+      !isStreaming
+    ) {
+      hasSentInitialPrompt.current = true;
+      sendMessage(initialPrompt.trim()).catch((err) => {
+        console.error('[AgentChatView] Failed to send initial prompt:', err);
+        hasSentInitialPrompt.current = false; // Allow retry on error
+      });
+    }
+  }, [isSessionReady, initialPrompt, messages.length, initialMessages.length, isStreaming, sendMessage]);
+
+  // Reset hasSentInitialPrompt if initialPrompt changes (shouldn't happen, but safety check)
+  useEffect(() => {
+    if (!initialPrompt) {
+      hasSentInitialPrompt.current = false;
+    }
+  }, [initialPrompt]);
 
   // Auto-scroll to bottom
   useEffect(() => {

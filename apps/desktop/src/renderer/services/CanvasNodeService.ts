@@ -129,13 +129,17 @@ export class CanvasNodeService {
     // Determine workspace path: modal > explicit > locked folder
     const selectedWorkspacePath = modalData?.workspacePath || workspacePath || lockedFolderPath || '';
 
+    // Store description in initialPrompt if provided (for auto-sending as first message)
+    const description = modalData?.description?.trim();
+    const initialPrompt = description || undefined;
+
     const data: AgentNodeData = {
       agentId,
       terminalId,
       agentType: 'claude_code',
       status: 'idle',
       title: nodeTitle,
-      summary: modalData?.description || null,
+      summary: description || null,
       progress: null,
       attachments: initialAttachments || [],
       activeView: 'overview',
@@ -144,6 +148,7 @@ export class CanvasNodeService {
       forking: false,
       workspacePath: selectedWorkspacePath,
       gitInfo,
+      initialPrompt,
     };
 
     return {
