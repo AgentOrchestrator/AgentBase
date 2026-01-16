@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Return type for the useFolderLock hook
@@ -32,6 +32,9 @@ export function useFolderLock(
   const [lockedFolderPath, setLockedFolderPath] = useState<string | null>(null);
   const [hoveredFolderPath, setHoveredFolderPath] = useState<string | null>(null);
 
+  // Track if user has explicitly unlocked to prevent auto-lock from re-locking
+  const hasExplicitlyUnlocked = useRef<boolean>(false);
+
   // Auto-lock the first folder that appears, and clear lock if no folders exist
   useEffect(() => {
     const folderNames = Object.keys(agentHierarchy);
@@ -39,14 +42,15 @@ export function useFolderLock(
     if (folderNames.length === 0) {
       // Clear lock if no folders exist
       setLockedFolderPath(null);
-    } else if (!lockedFolderPath) {
-      // Auto-lock first folder if none is locked
+      hasExplicitlyUnlocked.current = false;
+    } else if (!lockedFolderPath && !hasExplicitlyUnlocked.current) {
+      // Auto-lock first folder if none is locked AND user hasn't explicitly unlocked
       const firstFolderName = folderNames[0];
       const firstFolderPath = folderPathMap[firstFolderName];
       if (firstFolderPath) {
         setLockedFolderPath(firstFolderPath);
       }
-    } else {
+    } else if (lockedFolderPath) {
       // Validate that locked folder still exists
       const lockedFolderName = Object.keys(folderPathMap).find(
         (name) => folderPathMap[name] === lockedFolderPath
@@ -54,11 +58,19 @@ export function useFolderLock(
       if (!lockedFolderName || !agentHierarchy[lockedFolderName]) {
         // Locked folder no longer exists, clear it
         setLockedFolderPath(null);
+        hasExplicitlyUnlocked.current = false;
       }
     }
   }, [agentHierarchy, folderPathMap, lockedFolderPath]);
 
   const handleSetLockedFolderPath = useCallback((path: string | null) => {
+    // Track if user is explicitly unlocking (setting to null)
+    if (path === null) {
+      hasExplicitlyUnlocked.current = true;
+    } else {
+      // User is locking a folder, reset the explicit unlock flag
+      hasExplicitlyUnlocked.current = false;
+    }
     setLockedFolderPath(path);
   }, []);
 

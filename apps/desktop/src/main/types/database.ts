@@ -8,7 +8,6 @@
 export type {
   // Node data types
   TerminalNodeData,
-  WorkspaceNodeData,
   CustomNodeData,
   NodeData,
   // Canvas types
@@ -24,7 +23,6 @@ export {
   // Type guards
   isAgentNodeData,
   isTerminalNodeData,
-  isWorkspaceNodeData,
 } from '@agent-orchestrator/shared';
 
 // Re-export AgentNodeData for convenience (also available from agent-node types)

@@ -30,18 +30,6 @@ export interface TerminalNodeData {
 }
 
 /**
- * Data for workspace nodes
- */
-export interface WorkspaceNodeData {
-  /** Workspace directory path */
-  path: string;
-  /** Display name */
-  name?: string;
-  /** Detected project type */
-  projectType?: string;
-}
-
-/**
  * Data for custom/generic nodes
  */
 export interface CustomNodeData {
@@ -54,7 +42,7 @@ export interface CustomNodeData {
 /**
  * Union of all node data types
  */
-export type NodeData = TerminalNodeData | WorkspaceNodeData | CustomNodeData | AgentNodeData;
+export type NodeData = TerminalNodeData | CustomNodeData | AgentNodeData;
 
 // =============================================================================
 // Node Types
@@ -63,7 +51,7 @@ export type NodeData = TerminalNodeData | WorkspaceNodeData | CustomNodeData | A
 /**
  * Supported node types in the canvas
  */
-export type CanvasNodeType = 'custom' | 'terminal' | 'workspace' | 'agent';
+export type CanvasNodeType = 'custom' | 'terminal' | 'agent';
 
 // =============================================================================
 // Canvas Node
@@ -190,9 +178,3 @@ export function isTerminalNodeData(data: NodeData): data is TerminalNodeData {
   return 'terminalId' in data && !('agentId' in data);
 }
 
-/**
- * Type guard to check if node data is for a workspace node
- */
-export function isWorkspaceNodeData(data: NodeData): data is WorkspaceNodeData {
-  return 'path' in data && !('terminalId' in data);
-}

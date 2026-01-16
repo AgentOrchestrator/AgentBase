@@ -64,15 +64,6 @@ export const TerminalNodeDataSchema = z.object({
 });
 
 /**
- * Schema for WorkspaceNode data
- */
-export const WorkspaceNodeDataSchema = z.object({
-  path: z.string(),
-  name: z.string().optional(),
-  projectType: z.string().optional(),
-});
-
-/**
  * Schema for CodingAgentMessage data (must be before AgentNodeDataSchema)
  */
 export const ChatMessageSchema: z.ZodType<CodingAgentMessage> = z.object({
@@ -164,7 +155,6 @@ export const AgentChatNodeDataSchema = z.object({
 
 export type CustomNodeData = z.infer<typeof CustomNodeDataSchema>;
 export type TerminalNodeData = z.infer<typeof TerminalNodeDataSchema>;
-export type WorkspaceNodeData = z.infer<typeof WorkspaceNodeDataSchema>;
 export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
 export type MessageNodeData = z.infer<typeof MessageNodeDataSchema>;
 export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;

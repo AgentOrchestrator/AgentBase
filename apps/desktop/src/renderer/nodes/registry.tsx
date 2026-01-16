@@ -14,7 +14,6 @@ import type { z } from 'zod';
 
 // Import node components
 import TerminalNode from '../TerminalNode';
-import WorkspaceNode from '../WorkspaceNode';
 import StarterNode from './StarterNode';
 import { AgentNode } from './AgentNode';
 import ConversationNode from './ConversationNode';
@@ -24,7 +23,6 @@ import AgentChatNode from './AgentChatNode';
 import {
   CustomNodeDataSchema,
   TerminalNodeDataSchema,
-  WorkspaceNodeDataSchema,
   AgentNodeDataSchema,
   ConversationNodeDataSchema,
   AgentChatNodeDataSchema,
@@ -104,14 +102,6 @@ const NODE_CONFIGS: NodeTypeConfig[] = [
     persistence: {
       enabled: true,
       dataSchema: TerminalNodeDataSchema,
-    },
-  },
-  {
-    type: 'workspace',
-    component: WorkspaceNode as ComponentType<NodeProps>,
-    persistence: {
-      enabled: true,
-      dataSchema: WorkspaceNodeDataSchema,
     },
   },
   {

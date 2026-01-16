@@ -25,6 +25,8 @@ import {
   useForkModal,
   useCanvasActions,
   useFolderLock,
+  useFolderHighlight,
+  applyHighlightStylesToNodes,
   useSidebarState,
   usePillState,
   useCanvasDrop,
@@ -143,6 +145,9 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
   // Folder lock state
   const folderLock = useFolderLock(agentHierarchy, folderPathMap);
 
+  // Folder highlight state
+  const folderHighlight = useFolderHighlight(folderPathMap);
+
   // Pill animation state
   const pill = usePillState(() => {
     // onExpand callback - fetch issues when pill expands
@@ -184,6 +189,13 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
   const hasAgents = useMemo(() => {
     return nodes.some((node) => node.type === 'agent');
   }, [nodes]);
+
+  // Apply highlight styles to nodes when highlighting changes
+  useEffect(() => {
+    if (folderHighlight.highlightedFolders.size > 0 || folderHighlight.folderColors.size > 0) {
+      setNodes((nds) => applyHighlightStylesToNodes(nds, folderHighlight.highlightedFolders, folderHighlight.folderColors));
+    }
+  }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, setNodes]);
 
   // =============================================================================
   // Node store sync
@@ -632,21 +644,12 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
       action: () => canvasActions.addClaudeCodeTerminal(),
     },
     {
-      id: 'load-conversation',
-      label: 'Load Conversation',
-      shortcut: 'n',
-      action: () => canvasActions.addConversationNode({ id: '' } as never, screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      })),
-    },
-    {
       id: 'create-linear-ticket',
       label: 'Create Linear Ticket',
       shortcut: 'm',
       action: () => createLinearTicket(),
     },
-  ], [canvasActions, createLinearTicket, screenToFlowPosition]);
+  ], [canvasActions, createLinearTicket]);
 
   // =============================================================================
   // Keyboard shortcuts
@@ -685,12 +688,6 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
         return;
       }
 
-      // CMD+W / CTRL+W to add workspace
-      if (modifierKey && event.key === 'w') {
-        event.preventDefault();
-        canvasActions.addWorkspaceNode();
-      }
-
       if (modifierKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         canvasActions.addAgentNode();
@@ -699,14 +696,6 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
       if (modifierKey && event.key === 'n') {
         event.preventDefault();
         canvasActions.addStarterNode();
-      }
-
-      if (modifierKey && event.shiftKey && event.key === 'L') {
-        event.preventDefault();
-        canvasActions.addConversationNode({ id: '' } as never, screenToFlowPosition({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        }));
       }
 
       if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
@@ -1025,6 +1014,7 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                   const isLocked = folderLock.lockedFolderPath === projectPath;
                   const isHovered = folderLock.hoveredFolderPath === projectPath;
                   const showLock = isLocked || (isHovered && !isLocked);
+                  const highlightColor = folderHighlight.getHighlightColor(projectPath);
 
                   return (
                     <div
@@ -1051,6 +1041,7 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                               viewBox="0 0 800 800"
                               fill="none"
                               xmlns="http://www.w3.org/2000/svg"
+                              style={{ color: highlightColor || undefined }}
                             >
                               <path
                                 d="M100 304L100.001 187.5C100.001 170.924 106.586 155.027 118.307 143.306C130.028 131.585 145.925 125 162.501 125H281.079C293.42 125 305.484 128.654 315.751 135.5L359.251 164.5C369.519 171.346 381.583 175 393.923 175H637.501C654.077 175 669.974 181.585 681.695 193.306C693.417 205.027 700.001 220.924 700.001 237.5V304"
@@ -1074,6 +1065,7 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                               height="14"
                               viewBox="0 0 512 512"
                               xmlns="http://www.w3.org/2000/svg"
+                              style={{ color: highlightColor || undefined }}
                             >
                               <path
                                 d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
@@ -1093,7 +1085,7 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                               />
                             </svg>
                           )}
-                          <span className="sidebar-folder-name">{projectName}</span>
+                          <span className="sidebar-folder-name" style={{ color: highlightColor || undefined }}>{projectName}</span>
                         </button>
                         {showLock && projectPath && (
                           <button
@@ -1115,12 +1107,12 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                             title={isLocked ? 'Unlock folder' : 'Lock folder'}
                           >
                             {isLocked ? (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 5V3C3 1.34315 4.34315 0 6 0C7.65685 0 9 1.34315 9 3V5H10C10.5523 5 11 5.44772 11 6V10C11 10.5523 10.5523 11 10 11H2C1.44772 11 1 10.5523 1 10V6C1 5.44772 1.44772 5 2 5H3ZM4 3V5H8V3C8 1.89543 7.10457 1 6 1C4.89543 1 4 1.89543 4 3Z" fill="currentColor"/>
+                              <svg width="12" height="12" viewBox="0 0 134 197" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262V100.977C133.301 85.6445 125.684 77.832 111.328 77.832H21.9727C7.61719 77.832 0 85.6445 0 100.977V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336V99.9023C15.8203 95.1172 18.2617 92.5781 22.4609 92.5781H110.84C115.137 92.5781 117.48 95.1172 117.48 99.9023V169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.0898 85.3516H32.6172V52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V85.3516H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.1133 0 17.0898 17.7734 17.0898 54.4922V85.3516Z" fill="currentColor"/>
                               </svg>
                             ) : (
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 5V3C3 1.34315 4.34315 0 6 0C7.65685 0 9 1.34315 9 3V5H10C10.5523 5 11 5.44772 11 6V10C11 10.5523 10.5523 11 10 11H2C1.44772 11 1 10.5523 1 10V6C1 5.44772 1.44772 5 2 5H3ZM4 3V5H8V3C8 1.89543 7.10457 1 6 1C4.89543 1 4 1.89543 4 3ZM2 6V10H10V6H2Z" fill="currentColor"/>
+                              <svg width="12" height="12" viewBox="0 0 134 197" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262L133.301 131.899C133.301 116.566 125.684 108.754 111.328 108.754H21.9727C7.61719 108.754 0 116.566 0 131.899V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336L15.8203 130.824C15.8203 126.039 18.2617 123.5 22.4609 123.5H110.84C115.137 123.5 117.48 126.039 117.48 130.824L117.48 169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.1142 52.4792C17.0872 53.5835 17.9852 54.4922 19.0898 54.4922H30.5664C31.699 54.4922 32.6172 53.574 32.6172 52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V114H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.5835 0 17.9767 17.1236 17.1142 52.4792Z" fill="currentColor"/>
                               </svg>
                             )}
                           </button>
@@ -1335,33 +1327,26 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                 {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
               </span>
             </div>
-            <div className="context-menu-item" onClick={() => canvasActions.addWorkspaceNode()}>
-              <span>Add Workspace</span>
-              <span className="context-menu-shortcut">
-                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
-              </span>
-            </div>
             <div className="context-menu-item" onClick={() => canvasActions.addAgentNode()}>
               <span>Add Agent</span>
               <span className="context-menu-shortcut">
                 {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘T' : 'Ctrl+T'}
               </span>
             </div>
-            <div className="context-menu-divider" />
-            <div className="context-menu-item highlight" onClick={() => canvasActions.addStarterNode()}>
-              <span>New Conversation</span>
-              <span className="context-menu-shortcut">
-                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
-              </span>
-            </div>
-            <div className="context-menu-item" onClick={() => canvasActions.addConversationNode({ id: '' } as never, screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y }))}>
-              <span>Load Conversation</span>
-              <span className="context-menu-shortcut">
-                {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⇧⌘L' : 'Ctrl+Shift+L'}
-              </span>
-            </div>
           </div>
         )}
+
+        {/* Eye Icon Button - Highlight All Folders */}
+        <button
+          className="highlight-all-fab"
+          onClick={folderHighlight.toggleHighlightAll}
+          aria-label={folderHighlight.isHighlightAllActive ? 'Unhighlight all folders' : 'Highlight all folders'}
+          title={folderHighlight.isHighlightAllActive ? 'Unhighlight all folders' : 'Highlight all folders'}
+        >
+          <svg width="16" height="16" viewBox="0 0 267 168" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M133.496 167.48C212.402 167.48 266.895 103.711 266.895 83.7891C266.895 63.7695 212.305 0.0976562 133.496 0.0976562C55.6641 0.0976562 0 63.7695 0 83.7891C0 103.711 55.5664 167.48 133.496 167.48ZM133.496 152.051C69.1406 152.051 17.0898 97.5586 17.0898 83.7891C17.0898 72.168 69.1406 15.5273 133.496 15.5273C197.559 15.5273 249.805 72.168 249.805 83.7891C249.805 97.5586 197.559 152.051 133.496 152.051ZM133.496 138.379C163.77 138.379 188.281 113.867 188.281 83.5938C188.281 53.3203 163.77 28.8086 133.496 28.8086C103.223 28.8086 78.6133 53.3203 78.6133 83.5938C78.6133 113.867 103.223 138.379 133.496 138.379Z" fill="currentColor" fillOpacity={folderHighlight.isHighlightAllActive ? "1" : "0.85"}/>
+          </svg>
+        </button>
 
         {/* Settings FAB */}
         <button
@@ -1456,12 +1441,6 @@ const { screenToFlowPosition, getEdges, getNodes } = useReactFlow();
                     <span>Add Terminal</span>
                     <span className="settings-shortcut">
                       {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘K' : 'Ctrl+K'}
-                    </span>
-                  </div>
-                  <div className="settings-item">
-                    <span>Add Workspace</span>
-                    <span className="settings-shortcut">
-                      {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘W' : 'Ctrl+W'}
                     </span>
                   </div>
                   <div className="settings-item">

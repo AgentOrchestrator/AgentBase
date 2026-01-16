@@ -6,7 +6,6 @@
  */
 
 import type { AgentType, CodingAgentStatus } from '../../../../types/coding-agent-status';
-import type { WorktreeInfo } from '../../../main/types/worktree';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 
@@ -21,14 +20,10 @@ export interface WorkspaceState {
   path: string | null;
   /** How the workspace was obtained */
   source: WorkspaceSource;
-  /** Git worktree info if provisioned from parent workspace */
-  worktree: WorktreeInfo | null;
   /** Git repository info (branch, remote, status) */
   gitInfo: GitInfo | null;
   /** Whether git info is currently loading */
   isLoadingGit: boolean;
-  /** Whether worktree is being provisioned */
-  isProvisioning: boolean;
 }
 
 // =============================================================================

@@ -11,7 +11,6 @@ import { useReactFlow } from '@xyflow/react';
 import {
   canvasNodeService,
   type CreateAgentOptions,
-  type SessionData,
 } from '../services/CanvasNodeService';
 
 // =============================================================================
@@ -26,12 +25,8 @@ export interface UseCanvasActionsReturn {
   addAgentNode: (position?: { x: number; y: number }) => void;
   /** Add a terminal node to the canvas */
   addTerminalNode: (position?: { x: number; y: number }) => void;
-  /** Add a workspace node to the canvas */
-  addWorkspaceNode: (position?: { x: number; y: number }) => void;
   /** Add a starter node to the canvas */
   addStarterNode: (position?: { x: number; y: number }) => void;
-  /** Add a conversation node for a specific session */
-  addConversationNode: (session: SessionData, position: { x: number; y: number }) => void;
   /** Add a Claude Code terminal node (auto-starts claude command) */
   addClaudeCodeTerminal: (position?: { x: number; y: number }) => void;
   /** Create an agent node with modal data (for programmatic creation) */
@@ -52,8 +47,6 @@ export interface UseCanvasActionsInput {
   lockedFolderPath?: string | null;
   /** Callback when agent modal should be shown */
   onShowAgentModal?: (position: { x: number; y: number }) => void;
-  /** Callback when session picker should be shown */
-  onShowSessionPicker?: (position: { x: number; y: number }) => void;
 }
 
 // =============================================================================
@@ -89,7 +82,6 @@ export function useCanvasActions({
   closeContextMenu,
   lockedFolderPath,
   onShowAgentModal,
-  onShowSessionPicker,
 }: UseCanvasActionsInput): UseCanvasActionsReturn {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -164,22 +156,6 @@ export function useCanvasActions({
     [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
   );
 
-  /**
-   * Add a workspace node
-   */
-  const addWorkspaceNode = useCallback(
-    (position?: { x: number; y: number }) => {
-      const newNode = canvasNodeService.createWorkspaceNode({
-        position,
-        contextMenuPosition: contextMenu,
-        screenToFlowPosition,
-      });
-
-      setNodes((nds) => [...nds, newNode]);
-      closeContextMenu();
-    },
-    [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
-  );
 
   /**
    * Add a starter node
@@ -198,25 +174,6 @@ export function useCanvasActions({
     [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
   );
 
-  /**
-   * Add a conversation node
-   */
-  const addConversationNode = useCallback(
-    (session: SessionData, position: { x: number; y: number }) => {
-      // If no session provided and picker callback exists, show picker
-      if (!session.id && onShowSessionPicker) {
-        onShowSessionPicker(position);
-        closeContextMenu();
-        return;
-      }
-
-      const newNode = canvasNodeService.createConversationNode(session, position);
-
-      setNodes((nds) => [...nds, newNode]);
-      closeContextMenu();
-    },
-    [setNodes, closeContextMenu, onShowSessionPicker]
-  );
 
   /**
    * Add a Claude Code terminal node
@@ -238,9 +195,7 @@ export function useCanvasActions({
   return {
     addAgentNode,
     addTerminalNode,
-    addWorkspaceNode,
     addStarterNode,
-    addConversationNode,
     addClaudeCodeTerminal,
     createAgentWithData,
   };

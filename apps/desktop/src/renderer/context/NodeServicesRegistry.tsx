@@ -16,7 +16,6 @@ import type {
   NodeServices,
   TerminalNodeServices,
   AgentNodeServices,
-  WorkspaceNodeServices,
   CustomNodeServices,
   ConversationNodeServices,
 } from './node-services';
@@ -162,16 +161,6 @@ export function NodeServicesRegistryProvider({
             terminal,
             workspace,
           } as AgentNodeServices;
-          break;
-        }
-
-        case 'workspace': {
-          const workspace = factories.createWorkspaceService(nodeId, config.workspacePath);
-
-          services = {
-            type: 'workspace',
-            workspace,
-          } as WorkspaceNodeServices;
           break;
         }
 

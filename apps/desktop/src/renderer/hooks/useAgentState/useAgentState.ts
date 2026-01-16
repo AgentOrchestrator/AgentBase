@@ -5,7 +5,6 @@
  *
  * Consolidates:
  * - Session state (explicit session IDs)
- * - useWorkspaceInheritance (worktree provisioning)
  * - useWorkspaceDisplay (workspace path resolution + git info)
  * - Store subscriptions
  * - Node data management
@@ -19,7 +18,6 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import type { WorktreeInfo } from '../../../main/types/worktree';
 import type {
   AgentAction,
   AgentEvent,
@@ -132,8 +130,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // Workspace State
   // ---------------------------------------------------------------------------
   const [manualWorkspacePath, setManualWorkspacePath] = useState<string | null>(null);
-  const [worktree, setWorktree] = useState<WorktreeInfo | null>(null);
-  const [isProvisioning, setIsProvisioning] = useState(false);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(nodeData.gitInfo);
   const [isLoadingGit, setIsLoadingGit] = useState(false);
 
@@ -148,15 +144,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // ---------------------------------------------------------------------------
   const actionIdsRef = useRef<Set<string>>(new Set());
 
-  // ---------------------------------------------------------------------------
-  // Refs for cleanup
-  // ---------------------------------------------------------------------------
-  const worktreeRef = useRef<WorktreeInfo | null>(null);
-
-  // Keep refs in sync
-  useEffect(() => {
-    worktreeRef.current = worktree;
-  }, [worktree]);
 
   useEffect(() => {
     const nextSessionId = nodeData.sessionId ?? null;
@@ -189,16 +176,16 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // Workspace Path Resolution
   // ---------------------------------------------------------------------------
 
-  // Find parent workspace node (for inheritance)
+  // Find parent node (for potential inheritance - workspace nodes no longer used)
   const edges = getEdges();
   const nodes = getNodes();
   const incomingEdge = edges.find((e) => e.target === nodeId);
   const parentNode = incomingEdge ? nodes.find((n) => n.id === incomingEdge.source) : null;
-  const parentWorkspaceNode = parentNode?.type === 'workspace' ? parentNode : null;
-  const parentWorkspacePath = parentWorkspaceNode?.data?.path as string | undefined;
+  // parentWorkspacePath is no longer used since workspace nodes were removed
+  const _parentNode = parentNode; // Keep reference for potential future use
 
   // Resolve final workspace path and source
-  // Priority: node data > manual > worktree (inherited)
+  // Priority: node data > manual
   let workspacePath: string | null = null;
   let workspaceSource: WorkspaceSource = null;
 
@@ -208,9 +195,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   } else if (manualWorkspacePath) {
     workspacePath = manualWorkspacePath;
     workspaceSource = 'manual';
-  } else if (worktree?.worktreePath) {
-    workspacePath = worktree.worktreePath;
-    workspaceSource = 'inherited';
   }
 
   // ---------------------------------------------------------------------------
@@ -269,38 +253,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   //   return unsubscribe;
   // }, [nodeData.agentId, nodeId]);
 
-  // ---------------------------------------------------------------------------
-  // Worktree Provisioning (from parent workspace)
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    // Only provision worktree if no workspace is set yet
-    if (parentWorkspacePath && !worktree && !isProvisioning && !nodeData.workspacePath) {
-      setIsProvisioning(true);
-      const branchName = `agent-${nodeId}`;
-
-      window.worktreeAPI
-        ?.provision(parentWorkspacePath, branchName, { agentId: nodeId })
-        .then((wt) => {
-          setWorktree(wt);
-          setIsProvisioning(false);
-        })
-        .catch((err) => {
-          console.error('[useAgentState] Failed to provision worktree:', err);
-          setIsProvisioning(false);
-        });
-    }
-  }, [parentWorkspacePath, nodeId, worktree, isProvisioning, nodeData.workspacePath]);
-
-  // Cleanup worktree on unmount
-  useEffect(() => {
-    return () => {
-      if (worktreeRef.current) {
-        window.worktreeAPI?.release(worktreeRef.current.id).catch((err) => {
-          console.error('[useAgentState] Failed to release worktree:', err);
-        });
-      }
-    };
-  }, []);
 
   // ---------------------------------------------------------------------------
   // Git Info Fetching - sync to node data
@@ -498,10 +450,8 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
     workspace: {
       path: workspacePath,
       source: workspaceSource,
-      worktree,
       gitInfo,
       isLoadingGit,
-      isProvisioning,
     },
     session: {
       id: sessionId,

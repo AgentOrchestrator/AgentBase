@@ -223,7 +223,7 @@ export class SQLiteDatabase implements IDatabase {
 
     const nodes: CanvasNode[] = nodeRows.map(row => ({
       id: row.id,
-      type: row.type as 'custom' | 'terminal' | 'workspace',
+      type: row.type as 'custom' | 'terminal' | 'agent',
       position: {
         x: row.position_x,
         y: row.position_y

@@ -49,25 +49,6 @@ export interface CreateAgentOptions extends CreateNodeOptions {
   };
 }
 
-/**
- * Options for creating a conversation node
- */
-export interface CreateConversationOptions extends CreateNodeOptions {
-  /** Session ID for the conversation */
-  sessionId: string;
-  /** Type of agent */
-  agentType?: string;
-}
-
-/**
- * Session data for conversation node creation
- */
-export interface SessionData {
-  /** Session identifier */
-  id: string;
-  /** Type of agent */
-  agentType?: string;
-}
 
 // =============================================================================
 // Service Implementation
@@ -196,21 +177,6 @@ export class CanvasNodeService {
     };
   }
 
-  /**
-   * Create a workspace node
-   */
-  createWorkspaceNode(options: CreateNodeOptions): Node {
-    const nodePosition = this.resolvePosition(options);
-
-    return {
-      id: `node-${Date.now()}`,
-      type: 'workspace',
-      position: nodePosition,
-      data: {
-        path: '',
-      },
-    };
-  }
 
   /**
    * Create a starter node
@@ -232,24 +198,6 @@ export class CanvasNodeService {
     };
   }
 
-  /**
-   * Create a conversation node
-   */
-  createConversationNode(session: SessionData, position: { x: number; y: number }): Node {
-    return {
-      id: `node-${Date.now()}`,
-      type: 'conversation',
-      position,
-      data: {
-        sessionId: session.id,
-        agentType: session.agentType || 'claude_code',
-        isExpanded: true,
-      },
-      style: {
-        width: 500,
-      },
-    };
-  }
 
   /**
    * Create a Claude Code terminal node (auto-starts claude command)

@@ -27,7 +27,6 @@ export type {
 export type {
   TerminalNodeServices,
   AgentNodeServices,
-  WorkspaceNodeServices,
   CustomNodeServices,
   ConversationNodeServices,
   NodeServices,
@@ -37,7 +36,6 @@ export type {
 export {
   isTerminalNodeServices,
   isAgentNodeServices,
-  isWorkspaceNodeServices,
   isCustomNodeServices,
   isConversationNodeServices,
   hasTerminalService,

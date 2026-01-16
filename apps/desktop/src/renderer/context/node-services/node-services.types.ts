@@ -36,14 +36,6 @@ export interface AgentNodeServices {
 }
 
 /**
- * Services available to WorkspaceNode
- */
-export interface WorkspaceNodeServices {
-  readonly type: 'workspace';
-  readonly workspace: IWorkspaceService;
-}
-
-/**
  * Services available to CustomNode (minimal, extensible)
  */
 export interface CustomNodeServices {
@@ -64,7 +56,6 @@ export interface ConversationNodeServices {
 export type NodeServices =
   | TerminalNodeServices
   | AgentNodeServices
-  | WorkspaceNodeServices
   | CustomNodeServices
   | ConversationNodeServices;
 
@@ -88,15 +79,6 @@ export function isAgentNodeServices(
   services: NodeServices
 ): services is AgentNodeServices {
   return services.type === 'agent';
-}
-
-/**
- * Type guard for WorkspaceNodeServices
- */
-export function isWorkspaceNodeServices(
-  services: NodeServices
-): services is WorkspaceNodeServices {
-  return services.type === 'workspace';
 }
 
 /**
@@ -135,11 +117,10 @@ export function hasTerminalService(
  */
 export function hasWorkspaceService(
   services: NodeServices
-): services is TerminalNodeServices | AgentNodeServices | WorkspaceNodeServices {
+): services is TerminalNodeServices | AgentNodeServices {
   return (
     services.type === 'terminal' ||
-    services.type === 'agent' ||
-    services.type === 'workspace'
+    services.type === 'agent'
   );
 }
 

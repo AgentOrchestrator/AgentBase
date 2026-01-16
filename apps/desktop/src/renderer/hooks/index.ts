@@ -28,6 +28,12 @@ export {
 
 export { useFolderLock, type UseFolderLockReturn } from './useFolderLock';
 
+export {
+  useFolderHighlight,
+  applyHighlightStylesToNodes,
+  type UseFolderHighlightReturn,
+} from './useFolderHighlight';
+
 export { useSidebarState, type UseSidebarStateReturn } from './useSidebarState';
 
 export { usePillState, type UsePillStateReturn } from './usePillState';
