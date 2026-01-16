@@ -24,6 +24,10 @@
   transition: none;
 }
 
+.canvas-container.resizing {
+  user-select: none;
+}
+
 .canvas-sidebar.collapsed {
   width: 0;
   overflow: hidden;
@@ -32,13 +36,23 @@
 
 /* Resize Handle */
 .sidebar-resize-handle {
-  width: 4px;
+  width: 8px;
   height: 100%;
   background: transparent;
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+  border: none;
+  margin: 0;
+  padding: 0;
+  /* Make it invisible but functional */
+  opacity: 0;
+  /* Extend the hit area */
+  margin-left: -4px;
+  margin-right: -4px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 /* Expand button when sidebar is collapsed */
@@ -267,7 +281,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, padding-right 0.2s ease;
   position: relative;
   z-index: 1;
   min-width: 0;

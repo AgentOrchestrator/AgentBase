@@ -136,6 +136,9 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
   const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
   const [isLinearCollapsed, setIsLinearCollapsed] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartXRef = useRef<number>(0);
+  const resizeStartWidthRef = useRef<number>(0);
 
   // =============================================================================
   // Hook-based state management
@@ -946,6 +949,43 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
     [onNodesChange, isNodeDragEnabled, getNodes, applySnapping]
   );
 
+  // =============================================================================
+  // Resize handlers
+  // =============================================================================
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeStartXRef.current = e.clientX;
+    resizeStartWidthRef.current = sidebar.sidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [sidebar.sidebarWidth]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    const deltaX = e.clientX - resizeStartXRef.current;
+    const newWidth = resizeStartWidthRef.current + deltaX;
+    sidebar.setSidebarWidth(newWidth);
+  }, [isResizing, sidebar]);
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
+
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
     return (
@@ -963,7 +1003,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   // =============================================================================
 
   return (
-    <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''}`}>
+    <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''} ${isResizing ? 'resizing' : ''}`}>
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
@@ -997,7 +1037,10 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       />
 
       {/* Sidebar Panel */}
-      <div className={`canvas-sidebar ${sidebar.isSidebarCollapsed ? 'collapsed' : ''}`}>
+      <div 
+        className={`canvas-sidebar ${sidebar.isSidebarCollapsed ? 'collapsed' : ''} ${isResizing ? 'resizing' : ''}`}
+        style={{ width: sidebar.isSidebarCollapsed ? 0 : `${sidebar.sidebarWidth}px` }}
+      >
         <div className="sidebar-header">
           <h2 className="sidebar-title">Canvas</h2>
           <button
@@ -1032,7 +1075,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                     >
                       <div className="sidebar-folder-header-wrapper">
                         <button
-                          className="sidebar-folder-header"
+                          className={`sidebar-folder-header ${!showLock ? 'no-lock' : ''}`}
                           onClick={() => sidebar.toggleProject(projectName)}
                         >
                           <span className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}>
@@ -1359,6 +1402,14 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         )}
       </div>
 
+      {/* Resize Handle */}
+      {!sidebar.isSidebarCollapsed && (
+        <div
+          className="sidebar-resize-handle"
+          onMouseDown={handleResizeStart}
+        />
+      )}
+
       {/* Canvas Content */}
       <div className={`canvas-content ${sidebar.isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         {/* Expand button when sidebar is collapsed */}
@@ -1509,8 +1560,18 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
           className="settings-fab"
           onClick={() => setIsSettingsOpen(true)}
           aria-label="Settings"
+          title="Settings"
         >
-          ⚙️
+          <svg width="16" height="16" viewBox="0 0 209 209" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clipPath="url(#clip0_995_232)">
+              <path d="M94.6289 208.789H114.355C121.875 208.789 127.734 204.199 129.395 196.973L133.594 178.711L136.719 177.637L152.637 187.402C158.984 191.309 166.309 190.43 171.68 185.059L185.352 171.484C190.723 166.113 191.602 158.691 187.695 152.441L177.734 136.621L178.906 133.691L197.168 129.395C204.297 127.734 208.984 121.777 208.984 114.355V95.0195C208.984 87.5977 204.395 81.7383 197.168 79.9805L179.102 75.5859L177.832 72.4609L187.793 56.6406C191.699 50.3906 190.918 43.0664 185.449 37.5977L171.777 23.9258C166.504 18.6523 159.18 17.6758 152.832 21.582L136.914 31.3477L133.594 30.0781L129.395 11.8164C127.734 4.58984 121.875 0 114.355 0H94.6289C87.1094 0 81.25 4.58984 79.5898 11.8164L75.293 30.0781L71.9727 31.3477L56.1523 21.582C49.8047 17.6758 42.3828 18.6523 37.1094 23.9258L23.5352 37.5977C18.0664 43.0664 17.1875 50.3906 21.1914 56.6406L31.0547 72.4609L29.8828 75.5859L11.8164 79.9805C4.58984 81.7383 0 87.5977 0 95.0195V114.355C0 121.777 4.6875 127.734 11.8164 129.395L30.0781 133.691L31.1523 136.621L21.2891 152.441C17.2852 158.691 18.2617 166.113 23.6328 171.484L37.207 185.059C42.5781 190.43 50 191.309 56.3477 187.402L72.168 177.637L75.293 178.711L79.5898 196.973C81.25 204.199 87.1094 208.789 94.6289 208.789ZM96.1914 193.555C94.5312 193.555 93.6523 192.871 93.3594 191.309L87.5 167.09C81.543 165.625 75.9766 163.281 71.7773 160.645L50.4883 173.73C49.3164 174.609 47.9492 174.512 46.875 173.242L35.3516 161.719C34.2773 160.645 34.1797 159.473 34.9609 158.105L48.0469 137.012C45.8008 132.91 43.2617 127.344 41.6992 121.387L17.4805 115.625C15.918 115.332 15.2344 114.453 15.2344 112.793V96.4844C15.2344 94.7266 15.8203 93.9453 17.4805 93.6523L41.6016 87.793C43.1641 81.4453 46.0938 75.6836 47.8516 72.0703L34.8633 50.9766C33.9844 49.5117 34.082 48.3398 35.1562 47.168L46.7773 35.8398C47.9492 34.668 49.0234 34.5703 50.4883 35.3516L71.582 48.1445C75.7812 45.8008 81.7383 43.3594 87.5977 41.6992L93.3594 17.4805C93.6523 15.918 94.5312 15.2344 96.1914 15.2344H112.793C114.453 15.2344 115.332 15.918 115.527 17.4805L121.484 41.8945C127.539 43.457 132.812 45.8984 137.207 48.2422L158.398 35.3516C159.961 34.5703 160.938 34.668 162.207 35.8398L173.73 47.168C174.902 48.3398 174.902 49.5117 174.023 50.9766L161.035 72.0703C162.891 75.6836 165.723 81.4453 167.285 87.793L191.504 93.6523C193.066 93.9453 193.75 94.7266 193.75 96.4844V112.793C193.75 114.453 192.969 115.332 191.504 115.625L167.188 121.387C165.625 127.344 163.184 132.91 160.84 137.012L173.926 158.105C174.707 159.473 174.707 160.645 173.535 161.719L162.109 173.242C160.938 174.512 159.668 174.609 158.398 173.73L137.109 160.645C132.91 163.281 127.441 165.625 121.484 167.09L115.527 191.309C115.332 192.871 114.453 193.555 112.793 193.555H96.1914ZM104.492 141.602C125.098 141.602 141.699 125 141.699 104.395C141.699 83.7891 125.098 67.1875 104.492 67.1875C83.8867 67.1875 67.2852 83.7891 67.2852 104.395C67.2852 125 83.8867 141.602 104.492 141.602ZM104.492 126.465C92.2852 126.465 82.4219 116.602 82.4219 104.395C82.4219 92.1875 92.2852 82.3242 104.492 82.3242C116.699 82.3242 126.562 92.1875 126.562 104.395C126.562 116.602 116.699 126.465 104.492 126.465Z" fill="currentColor" fillOpacity="0.85"/>
+            </g>
+            <defs>
+              <clipPath id="clip0_995_232">
+                <rect width="208.984" height="208.887" fill="white"/>
+              </clipPath>
+            </defs>
+          </svg>
         </button>
 
         {/* Settings Modal */}
