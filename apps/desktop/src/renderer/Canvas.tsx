@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { MeshGradient } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
 import ForkSessionModal from './ForkSessionModal';
+import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import { forkStore, nodeStore } from './stores';
 import {
@@ -83,6 +84,9 @@ function CanvasFlow() {
   // GitHub username state
   const [githubUsername, setGithubUsername] = useState<string | null>(null);
   const [githubError, setGithubError] = useState<string | null>(null);
+
+  // Linear issue details modal state
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
   // Canvas persistence hook - centralized save/restore logic
   const {
@@ -1551,6 +1555,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
                           className="sidebar-issue-card"
                           draggable
                           onDragStart={(e) => canvasDrop.handleIssueDragStart(e, issue)}
+                          onClick={() => setSelectedIssueId(issue.id)}
                         >
                           <div className="sidebar-issue-header">
                             <span className="sidebar-issue-identifier">{issue.identifier}</span>
@@ -2063,6 +2068,14 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         )}
 
         <ActionPill />
+
+        {/* Linear Issue Details Modal */}
+        {selectedIssueId && (
+          <IssueDetailsModal
+            issueId={selectedIssueId}
+            onClose={() => setSelectedIssueId(null)}
+          />
+        )}
       </div>
     </div>
   );
