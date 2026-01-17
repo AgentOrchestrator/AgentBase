@@ -35,6 +35,18 @@
   cursor: text;
 }
 
+/* Forehead - covers everything above the top sticky user message */
+.agent-chat-view-forehead {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--color-bg-primary);
+  z-index: 6;
+  pointer-events: none;
+}
+
 /* Scrollbar styling - always visible */
 .conversation-content::-webkit-scrollbar {
   width: 8px;
@@ -83,8 +95,6 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  /* Add subtle shadow when sticky to indicate it's floating */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   /* Smooth transition for transform changes */
   transition: transform 0.3s ease;
 }
@@ -368,6 +378,18 @@
   z-index: 10;
 }
 
+/* Chin - covers everything from 50% of input bar downwards */
+.agent-chat-view-chin {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: var(--color-bg-primary);
+  z-index: 0;
+  pointer-events: none;
+}
+
 .agent-chat-view-input-container {
   display: flex;
   align-items: center;
@@ -377,6 +399,8 @@
   padding: 4px 4px 4px 12px;
   background: var(--color-bg-primary);
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 11;
 }
 
 .agent-chat-view-input {

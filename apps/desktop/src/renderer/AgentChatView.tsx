@@ -63,11 +63,13 @@ export default function AgentChatView({
   } | null>(null);
   const [isCommandPressed, setIsCommandPressed] = useState(false);
   const [stickyUserMessageId, setStickyUserMessageId] = useState<string | null>(null);
+  const [stickyMessageTop, setStickyMessageTop] = useState<number>(0);
   const hasSentInitialPrompt = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
   const { getViewport } = useReactFlow();
 
   // Get agentService from context
@@ -293,6 +295,7 @@ export default function AgentChatView({
       const userMessages = Array.from(container.querySelectorAll('.conversation-user-message')) as HTMLElement[];
       if (userMessages.length === 0) {
         setStickyUserMessageId(null);
+        setStickyMessageTop(0);
         return;
       }
 
@@ -302,6 +305,8 @@ export default function AgentChatView({
       // Find the user message that is currently at the sticky position
       // Check from bottom to top to get the most recent one that's sticky
       let currentStickyId: string | null = null;
+      let stickyTop = 0;
+      let stickyMessage: HTMLElement | null = null;
 
       for (let i = userMessages.length - 1; i >= 0; i--) {
         const userMsg = userMessages[i];
@@ -311,11 +316,44 @@ export default function AgentChatView({
         // Check if this message is in the sticky zone (at or near the top)
         if (rect.top <= stickyThreshold && rect.bottom > stickyThreshold) {
           currentStickyId = messageId;
+          stickyMessage = userMsg;
           break;
         }
       }
 
+      // Calculate forehead height based on sticky message position
+      if (stickyMessage) {
+        const stickyRect = stickyMessage.getBoundingClientRect();
+        // The forehead is positioned absolutely at top: 0 of agent-chat-view
+        // When sticky, the message is visually at the top of the visible content area
+        // The conversation-content has padding-top: 40px, so sticky messages appear at ~40px from agent-chat-view top
+        // Calculate visual position relative to agent-chat-view (the parent container)
+        const agentChatView = container.closest('.agent-chat-view');
+        if (agentChatView) {
+          const agentRect = agentChatView.getBoundingClientRect();
+          const visualTop = stickyRect.top - agentRect.top;
+          // Extend to bottom of sticky message to ensure full coverage
+          stickyTop = visualTop + stickyRect.height;
+        } else {
+          // Fallback: use container-relative position
+          const visualTop = stickyRect.top - containerRect.top;
+          stickyTop = visualTop + stickyRect.height;
+        }
+      } else if (userMessages.length > 0) {
+        // Fallback: use first user message if none is sticky
+        const firstUserMsg = userMessages[0];
+        const firstRect = firstUserMsg.getBoundingClientRect();
+        const agentChatView = container.closest('.agent-chat-view');
+        if (agentChatView) {
+          const agentRect = agentChatView.getBoundingClientRect();
+          stickyTop = firstRect.top - agentRect.top + firstRect.height;
+        } else {
+          stickyTop = firstRect.top - containerRect.top + firstRect.height;
+        }
+      }
+
       setStickyUserMessageId(currentStickyId);
+      setStickyMessageTop(stickyTop);
     };
 
     // Initial check
@@ -521,6 +559,11 @@ export default function AgentChatView({
 
   return (
     <div className="agent-chat-view">
+      {/* Forehead - covers everything above the top sticky user message */}
+      {stickyUserMessageId && (
+        <div className="agent-chat-view-forehead" />
+      )}
+      
       {/* Messages */}
       <div 
         className={`conversation-content ${isCommandPressed ? 'command-pressed' : ''}`}
@@ -563,7 +606,9 @@ export default function AgentChatView({
       )}
 
       {/* Input */}
-      <div className="agent-chat-view-input-area">
+      <div className="agent-chat-view-input-area" ref={inputAreaRef}>
+        {/* Chin - covers everything from 50% of input bar downwards */}
+        <div className="agent-chat-view-chin" />
         <div className="agent-chat-view-input-container">
           <textarea
             ref={inputRef}
