@@ -1055,6 +1055,12 @@ function CanvasFlow() {
       action: () => canvasActions.addClaudeCodeTerminal(),
     },
     {
+      id: 'add-browser',
+      label: 'Add Browser',
+      shortcut: 'j',
+      action: () => canvasActions.addBrowserNode(),
+    },
+    {
       id: 'create-linear-ticket',
       label: 'Create Linear Ticket',
       shortcut: 'm',

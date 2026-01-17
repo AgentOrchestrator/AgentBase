@@ -29,6 +29,8 @@ export interface UseCanvasActionsReturn {
   addStarterNode: (position?: { x: number; y: number }) => void;
   /** Add a Claude Code terminal node (auto-starts claude command) */
   addClaudeCodeTerminal: (position?: { x: number; y: number }) => void;
+  /** Add a browser node to the canvas */
+  addBrowserNode: (position?: { x: number; y: number }) => void;
   /** Create an agent node with modal data (for programmatic creation) */
   createAgentWithData: (options: Omit<CreateAgentOptions, 'screenToFlowPosition'>) => void;
 }
@@ -192,11 +194,29 @@ export function useCanvasActions({
     [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
   );
 
+  /**
+   * Add a browser node
+   */
+  const addBrowserNode = useCallback(
+    (position?: { x: number; y: number }) => {
+      const newNode = canvasNodeService.createBrowserNode({
+        position,
+        contextMenuPosition: contextMenu,
+        screenToFlowPosition,
+      });
+
+      setNodes((nds) => [...nds, newNode]);
+      closeContextMenu();
+    },
+    [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
+  );
+
   return {
     addAgentNode,
     addTerminalNode,
     addStarterNode,
     addClaudeCodeTerminal,
+    addBrowserNode,
     createAgentWithData,
   };
 }

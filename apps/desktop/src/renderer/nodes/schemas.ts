@@ -156,6 +156,14 @@ export const AgentChatNodeDataSchema = z.object({
   isDraft: z.boolean(),
 });
 
+/**
+ * Schema for BrowserNode data
+ */
+export const BrowserNodeDataSchema = z.object({
+  browserId: z.string(),
+  url: z.string().optional(),
+});
+
 // =============================================================================
 // Inferred Types
 // =============================================================================
@@ -166,3 +174,4 @@ export type AgentNodeData = z.infer<typeof AgentNodeDataSchema>;
 export type MessageNodeData = z.infer<typeof MessageNodeDataSchema>;
 export type ConversationNodeData = z.infer<typeof ConversationNodeDataSchema>;
 export type AgentChatNodeData = z.infer<typeof AgentChatNodeDataSchema>;
+export type BrowserNodeData = z.infer<typeof BrowserNodeDataSchema>;
