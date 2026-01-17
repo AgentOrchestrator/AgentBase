@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './CommandPalette.css';
 
 export interface CommandAction {
@@ -28,7 +28,7 @@ export function CommandPalette({ isOpen, onClose, commands }: CommandPaletteProp
   // Reset selection when commands change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [searchQuery, commands]);
+  }, []);
 
   // Focus input when palette opens
   useEffect(() => {
@@ -104,7 +104,11 @@ export function CommandPalette({ isOpen, onClose, commands }: CommandPaletteProp
 
   return (
     <div className="command-palette-overlay" onClick={onClose}>
-      <div className="command-palette-container" ref={containerRef} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="command-palette-container"
+        ref={containerRef}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="command-palette-input-wrapper">
           <input
             ref={inputRef}

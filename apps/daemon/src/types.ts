@@ -4,24 +4,24 @@
  */
 export type {
   AgentType,
-  ChatMessage,
   ChatHistory,
-  SessionMetadata,
-  ProjectInfo,
-  LoaderOptions,
+  ChatMessage,
   IChatHistoryLoader,
-  IIncrementalLoader,
   IDatabaseLoader,
+  IIncrementalLoader,
   ILoaderRegistry,
+  LoaderOptions,
+  ProjectInfo,
+  SessionMetadata,
 } from '@agent-orchestrator/shared';
 
 export {
-  normalizeTimestamp,
+  createLoaderRegistry,
   extractProjectNameFromPath,
+  fileExists,
   generateDeterministicUUID,
   getHomeDir,
-  fileExists,
   IDE_DATA_PATHS,
   LoaderRegistry,
-  createLoaderRegistry,
+  normalizeTimestamp,
 } from '@agent-orchestrator/shared';

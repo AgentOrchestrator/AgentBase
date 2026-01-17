@@ -1,17 +1,16 @@
 // Types
-export * from './types';
 
-// Interfaces
-export * from './interfaces';
-
-// Implementations
-export { RepresentationService } from './implementations/RepresentationService';
 export type {
+  IIdGenerator,
+  ILogger,
   RepresentationServiceConfig,
   RepresentationServiceDependencies,
-  ILogger,
-  IIdGenerator,
 } from './implementations/RepresentationService';
+// Implementations
+export { RepresentationService } from './implementations/RepresentationService';
+// Interfaces
+export * from './interfaces';
+export * from './types';
 
 // Utilities
 export * from './utils/capability-checker';

@@ -9,28 +9,28 @@ import type { StreamingChunk as _StreamingChunk } from '@agent-orchestrator/shar
 
 // Re-export rich message types from shared package
 export type {
-  MessageType,
-  ToolCategory,
-  ToolInfo,
-  ThinkingInfo,
-  McpInfo,
-  ErrorInfo,
   AgentContentBlock,
+  AgentRedactedThinkingBlock,
+  AgentServerToolUseBlock,
   AgentTextBlock,
   AgentThinkingBlock,
-  AgentRedactedThinkingBlock,
   AgentToolUseBlock,
-  AgentServerToolUseBlock,
+  AgentWebSearchResultBlock,
   AgentWebSearchToolResultBlock,
   AgentWebSearchToolResultContent,
-  AgentWebSearchResultBlock,
   AgentWebSearchToolResultError,
   AgentWebSearchToolResultErrorCode,
   CodingAgentMessage,
+  ErrorInfo,
+  McpInfo,
+  MessageType,
+  StreamingBlockType,
   // Streaming types
   StreamingChunk,
   StreamingContentBlock,
-  StreamingBlockType,
+  ThinkingInfo,
+  ToolCategory,
+  ToolInfo,
 } from '@agent-orchestrator/shared';
 
 /**

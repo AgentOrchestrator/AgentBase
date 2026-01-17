@@ -5,10 +5,10 @@
  * Extracts fork modal logic from Canvas.tsx for better separation of concerns.
  */
 
-import { useState, useCallback } from 'react';
-import type { Node, Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
+import { useCallback, useState } from 'react';
 import { forkService } from '../services';
-import { createDefaultAgentTitle, type AgentNodeData } from '../types/agent-node';
+import { type AgentNodeData, createDefaultAgentTitle } from '../types/agent-node';
 import { getOptimalHandles } from '../utils/edgeHandles';
 
 // =============================================================================
@@ -109,7 +109,13 @@ export interface UseForkModalReturn {
    * @param createWorktree - Whether to create a worktree (default: true)
    * @param selectedText - Optional selected text to populate in new node's input
    */
-  open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree?: boolean, selectedText?: string) => Promise<void>;
+  open: (
+    sourceNodeId: string,
+    position: { x: number; y: number },
+    targetMessageId?: string,
+    createWorktree?: boolean,
+    selectedText?: string
+  ) => Promise<void>;
   /**
    * Confirm the fork operation with data from NewAgentModal
    * @param data - Fork confirmation data from the modal
@@ -154,7 +160,7 @@ export interface UseForkModalInput {
 function truncateContent(content: string, maxLength: number = 100): string {
   const trimmed = content.trim().replace(/\s+/g, ' ');
   if (trimmed.length <= maxLength) return trimmed;
-  return trimmed.slice(0, maxLength - 3) + '...';
+  return `${trimmed.slice(0, maxLength - 3)}...`;
 }
 
 /**
@@ -191,7 +197,13 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
    * Open the fork modal for a source node
    */
   const open = useCallback(
-    async (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree: boolean = true, selectedText?: string) => {
+    async (
+      sourceNodeId: string,
+      position: { x: number; y: number },
+      targetMessageId?: string,
+      createWorktree: boolean = true,
+      selectedText?: string
+    ) => {
       // Find the source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) {
@@ -286,7 +298,13 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
       branchName?: string;
       worktreePath?: string;
     }): Promise<ForkConfirmResult | ForkConfirmError> => {
-      const { title: forkTitle, workspacePath: customWorkspacePath, createWorktree, branchName, worktreePath } = data;
+      const {
+        title: forkTitle,
+        workspacePath: customWorkspacePath,
+        createWorktree,
+        branchName,
+        worktreePath,
+      } = data;
 
       if (!modalData) {
         return { success: false, error: 'No fork operation in progress' };
@@ -320,9 +338,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         // Build filterOptions using cutoffMessageId (user's selected cutoff point)
         // Falls back to original targetMessageId if cutoff wasn't changed
         const effectiveCutoff = cutoffMessageId || modalData.targetMessageId;
-        const filterOptions = effectiveCutoff
-          ? { targetMessageId: effectiveCutoff }
-          : undefined;
+        const filterOptions = effectiveCutoff ? { targetMessageId: effectiveCutoff } : undefined;
 
         console.log('[useForkModal] Fork with filter:', {
           cutoffMessageId,
@@ -421,8 +437,8 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           targetHandle: optimalHandles.targetHandle,
           type: 'default',
           animated: false,
-          style: { 
-            stroke: '#4a5568', 
+          style: {
+            stroke: '#4a5568',
             strokeWidth: 2,
             // No strokeDasharray = solid line
           },

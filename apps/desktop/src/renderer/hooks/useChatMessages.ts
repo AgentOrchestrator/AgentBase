@@ -7,17 +7,17 @@
  * - Handles message sending with streaming support
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
-  CodingAgentMessage,
-  CodingAgentType,
-  StreamingChunk,
-  StreamingContentBlock,
   AgentContentBlock,
   AgentTextBlock,
   AgentThinkingBlock,
   AgentToolUseBlock,
+  CodingAgentMessage,
+  CodingAgentType,
+  StreamingChunk,
+  StreamingContentBlock,
 } from '@agent-orchestrator/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IAgentService } from '../context/node-services';
 import { useSessionFileWatcher } from './useSessionFileWatcher';
 
@@ -209,155 +209,158 @@ export function useChatMessages({
   });
 
   // Send a message and stream the response with structured content blocks
-  const sendMessage = useCallback(async (prompt: string) => {
-    if (!sessionId || !workspacePath) {
-      onError?.('Session ID and workspace path are required');
-      return;
-    }
+  const sendMessage = useCallback(
+    async (prompt: string) => {
+      if (!sessionId || !workspacePath) {
+        onError?.('Session ID and workspace path are required');
+        return;
+      }
 
-    setIsStreaming(true);
+      setIsStreaming(true);
 
-    // Add user message
-    const userMessage: CodingAgentMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: prompt,
-      timestamp: new Date().toISOString(),
-      messageType: 'user',
-    };
-    const withUserMessage = [...messagesRef.current, userMessage];
-    messagesRef.current = withUserMessage;
-    setMessages(withUserMessage);
-
-    // Create placeholder assistant message
-    const assistantMessage: CodingAgentMessage = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '',
-      contentBlocks: [],
-      timestamp: new Date().toISOString(),
-      messageType: 'assistant',
-    };
-    const withAssistantMessage = [...messagesRef.current, assistantMessage];
-    messagesRef.current = withAssistantMessage;
-    setMessages(withAssistantMessage);
-
-    // Track streaming content blocks by index
-    const streamingBlocks = new Map<number, StreamingContentBlock>();
-
-    // Helper to update assistant message with current state
-    const updateAssistantMessage = () => {
-      const contentBlocks = convertStreamingToContentBlocks(streamingBlocks);
-      // Build plain text content from text blocks for backward compatibility
-      const textContent = contentBlocks
-        .filter((b): b is AgentTextBlock => b.type === 'text')
-        .map((b) => b.text)
-        .join('\n');
-
-      const updatedMessages = [
-        ...messagesRef.current.slice(0, -1),
-        { ...assistantMessage, content: textContent, contentBlocks },
-      ];
-      messagesRef.current = updatedMessages;
-      setMessages(updatedMessages);
-    };
-
-    try {
-      const handleStructuredChunk = (chunk: StreamingChunk) => {
-        if (chunk.type === 'block_start' && chunk.blockType && chunk.block) {
-          // Initialize new block
-          streamingBlocks.set(chunk.index, {
-            index: chunk.index,
-            type: chunk.blockType,
-            id: chunk.block.id,
-            name: chunk.block.name,
-            text: chunk.blockType === 'text' ? '' : undefined,
-            thinking: chunk.blockType === 'thinking' ? '' : undefined,
-            input: chunk.blockType === 'tool_use' ? '' : undefined,
-            isComplete: false,
-          });
-          updateAssistantMessage();
-        } else if (chunk.type === 'block_delta' && chunk.delta) {
-          const block = streamingBlocks.get(chunk.index);
-          if (block) {
-            // Append delta content to appropriate field
-            if (chunk.delta.text !== undefined) {
-              block.text = (block.text || '') + chunk.delta.text;
-            }
-            if (chunk.delta.thinking !== undefined) {
-              block.thinking = (block.thinking || '') + chunk.delta.thinking;
-            }
-            if (chunk.delta.inputJson !== undefined) {
-              block.input = (block.input || '') + chunk.delta.inputJson;
-            }
-            updateAssistantMessage();
-          }
-        } else if (chunk.type === 'block_stop') {
-          const block = streamingBlocks.get(chunk.index);
-          if (block) {
-            block.isComplete = true;
-            updateAssistantMessage();
-          }
-        }
+      // Add user message
+      const userMessage: CodingAgentMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: prompt,
+        timestamp: new Date().toISOString(),
+        messageType: 'user',
       };
+      const withUserMessage = [...messagesRef.current, userMessage];
+      messagesRef.current = withUserMessage;
+      setMessages(withUserMessage);
 
-      // Use structured streaming API
-      const result = await agentService.sendMessageStreamingStructured(
-        prompt,
-        workspacePath,
-        sessionId,
-        handleStructuredChunk
-      );
+      // Create placeholder assistant message
+      const assistantMessage: CodingAgentMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '',
+        contentBlocks: [],
+        timestamp: new Date().toISOString(),
+        messageType: 'assistant',
+      };
+      const withAssistantMessage = [...messagesRef.current, assistantMessage];
+      messagesRef.current = withAssistantMessage;
+      setMessages(withAssistantMessage);
 
-      // Notify caller of session (useful for first message)
-      onSessionCreated?.(sessionId);
+      // Track streaming content blocks by index
+      const streamingBlocks = new Map<number, StreamingContentBlock>();
 
-      // Final update with complete content from result
-      const finalContentBlocks = convertStreamingToContentBlocks(streamingBlocks);
-      const finalTextContent = finalContentBlocks
-        .filter((b): b is AgentTextBlock => b.type === 'text')
-        .map((b) => b.text)
-        .join('\n');
-
-      const finalMessages = [
-        ...messagesRef.current.slice(0, -1),
-        {
-          ...assistantMessage,
-          content: result?.content || finalTextContent,
-          contentBlocks: finalContentBlocks,
-        },
-      ];
-      messagesRef.current = finalMessages;
-      setMessages(finalMessages);
-    } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Failed to send message');
-      // Keep partial content on error if we have any blocks
-      if (streamingBlocks.size > 0) {
-        const partialBlocks = convertStreamingToContentBlocks(streamingBlocks);
-        const partialContent = partialBlocks
+      // Helper to update assistant message with current state
+      const updateAssistantMessage = () => {
+        const contentBlocks = convertStreamingToContentBlocks(streamingBlocks);
+        // Build plain text content from text blocks for backward compatibility
+        const textContent = contentBlocks
           .filter((b): b is AgentTextBlock => b.type === 'text')
           .map((b) => b.text)
           .join('\n');
-        const errorMessages = [
+
+        const updatedMessages = [
+          ...messagesRef.current.slice(0, -1),
+          { ...assistantMessage, content: textContent, contentBlocks },
+        ];
+        messagesRef.current = updatedMessages;
+        setMessages(updatedMessages);
+      };
+
+      try {
+        const handleStructuredChunk = (chunk: StreamingChunk) => {
+          if (chunk.type === 'block_start' && chunk.blockType && chunk.block) {
+            // Initialize new block
+            streamingBlocks.set(chunk.index, {
+              index: chunk.index,
+              type: chunk.blockType,
+              id: chunk.block.id,
+              name: chunk.block.name,
+              text: chunk.blockType === 'text' ? '' : undefined,
+              thinking: chunk.blockType === 'thinking' ? '' : undefined,
+              input: chunk.blockType === 'tool_use' ? '' : undefined,
+              isComplete: false,
+            });
+            updateAssistantMessage();
+          } else if (chunk.type === 'block_delta' && chunk.delta) {
+            const block = streamingBlocks.get(chunk.index);
+            if (block) {
+              // Append delta content to appropriate field
+              if (chunk.delta.text !== undefined) {
+                block.text = (block.text || '') + chunk.delta.text;
+              }
+              if (chunk.delta.thinking !== undefined) {
+                block.thinking = (block.thinking || '') + chunk.delta.thinking;
+              }
+              if (chunk.delta.inputJson !== undefined) {
+                block.input = (block.input || '') + chunk.delta.inputJson;
+              }
+              updateAssistantMessage();
+            }
+          } else if (chunk.type === 'block_stop') {
+            const block = streamingBlocks.get(chunk.index);
+            if (block) {
+              block.isComplete = true;
+              updateAssistantMessage();
+            }
+          }
+        };
+
+        // Use structured streaming API
+        const result = await agentService.sendMessageStreamingStructured(
+          prompt,
+          workspacePath,
+          sessionId,
+          handleStructuredChunk
+        );
+
+        // Notify caller of session (useful for first message)
+        onSessionCreated?.(sessionId);
+
+        // Final update with complete content from result
+        const finalContentBlocks = convertStreamingToContentBlocks(streamingBlocks);
+        const finalTextContent = finalContentBlocks
+          .filter((b): b is AgentTextBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('\n');
+
+        const finalMessages = [
           ...messagesRef.current.slice(0, -1),
           {
             ...assistantMessage,
-            content: partialContent || 'Error: Response incomplete',
-            contentBlocks: partialBlocks,
+            content: result?.content || finalTextContent,
+            contentBlocks: finalContentBlocks,
           },
         ];
-        messagesRef.current = errorMessages;
-        setMessages(errorMessages);
-      } else {
-        // Remove incomplete assistant message on error if no content
-        const rollbackMessages = messagesRef.current.slice(0, -1);
-        messagesRef.current = rollbackMessages;
-        setMessages(rollbackMessages);
+        messagesRef.current = finalMessages;
+        setMessages(finalMessages);
+      } catch (err) {
+        onError?.(err instanceof Error ? err.message : 'Failed to send message');
+        // Keep partial content on error if we have any blocks
+        if (streamingBlocks.size > 0) {
+          const partialBlocks = convertStreamingToContentBlocks(streamingBlocks);
+          const partialContent = partialBlocks
+            .filter((b): b is AgentTextBlock => b.type === 'text')
+            .map((b) => b.text)
+            .join('\n');
+          const errorMessages = [
+            ...messagesRef.current.slice(0, -1),
+            {
+              ...assistantMessage,
+              content: partialContent || 'Error: Response incomplete',
+              contentBlocks: partialBlocks,
+            },
+          ];
+          messagesRef.current = errorMessages;
+          setMessages(errorMessages);
+        } else {
+          // Remove incomplete assistant message on error if no content
+          const rollbackMessages = messagesRef.current.slice(0, -1);
+          messagesRef.current = rollbackMessages;
+          setMessages(rollbackMessages);
+        }
+      } finally {
+        setIsStreaming(false);
       }
-    } finally {
-      setIsStreaming(false);
-    }
-  }, [agentService, sessionId, workspacePath, onSessionCreated, onError]);
+    },
+    [agentService, sessionId, workspacePath, onSessionCreated, onError]
+  );
 
   return {
     messages,

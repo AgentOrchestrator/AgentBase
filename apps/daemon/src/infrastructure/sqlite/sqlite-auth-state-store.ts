@@ -5,12 +5,12 @@
  * a vendor-agnostic interface for local auth state persistence.
  */
 
+import type { AppDatabase } from '../../database.js';
 import type {
+  DeviceIdentity,
   IAuthStateStore,
   PersistedAuthState,
-  DeviceIdentity,
 } from '../../interfaces/auth-state-store.js';
-import type { AppDatabase } from '../../database.js';
 
 export class SQLiteAuthStateStore implements IAuthStateStore {
   constructor(private db: AppDatabase) {}
@@ -62,11 +62,7 @@ export class SQLiteAuthStateStore implements IAuthStateStore {
     });
   }
 
-  updateTokens(tokens: {
-    accessToken: string;
-    refreshToken: string;
-    expiresAt: number;
-  }): void {
+  updateTokens(tokens: { accessToken: string; refreshToken: string; expiresAt: number }): void {
     this.db.updateAuth({
       access_token: tokens.accessToken,
       refresh_token: tokens.refreshToken,

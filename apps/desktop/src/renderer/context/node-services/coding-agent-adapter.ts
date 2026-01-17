@@ -6,13 +6,13 @@
  * capabilities with Result types for explicit error handling.
  */
 
-import type { AgentType } from '../../../../types/coding-agent-status';
 import type {
   MessageFilterOptions as SharedMessageFilterOptions,
-  StreamingChunk,
   StreamingBlockType,
+  StreamingChunk,
   StreamingContentBlock,
 } from '@agent-orchestrator/shared';
+import type { AgentType } from '../../../../types/coding-agent-status';
 
 // ============================================
 // Result Type (matches main-side contract)
@@ -44,9 +44,7 @@ export interface AgentError {
 /**
  * Result type for explicit error handling
  */
-export type Result<T, E> =
-  | { success: true; data: T }
-  | { success: false; error: E };
+export type Result<T, E> = { success: true; data: T } | { success: false; error: E };
 
 /**
  * Helper to create success result
@@ -273,8 +271,18 @@ export interface StatusPayload {
  * Discriminated union of all adapter events
  */
 export type AgentAdapterEvent =
-  | { type: 'permission:request'; payload: PermissionRequestPayload; agentId?: string; sessionId?: string }
-  | { type: 'permission:response'; payload: PermissionResponsePayload; agentId?: string; sessionId?: string }
+  | {
+      type: 'permission:request';
+      payload: PermissionRequestPayload;
+      agentId?: string;
+      sessionId?: string;
+    }
+  | {
+      type: 'permission:response';
+      payload: PermissionResponsePayload;
+      agentId?: string;
+      sessionId?: string;
+    }
   | { type: 'session:start'; payload: SessionPayload; agentId?: string }
   | { type: 'session:end'; payload: SessionPayload; agentId?: string }
   | { type: 'status:change'; payload: StatusPayload; agentId?: string; sessionId?: string };
@@ -414,9 +422,7 @@ export interface ICodingAgentAdapter {
   /**
    * Get the latest session for a workspace
    */
-  getLatestSession?(
-    workspacePath: string
-  ): Promise<Result<SessionInfo | null, AgentError>>;
+  getLatestSession?(workspacePath: string): Promise<Result<SessionInfo | null, AgentError>>;
 
   // ============================================
   // CLI REPL Session Commands
@@ -455,8 +461,5 @@ export interface ICodingAgentAdapter {
    * Subscribe to typed events
    * @returns Unsubscribe function
    */
-  onEvent<T extends AgentAdapterEventType>(
-    type: T,
-    handler: AgentEventHandler<T>
-  ): () => void;
+  onEvent<T extends AgentAdapterEventType>(type: T, handler: AgentEventHandler<T>): () => void;
 }

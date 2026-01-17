@@ -21,16 +21,16 @@
 
 /* Hide React Flow's default selection border/outline */
 .react-flow__node-browser.selected {
-  outline: none !important;
+  outline: none;
 }
 
 /* Show resize handles only when selected */
 .react-flow__node-browser.selected .react-flow__resize-control {
-  display: block !important;
+  display: block;
 }
 
 .react-flow__node-browser:not(.selected) .react-flow__resize-control {
-  display: none !important;
+  display: none;
 }
 
 /* Browser Header */
@@ -93,7 +93,7 @@
   padding: 6px 12px;
   color: var(--color-text-primary);
   font-size: 13px;
-  font-family: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
   outline: none;
   transition: all 0.15s ease;
 }

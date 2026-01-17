@@ -5,7 +5,7 @@
  * These types are database-agnostic and can be used across the monorepo.
  */
 
-import type { ChatMessage, AgentType } from '../loaders/types.js';
+import type { AgentType, ChatMessage } from '../loaders/types.js';
 
 // ============================================================================
 // Domain Types

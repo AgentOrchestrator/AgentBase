@@ -5,8 +5,8 @@
  * Only works for git-initialized directories - throws otherwise.
  */
 
-import { spawn } from 'child_process';
-import * as fs from 'fs';
+import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
 import type { GitInfo } from '@agent-orchestrator/shared';
 
 /**

@@ -3,10 +3,10 @@ import type { CodingAgentMessage } from './message.types';
 
 // Re-export types from shared (source of truth)
 export type {
-  MessageFilterOptions,
-  SessionFilterOptions,
-  SessionChange,
   ForkOptions,
+  MessageFilterOptions,
+  SessionChange,
+  SessionFilterOptions,
 } from '@agent-orchestrator/shared';
 
 /**

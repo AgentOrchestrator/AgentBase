@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AgentAction,
   AgentActionResponse,
   ClarifyingQuestionAction,
   ToolApprovalAction,
 } from '@agent-orchestrator/shared';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { agentActionStore } from '../stores';
 import './ActionPill.css';
 
 const DEFAULT_LABEL = 'Actions pending';
 
 export function ActionPill() {
-  const [actions, setActions] = useState<AgentAction[]>(() =>
-    agentActionStore.getAllActions()
-  );
+  const [actions, setActions] = useState<AgentAction[]>(() => agentActionStore.getAllActions());
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSquare, setIsSquare] = useState(false);
   const [showContent, setShowContent] = useState(false);
@@ -82,11 +80,7 @@ export function ActionPill() {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't interfere if user is typing in an input/textarea
       const target = event.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
@@ -127,7 +121,7 @@ export function ActionPill() {
 
   const submitAction = useCallback(async (response: AgentActionResponse) => {
     const isDummyAction = response.actionId.startsWith('dummy-action-');
-    
+
     setSubmittingActions((prev) => new Set(prev).add(response.actionId));
     try {
       // For dummy actions, just remove them from the store
@@ -139,7 +133,7 @@ export function ActionPill() {
       } else {
         return;
       }
-      
+
       setActionAnswers((prev) => {
         if (!prev[response.actionId]) {
           return prev;
@@ -194,11 +188,7 @@ export function ActionPill() {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't interfere if user is typing in an input/textarea
       const target = event.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
@@ -213,7 +203,11 @@ export function ActionPill() {
       }
 
       // Delete/Backspace to deny topmost tool approval action
-      if ((event.key === 'Delete' || event.key === 'Backspace') && isExpanded && sortedActions.length > 0) {
+      if (
+        (event.key === 'Delete' || event.key === 'Backspace') &&
+        isExpanded &&
+        sortedActions.length > 0
+      ) {
         const topAction = sortedActions[0];
         if (topAction.type === 'tool_approval' && !submittingActions.has(topAction.id)) {
           event.preventDefault();
@@ -232,7 +226,7 @@ export function ActionPill() {
   const label = hasActions
     ? sortedActions.length === 1
       ? '1 action pending'
-    : `${sortedActions.length} actions pending`
+      : `${sortedActions.length} actions pending`
     : "You're all clear";
 
   // Get the topmost action (first in sorted list)
@@ -247,9 +241,7 @@ export function ActionPill() {
         })
       );
     } else {
-      window.dispatchEvent(
-        new CustomEvent('action-pill:unhighlight-agent', {})
-      );
+      window.dispatchEvent(new CustomEvent('action-pill:unhighlight-agent', {}));
     }
   }, [isExpanded, topmostAction?.agentId]);
 
@@ -284,16 +276,19 @@ export function ActionPill() {
               const agentLabel = action.agentId
                 ? action.agentId
                 : action.agentType
-                ? action.agentType
-                : 'Unknown agent';
-              
+                  ? action.agentType
+                  : 'Unknown agent';
+
               // Highlight the topmost action (index 0)
               const isTopmost = index === 0 && isExpanded;
 
               if (action.type === 'clarifying_question') {
                 const questionAction = action as ClarifyingQuestionAction;
                 return (
-                  <div key={action.id} className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}>
+                  <div
+                    key={action.id}
+                    className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}
+                  >
                     <div className="action-pill-agent-label">{agentLabel}</div>
                     <div className="action-pill-card-body">
                       {questionAction.questions.map((question) => (
@@ -328,8 +323,8 @@ export function ActionPill() {
 
               const approvalAction = action as ToolApprovalAction;
               return (
-                <div 
-                  key={action.id} 
+                <div
+                  key={action.id}
                   className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}
                 >
                   <div className="action-pill-agent-label">{agentLabel}</div>

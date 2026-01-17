@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { NodeProps, NodeResizer } from '@xyflow/react';
+import { type NodeProps, NodeResizer } from '@xyflow/react';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './BrowserNode.css';
 
 interface BrowserNodeData {
@@ -24,25 +25,31 @@ function BrowserNode({ data, selected }: NodeProps) {
   }, []);
 
   // Handle URL submission
-  const handleUrlSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const normalizedUrl = normalizeUrl(inputUrl);
-    console.log('[BrowserNode] URL submit:', { inputUrl, normalizedUrl });
-    if (normalizedUrl) {
-      // Just set the URL - the webview will be mounted/updated by React
-      setCurrentUrl(normalizedUrl);
-      setInputUrl(normalizedUrl);
-    }
-  }, [inputUrl, normalizeUrl]);
+  const handleUrlSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const normalizedUrl = normalizeUrl(inputUrl);
+      console.log('[BrowserNode] URL submit:', { inputUrl, normalizedUrl });
+      if (normalizedUrl) {
+        // Just set the URL - the webview will be mounted/updated by React
+        setCurrentUrl(normalizedUrl);
+        setInputUrl(normalizedUrl);
+      }
+    },
+    [inputUrl, normalizeUrl]
+  );
 
   // Handle keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') {
-      // Reset input to current URL
-      setInputUrl(currentUrl);
-      inputRef.current?.blur();
-    }
-  }, [currentUrl]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Escape') {
+        // Reset input to current URL
+        setInputUrl(currentUrl);
+        inputRef.current?.blur();
+      }
+    },
+    [currentUrl]
+  );
 
   // Navigation handlers
   const handleBack = useCallback(() => {
@@ -66,7 +73,12 @@ function BrowserNode({ data, selected }: NodeProps) {
   // Setup webview event listeners - runs when currentUrl changes (webview mounts/unmounts)
   useEffect(() => {
     const webview = webviewRef.current;
-    console.log('[BrowserNode] Setting up webview listeners, webview exists:', !!webview, 'currentUrl:', currentUrl);
+    console.log(
+      '[BrowserNode] Setting up webview listeners, webview exists:',
+      !!webview,
+      'currentUrl:',
+      currentUrl
+    );
     if (!webview) return;
 
     const handleDomReady = () => {
@@ -116,7 +128,12 @@ function BrowserNode({ data, selected }: NodeProps) {
 
     const handleDidFailLoad = (e: Electron.DidFailLoadEvent) => {
       setIsLoading(false);
-      console.error('[BrowserNode] Failed to load:', e.errorCode, e.errorDescription, e.validatedURL);
+      console.error(
+        '[BrowserNode] Failed to load:',
+        e.errorCode,
+        e.errorDescription,
+        e.validatedURL
+      );
     };
 
     const handleConsoleMessage = (e: Electron.ConsoleMessageEvent) => {
@@ -200,11 +217,7 @@ function BrowserNode({ data, selected }: NodeProps) {
           >
             →
           </button>
-          <button
-            className="browser-nav-button"
-            onClick={handleReload}
-            title="Reload"
-          >
+          <button className="browser-nav-button" onClick={handleReload} title="Reload">
             {isLoading ? '×' : '↻'}
           </button>
         </div>

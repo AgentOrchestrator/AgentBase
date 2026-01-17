@@ -1,30 +1,27 @@
-import type { CodingAgentType, AgentCapabilities } from './agent.types';
+import type { AgentActionResponse, AgentEvent } from '@agent-orchestrator/shared';
+import type { AgentCapabilities, CodingAgentType } from './agent.types';
 import type {
   GenerateRequest,
   GenerateResponse,
   StreamCallback,
-  StructuredStreamCallback,
   StreamingChunk,
+  StructuredStreamCallback,
 } from './message.types';
+import type { AgentError, Result } from './result.types';
 import type {
+  CodingAgentSessionContent,
+  ContinueOptions,
+  ForkOptions,
+  MessageFilterOptions,
+  SessionFilterOptions,
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
-  CodingAgentSessionContent,
-  SessionFilterOptions,
-  MessageFilterOptions,
-  ContinueOptions,
-  ForkOptions,
 } from './session.types';
-import type { Result, AgentError } from './result.types';
-import type { AgentEvent, AgentActionResponse } from '@agent-orchestrator/shared';
 
 export interface CodingAgentAPI {
   /** Generate a one-off response */
-  generate: (
-    agentType: CodingAgentType,
-    request: GenerateRequest
-  ) => Promise<GenerateResponse>;
+  generate: (agentType: CodingAgentType, request: GenerateRequest) => Promise<GenerateResponse>;
 
   /** Generate a response with streaming */
   generateStreaming: (
@@ -99,9 +96,7 @@ export interface CodingAgentAPI {
   ) => Promise<CodingAgentSessionContent | null>;
 
   /** Subscribe to stream chunks */
-  onStreamChunk: (
-    callback: (data: { requestId: string; chunk: string }) => void
-  ) => () => void;
+  onStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => () => void;
 
   /** Subscribe to structured stream chunks (content blocks) */
   onStreamChunkStructured: (

@@ -41,7 +41,7 @@ export function mergeProjects(
       vscodeSessionCount: 0,
       factorySessionCount: 0,
       codexSessionCount: 0,
-      lastActivity: project.lastActivity
+      lastActivity: project.lastActivity,
     });
   }
 
@@ -66,7 +66,7 @@ export function mergeProjects(
         vscodeSessionCount: 0,
         factorySessionCount: 0,
         codexSessionCount: 0,
-        lastActivity: project.lastActivity
+        lastActivity: project.lastActivity,
       });
     }
   }
@@ -98,7 +98,7 @@ export function mergeProjects(
         vscodeSessionCount: project.vscodeSessionCount || 0,
         factorySessionCount: 0,
         codexSessionCount: 0,
-        lastActivity: project.lastActivity
+        lastActivity: project.lastActivity,
       });
     }
   }
@@ -124,7 +124,7 @@ export function mergeProjects(
         vscodeSessionCount: 0,
         factorySessionCount: project.factorySessionCount || 0,
         codexSessionCount: 0,
-        lastActivity: project.lastActivity
+        lastActivity: project.lastActivity,
       });
     }
   }
@@ -150,7 +150,7 @@ export function mergeProjects(
         vscodeSessionCount: 0,
         factorySessionCount: 0,
         codexSessionCount: project.codexSessionCount || 0,
-        lastActivity: project.lastActivity
+        lastActivity: project.lastActivity,
       });
     }
   }

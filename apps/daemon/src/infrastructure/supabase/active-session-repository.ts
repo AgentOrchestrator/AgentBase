@@ -5,15 +5,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type {
-  IActiveSessionRepository,
   ActiveSession,
   ActiveSessionInput,
+  IActiveSessionRepository,
 } from '../../interfaces/repositories.js';
 
 export class SupabaseActiveSessionRepository implements IActiveSessionRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async getActiveSessions(userId: string): Promise<ActiveSession[]> {
@@ -29,7 +29,7 @@ export class SupabaseActiveSessionRepository implements IActiveSessionRepository
       return [];
     }
 
-    return (data || []).map(row => this.mapToActiveSession(row));
+    return (data || []).map((row) => this.mapToActiveSession(row));
   }
 
   async getActiveSessionsByEditor(userId: string, editorType: string): Promise<ActiveSession[]> {
@@ -46,7 +46,7 @@ export class SupabaseActiveSessionRepository implements IActiveSessionRepository
       return [];
     }
 
-    return (data || []).map(row => this.mapToActiveSession(row));
+    return (data || []).map((row) => this.mapToActiveSession(row));
   }
 
   async upsertActiveSession(
@@ -66,8 +66,8 @@ export class SupabaseActiveSessionRepository implements IActiveSessionRepository
             editor_type: input.editorType,
             project_id: input.projectId ?? null,
             workspace_path: input.workspacePath ?? null,
-            recent_files: input.recentFiles as any ?? null,
-            session_metadata: input.sessionMetadata as any ?? null,
+            recent_files: (input.recentFiles as any) ?? null,
+            session_metadata: (input.sessionMetadata as any) ?? null,
             is_active: true,
             last_activity_at: now,
             updated_at: now,
@@ -153,9 +153,7 @@ export class SupabaseActiveSessionRepository implements IActiveSessionRepository
       workspacePath: data.workspace_path,
       isActive: data.is_active ?? false,
       lastActivityAt: data.last_activity_at,
-      recentFiles: Array.isArray(data.recent_files)
-        ? (data.recent_files as string[])
-        : null,
+      recentFiles: Array.isArray(data.recent_files) ? (data.recent_files as string[]) : null,
       sessionMetadata: data.session_metadata as Record<string, unknown> | null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,

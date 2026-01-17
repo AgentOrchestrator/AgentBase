@@ -199,7 +199,7 @@ export class AuthManager {
       }
 
       // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
 
     console.log('✗ Authentication timeout');

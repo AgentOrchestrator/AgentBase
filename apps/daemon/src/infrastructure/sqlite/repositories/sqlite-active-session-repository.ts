@@ -4,9 +4,9 @@
 
 import type Database from 'better-sqlite3';
 import type {
-  IActiveSessionRepository,
   ActiveSession,
   ActiveSessionInput,
+  IActiveSessionRepository,
 } from '../../../interfaces/repositories.js';
 
 interface ActiveSessionRow {
@@ -26,7 +26,7 @@ interface ActiveSessionRow {
 export class SQLiteActiveSessionRepository implements IActiveSessionRepository {
   constructor(
     private db: Database.Database,
-    private userId: string
+    _userId: string
   ) {}
 
   async getActiveSessions(userId: string): Promise<ActiveSession[]> {
@@ -40,10 +40,7 @@ export class SQLiteActiveSessionRepository implements IActiveSessionRepository {
     return rows.map((row) => this.mapToActiveSession(row));
   }
 
-  async getActiveSessionsByEditor(
-    userId: string,
-    editorType: string
-  ): Promise<ActiveSession[]> {
+  async getActiveSessionsByEditor(userId: string, editorType: string): Promise<ActiveSession[]> {
     const stmt = this.db.prepare(`
       SELECT * FROM active_sessions
       WHERE user_id = ? AND editor_type = ? AND is_active = 1

@@ -10,9 +10,9 @@
  * ```
  */
 
-import { ProviderRegistry } from './ProviderRegistry';
 import { ClaudeCodeAgent } from '../implementations';
 import type { CodingAgentType } from '../types';
+import { ProviderRegistry } from './ProviderRegistry';
 
 export interface RegistryOptions {
   /** Only register specific agent types */
@@ -31,9 +31,7 @@ export interface RegistryOptions {
  * @param options - Optional configuration
  * @returns Configured ProviderRegistry
  */
-export async function createDefaultRegistry(
-  options?: RegistryOptions
-): Promise<ProviderRegistry> {
+export async function createDefaultRegistry(options?: RegistryOptions): Promise<ProviderRegistry> {
   const registry = new ProviderRegistry();
   const skipErrors = options?.skipErrors ?? true;
   const agentFilter = options?.agents;

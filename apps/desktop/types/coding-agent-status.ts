@@ -10,21 +10,21 @@
 // =============================================================================
 
 export type {
+  AgentType,
+  CodingAgentState,
   CodingAgentStatus,
   CodingAgentStatusInfo,
-  CodingAgentState,
   TitleConfig,
   ToolType,
-  AgentType,
 } from '@agent-orchestrator/shared';
 
 // Import for use in local interfaces
 import type {
+  AgentType,
+  CodingAgentState,
   CodingAgentStatus,
   CodingAgentStatusInfo,
-  CodingAgentState,
   TitleConfig,
-  AgentType,
 } from '@agent-orchestrator/shared';
 
 // =============================================================================

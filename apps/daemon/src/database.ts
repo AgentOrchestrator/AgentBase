@@ -1,7 +1,7 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
 
 /**
  * Get the data directory path for the current platform
@@ -11,7 +11,6 @@ export function getAppDataPath(): string {
   // Use ~/.agent-orchestrator for all platforms
   return path.join(os.homedir(), '.agent-orchestrator');
 }
-
 
 interface AuthData {
   id: number;
@@ -31,19 +30,19 @@ interface DeviceData {
 
 export interface SyncStateData {
   id: number;
-  last_sync_completed_at: number;  // Timestamp of last successful sync
-  last_sync_started_at: number;    // Timestamp when current/last sync started
+  last_sync_completed_at: number; // Timestamp of last successful sync
+  last_sync_started_at: number; // Timestamp when current/last sync started
   sync_status: 'idle' | 'syncing' | 'error';
   error_message: string | null;
-  sessions_synced_count: number;   // Count from last sync
-  sessions_failed_count: number;   // Count from last sync
+  sessions_synced_count: number; // Count from last sync
+  sessions_failed_count: number; // Count from last sync
   updated_at: number;
 }
 
 export interface FailedSyncData {
   id: number;
   session_id: string;
-  session_source: string;  // 'claude_code' | 'cursor-composer' | 'cursor-copilot'
+  session_source: string; // 'claude_code' | 'cursor-composer' | 'cursor-copilot'
   error_message: string;
   retry_count: number;
   first_failed_at: number;
@@ -141,7 +140,9 @@ export class AppDatabase {
     `);
 
     // Initialize sync_state with a single row if it doesn't exist
-    const syncStateCount = this.db.prepare('SELECT COUNT(*) as count FROM sync_state').get() as { count: number };
+    const syncStateCount = this.db.prepare('SELECT COUNT(*) as count FROM sync_state').get() as {
+      count: number;
+    };
     if (syncStateCount.count === 0) {
       this.db.prepare('INSERT INTO sync_state DEFAULT VALUES').run();
     }
@@ -343,7 +344,10 @@ export class AppDatabase {
             user_id: authData.userId,
             expires_at: authData.expiresAt,
           });
-          console.log('[Database] Migrated auth data from file-based storage for user:', authData.userId);
+          console.log(
+            '[Database] Migrated auth data from file-based storage for user:',
+            authData.userId
+          );
           // Remove the old file after successful migration
           fs.unlinkSync(authPath);
           console.log('[Database] Removed legacy auth.json file');
@@ -406,24 +410,13 @@ export class AppDatabase {
       VALUES (?, ?, ?, ?, ?, ?)
     `);
     const now = Date.now();
-    stmt.run(
-      auth.access_token,
-      auth.refresh_token,
-      auth.user_id,
-      auth.expires_at,
-      now,
-      now
-    );
+    stmt.run(auth.access_token, auth.refresh_token, auth.user_id, auth.expires_at, now, now);
   }
 
   /**
    * Update the auth tokens (for token refresh)
    */
-  updateAuth(auth: {
-    access_token: string;
-    refresh_token: string;
-    expires_at: number;
-  }): void {
+  updateAuth(auth: { access_token: string; refresh_token: string; expires_at: number }): void {
     const stmt = this.db.prepare(`
       UPDATE auth
       SET access_token = ?,
@@ -432,12 +425,7 @@ export class AppDatabase {
           updated_at = ?
       WHERE id = (SELECT id FROM auth ORDER BY created_at DESC LIMIT 1)
     `);
-    stmt.run(
-      auth.access_token,
-      auth.refresh_token,
-      auth.expires_at,
-      Date.now()
-    );
+    stmt.run(auth.access_token, auth.refresh_token, auth.expires_at, Date.now());
   }
 
   /**
@@ -563,7 +551,7 @@ export class AppDatabase {
    * Clear old failed syncs (older than 7 days)
    */
   clearOldFailedSyncs(): void {
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const stmt = this.db.prepare(`
       DELETE FROM failed_syncs
       WHERE first_failed_at < ?

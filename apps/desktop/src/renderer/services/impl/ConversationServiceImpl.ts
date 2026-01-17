@@ -5,14 +5,14 @@
  * Manages session data loading with proper lifecycle.
  */
 
-import type {
-  IConversationService,
-  SessionFilter,
-  MessagesLoadedListener,
-  ErrorListener,
-} from '../../context/node-services';
-import type { CodingAgentAPI, CodingAgentType } from '../../../main/services/coding-agent';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+import type { CodingAgentAPI, CodingAgentType } from '../../../main/services/coding-agent';
+import type {
+  ErrorListener,
+  IConversationService,
+  MessagesLoadedListener,
+  SessionFilter,
+} from '../../context/node-services';
 
 /**
  * Conversation service implementation using codingAgentAPI
@@ -53,7 +53,8 @@ export class ConversationServiceImpl implements IConversationService {
     }
 
     // Get codingAgentAPI
-    const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI }).codingAgentAPI;
+    const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI })
+      .codingAgentAPI;
 
     if (!codingAgentAPI) {
       const error = 'Coding agent API not available';
@@ -76,9 +77,7 @@ export class ConversationServiceImpl implements IConversationService {
         // Filter to only text messages (skip tool calls)
         const textMessages = session.messages.filter(
           (m: CodingAgentMessage) =>
-            m.messageType === 'assistant' ||
-            m.messageType === 'user' ||
-            !m.messageType
+            m.messageType === 'assistant' || m.messageType === 'user' || !m.messageType
         );
         this._messages = textMessages;
         this.notifyMessagesLoaded(textMessages);

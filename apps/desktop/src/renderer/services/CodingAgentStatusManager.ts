@@ -160,8 +160,7 @@ export class CodingAgentStatusManager implements ICodingAgentStatusManager {
       return;
     }
 
-    const computedSummary =
-      await this.summaryComputer.computeSummary(messages);
+    const computedSummary = await this.summaryComputer.computeSummary(messages);
     state.summary = computedSummary;
     state.updatedAt = Date.now();
   }
@@ -185,9 +184,7 @@ export class CodingAgentStatusManager implements ICodingAgentStatusManager {
 
   registerAgent(agentId: string, agentType: AgentType): void {
     if (this.states.has(agentId)) {
-      console.warn(
-        `[CodingAgentStatusManager] Agent already registered: ${agentId}`
-      );
+      console.warn(`[CodingAgentStatusManager] Agent already registered: ${agentId}`);
       return;
     }
 
@@ -231,10 +228,7 @@ export class CodingAgentStatusManager implements ICodingAgentStatusManager {
       try {
         listener(agentId, oldStatus, newStatus);
       } catch (error) {
-        console.error(
-          `[CodingAgentStatusManager] Error in status change listener:`,
-          error
-        );
+        console.error(`[CodingAgentStatusManager] Error in status change listener:`, error);
       }
     }
   }
@@ -246,9 +240,7 @@ export class CodingAgentStatusManager implements ICodingAgentStatusManager {
   async persist(agentId: string): Promise<void> {
     const state = this.states.get(agentId);
     if (!state) {
-      console.warn(
-        `[CodingAgentStatusManager] Cannot persist unregistered agent: ${agentId}`
-      );
+      console.warn(`[CodingAgentStatusManager] Cannot persist unregistered agent: ${agentId}`);
       return;
     }
 

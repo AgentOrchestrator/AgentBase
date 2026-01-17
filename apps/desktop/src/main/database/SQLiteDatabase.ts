@@ -3,11 +3,11 @@
  * Stores canvas state in a local SQLite database
  */
 
-import sqlite3 from 'sqlite3';
-import { IDatabase } from './IDatabase';
-import { CanvasState, CanvasMetadata, CanvasNode, CanvasEdge } from '../types/database';
-import type { CodingAgentState } from '../../../types/coding-agent-status';
 import type { RecentWorkspace } from '@agent-orchestrator/shared';
+import sqlite3 from 'sqlite3';
+import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type { CanvasEdge, CanvasMetadata, CanvasNode, CanvasState } from '../types/database';
+import type { IDatabase } from './IDatabase';
 
 export class SQLiteDatabase implements IDatabase {
   private db: sqlite3.Database;
@@ -144,7 +144,7 @@ export class SQLiteDatabase implements IDatabase {
                 state.name || null,
                 state.viewport ? JSON.stringify(state.viewport) : null,
                 now,
-                canvasId
+                canvasId,
               ]
             );
           } else {
@@ -156,7 +156,7 @@ export class SQLiteDatabase implements IDatabase {
                 state.name || null,
                 state.viewport ? JSON.stringify(state.viewport) : null,
                 now,
-                now
+                now,
               ]
             );
           }
@@ -172,7 +172,7 @@ export class SQLiteDatabase implements IDatabase {
                 node.position.x,
                 node.position.y,
                 JSON.stringify(node.data),
-                node.style ? JSON.stringify(node.style) : null
+                node.style ? JSON.stringify(node.style) : null,
               ]
             );
           }
@@ -188,14 +188,14 @@ export class SQLiteDatabase implements IDatabase {
                 edge.target,
                 edge.type || null,
                 edge.data ? JSON.stringify(edge.data) : null,
-                edge.style ? JSON.stringify(edge.style) : null
+                edge.style ? JSON.stringify(edge.style) : null,
               ]
             );
           }
 
           // Delete nodes and edges that are no longer in the state
           if (state.nodes.length > 0) {
-            const nodeIds = state.nodes.map(n => n.id);
+            const nodeIds = state.nodes.map((n) => n.id);
             const placeholders = nodeIds.map(() => '?').join(',');
             await this.run(
               `DELETE FROM nodes WHERE canvas_id = ? AND id NOT IN (${placeholders})`,
@@ -207,7 +207,7 @@ export class SQLiteDatabase implements IDatabase {
           }
 
           if (state.edges.length > 0) {
-            const edgeIds = state.edges.map(e => e.id);
+            const edgeIds = state.edges.map((e) => e.id);
             const placeholders = edgeIds.map(() => '?').join(',');
             await this.run(
               `DELETE FROM edges WHERE canvas_id = ? AND id NOT IN (${placeholders})`,
@@ -253,18 +253,18 @@ export class SQLiteDatabase implements IDatabase {
       data: string;
       style: string | null;
     }>('SELECT id, type, position_x, position_y, data, style FROM nodes WHERE canvas_id = ?', [
-      canvasId
+      canvasId,
     ]);
 
-    const nodes: CanvasNode[] = nodeRows.map(row => ({
+    const nodes: CanvasNode[] = nodeRows.map((row) => ({
       id: row.id,
       type: row.type as 'custom' | 'terminal' | 'agent',
       position: {
         x: row.position_x,
-        y: row.position_y
+        y: row.position_y,
       },
       data: JSON.parse(row.data),
-      style: row.style ? JSON.parse(row.style) : undefined
+      style: row.style ? JSON.parse(row.style) : undefined,
     }));
 
     // Load edges
@@ -277,13 +277,13 @@ export class SQLiteDatabase implements IDatabase {
       style: string | null;
     }>('SELECT id, source, target, type, data, style FROM edges WHERE canvas_id = ?', [canvasId]);
 
-    const edges: CanvasEdge[] = edgeRows.map(row => ({
+    const edges: CanvasEdge[] = edgeRows.map((row) => ({
       id: row.id,
       source: row.source,
       target: row.target,
       type: row.type || undefined,
       data: row.data ? JSON.parse(row.data) : undefined,
-      style: row.style ? JSON.parse(row.style) : undefined
+      style: row.style ? JSON.parse(row.style) : undefined,
     }));
 
     return {
@@ -293,7 +293,7 @@ export class SQLiteDatabase implements IDatabase {
       edges,
       viewport: canvas.viewport ? JSON.parse(canvas.viewport) : undefined,
       createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at
+      updatedAt: canvas.updated_at,
     };
   }
 
@@ -320,13 +320,13 @@ export class SQLiteDatabase implements IDatabase {
       ORDER BY c.updated_at DESC
     `);
 
-    return canvases.map(canvas => ({
+    return canvases.map((canvas) => ({
       id: canvas.id,
       name: canvas.name || undefined,
       nodeCount: canvas.node_count,
       edgeCount: canvas.edge_count,
       createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at
+      updatedAt: canvas.updated_at,
     }));
   }
 
@@ -336,10 +336,9 @@ export class SQLiteDatabase implements IDatabase {
   }
 
   async getCurrentCanvasId(): Promise<string | null> {
-    const result = await this.get<{ value: string }>(
-      'SELECT value FROM settings WHERE key = ?',
-      ['current_canvas_id']
-    );
+    const result = await this.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', [
+      'current_canvas_id',
+    ]);
 
     return result?.value || null;
   }
@@ -347,7 +346,7 @@ export class SQLiteDatabase implements IDatabase {
   async setCurrentCanvasId(canvasId: string): Promise<void> {
     await this.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
       'current_canvas_id',
-      canvasId
+      canvasId,
     ]);
   }
 
@@ -443,7 +442,9 @@ export class SQLiteDatabase implements IDatabase {
       summary: string | null;
       created_at: number;
       updated_at: number;
-    }>('SELECT agent_id, agent_type, status_info, title, summary, created_at, updated_at FROM agent_statuses');
+    }>(
+      'SELECT agent_id, agent_type, status_info, title, summary, created_at, updated_at FROM agent_statuses'
+    );
 
     return rows.map((row) => ({
       agentId: row.agent_id,
@@ -576,10 +577,10 @@ export class SQLiteDatabase implements IDatabase {
   }
 
   async deleteSessionSummary(sessionId: string, workspacePath: string): Promise<void> {
-    await this.run(
-      'DELETE FROM session_summaries WHERE session_id = ? AND workspace_path = ?',
-      [sessionId, workspacePath]
-    );
+    await this.run('DELETE FROM session_summaries WHERE session_id = ? AND workspace_path = ?', [
+      sessionId,
+      workspacePath,
+    ]);
   }
 
   // Helper methods to promisify sqlite3 callbacks

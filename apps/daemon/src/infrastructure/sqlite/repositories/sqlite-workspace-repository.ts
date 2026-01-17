@@ -6,8 +6,8 @@
 import type {
   IWorkspaceRepository,
   Workspace,
-  WorkspaceMember,
   WorkspaceInput,
+  WorkspaceMember,
 } from '../../../interfaces/repositories.js';
 
 export class SQLiteWorkspaceRepository implements IWorkspaceRepository {

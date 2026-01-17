@@ -22,17 +22,17 @@
 
 /* Handle - fully invisible but functional */
 .agent-chat-handle {
-  background: transparent !important;
+  background: transparent;
   width: 8px;
   height: 8px;
-  border: none !important;
-  opacity: 0 !important;
+  border: none;
+  opacity: 0;
 }
 
 .agent-chat-handle:hover {
-  background: transparent !important;
-  border: none !important;
-  opacity: 0 !important;
+  background: transparent;
+  border: none;
+  opacity: 0;
 }
 
 /* Header */
@@ -147,8 +147,14 @@
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* Error */

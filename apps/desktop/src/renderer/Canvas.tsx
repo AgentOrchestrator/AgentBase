@@ -1,52 +1,53 @@
-import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import {
-  ReactFlow,
-  ReactFlowProvider,
+  addEdge,
   Background,
   BackgroundVariant,
-  useNodesState,
+  type Connection,
+  type Edge,
+  type Node,
+  type OnConnectStartParams,
+  ReactFlow,
+  ReactFlowProvider,
   useEdgesState,
-  addEdge,
-  Connection,
-  Edge,
-  Node,
+  useNodesState,
   useReactFlow,
-  OnConnectStartParams,
   useUpdateNodeInternals,
 } from '@xyflow/react';
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@xyflow/react/dist/style.css';
-import { MeshGradient, Dithering } from '@paper-design/shaders-react';
+import { Dithering, MeshGradient } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
 import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
-import { forkStore, nodeStore } from './stores';
+import type { AgentNodeData } from '@agent-orchestrator/shared';
+import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
+import { ActionPill } from './components/ActionPill';
+import AssistantMessageNode from './components/AssistantMessageNode';
+import { type CommandAction, CommandPalette } from './components/CommandPalette';
+import ConversationNode from './components/ConversationNode';
+import { NewAgentModal } from './components/NewAgentModal';
+import UserMessageNode from './components/UserMessageNode';
+import { useTheme } from './context';
 import {
-  useCanvasPersistence,
-  useLinear,
-  useAgentHierarchy,
-  useForkModal,
-  useCanvasActions,
-  useFolderLock,
-  useFolderHighlight,
   applyHighlightStylesToNodes,
-  useSidebarState,
-  usePillState,
-  useCanvasDrop,
   type LinearIssue,
+  useAgentHierarchy,
+  useCanvasActions,
+  useCanvasDrop,
+  useCanvasPersistence,
+  useFolderHighlight,
+  useFolderLock,
+  useForkModal,
+  useLinear,
+  usePillState,
+  useSidebarState,
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
-import UserMessageNode from './components/UserMessageNode';
-import AssistantMessageNode from './components/AssistantMessageNode';
-import ConversationNode from './components/ConversationNode';
-import { CommandPalette, type CommandAction } from './components/CommandPalette';
-import { NewAgentModal } from './components/NewAgentModal';
-import { ActionPill } from './components/ActionPill';
-import { useTheme } from './context';
-import { createLinearIssueAttachment } from './types/attachments';
 import { forkService } from './services';
-import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
-import type { AgentNodeData } from '@agent-orchestrator/shared';
-import { updateEdgesWithOptimalHandles, getOptimalHandles } from './utils/edgeHandles';
+import { forkStore, nodeStore } from './stores';
+import { createLinearIssueAttachment } from './types/attachments';
+import { getOptimalHandles, updateEdgesWithOptimalHandles } from './utils/edgeHandles';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -153,11 +154,14 @@ function CanvasFlow() {
   useEffect(() => {
     if (!isCanvasLoading) {
       if (!initialStateApplied.current && (initialNodes.length > 0 || initialEdges.length > 0)) {
-        console.log('[Canvas] Restoring nodes from persistence:', initialNodes.map(n => ({
-          nodeId: n.id,
-          agentId: (n.data as Record<string, unknown>)?.agentId,
-          title: ((n.data as Record<string, unknown>)?.title as { value?: string })?.value,
-        })));
+        console.log(
+          '[Canvas] Restoring nodes from persistence:',
+          initialNodes.map((n) => ({
+            nodeId: n.id,
+            agentId: (n.data as Record<string, unknown>)?.agentId,
+            title: ((n.data as Record<string, unknown>)?.title as { value?: string })?.value,
+          }))
+        );
         // Strip any persisted highlight styles (boxShadow/borderRadius on agent nodes)
         // Highlighting is transient UI state, not meant to persist across refreshes
         const cleanedNodes = initialNodes.map((node) => {
@@ -178,7 +182,6 @@ function CanvasFlow() {
     }
   }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
 
-
   // Persist nodes when they change
   const prevNodesRef = useRef<Node[]>(nodes);
   useEffect(() => {
@@ -195,8 +198,9 @@ function CanvasFlow() {
       // Only update if sanitization changed anything
       const hasChanges = sanitized.some((edge, index) => {
         const original = edges[index];
-        return edge.sourceHandle !== original.sourceHandle || 
-               edge.targetHandle !== original.targetHandle;
+        return (
+          edge.sourceHandle !== original.sourceHandle || edge.targetHandle !== original.targetHandle
+        );
       });
       if (hasChanges) {
         setEdges(sanitized);
@@ -240,7 +244,10 @@ function CanvasFlow() {
           } else {
             // Remove highlight from other nodes (preserve other styles)
             const currentStyle = node.style || {};
-            const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<string, unknown>;
+            const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
+              string,
+              unknown
+            >;
             // Only remove if it's our highlight (check if it's the blue border/shadow)
             if (
               (border as string)?.includes('#4a9eff') ||
@@ -259,7 +266,10 @@ function CanvasFlow() {
         currentNodes.map((node) => {
           if (node.type !== 'agent') return node;
           const currentStyle = node.style || {};
-          const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<string, unknown>;
+          const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
+            string,
+            unknown
+          >;
           // Only remove if it's our highlight (check if it's the blue border/shadow)
           if (
             (border as string)?.includes('#4a9eff') ||
@@ -273,11 +283,20 @@ function CanvasFlow() {
     };
 
     window.addEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
-    window.addEventListener('action-pill:unhighlight-agent', handleUnhighlightAgent as EventListener);
+    window.addEventListener(
+      'action-pill:unhighlight-agent',
+      handleUnhighlightAgent as EventListener
+    );
 
     return () => {
-      window.removeEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
-      window.removeEventListener('action-pill:unhighlight-agent', handleUnhighlightAgent as EventListener);
+      window.removeEventListener(
+        'action-pill:highlight-agent',
+        handleHighlightAgent as EventListener
+      );
+      window.removeEventListener(
+        'action-pill:unhighlight-agent',
+        handleUnhighlightAgent as EventListener
+      );
     };
   }, [setNodes]);
 
@@ -292,18 +311,20 @@ function CanvasFlow() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
   const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
-  
+
   // Auto-fork setting (default: true, persisted in localStorage)
   const [autoFork, setAutoFork] = useState<boolean>(() => {
     const stored = localStorage.getItem('auto-fork');
     return stored !== null ? stored === 'true' : true;
   });
-  
+
   // Persist auto-fork setting
   useEffect(() => {
     localStorage.setItem('auto-fork', String(autoFork));
   }, [autoFork]);
-  const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+  const [pendingAgentPosition, setPendingAgentPosition] = useState<
+    { x: number; y: number } | undefined
+  >(undefined);
   const [pendingLinearIssue, setPendingLinearIssue] = useState<LinearIssue | undefined>(undefined);
   const [isLinearCollapsed, setIsLinearCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -374,7 +395,11 @@ function CanvasFlow() {
   // Chat message fork - listen for text selection fork events
   useEffect(() => {
     const handleChatMessageFork = async (event: Event) => {
-      const customEvent = event as CustomEvent<{ nodeId: string; selectedText: string; messageId?: string }>;
+      const customEvent = event as CustomEvent<{
+        nodeId: string;
+        selectedText: string;
+        messageId?: string;
+      }>;
       const { nodeId, selectedText, messageId } = customEvent.detail;
 
       console.log('[Canvas] chat-message-fork event:', {
@@ -407,7 +432,7 @@ function CanvasFlow() {
 
         const sourceNodeData = sourceNode.data as unknown as AgentNodeData;
         const workspacePath = sourceNodeData.workspacePath;
-        
+
         if (!workspacePath) {
           console.error('[Canvas] Auto-fork failed: no workspace path');
           return;
@@ -505,8 +530,8 @@ function CanvasFlow() {
             targetHandle: optimalHandles.targetHandle,
             type: 'default',
             animated: false,
-            style: { 
-              stroke: '#4a5568', 
+            style: {
+              stroke: '#4a5568',
               strokeWidth: 2,
             },
           };
@@ -541,7 +566,13 @@ function CanvasFlow() {
   // Apply highlight styles to nodes when highlighting changes
   // Always run to clear styles when toggled off (empty collections)
   useEffect(() => {
-    setNodes((nds) => applyHighlightStylesToNodes(nds, folderHighlight.highlightedFolders, folderHighlight.folderColors));
+    setNodes((nds) =>
+      applyHighlightStylesToNodes(
+        nds,
+        folderHighlight.highlightedFolders,
+        folderHighlight.folderColors
+      )
+    );
   }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, setNodes]);
 
   // =============================================================================
@@ -588,7 +619,8 @@ function CanvasFlow() {
       const starterNode = nodes.find((n) => n.id === nodeId);
       if (!starterNode) return;
 
-      const electronAPI = (window as unknown as { electronAPI?: { getHomeDir: () => string } }).electronAPI;
+      const electronAPI = (window as unknown as { electronAPI?: { getHomeDir: () => string } })
+        .electronAPI;
       const workingDirectory = electronAPI?.getHomeDir() || '/';
 
       const terminalId = `terminal-${crypto.randomUUID()}`;
@@ -615,7 +647,10 @@ function CanvasFlow() {
           terminalId,
           agentType: 'claude_code',
           status: 'idle',
-          title: { value: message.slice(0, 50) + (message.length > 50 ? '...' : ''), isManuallySet: false },
+          title: {
+            value: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
+            isManuallySet: false,
+          },
           summary: null,
           progress: null,
           initialPrompt: message,
@@ -646,14 +681,16 @@ function CanvasFlow() {
       const cleanParams: Connection = {
         source: params.source,
         target: params.target,
-        sourceHandle: params.sourceHandle && params.sourceHandle !== 'null' && params.sourceHandle !== '' 
-          ? params.sourceHandle 
-          : null,
-        targetHandle: params.targetHandle && params.targetHandle !== 'null' && params.targetHandle !== '' 
-          ? params.targetHandle 
-          : null,
+        sourceHandle:
+          params.sourceHandle && params.sourceHandle !== 'null' && params.sourceHandle !== ''
+            ? params.sourceHandle
+            : null,
+        targetHandle:
+          params.targetHandle && params.targetHandle !== 'null' && params.targetHandle !== ''
+            ? params.targetHandle
+            : null,
       };
-      
+
       setEdges((eds) => addEdge(cleanParams, eds));
     },
     [setEdges]
@@ -681,8 +718,8 @@ function CanvasFlow() {
       const isDropOnHandle = target.classList.contains('react-flow__handle');
 
       if (!isDropOnHandle) {
-        const clientX = 'clientX' in event ? event.clientX : event.touches?.[0]?.clientX ?? 0;
-        const clientY = 'clientY' in event ? event.clientY : event.touches?.[0]?.clientY ?? 0;
+        const clientX = 'clientX' in event ? event.clientX : (event.touches?.[0]?.clientX ?? 0);
+        const clientY = 'clientY' in event ? event.clientY : (event.touches?.[0]?.clientY ?? 0);
 
         const position = screenToFlowPosition({ x: clientX, y: clientY });
         // Fork handle drag creates worktree
@@ -694,7 +731,7 @@ function CanvasFlow() {
     [screenToFlowPosition, forkModal]
   );
 
-// Keyboard shortcut: Cmd+F (Mac) / Ctrl+F (Windows/Linux) to fork selected node
+  // Keyboard shortcut: Cmd+F (Mac) / Ctrl+F (Windows/Linux) to fork selected node
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check for Cmd+F (Mac) or Ctrl+F (Windows/Linux)
@@ -718,9 +755,7 @@ function CanvasFlow() {
       const currentNodes = getNodes();
 
       // Find selected AgentNode (type is 'agent', not 'agentNode')
-      const selectedNode = currentNodes.find(
-        (n) => n.selected && n.type === 'agent'
-      );
+      const selectedNode = currentNodes.find((n) => n.selected && n.type === 'agent');
 
       if (!selectedNode) {
         console.log('[Canvas] No AgentNode selected for fork shortcut');
@@ -760,14 +795,17 @@ function CanvasFlow() {
 
       // Check if a chat node already exists for this agent node
       const existingChatNode = nodes.find(
-        (n) => n.type === 'agent-chat' &&
-        (n.data as { agentId?: string })?.agentId === agentId &&
-        edges.some((e) => e.source === nodeId && e.target === n.id)
+        (n) =>
+          n.type === 'agent-chat' &&
+          (n.data as { agentId?: string })?.agentId === agentId &&
+          edges.some((e) => e.source === nodeId && e.target === n.id)
       );
 
       if (existingChatNode) {
         // Remove existing chat node and its edge
-        const edgeToRemove = edges.find((e) => e.source === nodeId && e.target === existingChatNode.id);
+        const edgeToRemove = edges.find(
+          (e) => e.source === nodeId && e.target === existingChatNode.id
+        );
         setNodes((nds) => nds.filter((n) => n.id !== existingChatNode.id));
         if (edgeToRemove) {
           setEdges((eds) => eds.filter((e) => e.id !== edgeToRemove.id));
@@ -785,7 +823,8 @@ function CanvasFlow() {
 
       // Get node dimensions (default if not available)
       const nodeWidth = (sourceNode.width as number) || (sourceNode.style?.width as number) || 500;
-      const nodeHeight = (sourceNode.height as number) || (sourceNode.style?.height as number) || 450;
+      const nodeHeight =
+        (sourceNode.height as number) || (sourceNode.style?.height as number) || 450;
 
       // Calculate position below the source node
       const chatNodePosition = {
@@ -816,9 +855,9 @@ function CanvasFlow() {
       };
 
       // Get the border color from CSS variable to match node borders
-      const borderColor = getComputedStyle(document.documentElement)
-        .getPropertyValue('--color-border')
-        .trim() || '#232323'; // Fallback to dark theme default
+      const borderColor =
+        getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim() ||
+        '#232323'; // Fallback to dark theme default
 
       // Create edge connecting the nodes (agent to chat view)
       // Use dashed style to differentiate from fork edges (agent to agent)
@@ -832,8 +871,8 @@ function CanvasFlow() {
         targetHandle: 'chat-target', // AgentChatNode uses 'chat-target' for its top handle
         type: 'default',
         animated: false,
-        style: { 
-          stroke: borderColor, 
+        style: {
+          stroke: borderColor,
           strokeWidth: 2,
           strokeDasharray: '5, 5', // Dashed line pattern
         },
@@ -841,14 +880,14 @@ function CanvasFlow() {
 
       // Add the new node first
       setNodes((nds) => [...nds, chatNode]);
-      
+
       // Defer edge addition until after the node is rendered and handles are measured
       // This ensures React Flow can properly calculate edge positions
       requestAnimationFrame(() => {
         // Update node internals to ensure handles are measured
         updateNodeInternals(chatNodeId);
         updateNodeInternals(nodeId);
-        
+
         // Add edge after a short delay to ensure node internals are updated
         requestAnimationFrame(() => {
           setEdges((eds) => {
@@ -870,7 +909,10 @@ function CanvasFlow() {
 
     window.addEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
     return () => {
-      window.removeEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
+      window.removeEventListener(
+        'agent-node:create-chat-node',
+        handleCreateChatNode as EventListener
+      );
     };
   }, [nodes, edges, setNodes, setEdges, updateNodeInternals, getNodes]);
 
@@ -902,14 +944,14 @@ function CanvasFlow() {
       if (result.success) {
         // Add the forked node first
         setNodes((nds) => [...nds, result.forkedNode]);
-        
+
         // Defer edge addition until after the node is rendered and handles are measured
         // This ensures React Flow can properly calculate edge positions
         requestAnimationFrame(() => {
           // Update node internals to ensure handles are measured
           updateNodeInternals(result.forkedNode.id);
           updateNodeInternals(result.newEdge.source);
-          
+
           // Add edge after a short delay to ensure node internals are updated
           requestAnimationFrame(() => {
             setEdges((eds) => {
@@ -933,17 +975,13 @@ function CanvasFlow() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const isForkShortcut =
-        event.shiftKey &&
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === 's';
+        event.shiftKey && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
 
       if (!isForkShortcut) return;
 
       event.preventDefault();
 
-      const selectedNode = nodes.find(
-        (n) => n.selected && n.type === 'agentNode'
-      );
+      const selectedNode = nodes.find((n) => n.selected && n.type === 'agentNode');
 
       if (!selectedNode) {
         console.log('[Canvas] No AgentNode selected for fork shortcut');
@@ -987,7 +1025,8 @@ function CanvasFlow() {
     };
 
     window.addEventListener('agent-node:fork-click', handleForkClick as EventListener);
-    return () => window.removeEventListener('agent-node:fork-click', handleForkClick as EventListener);
+    return () =>
+      window.removeEventListener('agent-node:fork-click', handleForkClick as EventListener);
   }, [nodes, forkModal]);
 
   // =============================================================================
@@ -1005,9 +1044,11 @@ function CanvasFlow() {
 
     const result = await linear.createTicket(title);
     if (result.success && result.issue) {
-      alert(`Ticket created: ${result.issue.identifier} - ${result.issue.title}\n${result.issue.url}`);
+      alert(
+        `Ticket created: ${result.issue.identifier} - ${result.issue.title}\n${result.issue.url}`
+      );
     } else {
-      alert('Failed to create ticket: ' + (result.error || 'Unknown error'));
+      alert(`Failed to create ticket: ${result.error || 'Unknown error'}`);
     }
   }, [linear]);
 
@@ -1034,38 +1075,41 @@ function CanvasFlow() {
   // Command palette commands
   // =============================================================================
 
-  const commandActions = useMemo<CommandAction[]>(() => [
-    {
-      id: 'add-agent',
-      label: 'Add Agent',
-      shortcut: 'c',
-      action: () => canvasActions.addAgentNode(),
-    },
-    {
-      id: 'add-terminal',
-      label: 'Add Terminal',
-      shortcut: 'v',
-      action: () => canvasActions.addTerminalNode(),
-    },
-    {
-      id: 'add-claude-terminal',
-      label: 'Add Claude Code Terminal',
-      shortcut: 'b',
-      action: () => canvasActions.addClaudeCodeTerminal(),
-    },
-    {
-      id: 'add-browser',
-      label: 'Add Browser',
-      shortcut: 'j',
-      action: () => canvasActions.addBrowserNode(),
-    },
-    {
-      id: 'create-linear-ticket',
-      label: 'Create Linear Ticket',
-      shortcut: 'm',
-      action: () => createLinearTicket(),
-    },
-  ], [canvasActions, createLinearTicket]);
+  const commandActions = useMemo<CommandAction[]>(
+    () => [
+      {
+        id: 'add-agent',
+        label: 'Add Agent',
+        shortcut: 'c',
+        action: () => canvasActions.addAgentNode(),
+      },
+      {
+        id: 'add-terminal',
+        label: 'Add Terminal',
+        shortcut: 'v',
+        action: () => canvasActions.addTerminalNode(),
+      },
+      {
+        id: 'add-claude-terminal',
+        label: 'Add Claude Code Terminal',
+        shortcut: 'b',
+        action: () => canvasActions.addClaudeCodeTerminal(),
+      },
+      {
+        id: 'add-browser',
+        label: 'Add Browser',
+        shortcut: 'j',
+        action: () => canvasActions.addBrowserNode(),
+      },
+      {
+        id: 'create-linear-ticket',
+        label: 'Create Linear Ticket',
+        shortcut: 'm',
+        action: () => createLinearTicket(),
+      },
+    ],
+    [canvasActions, createLinearTicket]
+  );
 
   // =============================================================================
   // Keyboard shortcuts
@@ -1095,7 +1139,7 @@ function CanvasFlow() {
         return;
       }
 
-// CMD+G / CTRL+G to open agent modal with new worktree
+      // CMD+G / CTRL+G to open agent modal with new worktree
       if (modifierKey && event.key === 'g') {
         event.preventDefault(); // Prevent default browser behavior
         if (!isNewAgentModalOpen) {
@@ -1144,122 +1188,119 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [canvasActions, isNodeDragEnabled, isNewAgentModalOpen, screenToFlowPosition]);
+  }, [canvasActions, isNodeDragEnabled, isNewAgentModalOpen]);
 
   // =============================================================================
   // Loading state
   // =============================================================================
 
-// Snap-to-edge functionality when dragging nodes
+  // Snap-to-edge functionality when dragging nodes
   const SNAP_THRESHOLD = 20; // pixels - soft snapping threshold
   const isSnappingRef = useRef(false); // Prevent infinite loops
 
   // Shared function to calculate and apply snapping
-  const applySnapping = useCallback(
-    (node: Node, allNodes: Node[]) => {
-      const currentNode = node;
-      const otherNodes = allNodes.filter((n) => n.id !== currentNode.id);
+  const applySnapping = useCallback((node: Node, allNodes: Node[]) => {
+    const currentNode = node;
+    const otherNodes = allNodes.filter((n) => n.id !== currentNode.id);
 
-      if (otherNodes.length === 0) {
-        return null;
-      }
+    if (otherNodes.length === 0) {
+      return null;
+    }
 
-      // Get current node dimensions
-      const currentNodeWidth =
-        (currentNode.width as number) ||
-        (currentNode.style?.width as number) ||
-        (currentNode.measured?.width as number) ||
+    // Get current node dimensions
+    const currentNodeWidth =
+      (currentNode.width as number) ||
+      (currentNode.style?.width as number) ||
+      (currentNode.measured?.width as number) ||
+      500;
+    const currentNodeHeight =
+      (currentNode.height as number) ||
+      (currentNode.style?.height as number) ||
+      (currentNode.measured?.height as number) ||
+      400;
+
+    // Calculate current node bounds
+    const currentNodeLeft = currentNode.position.x;
+    const currentNodeRight = currentNode.position.x + currentNodeWidth;
+    const currentNodeTop = currentNode.position.y;
+    const currentNodeBottom = currentNode.position.y + currentNodeHeight;
+
+    let snappedX = currentNode.position.x;
+    let snappedY = currentNode.position.y;
+    let minDistanceX = SNAP_THRESHOLD;
+    let minDistanceY = SNAP_THRESHOLD;
+
+    // Check alignment with other nodes
+    for (const otherNode of otherNodes) {
+      const otherNodeWidth =
+        (otherNode.width as number) ||
+        (otherNode.style?.width as number) ||
+        (otherNode.measured?.width as number) ||
         500;
-      const currentNodeHeight =
-        (currentNode.height as number) ||
-        (currentNode.style?.height as number) ||
-        (currentNode.measured?.height as number) ||
+      const otherNodeHeight =
+        (otherNode.height as number) ||
+        (otherNode.style?.height as number) ||
+        (otherNode.measured?.height as number) ||
         400;
 
-      // Calculate current node bounds
-      const currentNodeLeft = currentNode.position.x;
-      const currentNodeRight = currentNode.position.x + currentNodeWidth;
-      const currentNodeTop = currentNode.position.y;
-      const currentNodeBottom = currentNode.position.y + currentNodeHeight;
+      const otherNodeLeft = otherNode.position.x;
+      const otherNodeRight = otherNode.position.x + otherNodeWidth;
+      const otherNodeTop = otherNode.position.y;
+      const otherNodeBottom = otherNode.position.y + otherNodeHeight;
 
-      let snappedX = currentNode.position.x;
-      let snappedY = currentNode.position.y;
-      let minDistanceX = SNAP_THRESHOLD;
-      let minDistanceY = SNAP_THRESHOLD;
+      // Check horizontal alignment (left edges, right edges, left-right, right-left)
+      const leftToLeft = Math.abs(currentNodeLeft - otherNodeLeft);
+      const rightToRight = Math.abs(currentNodeRight - otherNodeRight);
+      const leftToRight = Math.abs(currentNodeLeft - otherNodeRight);
+      const rightToLeft = Math.abs(currentNodeRight - otherNodeLeft);
 
-      // Check alignment with other nodes
-      for (const otherNode of otherNodes) {
-        const otherNodeWidth =
-          (otherNode.width as number) ||
-          (otherNode.style?.width as number) ||
-          (otherNode.measured?.width as number) ||
-          500;
-        const otherNodeHeight =
-          (otherNode.height as number) ||
-          (otherNode.style?.height as number) ||
-          (otherNode.measured?.height as number) ||
-          400;
+      // Find closest horizontal alignment
+      const horizontalDistances = [
+        { distance: leftToLeft, snap: otherNodeLeft },
+        { distance: rightToRight, snap: otherNodeRight - currentNodeWidth },
+        { distance: leftToRight, snap: otherNodeRight },
+        { distance: rightToLeft, snap: otherNodeLeft - currentNodeWidth },
+      ];
 
-        const otherNodeLeft = otherNode.position.x;
-        const otherNodeRight = otherNode.position.x + otherNodeWidth;
-        const otherNodeTop = otherNode.position.y;
-        const otherNodeBottom = otherNode.position.y + otherNodeHeight;
-
-        // Check horizontal alignment (left edges, right edges, left-right, right-left)
-        const leftToLeft = Math.abs(currentNodeLeft - otherNodeLeft);
-        const rightToRight = Math.abs(currentNodeRight - otherNodeRight);
-        const leftToRight = Math.abs(currentNodeLeft - otherNodeRight);
-        const rightToLeft = Math.abs(currentNodeRight - otherNodeLeft);
-
-        // Find closest horizontal alignment
-        const horizontalDistances = [
-          { distance: leftToLeft, snap: otherNodeLeft },
-          { distance: rightToRight, snap: otherNodeRight - currentNodeWidth },
-          { distance: leftToRight, snap: otherNodeRight },
-          { distance: rightToLeft, snap: otherNodeLeft - currentNodeWidth },
-        ];
-
-        for (const { distance, snap } of horizontalDistances) {
-          if (distance < minDistanceX) {
-            minDistanceX = distance;
-            snappedX = snap;
-          }
-        }
-
-        // Check vertical alignment (top edges, bottom edges, top-bottom, bottom-top)
-        const topToTop = Math.abs(currentNodeTop - otherNodeTop);
-        const bottomToBottom = Math.abs(currentNodeBottom - otherNodeBottom);
-        const topToBottom = Math.abs(currentNodeTop - otherNodeBottom);
-        const bottomToTop = Math.abs(currentNodeBottom - otherNodeTop);
-
-        // Find closest vertical alignment
-        const verticalDistances = [
-          { distance: topToTop, snap: otherNodeTop },
-          { distance: bottomToBottom, snap: otherNodeBottom - currentNodeHeight },
-          { distance: topToBottom, snap: otherNodeBottom },
-          { distance: bottomToTop, snap: otherNodeTop - currentNodeHeight },
-        ];
-
-        for (const { distance, snap } of verticalDistances) {
-          if (distance < minDistanceY) {
-            minDistanceY = distance;
-            snappedY = snap;
-          }
+      for (const { distance, snap } of horizontalDistances) {
+        if (distance < minDistanceX) {
+          minDistanceX = distance;
+          snappedX = snap;
         }
       }
 
-      // Return snapped position if within threshold
-      if (minDistanceX < SNAP_THRESHOLD || minDistanceY < SNAP_THRESHOLD) {
-        return {
-          x: minDistanceX < SNAP_THRESHOLD ? snappedX : currentNode.position.x,
-          y: minDistanceY < SNAP_THRESHOLD ? snappedY : currentNode.position.y,
-        };
-      }
+      // Check vertical alignment (top edges, bottom edges, top-bottom, bottom-top)
+      const topToTop = Math.abs(currentNodeTop - otherNodeTop);
+      const bottomToBottom = Math.abs(currentNodeBottom - otherNodeBottom);
+      const topToBottom = Math.abs(currentNodeTop - otherNodeBottom);
+      const bottomToTop = Math.abs(currentNodeBottom - otherNodeTop);
 
-      return null;
-    },
-    []
-  );
+      // Find closest vertical alignment
+      const verticalDistances = [
+        { distance: topToTop, snap: otherNodeTop },
+        { distance: bottomToBottom, snap: otherNodeBottom - currentNodeHeight },
+        { distance: topToBottom, snap: otherNodeBottom },
+        { distance: bottomToTop, snap: otherNodeTop - currentNodeHeight },
+      ];
+
+      for (const { distance, snap } of verticalDistances) {
+        if (distance < minDistanceY) {
+          minDistanceY = distance;
+          snappedY = snap;
+        }
+      }
+    }
+
+    // Return snapped position if within threshold
+    if (minDistanceX < SNAP_THRESHOLD || minDistanceY < SNAP_THRESHOLD) {
+      return {
+        x: minDistanceX < SNAP_THRESHOLD ? snappedX : currentNode.position.x,
+        y: minDistanceY < SNAP_THRESHOLD ? snappedY : currentNode.position.y,
+      };
+    }
+
+    return null;
+  }, []);
 
   const onNodeDrag = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -1294,12 +1335,9 @@ function CanvasFlow() {
     [isNodeDragEnabled, getNodes, setNodes, applySnapping]
   );
 
-  const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, _node: Node) => {
-      isSnappingRef.current = false;
-    },
-    []
-  );
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, _node: Node) => {
+    isSnappingRef.current = false;
+  }, []);
 
   // Wrap onNodesChange to intercept position changes and apply snapping
   // Also updates edge handles to maintain optimal connections when nodes move
@@ -1313,7 +1351,11 @@ function CanvasFlow() {
 
       const allNodes = getNodes();
       const modifiedChanges = changes.map((change) => {
-        const posChange = change as { type?: string; position?: { x: number; y: number }; id?: string };
+        const posChange = change as {
+          type?: string;
+          position?: { x: number; y: number };
+          id?: string;
+        };
         // Intercept position changes and apply snapping
         if (posChange.type === 'position' && posChange.position) {
           const node = allNodes.find((n) => n.id === posChange.id);
@@ -1337,9 +1379,7 @@ function CanvasFlow() {
       });
 
       // Check if any changes were modified
-      const hasSnapping = modifiedChanges.some(
-        (change, index) => change !== changes[index]
-      );
+      const hasSnapping = modifiedChanges.some((change, index) => change !== changes[index]);
 
       if (hasSnapping) {
         isSnappingRef.current = true;
@@ -1369,7 +1409,7 @@ function CanvasFlow() {
             const posChange = c as { id?: string; position?: { x: number; y: number } };
             return posChange.id === node.id && posChange.position;
           }) as { id?: string; position?: { x: number; y: number } } | undefined;
-          
+
           if (change?.position) {
             return { ...node, position: change.position };
           }
@@ -1387,21 +1427,27 @@ function CanvasFlow() {
   // Resize handlers
   // =============================================================================
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    resizeStartXRef.current = e.clientX;
-    resizeStartWidthRef.current = sidebar.sidebarWidth;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [sidebar.sidebarWidth]);
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
+      resizeStartXRef.current = e.clientX;
+      resizeStartWidthRef.current = sidebar.sidebarWidth;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [sidebar.sidebarWidth]
+  );
 
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    const deltaX = e.clientX - resizeStartXRef.current;
-    const newWidth = resizeStartWidthRef.current + deltaX;
-    sidebar.setSidebarWidth(newWidth);
-  }, [isResizing, sidebar]);
+  const handleResizeMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const deltaX = e.clientX - resizeStartXRef.current;
+      const newWidth = resizeStartWidthRef.current + deltaX;
+      sidebar.setSidebarWidth(newWidth);
+    },
+    [isResizing, sidebar]
+  );
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
@@ -1424,7 +1470,7 @@ function CanvasFlow() {
   // Gradient configurations based on first letter of username
   // =============================================================================
 
-  type GradientConfig = 
+  type GradientConfig =
     | {
         type: 'mesh';
         speed: number;
@@ -1469,7 +1515,7 @@ function CanvasFlow() {
     }
 
     const upperLetter = letter.toUpperCase();
-    
+
     // A, B
     if (upperLetter === 'A' || upperLetter === 'B') {
       return {
@@ -1485,7 +1531,7 @@ function CanvasFlow() {
         overlayColor: '#0051FF',
       };
     }
-    
+
     // C, D
     if (upperLetter === 'C' || upperLetter === 'D') {
       return {
@@ -1501,7 +1547,7 @@ function CanvasFlow() {
         overlayColor: '#E54F0E',
       };
     }
-    
+
     // E, F
     if (upperLetter === 'E' || upperLetter === 'F') {
       return {
@@ -1517,7 +1563,7 @@ function CanvasFlow() {
         overlayColor: '#CD005F',
       };
     }
-    
+
     // G, H
     if (upperLetter === 'G' || upperLetter === 'H') {
       return {
@@ -1533,7 +1579,7 @@ function CanvasFlow() {
         overlayColor: '#008A6D',
       };
     }
-    
+
     // I, J
     if (upperLetter === 'I' || upperLetter === 'J') {
       return {
@@ -1549,7 +1595,7 @@ function CanvasFlow() {
         overlayColor: '#8DB735',
       };
     }
-    
+
     // K, L
     if (upperLetter === 'K' || upperLetter === 'L') {
       return {
@@ -1565,7 +1611,7 @@ function CanvasFlow() {
         overlayColor: '#FFFFFF',
       };
     }
-    
+
     // M, N
     if (upperLetter === 'M' || upperLetter === 'N') {
       return {
@@ -1581,7 +1627,7 @@ function CanvasFlow() {
         overlayColor: '#4F0C28',
       };
     }
-    
+
     // O, P
     if (upperLetter === 'O' || upperLetter === 'P') {
       return {
@@ -1597,7 +1643,7 @@ function CanvasFlow() {
         overlayColor: '#A8051A',
       };
     }
-    
+
     // Q, R
     if (upperLetter === 'Q' || upperLetter === 'R') {
       return {
@@ -1613,7 +1659,7 @@ function CanvasFlow() {
         overlayColor: '#53F398',
       };
     }
-    
+
     // S, T
     if (upperLetter === 'S' || upperLetter === 'T') {
       return {
@@ -1630,7 +1676,7 @@ function CanvasFlow() {
         backgroundColor: '#000000',
       };
     }
-    
+
     // U, V, W
     if (upperLetter === 'U' || upperLetter === 'V' || upperLetter === 'W') {
       return {
@@ -1646,7 +1692,7 @@ function CanvasFlow() {
         overlayColor: '#BCA145',
       };
     }
-    
+
     // X, Y, Z
     if (upperLetter === 'X' || upperLetter === 'Y' || upperLetter === 'Z') {
       return {
@@ -1662,7 +1708,7 @@ function CanvasFlow() {
         overlayColor: '#FF00EA',
       };
     }
-    
+
     // Default fallback
     return {
       type: 'mesh',
@@ -1682,7 +1728,7 @@ function CanvasFlow() {
     if (!githubUsername) {
       return getGradientForLetter(null);
     }
-    
+
     const firstChar = githubUsername.charAt(0);
     // If it's a number (0-9), map to first 10 letter pairs (A-T)
     if (/[0-9]/.test(firstChar)) {
@@ -1691,7 +1737,7 @@ function CanvasFlow() {
       const letterPairs = ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O', 'Q', 'S'];
       return getGradientForLetter(letterPairs[num]);
     }
-    
+
     // Otherwise, use the first letter as-is
     return getGradientForLetter(firstChar);
   }, [githubUsername, getGradientForLetter]);
@@ -1730,7 +1776,9 @@ function CanvasFlow() {
   // =============================================================================
 
   return (
-    <div className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''} ${isResizing ? 'resizing' : ''}`}>
+    <div
+      className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''} ${isResizing ? 'resizing' : ''}`}
+    >
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
@@ -1789,7 +1837,7 @@ function CanvasFlow() {
       />
 
       {/* Sidebar Panel */}
-      <div 
+      <div
         className={`canvas-sidebar ${sidebar.isSidebarCollapsed ? 'collapsed' : ''} ${isResizing ? 'resizing' : ''}`}
         style={{ width: sidebar.isSidebarCollapsed ? 0 : `${sidebar.sidebarWidth}px` }}
       >
@@ -1814,7 +1862,16 @@ function CanvasFlow() {
             onClick={sidebar.toggleSidebar}
             aria-label="Collapse sidebar"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
@@ -1844,8 +1901,19 @@ function CanvasFlow() {
                           className={`sidebar-folder-header ${!showLock ? 'no-lock' : ''}`}
                           onClick={() => sidebar.toggleProject(projectName)}
                         >
-                          <span className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <span
+                            className={`sidebar-folder-icon ${isProjectCollapsed ? 'collapsed' : 'expanded'}`}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <polyline points="15 18 9 12 15 6" />
                             </svg>
                           </span>
@@ -1901,7 +1969,12 @@ function CanvasFlow() {
                               />
                             </svg>
                           )}
-                          <span className="sidebar-folder-name" style={{ color: highlightColor || undefined }}>{projectName}</span>
+                          <span
+                            className="sidebar-folder-name"
+                            style={{ color: highlightColor || undefined }}
+                          >
+                            {projectName}
+                          </span>
                         </button>
                         {showLock && projectPath && (
                           <button
@@ -1923,12 +1996,30 @@ function CanvasFlow() {
                             title={isLocked ? 'Unlock folder' : 'Lock folder'}
                           >
                             {isLocked ? (
-                              <svg width="12" height="12" viewBox="0 0 134 197" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262V100.977C133.301 85.6445 125.684 77.832 111.328 77.832H21.9727C7.61719 77.832 0 85.6445 0 100.977V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336V99.9023C15.8203 95.1172 18.2617 92.5781 22.4609 92.5781H110.84C115.137 92.5781 117.48 95.1172 117.48 99.9023V169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.0898 85.3516H32.6172V52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V85.3516H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.1133 0 17.0898 17.7734 17.0898 54.4922V85.3516Z" fill="currentColor"/>
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 134 197"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262V100.977C133.301 85.6445 125.684 77.832 111.328 77.832H21.9727C7.61719 77.832 0 85.6445 0 100.977V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336V99.9023C15.8203 95.1172 18.2617 92.5781 22.4609 92.5781H110.84C115.137 92.5781 117.48 95.1172 117.48 99.9023V169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.0898 85.3516H32.6172V52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V85.3516H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.1133 0 17.0898 17.7734 17.0898 54.4922V85.3516Z"
+                                  fill="currentColor"
+                                />
                               </svg>
                             ) : (
-                              <svg width="12" height="12" viewBox="0 0 134 197" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262L133.301 131.899C133.301 116.566 125.684 108.754 111.328 108.754H21.9727C7.61719 108.754 0 116.566 0 131.899V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336L15.8203 130.824C15.8203 126.039 18.2617 123.5 22.4609 123.5H110.84C115.137 123.5 117.48 126.039 117.48 130.824L117.48 169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.1142 52.4792C17.0872 53.5835 17.9852 54.4922 19.0898 54.4922H30.5664C31.699 54.4922 32.6172 53.574 32.6172 52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V114H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.5835 0 17.9767 17.1236 17.1142 52.4792Z" fill="currentColor"/>
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 134 197"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M21.9727 191.504H111.328C125.684 191.504 133.301 183.691 133.301 168.262L133.301 131.899C133.301 116.566 125.684 108.754 111.328 108.754H21.9727C7.61719 108.754 0 116.566 0 131.899V168.262C0 183.691 7.61719 191.504 21.9727 191.504ZM22.4609 176.758C18.2617 176.758 15.8203 174.121 15.8203 169.336L15.8203 130.824C15.8203 126.039 18.2617 123.5 22.4609 123.5H110.84C115.137 123.5 117.48 126.039 117.48 130.824L117.48 169.336C117.48 174.121 115.137 176.758 110.84 176.758H22.4609ZM17.1142 52.4792C17.0872 53.5835 17.9852 54.4922 19.0898 54.4922H30.5664C31.699 54.4922 32.6172 53.574 32.6172 52.4414C32.6172 27.7344 48.3398 14.7461 66.6016 14.7461C84.8633 14.7461 100.781 27.7344 100.781 52.4414V114H116.211V54.4922C116.211 17.7734 92.1875 0 66.6016 0C41.5835 0 17.9767 17.1236 17.1142 52.4792Z"
+                                  fill="currentColor"
+                                />
                               </svg>
                             )}
                           </button>
@@ -1945,8 +2036,19 @@ function CanvasFlow() {
                                   className="sidebar-folder-header"
                                   onClick={() => sidebar.toggleBranch(branchKey)}
                                 >
-                                  <span className={`sidebar-folder-icon ${isBranchCollapsed ? 'collapsed' : 'expanded'}`}>
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <span
+                                    className={`sidebar-folder-icon ${isBranchCollapsed ? 'collapsed' : 'expanded'}`}
+                                  >
+                                    <svg
+                                      width="12"
+                                      height="12"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
                                       <polyline points="15 18 9 12 15 6" />
                                     </svg>
                                   </span>
@@ -2032,13 +2134,24 @@ function CanvasFlow() {
             {/* Linear Issues Container - Fixed at bottom */}
             {linear.isConnected && (
               <div className="sidebar-linear-issues-container">
-                <div 
+                <div
                   className="sidebar-linear-issues-header"
                   onClick={() => setIsLinearCollapsed(!isLinearCollapsed)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <span className={`sidebar-linear-issues-chevron ${isLinearCollapsed ? 'collapsed' : 'expanded'}`}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <span
+                    className={`sidebar-linear-issues-chevron ${isLinearCollapsed ? 'collapsed' : 'expanded'}`}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="15 18 9 12 15 6" />
                     </svg>
                   </span>
@@ -2048,113 +2161,134 @@ function CanvasFlow() {
                 {!isLinearCollapsed && (
                   <>
                     <div className="sidebar-linear-issues-filters">
-                  <div className="sidebar-linear-issues-filter">
-                    <select
-                      id="sidebar-issues-filter-project"
-                      className="sidebar-issues-select"
-                      value={linear.selectedProjectId}
-                      onChange={(event) => linear.setFilter('selectedProjectId', event.target.value)}
-                    >
-                      <option value="all">All projects</option>
-                      {linear.hasUnassignedProject && <option value="none">No project</option>}
-                      {linear.projectOptions.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="sidebar-linear-issues-filter">
-                    <select
-                      id="sidebar-issues-filter-milestone"
-                      className="sidebar-issues-select"
-                      value={linear.selectedMilestoneId}
-                      onChange={(event) => linear.setFilter('selectedMilestoneId', event.target.value)}
-                    >
-                      <option value="all">All milestones</option>
-                      {linear.hasUnassignedMilestone && <option value="none">No milestone</option>}
-                      {linear.visibleMilestoneOptions.map((milestone) => (
-                        <option key={milestone.id} value={milestone.id}>
-                          {milestone.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="sidebar-linear-issues-filter">
-                    <select
-                      id="sidebar-issues-filter-status"
-                      className="sidebar-issues-select"
-                      value={linear.selectedStatusId}
-                      onChange={(event) => linear.setFilter('selectedStatusId', event.target.value)}
-                    >
-                      <option value="all">All statuses</option>
-                      {linear.statusOptions.map((state) => (
-                        <option key={state.id} value={state.id}>
-                          {state.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="sidebar-linear-issues-list">
-                  {linear.isLoading ? (
-                    <div className="sidebar-linear-issues-loading">Loading issues...</div>
-                  ) : linear.filteredIssues.length === 0 ? (
-                    <div className="sidebar-linear-issues-empty">
-                      {linear.issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
-                    </div>
-                  ) : (
-                    linear.filteredIssues.map((issue: LinearIssue) => {
-                      const projectLabel = issue.project?.name;
-                      const milestoneLabel = issue.projectMilestone?.name;
-                      return (
-                        <div
-                          key={issue.id}
-                          className="sidebar-issue-card"
-                          draggable
-                          onDragStart={(e) => canvasDrop.handleIssueDragStart(e, issue)}
-                          onClick={() => setSelectedIssueId(issue.id)}
+                      <div className="sidebar-linear-issues-filter">
+                        <select
+                          id="sidebar-issues-filter-project"
+                          className="sidebar-issues-select"
+                          value={linear.selectedProjectId}
+                          onChange={(event) =>
+                            linear.setFilter('selectedProjectId', event.target.value)
+                          }
                         >
-                          <div className="sidebar-issue-header">
-                            <span className="sidebar-issue-identifier">{issue.identifier}</span>
-                            <span
-                              className="sidebar-issue-status"
-                              style={{ backgroundColor: issue.state.color }}
-                            >
-                              {issue.state.name}
-                            </span>
-                          </div>
-                          <div className="sidebar-issue-title">{issue.title}</div>
-                          {(projectLabel || milestoneLabel) && (
-                            <div className="sidebar-issue-meta">
-                              {projectLabel && <span>Project: {projectLabel}</span>}
-                              {projectLabel && milestoneLabel && (
-                                <span className="sidebar-issue-meta-sep">|</span>
-                              )}
-                              {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
-                            </div>
+                          <option value="all">All projects</option>
+                          {linear.hasUnassignedProject && <option value="none">No project</option>}
+                          {linear.projectOptions.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sidebar-linear-issues-filter">
+                        <select
+                          id="sidebar-issues-filter-milestone"
+                          className="sidebar-issues-select"
+                          value={linear.selectedMilestoneId}
+                          onChange={(event) =>
+                            linear.setFilter('selectedMilestoneId', event.target.value)
+                          }
+                        >
+                          <option value="all">All milestones</option>
+                          {linear.hasUnassignedMilestone && (
+                            <option value="none">No milestone</option>
                           )}
-                          {issue.assignee && (
-                            <div className="sidebar-issue-assignee">
-                              {issue.assignee.avatarUrl && (
-                                <img
-                                  src={issue.assignee.avatarUrl}
-                                  alt={issue.assignee.name}
-                                  className="sidebar-assignee-avatar"
-                                />
-                              )}
-                              <span className="sidebar-assignee-name">{issue.assignee.name}</span>
-                            </div>
-                          )}
-                          <div className="sidebar-issue-priority">
-                            Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
-                          </div>
+                          {linear.visibleMilestoneOptions.map((milestone) => (
+                            <option key={milestone.id} value={milestone.id}>
+                              {milestone.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sidebar-linear-issues-filter">
+                        <select
+                          id="sidebar-issues-filter-status"
+                          className="sidebar-issues-select"
+                          value={linear.selectedStatusId}
+                          onChange={(event) =>
+                            linear.setFilter('selectedStatusId', event.target.value)
+                          }
+                        >
+                          <option value="all">All statuses</option>
+                          {linear.statusOptions.map((state) => (
+                            <option key={state.id} value={state.id}>
+                              {state.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="sidebar-linear-issues-list">
+                      {linear.isLoading ? (
+                        <div className="sidebar-linear-issues-loading">Loading issues...</div>
+                      ) : linear.filteredIssues.length === 0 ? (
+                        <div className="sidebar-linear-issues-empty">
+                          {linear.issues.length === 0
+                            ? 'No open issues found'
+                            : 'No issues match these filters'}
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      ) : (
+                        linear.filteredIssues.map((issue: LinearIssue) => {
+                          const projectLabel = issue.project?.name;
+                          const milestoneLabel = issue.projectMilestone?.name;
+                          return (
+                            <div
+                              key={issue.id}
+                              className="sidebar-issue-card"
+                              draggable
+                              onDragStart={(e) => canvasDrop.handleIssueDragStart(e, issue)}
+                              onClick={() => setSelectedIssueId(issue.id)}
+                            >
+                              <div className="sidebar-issue-header">
+                                <span className="sidebar-issue-identifier">{issue.identifier}</span>
+                                <span
+                                  className="sidebar-issue-status"
+                                  style={{ backgroundColor: issue.state.color }}
+                                >
+                                  {issue.state.name}
+                                </span>
+                              </div>
+                              <div className="sidebar-issue-title">{issue.title}</div>
+                              {(projectLabel || milestoneLabel) && (
+                                <div className="sidebar-issue-meta">
+                                  {projectLabel && <span>Project: {projectLabel}</span>}
+                                  {projectLabel && milestoneLabel && (
+                                    <span className="sidebar-issue-meta-sep">|</span>
+                                  )}
+                                  {milestoneLabel && <span>Milestone: {milestoneLabel}</span>}
+                                </div>
+                              )}
+                              {issue.assignee && (
+                                <div className="sidebar-issue-assignee">
+                                  {issue.assignee.avatarUrl && (
+                                    <img
+                                      src={issue.assignee.avatarUrl}
+                                      alt={issue.assignee.name}
+                                      className="sidebar-assignee-avatar"
+                                    />
+                                  )}
+                                  <span className="sidebar-assignee-name">
+                                    {issue.assignee.name}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="sidebar-issue-priority">
+                                Priority:{' '}
+                                {issue.priority === 0
+                                  ? 'None'
+                                  : issue.priority === 1
+                                    ? 'Urgent'
+                                    : issue.priority === 2
+                                      ? 'High'
+                                      : issue.priority === 3
+                                        ? 'Medium'
+                                        : 'Low'}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -2165,10 +2299,7 @@ function CanvasFlow() {
 
       {/* Resize Handle */}
       {!sidebar.isSidebarCollapsed && (
-        <div
-          className="sidebar-resize-handle"
-          onMouseDown={handleResizeStart}
-        />
+        <div className="sidebar-resize-handle" onMouseDown={handleResizeStart} />
       )}
 
       {/* Canvas Content */}
@@ -2180,7 +2311,16 @@ function CanvasFlow() {
             onClick={sidebar.toggleSidebar}
             aria-label="Expand sidebar"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
@@ -2271,10 +2411,7 @@ function CanvasFlow() {
 
         {contextMenu && (
           <>
-            <div
-              className="context-menu-overlay"
-              onClick={() => setContextMenu(null)}
-            />
+            <div className="context-menu-overlay" onClick={() => setContextMenu(null)} />
             <div
               ref={contextMenuRef}
               className="context-menu"
@@ -2298,7 +2435,10 @@ function CanvasFlow() {
                 </span>
               </div>
               <div className="context-menu-divider" />
-              <div className="context-menu-item highlight" onClick={() => canvasActions.addStarterNode()}>
+              <div
+                className="context-menu-item highlight"
+                onClick={() => canvasActions.addStarterNode()}
+              >
                 <span className="context-menu-label">New Conversation</span>
                 <span className="context-menu-shortcut">
                   {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘N' : 'Ctrl+N'}
@@ -2312,11 +2452,29 @@ function CanvasFlow() {
         <button
           className="highlight-all-fab"
           onClick={folderHighlight.toggleHighlightAll}
-          aria-label={folderHighlight.isHighlightAllActive ? 'Unhighlight all folders' : 'Highlight all folders'}
-          title={folderHighlight.isHighlightAllActive ? 'Unhighlight all folders' : 'Highlight all folders'}
+          aria-label={
+            folderHighlight.isHighlightAllActive
+              ? 'Unhighlight all folders'
+              : 'Highlight all folders'
+          }
+          title={
+            folderHighlight.isHighlightAllActive
+              ? 'Unhighlight all folders'
+              : 'Highlight all folders'
+          }
         >
-          <svg width="16" height="16" viewBox="0 0 267 168" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M133.496 167.48C212.402 167.48 266.895 103.711 266.895 83.7891C266.895 63.7695 212.305 0.0976562 133.496 0.0976562C55.6641 0.0976562 0 63.7695 0 83.7891C0 103.711 55.5664 167.48 133.496 167.48ZM133.496 152.051C69.1406 152.051 17.0898 97.5586 17.0898 83.7891C17.0898 72.168 69.1406 15.5273 133.496 15.5273C197.559 15.5273 249.805 72.168 249.805 83.7891C249.805 97.5586 197.559 152.051 133.496 152.051ZM133.496 138.379C163.77 138.379 188.281 113.867 188.281 83.5938C188.281 53.3203 163.77 28.8086 133.496 28.8086C103.223 28.8086 78.6133 53.3203 78.6133 83.5938C78.6133 113.867 103.223 138.379 133.496 138.379Z" fill="currentColor" fillOpacity={folderHighlight.isHighlightAllActive ? "1" : "0.85"}/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 267 168"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M133.496 167.48C212.402 167.48 266.895 103.711 266.895 83.7891C266.895 63.7695 212.305 0.0976562 133.496 0.0976562C55.6641 0.0976562 0 63.7695 0 83.7891C0 103.711 55.5664 167.48 133.496 167.48ZM133.496 152.051C69.1406 152.051 17.0898 97.5586 17.0898 83.7891C17.0898 72.168 69.1406 15.5273 133.496 15.5273C197.559 15.5273 249.805 72.168 249.805 83.7891C249.805 97.5586 197.559 152.051 133.496 152.051ZM133.496 138.379C163.77 138.379 188.281 113.867 188.281 83.5938C188.281 53.3203 163.77 28.8086 133.496 28.8086C103.223 28.8086 78.6133 53.3203 78.6133 83.5938C78.6133 113.867 103.223 138.379 133.496 138.379Z"
+              fill="currentColor"
+              fillOpacity={folderHighlight.isHighlightAllActive ? '1' : '0.85'}
+            />
           </svg>
         </button>
 
@@ -2327,13 +2485,23 @@ function CanvasFlow() {
           aria-label="Settings"
           title="Settings"
         >
-          <svg width="16" height="16" viewBox="0 0 209 209" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 209 209"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <g clipPath="url(#clip0_995_232)">
-              <path d="M94.6289 208.789H114.355C121.875 208.789 127.734 204.199 129.395 196.973L133.594 178.711L136.719 177.637L152.637 187.402C158.984 191.309 166.309 190.43 171.68 185.059L185.352 171.484C190.723 166.113 191.602 158.691 187.695 152.441L177.734 136.621L178.906 133.691L197.168 129.395C204.297 127.734 208.984 121.777 208.984 114.355V95.0195C208.984 87.5977 204.395 81.7383 197.168 79.9805L179.102 75.5859L177.832 72.4609L187.793 56.6406C191.699 50.3906 190.918 43.0664 185.449 37.5977L171.777 23.9258C166.504 18.6523 159.18 17.6758 152.832 21.582L136.914 31.3477L133.594 30.0781L129.395 11.8164C127.734 4.58984 121.875 0 114.355 0H94.6289C87.1094 0 81.25 4.58984 79.5898 11.8164L75.293 30.0781L71.9727 31.3477L56.1523 21.582C49.8047 17.6758 42.3828 18.6523 37.1094 23.9258L23.5352 37.5977C18.0664 43.0664 17.1875 50.3906 21.1914 56.6406L31.0547 72.4609L29.8828 75.5859L11.8164 79.9805C4.58984 81.7383 0 87.5977 0 95.0195V114.355C0 121.777 4.6875 127.734 11.8164 129.395L30.0781 133.691L31.1523 136.621L21.2891 152.441C17.2852 158.691 18.2617 166.113 23.6328 171.484L37.207 185.059C42.5781 190.43 50 191.309 56.3477 187.402L72.168 177.637L75.293 178.711L79.5898 196.973C81.25 204.199 87.1094 208.789 94.6289 208.789ZM96.1914 193.555C94.5312 193.555 93.6523 192.871 93.3594 191.309L87.5 167.09C81.543 165.625 75.9766 163.281 71.7773 160.645L50.4883 173.73C49.3164 174.609 47.9492 174.512 46.875 173.242L35.3516 161.719C34.2773 160.645 34.1797 159.473 34.9609 158.105L48.0469 137.012C45.8008 132.91 43.2617 127.344 41.6992 121.387L17.4805 115.625C15.918 115.332 15.2344 114.453 15.2344 112.793V96.4844C15.2344 94.7266 15.8203 93.9453 17.4805 93.6523L41.6016 87.793C43.1641 81.4453 46.0938 75.6836 47.8516 72.0703L34.8633 50.9766C33.9844 49.5117 34.082 48.3398 35.1562 47.168L46.7773 35.8398C47.9492 34.668 49.0234 34.5703 50.4883 35.3516L71.582 48.1445C75.7812 45.8008 81.7383 43.3594 87.5977 41.6992L93.3594 17.4805C93.6523 15.918 94.5312 15.2344 96.1914 15.2344H112.793C114.453 15.2344 115.332 15.918 115.527 17.4805L121.484 41.8945C127.539 43.457 132.812 45.8984 137.207 48.2422L158.398 35.3516C159.961 34.5703 160.938 34.668 162.207 35.8398L173.73 47.168C174.902 48.3398 174.902 49.5117 174.023 50.9766L161.035 72.0703C162.891 75.6836 165.723 81.4453 167.285 87.793L191.504 93.6523C193.066 93.9453 193.75 94.7266 193.75 96.4844V112.793C193.75 114.453 192.969 115.332 191.504 115.625L167.188 121.387C165.625 127.344 163.184 132.91 160.84 137.012L173.926 158.105C174.707 159.473 174.707 160.645 173.535 161.719L162.109 173.242C160.938 174.512 159.668 174.609 158.398 173.73L137.109 160.645C132.91 163.281 127.441 165.625 121.484 167.09L115.527 191.309C115.332 192.871 114.453 193.555 112.793 193.555H96.1914ZM104.492 141.602C125.098 141.602 141.699 125 141.699 104.395C141.699 83.7891 125.098 67.1875 104.492 67.1875C83.8867 67.1875 67.2852 83.7891 67.2852 104.395C67.2852 125 83.8867 141.602 104.492 141.602ZM104.492 126.465C92.2852 126.465 82.4219 116.602 82.4219 104.395C82.4219 92.1875 92.2852 82.3242 104.492 82.3242C116.699 82.3242 126.562 92.1875 126.562 104.395C126.562 116.602 116.699 126.465 104.492 126.465Z" fill="currentColor" fillOpacity="0.85"/>
+              <path
+                d="M94.6289 208.789H114.355C121.875 208.789 127.734 204.199 129.395 196.973L133.594 178.711L136.719 177.637L152.637 187.402C158.984 191.309 166.309 190.43 171.68 185.059L185.352 171.484C190.723 166.113 191.602 158.691 187.695 152.441L177.734 136.621L178.906 133.691L197.168 129.395C204.297 127.734 208.984 121.777 208.984 114.355V95.0195C208.984 87.5977 204.395 81.7383 197.168 79.9805L179.102 75.5859L177.832 72.4609L187.793 56.6406C191.699 50.3906 190.918 43.0664 185.449 37.5977L171.777 23.9258C166.504 18.6523 159.18 17.6758 152.832 21.582L136.914 31.3477L133.594 30.0781L129.395 11.8164C127.734 4.58984 121.875 0 114.355 0H94.6289C87.1094 0 81.25 4.58984 79.5898 11.8164L75.293 30.0781L71.9727 31.3477L56.1523 21.582C49.8047 17.6758 42.3828 18.6523 37.1094 23.9258L23.5352 37.5977C18.0664 43.0664 17.1875 50.3906 21.1914 56.6406L31.0547 72.4609L29.8828 75.5859L11.8164 79.9805C4.58984 81.7383 0 87.5977 0 95.0195V114.355C0 121.777 4.6875 127.734 11.8164 129.395L30.0781 133.691L31.1523 136.621L21.2891 152.441C17.2852 158.691 18.2617 166.113 23.6328 171.484L37.207 185.059C42.5781 190.43 50 191.309 56.3477 187.402L72.168 177.637L75.293 178.711L79.5898 196.973C81.25 204.199 87.1094 208.789 94.6289 208.789ZM96.1914 193.555C94.5312 193.555 93.6523 192.871 93.3594 191.309L87.5 167.09C81.543 165.625 75.9766 163.281 71.7773 160.645L50.4883 173.73C49.3164 174.609 47.9492 174.512 46.875 173.242L35.3516 161.719C34.2773 160.645 34.1797 159.473 34.9609 158.105L48.0469 137.012C45.8008 132.91 43.2617 127.344 41.6992 121.387L17.4805 115.625C15.918 115.332 15.2344 114.453 15.2344 112.793V96.4844C15.2344 94.7266 15.8203 93.9453 17.4805 93.6523L41.6016 87.793C43.1641 81.4453 46.0938 75.6836 47.8516 72.0703L34.8633 50.9766C33.9844 49.5117 34.082 48.3398 35.1562 47.168L46.7773 35.8398C47.9492 34.668 49.0234 34.5703 50.4883 35.3516L71.582 48.1445C75.7812 45.8008 81.7383 43.3594 87.5977 41.6992L93.3594 17.4805C93.6523 15.918 94.5312 15.2344 96.1914 15.2344H112.793C114.453 15.2344 115.332 15.918 115.527 17.4805L121.484 41.8945C127.539 43.457 132.812 45.8984 137.207 48.2422L158.398 35.3516C159.961 34.5703 160.938 34.668 162.207 35.8398L173.73 47.168C174.902 48.3398 174.902 49.5117 174.023 50.9766L161.035 72.0703C162.891 75.6836 165.723 81.4453 167.285 87.793L191.504 93.6523C193.066 93.9453 193.75 94.7266 193.75 96.4844V112.793C193.75 114.453 192.969 115.332 191.504 115.625L167.188 121.387C165.625 127.344 163.184 132.91 160.84 137.012L173.926 158.105C174.707 159.473 174.707 160.645 173.535 161.719L162.109 173.242C160.938 174.512 159.668 174.609 158.398 173.73L137.109 160.645C132.91 163.281 127.441 165.625 121.484 167.09L115.527 191.309C115.332 192.871 114.453 193.555 112.793 193.555H96.1914ZM104.492 141.602C125.098 141.602 141.699 125 141.699 104.395C141.699 83.7891 125.098 67.1875 104.492 67.1875C83.8867 67.1875 67.2852 83.7891 67.2852 104.395C67.2852 125 83.8867 141.602 104.492 141.602ZM104.492 126.465C92.2852 126.465 82.4219 116.602 82.4219 104.395C82.4219 92.1875 92.2852 82.3242 104.492 82.3242C116.699 82.3242 126.562 92.1875 126.562 104.395C126.562 116.602 116.699 126.465 104.492 126.465Z"
+                fill="currentColor"
+                fillOpacity="0.85"
+              />
             </g>
             <defs>
               <clipPath id="clip0_995_232">
-                <rect width="208.984" height="208.887" fill="white"/>
+                <rect width="208.984" height="208.887" fill="white" />
               </clipPath>
             </defs>
           </svg>
@@ -2347,8 +2515,20 @@ function CanvasFlow() {
             aria-label="Zoom in"
             title="Zoom in"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 5V19M5 12H19"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
           <button
@@ -2357,8 +2537,20 @@ function CanvasFlow() {
             aria-label="Zoom out"
             title="Zoom out"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5 12H19"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -2376,27 +2568,27 @@ function CanvasFlow() {
               <div className="settings-modal-content">
                 <div className="settings-section">
                   <div className="settings-mesh-container">
-                    <div 
+                    <div
                       className="settings-mesh-preview"
                       style={{ borderColor: selectedGradient.overlayColor }}
                     >
                       {selectedGradient.type === 'mesh' ? (
-                        <MeshGradient 
-                          speed={selectedGradient.speed} 
-                          distortion={selectedGradient.distortion} 
-                          swirl={selectedGradient.swirl} 
-                          frame={selectedGradient.frame} 
-                          grainMixer={selectedGradient.grainMixer} 
-                          grainOverlay={selectedGradient.grainOverlay} 
-                          colors={selectedGradient.colors} 
-                          style={{ 
-                            width: '256px', 
-                            height: '360px', 
-                            opacity: 1, 
+                        <MeshGradient
+                          speed={selectedGradient.speed}
+                          distortion={selectedGradient.distortion}
+                          swirl={selectedGradient.swirl}
+                          frame={selectedGradient.frame}
+                          grainMixer={selectedGradient.grainMixer}
+                          grainOverlay={selectedGradient.grainOverlay}
+                          colors={selectedGradient.colors}
+                          style={{
+                            width: '256px',
+                            height: '360px',
+                            opacity: 1,
                             borderRadius: 0,
                             transformOrigin: 'center center',
-                            rotate: selectedGradient.rotate
-                          }} 
+                            rotate: selectedGradient.rotate,
+                          }}
                         />
                       ) : (
                         <Dithering
@@ -2414,23 +2606,23 @@ function CanvasFlow() {
                             borderRadius: 0,
                             transformOrigin: 'center center',
                             rotate: '0deg',
-                            backgroundColor: selectedGradient.backgroundColor || undefined
+                            backgroundColor: selectedGradient.backgroundColor || undefined,
                           }}
                         />
                       )}
-                      <div 
+                      <div
                         className="settings-mesh-overlay"
                         style={{ backgroundColor: selectedGradient.overlayColor }}
                       >
                         {githubUsername && (
                           <>
-                            <div 
+                            <div
                               className="settings-mesh-username"
                               style={{ color: overlayTextColor }}
                             >
                               @{githubUsername}
                             </div>
-                            <div 
+                            <div
                               className="settings-mesh-subtitle"
                               style={{ color: overlayTextColor }}
                             >
@@ -2452,13 +2644,17 @@ function CanvasFlow() {
                         <div className="settings-mesh-shortcut-item">
                           <span className="settings-mesh-shortcut-label">New Terminal</span>
                           <span className="settings-mesh-shortcut-key">
-                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} K V
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} K
+                            V
                           </span>
                         </div>
                         <div className="settings-mesh-shortcut-item">
-                          <span className="settings-mesh-shortcut-label">New Claude Code Terminal</span>
+                          <span className="settings-mesh-shortcut-label">
+                            New Claude Code Terminal
+                          </span>
                           <span className="settings-mesh-shortcut-key">
-                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} K B
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'} K
+                            B
                           </span>
                         </div>
                         <div className="settings-mesh-shortcut-item">
@@ -2476,7 +2672,9 @@ function CanvasFlow() {
                         <div className="settings-mesh-shortcut-item">
                           <span className="settings-mesh-shortcut-label">Node Drag Mode</span>
                           <span className="settings-mesh-shortcut-key">
-                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Hold ⌘' : 'Hold Ctrl'}
+                            {navigator.platform.toUpperCase().indexOf('MAC') >= 0
+                              ? 'Hold ⌘'
+                              : 'Hold Ctrl'}
                           </span>
                         </div>
                       </div>
@@ -2490,7 +2688,10 @@ function CanvasFlow() {
                       <span className="integration-name">Appearance</span>
                     </div>
                   </div>
-                  <div className="settings-item" style={{ padding: '12px 0', borderBottom: 'none' }}>
+                  <div
+                    className="settings-item"
+                    style={{ padding: '12px 0', borderBottom: 'none' }}
+                  >
                     <select
                       className="theme-select"
                       value={theme}
@@ -2519,10 +2720,7 @@ function CanvasFlow() {
                       disabled={linear.isConnected}
                     />
                     {linear.isConnected ? (
-                      <button
-                        onClick={linear.disconnect}
-                        className="integration-button disconnect"
-                      >
+                      <button onClick={linear.disconnect} className="integration-button disconnect">
                         Disconnect
                       </button>
                     ) : (
@@ -2554,7 +2752,10 @@ function CanvasFlow() {
                       <span className="integration-name">Text Level Fork</span>
                     </div>
                   </div>
-                  <div className="settings-item" style={{ padding: '12px 0', borderBottom: 'none' }}>
+                  <div
+                    className="settings-item"
+                    style={{ padding: '12px 0', borderBottom: 'none' }}
+                  >
                     <label className="settings-toggle-label">
                       <input
                         type="checkbox"
@@ -2565,7 +2766,8 @@ function CanvasFlow() {
                       <span className="settings-toggle-text">Text Level Fork</span>
                     </label>
                     <div className="settings-toggle-description" style={{ marginLeft: '0' }}>
-                      When enabled, highlighting text and clicking the plus button opens the fork dialog. When disabled, automatically creates a fork with a random name.
+                      When enabled, highlighting text and clicking the plus button opens the fork
+                      dialog. When disabled, automatically creates a fork with a random name.
                     </div>
                   </div>
                 </div>
@@ -2582,7 +2784,7 @@ function CanvasFlow() {
               pill.isPillExpanded ? 'expanded' : ''
             } ${pill.isPillSquare ? 'square' : ''}`}
             style={{
-              borderRadius: pill.isPillSquare ? '24px' : '20px'
+              borderRadius: pill.isPillSquare ? '24px' : '20px',
             }}
           >
             {!pill.isPillSquare ? (
@@ -2614,7 +2816,9 @@ function CanvasFlow() {
                           id="issues-filter-project"
                           className="issues-select"
                           value={linear.selectedProjectId}
-                          onChange={(event) => linear.setFilter('selectedProjectId', event.target.value)}
+                          onChange={(event) =>
+                            linear.setFilter('selectedProjectId', event.target.value)
+                          }
                         >
                           <option value="all">All projects</option>
                           {linear.hasUnassignedProject && <option value="none">No project</option>}
@@ -2631,10 +2835,14 @@ function CanvasFlow() {
                           id="issues-filter-milestone"
                           className="issues-select"
                           value={linear.selectedMilestoneId}
-                          onChange={(event) => linear.setFilter('selectedMilestoneId', event.target.value)}
+                          onChange={(event) =>
+                            linear.setFilter('selectedMilestoneId', event.target.value)
+                          }
                         >
                           <option value="all">All milestones</option>
-                          {linear.hasUnassignedMilestone && <option value="none">No milestone</option>}
+                          {linear.hasUnassignedMilestone && (
+                            <option value="none">No milestone</option>
+                          )}
                           {linear.visibleMilestoneOptions.map((milestone) => (
                             <option key={milestone.id} value={milestone.id}>
                               {milestone.label}
@@ -2648,7 +2856,9 @@ function CanvasFlow() {
                           id="issues-filter-status"
                           className="issues-select"
                           value={linear.selectedStatusId}
-                          onChange={(event) => linear.setFilter('selectedStatusId', event.target.value)}
+                          onChange={(event) =>
+                            linear.setFilter('selectedStatusId', event.target.value)
+                          }
                         >
                           <option value="all">All statuses</option>
                           {linear.statusOptions.map((state) => (
@@ -2665,7 +2875,9 @@ function CanvasFlow() {
                     <div className="loading-state">Loading issues...</div>
                   ) : linear.filteredIssues.length === 0 ? (
                     <div className="empty-state">
-                      {linear.issues.length === 0 ? 'No open issues found' : 'No issues match these filters'}
+                      {linear.issues.length === 0
+                        ? 'No open issues found'
+                        : 'No issues match these filters'}
                     </div>
                   ) : (
                     linear.filteredIssues.map((issue: LinearIssue) => {
@@ -2710,7 +2922,16 @@ function CanvasFlow() {
                             </div>
                           )}
                           <div className="issue-priority">
-                            Priority: {issue.priority === 0 ? 'None' : issue.priority === 1 ? 'Urgent' : issue.priority === 2 ? 'High' : issue.priority === 3 ? 'Medium' : 'Low'}
+                            Priority:{' '}
+                            {issue.priority === 0
+                              ? 'None'
+                              : issue.priority === 1
+                                ? 'Urgent'
+                                : issue.priority === 2
+                                  ? 'High'
+                                  : issue.priority === 3
+                                    ? 'Medium'
+                                    : 'Low'}
                           </div>
                         </div>
                       );
@@ -2726,10 +2947,7 @@ function CanvasFlow() {
 
         {/* Linear Issue Details Modal */}
         {selectedIssueId && (
-          <IssueDetailsModal
-            issueId={selectedIssueId}
-            onClose={() => setSelectedIssueId(null)}
-          />
+          <IssueDetailsModal issueId={selectedIssueId} onClose={() => setSelectedIssueId(null)} />
         )}
       </div>
     </div>

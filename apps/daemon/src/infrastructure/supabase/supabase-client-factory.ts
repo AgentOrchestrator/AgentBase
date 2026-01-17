@@ -8,8 +8,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type {
-  IAuthenticatedClientFactory,
   AuthenticatedClientResult,
+  IAuthenticatedClientFactory,
 } from '../../interfaces/authenticated-client-factory.js';
 import { createAuthenticatedSupabaseClient } from './client.js';
 
@@ -35,9 +35,7 @@ export class SupabaseClientFactory
     }
   }
 
-  async getUserIdFromClient(
-    client: SupabaseClient<Database>
-  ): Promise<string | null> {
+  async getUserIdFromClient(client: SupabaseClient<Database>): Promise<string | null> {
     try {
       const { data } = await client.auth.getSession();
       return data.session?.user.id ?? null;

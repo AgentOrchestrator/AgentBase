@@ -8,8 +8,8 @@
  * It only exists until the user submits, then gets replaced by an AgentNode.
  */
 
+import type { NodeProps } from '@xyflow/react';
 import { useCallback } from 'react';
-import { NodeProps } from '@xyflow/react';
 import { StarterNodePresentation } from './StarterNodePresentation';
 
 /**

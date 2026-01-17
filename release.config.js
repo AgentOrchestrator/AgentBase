@@ -16,6 +16,7 @@ export default {
     [
       '@semantic-release/exec',
       {
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: semantic-release template syntax
         prepareCmd: 'npm version ${nextRelease.version} --no-git-tag-version --prefix apps/desktop',
       },
     ],
@@ -24,6 +25,7 @@ export default {
       '@semantic-release/git',
       {
         assets: ['package.json', 'package-lock.json', 'apps/desktop/package.json'],
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: semantic-release template syntax
         message: 'chore(release): ${nextRelease.version} [skip ci]',
       },
     ],

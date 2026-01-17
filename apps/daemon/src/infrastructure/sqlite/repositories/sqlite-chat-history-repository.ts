@@ -4,11 +4,11 @@
 
 import type Database from 'better-sqlite3';
 import type {
-  IChatHistoryRepository,
-  ChatHistoryRecord,
   ChatHistoryInput,
+  ChatHistoryRecord,
+  IChatHistoryRepository,
 } from '../../../interfaces/repositories.js';
-import type { ChatMessage, AgentType } from '../../../types.js';
+import type { AgentType, ChatMessage } from '../../../types.js';
 
 interface ChatHistoryRow {
   id: string;
@@ -107,11 +107,7 @@ export class SQLiteChatHistoryRepository implements IChatHistoryRepository {
     return rows.map((row) => this.mapToChatHistoryRecord(row));
   }
 
-  async updateAiSummary(
-    id: string,
-    summary: string,
-    messageCount: number
-  ): Promise<boolean> {
+  async updateAiSummary(id: string, summary: string, messageCount: number): Promise<boolean> {
     try {
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`

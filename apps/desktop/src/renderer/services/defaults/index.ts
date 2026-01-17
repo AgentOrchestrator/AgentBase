@@ -2,10 +2,10 @@
  * Default implementations for CodingAgentStatusManager dependencies.
  */
 
-export { SimpleTitleComputer } from './SimpleTitleComputer';
-export { SimpleSummaryComputer } from './SimpleSummaryComputer';
 export {
+  type AgentStatusAPI,
   CanvasDatabasePersistence,
   InMemoryPersistence,
-  type AgentStatusAPI,
 } from './CanvasDatabasePersistence';
+export { SimpleSummaryComputer } from './SimpleSummaryComputer';
+export { SimpleTitleComputer } from './SimpleTitleComputer';

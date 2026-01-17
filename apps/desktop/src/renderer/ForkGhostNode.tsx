@@ -5,8 +5,8 @@
  * Follows cursor position and indicates where the forked node will appear.
  */
 
-import { useState, useEffect } from 'react';
 import { useConnection } from '@xyflow/react';
+import { useEffect, useState } from 'react';
 import { forkStore } from './stores';
 import type { ForkDragState } from './stores/IForkStore';
 import './ForkGhostNode.css';

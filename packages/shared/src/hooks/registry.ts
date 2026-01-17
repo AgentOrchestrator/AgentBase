@@ -9,17 +9,18 @@
 
 // Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
 const randomUUID = (): string => globalThis.crypto.randomUUID();
+
 import type {
   AgentEvent,
-  AgentEventType,
   AgentEventCategory,
+  AgentEventType,
+  AgentOutputPayload,
   EventHandler,
   EventResult,
-  UnsubscribeFn,
-  SessionPayload,
   PermissionPayload,
+  SessionPayload,
   ToolPayload,
-  AgentOutputPayload,
+  UnsubscribeFn,
 } from './types.js';
 
 /**
@@ -51,14 +52,11 @@ export class EventRegistry {
    *   return { action: 'continue' };
    * });
    */
-  on<T = unknown>(
-    eventType: AgentEventType,
-    handler: EventHandler<T>
-  ): UnsubscribeFn {
+  on<T = unknown>(eventType: AgentEventType, handler: EventHandler<T>): UnsubscribeFn {
     if (!this.handlers.has(eventType)) {
       this.handlers.set(eventType, new Set());
     }
-    this.handlers.get(eventType)!.add(handler as EventHandler);
+    this.handlers.get(eventType)?.add(handler as EventHandler);
 
     return () => {
       this.handlers.get(eventType)?.delete(handler as EventHandler);
@@ -75,14 +73,11 @@ export class EventRegistry {
    *   return { action: 'continue' };
    * });
    */
-  onCategory<T = unknown>(
-    category: AgentEventCategory,
-    handler: EventHandler<T>
-  ): UnsubscribeFn {
+  onCategory<T = unknown>(category: AgentEventCategory, handler: EventHandler<T>): UnsubscribeFn {
     if (!this.categoryHandlers.has(category)) {
       this.categoryHandlers.set(category, new Set());
     }
-    this.categoryHandlers.get(category)!.add(handler as EventHandler);
+    this.categoryHandlers.get(category)?.add(handler as EventHandler);
 
     return () => {
       this.categoryHandlers.get(category)?.delete(handler as EventHandler);
@@ -141,10 +136,7 @@ export class EventRegistry {
           const result = await handler(event);
           results.push(result);
         } catch (error) {
-          console.error(
-            `[EventRegistry] Category handler error for ${category}:`,
-            error
-          );
+          console.error(`[EventRegistry] Category handler error for ${category}:`, error);
           results.push({
             action: 'continue',
             message: `Handler error: ${error}`,
@@ -161,10 +153,7 @@ export class EventRegistry {
           const result = await handler(event);
           results.push(result);
         } catch (error) {
-          console.error(
-            `[EventRegistry] Handler error for ${event.type}:`,
-            error
-          );
+          console.error(`[EventRegistry] Handler error for ${event.type}:`, error);
           results.push({
             action: 'continue',
             message: `Handler error: ${error}`,
@@ -183,9 +172,7 @@ export class EventRegistry {
   /**
    * Register handler for permission:request events
    */
-  onPermissionRequest(
-    handler: EventHandler<PermissionPayload>
-  ): UnsubscribeFn {
+  onPermissionRequest(handler: EventHandler<PermissionPayload>): UnsubscribeFn {
     return this.on('permission:request', handler);
   }
 

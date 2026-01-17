@@ -5,7 +5,11 @@
  * Provides a clean interface to the worktreeAPI exposed by the main process.
  */
 
-import type { WorktreeInfo, WorktreeProvisionOptions, WorktreeReleaseOptions } from '../../main/types/worktree';
+import type {
+  WorktreeInfo,
+  WorktreeProvisionOptions,
+  WorktreeReleaseOptions,
+} from '../../main/types/worktree';
 
 /**
  * Result of worktree creation

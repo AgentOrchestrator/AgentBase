@@ -16,18 +16,13 @@
  *   agent.actions.setWorkspace(path)  // set workspace
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useReactFlow } from '@xyflow/react';
 import type { GitInfo } from '@agent-orchestrator/shared';
-import type { AgentNodeData } from '../../types/agent-node';
+import { useReactFlow } from '@xyflow/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { agentActionStore } from '../../stores';
+import type { AgentNodeData } from '../../types/agent-node';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
-import type {
-  AgentState,
-  UseAgentStateInput,
-  WorkspaceSource,
-  SessionReadiness,
-} from './types';
+import type { AgentState, SessionReadiness, UseAgentStateInput, WorkspaceSource } from './types';
 
 // =============================================================================
 // Deterministic Session ID - Commented out for future use
@@ -90,7 +85,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
       console.log('[useAgentState] Initialized for node', initialNodeData);
       hasLoggedInit.current = true;
     }
-  }, []);
+  }, [initialNodeData]);
 
   // Sync external node updates (e.g., from Canvas update-node events)
   useEffect(() => {
@@ -136,7 +131,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // Clear actions when agent/session changes
   useEffect(() => {
     agentActionStore.clearAgent(nodeData.agentId);
-  }, [nodeData.agentId, sessionId]);
+  }, [nodeData.agentId]);
 
   // ---------------------------------------------------------------------------
   // Config (immutable)
@@ -150,7 +145,14 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
       createdAt: nodeData.createdAt,
       initialPrompt: nodeData.initialPrompt,
     }),
-    [nodeId, nodeData.agentId, nodeData.terminalId, nodeData.agentType, nodeData.createdAt, nodeData.initialPrompt]
+    [
+      nodeId,
+      nodeData.agentId,
+      nodeData.terminalId,
+      nodeData.agentType,
+      nodeData.createdAt,
+      nodeData.initialPrompt,
+    ]
   );
 
   // ---------------------------------------------------------------------------
@@ -198,11 +200,9 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
           return;
         }
 
-        const session = await codingAgentAPI.getSession(
-          nodeData.agentType,
-          sessionId,
-          { workspacePath }
-        );
+        const session = await codingAgentAPI.getSession(nodeData.agentType, sessionId, {
+          workspacePath,
+        });
 
         if (session?.createdAt) {
           setSessionCreatedAt(session.createdAt);
@@ -277,7 +277,6 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   //   return unsubscribe;
   // }, [nodeData.agentId, nodeId]);
 
-
   // ---------------------------------------------------------------------------
   // Git Info Fetching - sync to node data
   // ---------------------------------------------------------------------------
@@ -304,7 +303,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
         setGitInfo(null);
         setIsLoadingGit(false);
       });
-  }, [workspacePath, nodeId]);
+  }, [workspacePath, nodeId, nodeData]);
 
   // ---------------------------------------------------------------------------
   // Actions

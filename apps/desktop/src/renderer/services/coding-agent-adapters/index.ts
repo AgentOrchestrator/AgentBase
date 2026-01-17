@@ -27,10 +27,10 @@
 
 // Factory function - main entry point
 export {
-  createCodingAgentAdapter,
-  isAdapterSupported,
-  getSupportedAdapterTypes,
   AdapterFactoryError,
+  createCodingAgentAdapter,
+  getSupportedAdapterTypes,
+  isAdapterSupported,
 } from './AdapterFactory';
 
 // Adapter implementation

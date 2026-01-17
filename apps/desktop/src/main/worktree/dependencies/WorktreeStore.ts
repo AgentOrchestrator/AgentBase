@@ -1,6 +1,6 @@
 import sqlite3 from 'sqlite3';
-import { WorktreeRow, WorktreeStatus } from '../../types/worktree';
-import { IWorktreeStore } from './IWorktreeStore';
+import type { WorktreeRow, WorktreeStatus } from '../../types/worktree';
+import type { IWorktreeStore } from './IWorktreeStore';
 
 /**
  * Production implementation of IWorktreeStore using SQLite
@@ -30,12 +30,8 @@ export class WorktreeStore implements IWorktreeStore {
       )
     `);
 
-    await this.run(
-      'CREATE INDEX IF NOT EXISTS idx_worktrees_repo_path ON worktrees(repo_path)'
-    );
-    await this.run(
-      'CREATE INDEX IF NOT EXISTS idx_worktrees_status ON worktrees(status)'
-    );
+    await this.run('CREATE INDEX IF NOT EXISTS idx_worktrees_repo_path ON worktrees(repo_path)');
+    await this.run('CREATE INDEX IF NOT EXISTS idx_worktrees_status ON worktrees(status)');
   }
 
   async insert(worktree: WorktreeRow): Promise<void> {
@@ -57,11 +53,7 @@ export class WorktreeStore implements IWorktreeStore {
     );
   }
 
-  async updateStatus(
-    id: string,
-    status: WorktreeStatus,
-    errorMessage?: string
-  ): Promise<void> {
+  async updateStatus(id: string, status: WorktreeStatus, errorMessage?: string): Promise<void> {
     const now = new Date().toISOString();
     await this.run(
       `UPDATE worktrees SET status = ?, error_message = ?, last_activity_at = ? WHERE id = ?`,
@@ -70,25 +62,18 @@ export class WorktreeStore implements IWorktreeStore {
   }
 
   async getById(id: string): Promise<WorktreeRow | null> {
-    const row = await this.get<WorktreeRow>(
-      'SELECT * FROM worktrees WHERE id = ?',
-      [id]
-    );
+    const row = await this.get<WorktreeRow>('SELECT * FROM worktrees WHERE id = ?', [id]);
     return row ?? null;
   }
 
   async getByPath(path: string): Promise<WorktreeRow | null> {
-    const row = await this.get<WorktreeRow>(
-      'SELECT * FROM worktrees WHERE worktree_path = ?',
-      [path]
-    );
+    const row = await this.get<WorktreeRow>('SELECT * FROM worktrees WHERE worktree_path = ?', [
+      path,
+    ]);
     return row ?? null;
   }
 
-  async getByRepoBranch(
-    repoPath: string,
-    branchName: string
-  ): Promise<WorktreeRow | null> {
+  async getByRepoBranch(repoPath: string, branchName: string): Promise<WorktreeRow | null> {
     const row = await this.get<WorktreeRow>(
       'SELECT * FROM worktrees WHERE repo_path = ? AND branch_name = ?',
       [repoPath, branchName]
@@ -103,9 +88,7 @@ export class WorktreeStore implements IWorktreeStore {
         [repoPath]
       );
     }
-    return this.all<WorktreeRow>(
-      'SELECT * FROM worktrees ORDER BY provisioned_at DESC'
-    );
+    return this.all<WorktreeRow>('SELECT * FROM worktrees ORDER BY provisioned_at DESC');
   }
 
   async listByStatus(statuses: WorktreeStatus[]): Promise<WorktreeRow[]> {

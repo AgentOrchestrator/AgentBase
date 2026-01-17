@@ -5,6 +5,13 @@
  * allowing users to include only messages up to a specific point when forking.
  */
 
+// Filter functions
+export {
+  extractMessageMetadata,
+  filterByMessageId,
+  filterByTimestamp,
+  filterJsonl,
+} from './JsonlFilterModule';
 // Types (re-exported from shared + internal types)
 export type {
   FilterOptions,
@@ -12,11 +19,3 @@ export type {
   MessageMetadata,
   ParsedJsonlLine,
 } from './types';
-
-// Filter functions
-export {
-  filterByMessageId,
-  filterByTimestamp,
-  filterJsonl,
-  extractMessageMetadata,
-} from './JsonlFilterModule';

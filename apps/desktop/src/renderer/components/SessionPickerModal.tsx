@@ -4,7 +4,7 @@
  * Modal to browse and select from available conversation sessions.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { CodingAgentAPI } from '../../main/services/coding-agent';
 import './SessionPickerModal.css';
 
@@ -45,7 +45,8 @@ function SessionPickerModal({ isOpen, onClose, onSelect }: SessionPickerModalPro
       setError(null);
 
       try {
-        const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI }).codingAgentAPI;
+        const codingAgentAPI = (window as unknown as { codingAgentAPI?: CodingAgentAPI })
+          .codingAgentAPI;
         if (!codingAgentAPI) {
           setError('Coding agent API not available');
           return;
@@ -119,14 +120,11 @@ function SessionPickerModal({ isOpen, onClose, onSelect }: SessionPickerModalPro
             placeholder="Search by project or message..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            autoFocus
           />
         </div>
 
         <div className="session-picker-content">
-          {isLoading && (
-            <div className="session-picker-loading">Loading sessions...</div>
-          )}
+          {isLoading && <div className="session-picker-loading">Loading sessions...</div>}
 
           {error && <div className="session-picker-error">{error}</div>}
 

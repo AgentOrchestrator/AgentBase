@@ -1,5 +1,5 @@
-import { randomUUID } from 'crypto';
-import { IIdGenerator } from './IIdGenerator';
+import { randomUUID } from 'node:crypto';
+import type { IIdGenerator } from './IIdGenerator';
 
 /**
  * Production implementation of IIdGenerator using crypto.randomUUID

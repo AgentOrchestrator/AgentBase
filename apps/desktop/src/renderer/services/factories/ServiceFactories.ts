@@ -7,11 +7,11 @@
 import type { AgentType } from '../../../../types/coding-agent-status';
 import type { ServiceFactories } from '../../context/NodeServicesRegistry';
 import type { ITerminalService } from '../../context/node-services';
-import { TerminalServiceImpl } from '../impl/TerminalServiceImpl';
-import { WorkspaceServiceImpl } from '../impl/WorkspaceServiceImpl';
+import { createCodingAgentAdapter } from '../coding-agent-adapters';
 import { AgentServiceImpl } from '../impl/AgentServiceImpl';
 import { ConversationServiceImpl } from '../impl/ConversationServiceImpl';
-import { createCodingAgentAdapter } from '../coding-agent-adapters';
+import { TerminalServiceImpl } from '../impl/TerminalServiceImpl';
+import { WorkspaceServiceImpl } from '../impl/WorkspaceServiceImpl';
 
 /**
  * Create production service factories
@@ -38,11 +38,7 @@ export function createServiceFactories(): ServiceFactories {
       return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, adapter);
     },
 
-    createConversationService: (
-      nodeId: string,
-      sessionId: string,
-      agentType: string
-    ) => {
+    createConversationService: (nodeId: string, sessionId: string, agentType: string) => {
       return new ConversationServiceImpl(nodeId, sessionId, agentType);
     },
   };

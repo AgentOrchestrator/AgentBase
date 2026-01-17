@@ -6,9 +6,9 @@
  * and separation of concerns.
  */
 
-import type { Node } from '@xyflow/react';
 import type { GitInfo, TerminalAttachment } from '@agent-orchestrator/shared';
-import { createDefaultAgentTitle, type AgentNodeData, type AgentTitle } from '../types/agent-node';
+import type { Node } from '@xyflow/react';
+import { type AgentNodeData, type AgentTitle, createDefaultAgentTitle } from '../types/agent-node';
 
 // =============================================================================
 // Types
@@ -50,7 +50,6 @@ export interface CreateAgentOptions extends CreateNodeOptions {
   /** Initial attachments to attach to the agent (e.g., Linear issues) */
   initialAttachments?: TerminalAttachment[];
 }
-
 
 // =============================================================================
 // Service Implementation
@@ -127,7 +126,8 @@ export class CanvasNodeService {
       : createDefaultAgentTitle();
 
     // Determine workspace path: modal > explicit > locked folder
-    const selectedWorkspacePath = modalData?.workspacePath || workspacePath || lockedFolderPath || '';
+    const selectedWorkspacePath =
+      modalData?.workspacePath || workspacePath || lockedFolderPath || '';
 
     // Store description in initialPrompt if provided (for auto-sending as first message)
     const description = modalData?.description?.trim();
@@ -184,7 +184,6 @@ export class CanvasNodeService {
     };
   }
 
-
   /**
    * Create a starter node
    */
@@ -204,7 +203,6 @@ export class CanvasNodeService {
       },
     };
   }
-
 
   /**
    * Create a Claude Code terminal node (auto-starts claude command)

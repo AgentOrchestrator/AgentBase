@@ -210,7 +210,9 @@ export function isQueueOperationEntry(entry: ConversationEntry): entry is QueueO
 /**
  * Type guard to check if entry is a file history snapshot
  */
-export function isFileHistorySnapshotEntry(entry: ConversationEntry): entry is FileHistorySnapshotEntry {
+export function isFileHistorySnapshotEntry(
+  entry: ConversationEntry
+): entry is FileHistorySnapshotEntry {
   return entry.type === 'file-history-snapshot';
 }
 

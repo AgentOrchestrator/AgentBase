@@ -3,7 +3,7 @@
  * based on relative node positions.
  */
 
-import type { Node, Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 export interface HandlePair {
   sourceHandle: string;
@@ -13,18 +13,15 @@ export interface HandlePair {
 /**
  * Calculate the optimal source and target handles for an edge
  * based on the relative positions of the source and target nodes.
- * 
+ *
  * This creates the shortest visual path by connecting nodes via
  * the sides that face each other.
- * 
+ *
  * @param sourceNode - The source node
  * @param targetNode - The target node
  * @returns The optimal sourceHandle and targetHandle IDs
  */
-export function getOptimalHandles(
-  sourceNode: Node,
-  targetNode: Node
-): HandlePair {
+export function getOptimalHandles(sourceNode: Node, targetNode: Node): HandlePair {
   // Get node centers (position is top-left corner)
   // Use measured dimensions if available, otherwise use defaults
   const sourceWidth = sourceNode.measured?.width ?? sourceNode.width ?? 450;
@@ -70,7 +67,7 @@ export function getOptimalHandles(
 /**
  * Check if a node type supports dynamic handle updates.
  * Some node types (like agent-chat) only have handles on specific sides.
- * 
+ *
  * @param nodeType - The type of the node
  * @returns True if the node supports all-side handles
  */
@@ -83,18 +80,15 @@ function supportsAllSideHandles(nodeType: string | undefined): boolean {
 /**
  * Update edges with optimal handles based on current node positions.
  * Only updates edges where both source and target nodes support all-side handles.
- * 
+ *
  * @param edges - Array of edges to update
  * @param nodes - Array of all nodes
  * @returns Updated edges with optimal handles
  */
-export function updateEdgesWithOptimalHandles(
-  edges: Edge[],
-  nodes: Node[]
-): Edge[] {
-  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+export function updateEdgesWithOptimalHandles(edges: Edge[], nodes: Node[]): Edge[] {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
 
-  return edges.map(edge => {
+  return edges.map((edge) => {
     const sourceNode = nodeMap.get(edge.source);
     const targetNode = nodeMap.get(edge.target);
 
@@ -129,18 +123,15 @@ export function updateEdgesWithOptimalHandles(
 /**
  * Check if any edges need handle updates based on node positions.
  * This is useful for determining whether to trigger an edge update.
- * 
+ *
  * @param edges - Array of edges to check
  * @param nodes - Array of all nodes
  * @returns True if any edge handles need updating
  */
-export function edgesNeedHandleUpdate(
-  edges: Edge[],
-  nodes: Node[]
-): boolean {
-  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+export function edgesNeedHandleUpdate(edges: Edge[], nodes: Node[]): boolean {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
 
-  return edges.some(edge => {
+  return edges.some((edge) => {
     const sourceNode = nodeMap.get(edge.source);
     const targetNode = nodeMap.get(edge.target);
 

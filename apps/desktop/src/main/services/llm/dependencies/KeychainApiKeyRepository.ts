@@ -1,7 +1,7 @@
 import keytar from 'keytar';
 import type { IApiKeyRepository } from '../interfaces';
-import type { Result, LLMError, VendorId } from '../types';
-import { ok, err, llmError, LLMErrorCode } from '../types';
+import type { LLMError, Result, VendorId } from '../types';
+import { err, LLMErrorCode, llmError, ok } from '../types';
 
 /**
  * macOS Keychain implementation for API key storage.
@@ -34,10 +34,7 @@ export class KeychainApiKeyRepository implements IApiKeyRepository {
     }
   }
 
-  async setApiKey(
-    vendor: VendorId,
-    apiKey: string
-  ): Promise<Result<void, LLMError>> {
+  async setApiKey(vendor: VendorId, apiKey: string): Promise<Result<void, LLMError>> {
     try {
       await keytar.setPassword(this.serviceName, vendor, apiKey);
       return ok(undefined);

@@ -6,34 +6,34 @@
  */
 
 export type {
-  // Content types
-  TextContent,
-  ToolUseContent,
-  ToolResultContent,
-  ThinkingContent,
-  MessageContent,
+  AssistantMessageEntry,
+  AssistantMessageGroup,
   // Message types
   ClaudeMessage,
+  ConversationEntry,
+  FileHistorySnapshotEntry,
+  MessageContent,
+  MessageGroup,
   // Entry types
   QueueOperationEntry,
-  FileHistorySnapshotEntry,
+  // Content types
+  TextContent,
+  ThinkingContent,
+  ToolResultContent,
+  ToolUseContent,
   UserMessageEntry,
-  AssistantMessageEntry,
-  ConversationEntry,
   // Group types
   UserMessageGroup,
-  AssistantMessageGroup,
-  MessageGroup,
 } from '@agent-orchestrator/shared';
 
 export {
+  isAssistantMessageEntry,
+  isFileHistorySnapshotEntry,
+  isQueueOperationEntry,
+  isTextContent,
+  isThinkingContent,
+  isToolResultContent,
+  isToolUseContent,
   // Type guards
   isUserMessageEntry,
-  isAssistantMessageEntry,
-  isQueueOperationEntry,
-  isFileHistorySnapshotEntry,
-  isTextContent,
-  isToolUseContent,
-  isToolResultContent,
-  isThinkingContent,
 } from '@agent-orchestrator/shared';

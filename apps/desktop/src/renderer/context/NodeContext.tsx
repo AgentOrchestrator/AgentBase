@@ -6,30 +6,25 @@
  * type-appropriate services that are disposed on unmount.
  */
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-} from 'react';
+import type React from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { AgentType } from '../../../types/coding-agent-status';
+import type { NodeServiceConfig } from './NodeServicesRegistry';
+import { useNodeServicesRegistry } from './NodeServicesRegistry';
 import type {
-  NodeType,
-  ITerminalService,
-  IWorkspaceService,
   IAgentService,
   IConversationService,
+  ITerminalService,
+  IWorkspaceService,
   NodeServices,
+  NodeType,
 } from './node-services';
 import {
-  hasTerminalService,
-  hasWorkspaceService,
   hasAgentService,
   hasConversationService,
+  hasTerminalService,
+  hasWorkspaceService,
 } from './node-services';
-import { useNodeServicesRegistry } from './NodeServicesRegistry';
-import type { NodeServiceConfig } from './NodeServicesRegistry';
 
 // =============================================================================
 // Context Types
@@ -168,7 +163,7 @@ export function NodeContextProvider({
         });
       }
     };
-  }, [nodeId, nodeType, registry]);
+  }, [nodeId, nodeType, registry, config]);
 
   // Handle workspace path changes after initialization
   useEffect(() => {
@@ -210,9 +205,7 @@ export function NodeContextProvider({
     return null;
   }
 
-  return (
-    <NodeContext.Provider value={contextValue}>{children}</NodeContext.Provider>
-  );
+  return <NodeContext.Provider value={contextValue}>{children}</NodeContext.Provider>;
 }
 
 // =============================================================================
@@ -244,9 +237,7 @@ export function useNodeServices<T extends NodeServices = NodeServices>(): T {
 export function useTerminalService(): ITerminalService {
   const context = useNodeContext();
   if (!hasTerminalService(context.services)) {
-    throw new Error(
-      `Terminal service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Terminal service not available for node type: ${context.nodeType}`);
   }
   return context.services.terminal;
 }
@@ -257,9 +248,7 @@ export function useTerminalService(): ITerminalService {
 export function useWorkspaceService(): IWorkspaceService {
   const context = useNodeContext();
   if (!hasWorkspaceService(context.services)) {
-    throw new Error(
-      `Workspace service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Workspace service not available for node type: ${context.nodeType}`);
   }
   return context.services.workspace;
 }
@@ -270,9 +259,7 @@ export function useWorkspaceService(): IWorkspaceService {
 export function useAgentService(): IAgentService {
   const context = useNodeContext();
   if (!hasAgentService(context.services)) {
-    throw new Error(
-      `Agent service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Agent service not available for node type: ${context.nodeType}`);
   }
   return context.services.agent;
 }
@@ -283,9 +270,7 @@ export function useAgentService(): IAgentService {
 export function useConversationService(): IConversationService {
   const context = useNodeContext();
   if (!hasConversationService(context.services)) {
-    throw new Error(
-      `Conversation service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Conversation service not available for node type: ${context.nodeType}`);
   }
   return context.services.conversation;
 }

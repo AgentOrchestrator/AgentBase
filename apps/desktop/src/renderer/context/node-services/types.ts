@@ -5,23 +5,23 @@
  * Each node type gets appropriate services via NodeContext.
  */
 
-import type { WorktreeInfo } from '../../../main/types/worktree';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type {
   AgentType,
   CodingAgentStatus,
   CodingAgentStatusInfo,
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type { WorktreeInfo } from '../../../main/types/worktree';
 import type {
-  GenerateResponse,
-  StreamCallback,
-  StructuredStreamCallback,
-  SessionInfo,
-  CodingAgentSessionContent,
-  MessageFilterOptions,
   AgentAdapterEventType,
   AgentEventHandler,
+  CodingAgentSessionContent,
+  GenerateResponse,
+  MessageFilterOptions,
+  SessionInfo,
+  StreamCallback,
+  StructuredStreamCallback,
 } from './coding-agent-adapter';
 
 // Re-export for consumers
@@ -34,7 +34,7 @@ export type { GitInfo };
 /**
  * Discriminator for node types
  */
-export type NodeType = 'agent' | 'terminal'| 'custom' | 'conversation';
+export type NodeType = 'agent' | 'terminal' | 'custom' | 'conversation';
 
 // =============================================================================
 // Base Service Interface
@@ -289,8 +289,5 @@ export interface IAgentService extends INodeService {
    * @param handler - Handler called when event occurs
    * @returns Unsubscribe function
    */
-  onAgentEvent<T extends AgentAdapterEventType>(
-    type: T,
-    handler: AgentEventHandler<T>
-  ): () => void;
+  onAgentEvent<T extends AgentAdapterEventType>(type: T, handler: AgentEventHandler<T>): () => void;
 }

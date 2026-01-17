@@ -47,7 +47,11 @@ export function categorizeToolName(toolName: string): ToolCategory {
   }
 
   // MCP tools
-  if (lowerName.startsWith('mcp_') || lowerName.startsWith('mcp__') || lowerName.startsWith('mcp')) {
+  if (
+    lowerName.startsWith('mcp_') ||
+    lowerName.startsWith('mcp__') ||
+    lowerName.startsWith('mcp')
+  ) {
     return 'mcp';
   }
 

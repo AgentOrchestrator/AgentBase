@@ -1,4 +1,4 @@
-import { AgentType } from '@agent-orchestrator/shared';
+import type { AgentType } from '@agent-orchestrator/shared';
 
 /**
  * Re-export AgentType from shared package

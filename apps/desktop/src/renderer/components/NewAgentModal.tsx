@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './NewAgentModal.css';
-import { worktreeService } from '../services/WorktreeService';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type { WorktreeInfo } from '../../main/types/worktree';
+import type { MessagePreview } from '../hooks/useForkModal';
+import { worktreeService } from '../services/WorktreeService';
 import { BranchSwitchWarningDialog } from './BranchSwitchWarningDialog';
 import { MessagePreviewPanel } from './MessagePreviewPanel';
-import type { GitInfo } from '@agent-orchestrator/shared';
-import type { MessagePreview } from '../hooks/useForkModal';
 
 /**
  * Data for fork mode operations
@@ -109,8 +109,10 @@ export function NewAgentModal({
   const [keyboardFocus, setKeyboardFocus] = useState<'input' | 'folder' | 'branch'>('input');
   const [dropdownItemIndex, setDropdownItemIndex] = useState<number | null>(null);
   // Fork mode state
-  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
-  const [shouldCreateWorktreeForFork, setShouldCreateWorktreeForFork] = useState(forkData?.createWorktree ?? true);
+  const [isPreviewExpanded, _setIsPreviewExpanded] = useState(false);
+  const [shouldCreateWorktreeForFork, setShouldCreateWorktreeForFork] = useState(
+    forkData?.createWorktree ?? true
+  );
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -133,7 +135,8 @@ export function NewAgentModal({
     }
 
     setIsLoadingGit(true);
-    window.gitAPI?.getInfo(workspacePath)
+    window.gitAPI
+      ?.getInfo(workspacePath)
       .then((info) => {
         setGitInfo(info);
         setIsLoadingGit(false);
@@ -182,7 +185,7 @@ export function NewAgentModal({
 
   // Get available branches for dropdown (excluding current branch)
   const availableBranches = branches.filter((branch) => branch !== gitInfo?.branch);
-  
+
   // Define handleBrowseFolder before it's used in useEffect
   const handleBrowseFolder = useCallback(async () => {
     setIsSelectingFolder(true);
@@ -207,10 +210,15 @@ export function NewAgentModal({
       setIsSelectingFolder(false);
     }
   }, []);
-  
+
   // Get dropdown items (actions + branches) - only actionable items, no dividers
   const dropdownItems = useMemo(() => {
-    const items: Array<{ type: 'action' | 'branch'; label?: string; branch?: string; action?: () => void }> = [];
+    const items: Array<{
+      type: 'action' | 'branch';
+      label?: string;
+      branch?: string;
+      action?: () => void;
+    }> = [];
     if (workspacePath && gitInfo?.branch) {
       items.push(
         { type: 'action', label: 'New branch', action: () => setIsCreatingNewBranch(true) },
@@ -233,7 +241,13 @@ export function NewAgentModal({
       setIsBranchDropdownOpen(false);
       setDropdownItemIndex(null);
     }
-  }, [keyboardFocus, gitInfo?.branch, isCreatingNewBranch, dropdownItems.length, dropdownItemIndex]);
+  }, [
+    keyboardFocus,
+    gitInfo?.branch,
+    isCreatingNewBranch,
+    dropdownItems.length,
+    dropdownItemIndex,
+  ]);
 
   // Handle Escape key, Tab navigation, and Command shortcuts
   useEffect(() => {
@@ -241,7 +255,7 @@ export function NewAgentModal({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      
+
       // Allow new branch input to handle its own keys
       if (target === newBranchInputRef.current) {
         if (event.key === 'Enter' || event.key === 'Escape') {
@@ -279,7 +293,7 @@ export function NewAgentModal({
       if (event.key === 'Tab' && !event.shiftKey) {
         // Always prevent default Tab behavior when modal is open
         event.preventDefault();
-        
+
         if (keyboardFocus === 'input') {
           // Tab from input: go to folder (if visible) or branch
           // Blur textarea first
@@ -339,7 +353,11 @@ export function NewAgentModal({
       }
 
       // Up/Down arrow keys for dropdown navigation
-      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && keyboardFocus === 'branch' && isBranchDropdownOpen) {
+      if (
+        (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+        keyboardFocus === 'branch' &&
+        isBranchDropdownOpen
+      ) {
         event.preventDefault();
         if (dropdownItemIndex === null) {
           setDropdownItemIndex(event.key === 'ArrowDown' ? 0 : dropdownItems.length - 1);
@@ -396,7 +414,21 @@ export function NewAgentModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, workspacePath, branches, gitInfo?.branch, keyboardFocus, isBranchDropdownOpen, dropdownItemIndex, dropdownItems, availableBranches, worktreeInfo, isCreatingNewBranch, handleBrowseFolder]);
+  }, [
+    isOpen,
+    onClose,
+    workspacePath,
+    branches,
+    gitInfo?.branch,
+    keyboardFocus,
+    isBranchDropdownOpen,
+    dropdownItemIndex,
+    dropdownItems,
+    availableBranches,
+    worktreeInfo,
+    isCreatingNewBranch,
+    handleBrowseFolder,
+  ]);
 
   // Close on outside click
   useEffect(() => {
@@ -422,7 +454,8 @@ export function NewAgentModal({
   useEffect(() => {
     if (workspacePath) {
       setIsLoadingBranches(true);
-      window.gitAPI?.listBranches(workspacePath)
+      window.gitAPI
+        ?.listBranches(workspacePath)
         .then((branchList) => {
           setBranches(branchList || []);
           setIsLoadingBranches(false);
@@ -463,13 +496,21 @@ export function NewAgentModal({
     try {
       // Generate a branch name based on timestamp or description
       const branchName = description.trim()
-        ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}-${Date.now().toString().slice(-6)}`
+        ? `agent-${description
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .slice(0, 30)}-${Date.now().toString().slice(-6)}`
         : `agent-${Date.now().toString().slice(-6)}`;
 
       // Compute full sibling worktree path
       const parentDir = workspacePath.split('/').slice(0, -1).join('/');
       const dirName = description.trim()
-        ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+        ? `agent-${description
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .slice(0, 30)}`
         : `agent-${Date.now().toString().slice(-6)}`;
       const fullWorktreePath = `${parentDir}/${dirName}`;
 
@@ -508,7 +549,7 @@ export function NewAgentModal({
     } finally {
       setIsCreatingWorktree(false);
     }
-  }, [workspacePath, description]);
+  }, [workspacePath, description, originalWorkspacePath]);
 
   // Store handleCreateWorktree in ref for keyboard handler
   useEffect(() => {
@@ -567,7 +608,10 @@ export function NewAgentModal({
           if (!result?.success) {
             console.error('[NewAgentModal] Failed to checkout branch:', result?.error);
             // Check if error is due to uncommitted changes
-            if (result?.error?.toLowerCase().includes('uncommitted') || result?.error?.toLowerCase().includes('changes')) {
+            if (
+              result?.error?.toLowerCase().includes('uncommitted') ||
+              result?.error?.toLowerCase().includes('changes')
+            ) {
               setShowBranchSwitchWarning(true);
               return;
             }
@@ -610,7 +654,11 @@ export function NewAgentModal({
       // Compute full sibling worktree path from workspace path
       const parentDir = finalWorkspacePath.split('/').slice(0, -1).join('/');
       const dirName = description.trim()
-        ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+        ? `agent-${description
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .slice(0, 30)}`
         : `agent-fork-${Date.now()}`;
       const fullWorktreePath = `${parentDir}/${dirName}`;
 
@@ -650,19 +698,22 @@ export function NewAgentModal({
         <div className="new-agent-modal-header">
           <div className="new-agent-modal-header-left">
             {/* Fork mode title */}
-            {isForkMode && (
-              <span className="new-agent-modal-title">Fork Agent Session</span>
-            )}
+            {isForkMode && <span className="new-agent-modal-title">Fork Agent Session</span>}
             {/* Show original folder only if no worktree is active */}
             {!worktreeInfo && (
-              <div 
+              <div
                 className={`new-agent-modal-folder-wrapper ${keyboardFocus === 'folder' ? 'keyboard-selected' : ''}`}
                 onClick={handleBrowseFolder}
                 style={{ cursor: 'pointer' }}
                 title="Click to select folder"
               >
                 <div className="new-agent-modal-folder-icon">
-                  <svg width="16" height="16" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 512 512"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
                     <path
                       d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
                       fill="none"
@@ -690,7 +741,12 @@ export function NewAgentModal({
             {worktreeInfo && (
               <div className="new-agent-modal-worktree-wrapper">
                 <div className="new-agent-modal-worktree-icon">
-                  <svg width="14" height="14" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 512 512"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
                     <path
                       d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
                       fill="none"
@@ -715,7 +771,7 @@ export function NewAgentModal({
               </div>
             )}
             {gitInfo?.branch && (
-              <div 
+              <div
                 className={`new-agent-modal-branch-wrapper ${keyboardFocus === 'branch' ? 'keyboard-selected' : ''}`}
                 ref={branchDropdownRef}
                 style={{ position: 'relative' }}
@@ -824,7 +880,9 @@ export function NewAgentModal({
                       {(() => {
                         // Show selected branch if cycling, otherwise show current branch
                         if (selectedBranchIndex !== null) {
-                          const availableBranches = branches.filter((branch) => branch !== gitInfo.branch);
+                          const availableBranches = branches.filter(
+                            (branch) => branch !== gitInfo.branch
+                          );
                           if (availableBranches[selectedBranchIndex]) {
                             return availableBranches[selectedBranchIndex];
                           }
@@ -894,9 +952,7 @@ export function NewAgentModal({
                             key={branch}
                             className={`new-agent-modal-branch-dropdown-item ${
                               selectedBranchIndex === index ? 'selected' : ''
-                            } ${
-                              dropdownItemIndex === itemIndex ? 'keyboard-selected' : ''
-                            }`}
+                            } ${dropdownItemIndex === itemIndex ? 'keyboard-selected' : ''}`}
                             onClick={() => {
                               // Set the selected branch index to trigger checkout on create
                               setSelectedBranchIndex(index);
@@ -915,7 +971,14 @@ export function NewAgentModal({
           </div>
           <div className="new-agent-modal-header-right">
             <button className="new-agent-modal-window-control" onClick={onClose}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
                 <path d="M3 3l6 6M9 3l-6 6" />
               </svg>
             </button>
@@ -1042,12 +1105,17 @@ export function NewAgentModal({
             }
             title={!gitInfo && !isLoadingGit ? 'Please select a git repository' : undefined}
           >
-            {isCreatingBranch ? 'Creating branch...' :
-             isCreatingWorktree ? 'Creating worktree...' :
-             isLoadingGit ? 'Checking git...' :
-             !gitInfo ? 'Git required' :
-             isForkMode ? 'Create fork' :
-             'Start agent'}
+            {isCreatingBranch
+              ? 'Creating branch...'
+              : isCreatingWorktree
+                ? 'Creating worktree...'
+                : isLoadingGit
+                  ? 'Checking git...'
+                  : !gitInfo
+                    ? 'Git required'
+                    : isForkMode
+                      ? 'Create fork'
+                      : 'Start agent'}
           </button>
         </div>
 
@@ -1060,7 +1128,11 @@ export function NewAgentModal({
                 // Compute sibling path: parent directory of workspace + directory name
                 const parentDir = workspacePath.split('/').slice(0, -1).join('/');
                 const dirName = description.trim()
-                  ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+                  ? `agent-${description
+                      .trim()
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .slice(0, 30)}`
                   : 'agent-fork';
                 return `${parentDir}/${dirName}`;
               })()}

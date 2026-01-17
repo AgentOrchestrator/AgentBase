@@ -1,7 +1,7 @@
-import { ipcMain, BrowserWindow } from 'electron';
 import type { CodingAgentType, SessionFileChangeEvent } from '@agent-orchestrator/shared';
-import { SessionFileWatcher } from './SessionFileWatcher';
+import { type BrowserWindow, ipcMain } from 'electron';
 import { CodingAgentFactory, isChatHistoryProvider } from '../coding-agent';
+import { SessionFileWatcher } from './SessionFileWatcher';
 
 /**
  * IPC response wrapper for consistent error handling

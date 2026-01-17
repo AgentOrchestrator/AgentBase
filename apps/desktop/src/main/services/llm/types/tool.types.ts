@@ -39,6 +39,4 @@ export interface ToolResult {
 /**
  * Function that executes a tool
  */
-export type ToolExecutor = (
-  args: Record<string, unknown>
-) => Promise<unknown>;
+export type ToolExecutor = (args: Record<string, unknown>) => Promise<unknown>;

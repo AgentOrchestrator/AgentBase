@@ -18,7 +18,9 @@ export class TerminalServiceImpl implements ITerminalService {
   private exitListeners: Set<(code: number, signal?: number) => void> = new Set();
   private isCreated = false;
   private ipcDataHandler: ((data: { terminalId: string; data: string }) => void) | null = null;
-  private ipcExitHandler: ((data: { terminalId: string; code: number; signal?: number }) => void) | null = null;
+  private ipcExitHandler:
+    | ((data: { terminalId: string; code: number; signal?: number }) => void)
+    | null = null;
 
   constructor(nodeId: string, terminalId: string) {
     this.nodeId = nodeId;
@@ -109,7 +111,7 @@ export class TerminalServiceImpl implements ITerminalService {
    * Appends newline if not present to execute the command.
    */
   executeCommand(command: string): void {
-    const commandWithNewline = command.endsWith('\n') ? command : command + '\n';
+    const commandWithNewline = command.endsWith('\n') ? command : `${command}\n`;
     this.writeToTerminal(commandWithNewline, 'executeCommand');
   }
 
@@ -142,7 +144,7 @@ export class TerminalServiceImpl implements ITerminalService {
     console.log(`[TerminalService] ${source}()`, {
       terminalId: this.terminalId,
       dataLength: data.length,
-      data: data.length > 200 ? data.substring(0, 200) + '...' : data,
+      data: data.length > 200 ? `${data.substring(0, 200)}...` : data,
     });
 
     if (window.electronAPI) {

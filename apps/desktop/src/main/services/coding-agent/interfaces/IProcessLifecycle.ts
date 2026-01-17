@@ -1,4 +1,4 @@
-import type { Result, AgentError } from '../types';
+import type { AgentError, Result } from '../types';
 
 /**
  * Interface for process lifecycle management

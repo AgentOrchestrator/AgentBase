@@ -1,5 +1,5 @@
-import type { Result, AgentError } from '../../coding-agent/types';
 import type { JsonlFilterOptions } from '@agent-orchestrator/shared';
+import type { AgentError, Result } from '../../coding-agent/types';
 
 /**
  * Fork adapter interface for copying and transforming session files

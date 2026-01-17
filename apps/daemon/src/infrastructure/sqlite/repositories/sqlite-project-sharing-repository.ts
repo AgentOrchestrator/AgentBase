@@ -5,10 +5,10 @@
 
 import type {
   IProjectSharingRepository,
+  PermissionLevel,
+  ProjectOrganizationShare,
   ProjectShare,
   ProjectWorkspaceShare,
-  ProjectOrganizationShare,
-  PermissionLevel,
 } from '../../../interfaces/repositories.js';
 
 export class SQLiteProjectSharingRepository implements IProjectSharingRepository {
@@ -33,7 +33,10 @@ export class SQLiteProjectSharingRepository implements IProjectSharingRepository
     return false;
   }
 
-  async updateUserSharePermission(_shareId: string, _permission: PermissionLevel): Promise<boolean> {
+  async updateUserSharePermission(
+    _shareId: string,
+    _permission: PermissionLevel
+  ): Promise<boolean> {
     return false;
   }
 

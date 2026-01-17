@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
 import type { Node } from '@xyflow/react';
-import { createLinearIssueAttachment } from '../types/attachments';
+import { useCallback } from 'react';
 import { createDefaultAgentTitle } from '../types/agent-node';
+import { createLinearIssueAttachment } from '../types/attachments';
 
 /**
  * Linear issue data structure (from Linear API)
@@ -77,20 +77,18 @@ export interface UseCanvasDropOptions {
  * @param options - Configuration options for the hook
  */
 export function useCanvasDrop(options: UseCanvasDropOptions): UseCanvasDropReturn {
-  const { screenToFlowPosition, setNodes, isPillExpanded, collapsePill, onOpenAgentModal } = options;
+  const { screenToFlowPosition, setNodes, isPillExpanded, collapsePill, onOpenAgentModal } =
+    options;
 
   /**
    * Handler for when a drag starts on an issue card
    * Sets up the data transfer with JSON and text fallback
    */
-  const handleIssueDragStart = useCallback(
-    (e: React.DragEvent, issue: LinearIssue) => {
-      e.dataTransfer.effectAllowed = 'copy';
-      e.dataTransfer.setData('application/json', JSON.stringify(issue));
-      e.dataTransfer.setData('text/plain', `${issue.identifier}: ${issue.title}`);
-    },
-    []
-  );
+  const handleIssueDragStart = useCallback((e: React.DragEvent, issue: LinearIssue) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/json', JSON.stringify(issue));
+    e.dataTransfer.setData('text/plain', `${issue.identifier}: ${issue.title}`);
+  }, []);
 
   /**
    * Handler for drag over events to allow dropping

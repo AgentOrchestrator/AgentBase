@@ -3,21 +3,20 @@
  * Creates SQLite repositories bound to a local user
  */
 
-import type { IRepositoryFactory } from '../../interfaces/repositories.js';
 import type { AppDatabase } from '../../database.js';
-
-import { SQLiteUserRepository } from './repositories/sqlite-user-repository.js';
-import { SQLiteProjectRepository } from './repositories/sqlite-project-repository.js';
-import { SQLiteChatHistoryRepository } from './repositories/sqlite-chat-history-repository.js';
-import { SQLiteApiKeyRepository } from './repositories/sqlite-api-key-repository.js';
-import { SQLiteUserPreferencesRepository } from './repositories/sqlite-user-preferences-repository.js';
+import type { IRepositoryFactory } from '../../interfaces/repositories.js';
+import { LocalAuthProvider } from './local-auth-provider.js';
 import { SQLiteActiveSessionRepository } from './repositories/sqlite-active-session-repository.js';
-import { SQLiteWorkspaceRepository } from './repositories/sqlite-workspace-repository.js';
+import { SQLiteApiKeyRepository } from './repositories/sqlite-api-key-repository.js';
+import { SQLiteCanvasLayoutRepository } from './repositories/sqlite-canvas-layout-repository.js';
+import { SQLiteChatHistoryRepository } from './repositories/sqlite-chat-history-repository.js';
+import { SQLitePinnedConversationRepository } from './repositories/sqlite-pinned-conversation-repository.js';
+import { SQLiteProjectRepository } from './repositories/sqlite-project-repository.js';
 import { SQLiteProjectSharingRepository } from './repositories/sqlite-project-sharing-repository.js';
 import { SQLiteSessionSharingRepository } from './repositories/sqlite-session-sharing-repository.js';
-import { SQLiteCanvasLayoutRepository } from './repositories/sqlite-canvas-layout-repository.js';
-import { SQLitePinnedConversationRepository } from './repositories/sqlite-pinned-conversation-repository.js';
-import { LocalAuthProvider } from './local-auth-provider.js';
+import { SQLiteUserPreferencesRepository } from './repositories/sqlite-user-preferences-repository.js';
+import { SQLiteUserRepository } from './repositories/sqlite-user-repository.js';
+import { SQLiteWorkspaceRepository } from './repositories/sqlite-workspace-repository.js';
 
 export class SQLiteRepositoryFactory implements IRepositoryFactory {
   private localAuthProvider: LocalAuthProvider;
@@ -26,10 +25,7 @@ export class SQLiteRepositoryFactory implements IRepositoryFactory {
     this.localAuthProvider = new LocalAuthProvider(appDb);
   }
 
-  async createRepositories(
-    _accessToken: string,
-    _refreshToken: string
-  ) {
+  async createRepositories(_accessToken: string, _refreshToken: string) {
     const db = this.appDb.getRawDb();
     const userId = this.localAuthProvider.getLocalUserId();
 

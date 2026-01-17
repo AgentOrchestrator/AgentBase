@@ -5,7 +5,7 @@
  * View components subscribe to state changes.
  */
 
-import type { IForkStore, ForkDragState, ForkStateListener } from './IForkStore';
+import type { ForkDragState, ForkStateListener, IForkStore } from './IForkStore';
 
 /**
  * Default initial state

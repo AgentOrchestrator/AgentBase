@@ -9,7 +9,7 @@ import type { IApiKeyRepository } from '../../interfaces/repositories.js';
 export class SupabaseApiKeyRepository implements IApiKeyRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async findActiveKey(
@@ -28,10 +28,7 @@ export class SupabaseApiKeyRepository implements IApiKeyRepository {
       if (error) {
         // PGRST116 = no rows found, not an error
         if (error.code !== 'PGRST116') {
-          console.error(
-            `[ApiKeyRepository] Error fetching ${provider} API key:`,
-            error.message
-          );
+          console.error(`[ApiKeyRepository] Error fetching ${provider} API key:`, error.message);
         }
         return null;
       }

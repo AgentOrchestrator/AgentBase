@@ -28,35 +28,41 @@ export type LinearViewer = {
   };
 };
 
-export type FetchProjectsResponse = {
-  success: true;
-  projects: LinearProject[];
-} | {
-  success: false;
-  error: string;
-};
+export type FetchProjectsResponse =
+  | {
+      success: true;
+      projects: LinearProject[];
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
-export type FetchIssuesResponse = {
-  success: true;
-  issues: LinearIssue[];
-  workspaceName: string;
-} | {
-  success: false;
-  error: string;
-};
+export type FetchIssuesResponse =
+  | {
+      success: true;
+      issues: LinearIssue[];
+      workspaceName: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
-export type CreateTicketResponse = {
-  success: true;
-  issue: {
-    id: string;
-    identifier: string;
-    title: string;
-    url: string;
-  };
-} | {
-  success: false;
-  error: string;
-};
+export type CreateTicketResponse =
+  | {
+      success: true;
+      issue: {
+        id: string;
+        identifier: string;
+        title: string;
+        url: string;
+      };
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 // =============================================================================
 // Service Interface
@@ -77,11 +83,7 @@ export interface ILinearService {
    * Create a new ticket
    * Two-phase: first queries teams, then creates issue
    */
-  createTicket(
-    apiKey: string,
-    title: string,
-    description?: string
-  ): Promise<CreateTicketResponse>;
+  createTicket(apiKey: string, title: string, description?: string): Promise<CreateTicketResponse>;
 }
 
 // =============================================================================

@@ -5,12 +5,7 @@
  * allowing users to include only messages up to a specific point when forking.
  */
 
-import type {
-  FilterOptions,
-  FilterResult,
-  MessageMetadata,
-  ParsedJsonlLine,
-} from './types';
+import type { FilterOptions, FilterResult, MessageMetadata, ParsedJsonlLine } from './types';
 
 /**
  * Parse a JSONL line into a structured object for filtering
@@ -50,10 +45,7 @@ function matchesMessageId(message: ParsedJsonlLine, targetId: string): boolean {
 /**
  * Check if a message's timestamp is at or before the target timestamp
  */
-function isAtOrBeforeTimestamp(
-  message: ParsedJsonlLine,
-  targetTimestamp: Date
-): boolean {
+function isAtOrBeforeTimestamp(message: ParsedJsonlLine, targetTimestamp: Date): boolean {
   if (!message.timestamp) {
     // Messages without timestamps are included (like summaries at the start)
     return true;
@@ -73,10 +65,7 @@ function isAtOrBeforeTimestamp(
  * @param targetMessageId - The message ID to filter up to (inclusive)
  * @returns FilterResult with the filtered content
  */
-export function filterByMessageId(
-  content: string,
-  targetMessageId: string
-): FilterResult {
+export function filterByMessageId(content: string, targetMessageId: string): FilterResult {
   const lines = content.split('\n');
   const includedLines: string[] = [];
   let targetFound = false;
@@ -100,8 +89,8 @@ export function filterByMessageId(
     }
   }
 
-  const includedNonEmpty = includedLines.filter(l => l.trim()).length;
-  const totalNonEmpty = lines.filter(l => l.trim()).length;
+  const includedNonEmpty = includedLines.filter((l) => l.trim()).length;
+  const totalNonEmpty = lines.filter((l) => l.trim()).length;
 
   return {
     content: includedLines.join('\n'),
@@ -121,14 +110,8 @@ export function filterByMessageId(
  * @param targetTimestamp - The timestamp to filter up to (inclusive)
  * @returns FilterResult with the filtered content
  */
-export function filterByTimestamp(
-  content: string,
-  targetTimestamp: string | Date
-): FilterResult {
-  const target =
-    typeof targetTimestamp === 'string'
-      ? new Date(targetTimestamp)
-      : targetTimestamp;
+export function filterByTimestamp(content: string, targetTimestamp: string | Date): FilterResult {
+  const target = typeof targetTimestamp === 'string' ? new Date(targetTimestamp) : targetTimestamp;
 
   const lines = content.split('\n');
   const includedLines: string[] = [];
@@ -151,8 +134,8 @@ export function filterByTimestamp(
     }
   }
 
-  const includedCount = includedLines.filter(l => l.trim()).length;
-  const totalCount = lines.filter(l => l.trim()).length;
+  const includedCount = includedLines.filter((l) => l.trim()).length;
+  const totalCount = lines.filter((l) => l.trim()).length;
 
   return {
     content: includedLines.join('\n'),
@@ -169,10 +152,7 @@ export function filterByTimestamp(
  * @param options - Filter options (messageId or timestamp)
  * @returns FilterResult with the filtered content
  */
-export function filterJsonl(
-  content: string,
-  options: FilterOptions
-): FilterResult {
+export function filterJsonl(content: string, options: FilterOptions): FilterResult {
   if (options.targetMessageId) {
     return filterByMessageId(content, options.targetMessageId);
   }
@@ -183,7 +163,7 @@ export function filterJsonl(
 
   // No filtering - return all content
   const lines = content.split('\n');
-  const nonEmptyCount = lines.filter(l => l.trim()).length;
+  const nonEmptyCount = lines.filter((l) => l.trim()).length;
 
   return {
     content,
@@ -219,8 +199,7 @@ export function extractMessageMetadata(content: string): MessageMetadata[] {
           typeof data.message.content === 'string'
             ? data.message.content
             : JSON.stringify(data.message.content);
-        preview =
-          contentStr.slice(0, 100) + (contentStr.length > 100 ? '...' : '');
+        preview = contentStr.slice(0, 100) + (contentStr.length > 100 ? '...' : '');
       } else if (data.summary) {
         preview = data.summary;
       }

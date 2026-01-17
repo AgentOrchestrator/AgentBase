@@ -6,12 +6,12 @@
  */
 
 import type {
-  SDKMessage,
   SDKAssistantMessage,
-  SDKResultMessage,
+  SDKMessage,
   SDKPartialAssistantMessage,
+  SDKResultMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { GenerateResponse, StreamingChunk, StreamingBlockType } from '../types/message.types';
+import type { GenerateResponse, StreamingBlockType, StreamingChunk } from '../types/message.types';
 
 /**
  * Extract the result message from an array of SDK messages
@@ -40,9 +40,7 @@ export function mapSdkMessagesToResponse(
 
   // Use result message content if available, otherwise fall back to assistant content
   const content =
-    result?.subtype === 'success'
-      ? result.result || assistantContent
-      : assistantContent;
+    result?.subtype === 'success' ? result.result || assistantContent : assistantContent;
 
   // Calculate tokens if usage is available
   const tokensUsed = result?.usage

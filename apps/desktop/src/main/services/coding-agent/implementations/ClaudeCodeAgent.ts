@@ -1,59 +1,61 @@
-import { EventEmitter } from 'events';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Query, SDKMessage, Options, CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import type { AgentEvent, PermissionPayload, SessionPayload } from '@agent-orchestrator/shared';
 import {
+  ClaudeCodeJsonlParser,
   createEventRegistry,
   createSDKHookBridge,
-  ClaudeCodeJsonlParser,
   type EventRegistry,
   type SDKHookBridge,
 } from '@agent-orchestrator/shared';
 import type {
-  ICodingAgentProvider,
-  ISessionResumable,
-  ISessionForkable,
-  IProcessLifecycle,
+  CanUseTool,
+  Options,
+  PermissionResult,
+  Query,
+  SDKMessage,
+} from '@anthropic-ai/claude-agent-sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
+import type {
   IChatHistoryProvider,
+  ICodingAgentProvider,
+  IProcessLifecycle,
+  ISessionForkable,
+  ISessionResumable,
   ISessionValidator,
 } from '../interfaces';
 import type {
-  Result,
-  AgentError,
-  AgentConfig,
   AgentCapabilities,
+  AgentConfig,
+  AgentError,
+  CodingAgentMessage,
+  CodingAgentSessionContent,
   CodingAgentType,
+  ContinueOptions,
+  ForkOptions,
   GenerateRequest,
   GenerateResponse,
-  StreamCallback,
-  StructuredStreamCallback,
+  MessageFilterOptions,
+  Result,
+  SessionFilterOptions,
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
-  CodingAgentSessionContent,
-  SessionFilterOptions,
-  MessageFilterOptions,
-  ContinueOptions,
-  ForkOptions,
-  CodingAgentMessage,
+  StreamCallback,
+  StructuredStreamCallback,
 } from '../types';
-import { AgentErrorCode, ok, err, agentError } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
+import { mapSdkError, mapSdkResultError, noResultError } from '../utils/sdk-error-mapper';
 import {
-  mapSdkMessagesToResponse,
-  findResultMessage,
   extractStreamingChunk,
   extractStructuredStreamingChunk,
+  findResultMessage,
   isResultError,
+  mapSdkMessagesToResponse,
 } from '../utils/sdk-message-mapper';
-import {
-  mapSdkError,
-  mapSdkResultError,
-  noResultError,
-} from '../utils/sdk-error-mapper';
-import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
-import type { AgentEvent, PermissionPayload, SessionPayload } from '@agent-orchestrator/shared';
 
 /**
  * Active query handle for tracking and cancellation
@@ -92,7 +94,13 @@ export interface ClaudeCodeAgentConfig extends AgentConfig {
 
 export class ClaudeCodeAgent
   extends EventEmitter
-  implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider, ISessionValidator
+  implements
+    ICodingAgentProvider,
+    ISessionResumable,
+    ISessionForkable,
+    IProcessLifecycle,
+    IChatHistoryProvider,
+    ISessionValidator
 {
   protected readonly config: AgentConfig;
   private readonly eventRegistry: EventRegistry;
@@ -131,8 +139,8 @@ export class ClaudeCodeAgent
           typeof input.file_path === 'string'
             ? input.file_path
             : typeof input.filePath === 'string'
-            ? input.filePath
-            : undefined,
+              ? input.filePath
+              : undefined,
         workingDirectory: workspacePath,
         reason: options.decisionReason,
       },
@@ -393,7 +401,10 @@ export class ClaudeCodeAgent
       try {
         return await this.executeQuery(prompt, resumeOptions, onChunk, onStructuredChunk);
       } catch (error) {
-        console.log(`[ClaudeCodeAgent] Resume failed, falling back to new session with session-id: ${sessionId}`, error);
+        console.log(
+          `[ClaudeCodeAgent] Resume failed, falling back to new session with session-id: ${sessionId}`,
+          error
+        );
 
         // Create a new AbortController for the retry
         const retryAbortController = new AbortController();
@@ -627,9 +638,7 @@ export class ClaudeCodeAgent
     // Determine target session ID:
     // - Cross-directory (worktree) forks: use same session ID (file is in different project directory)
     // - Same-directory forks without worktree: generate new session ID
-    const targetSessionId = createWorktree
-      ? sourceSessionId
-      : crypto.randomUUID();
+    const targetSessionId = createWorktree ? sourceSessionId : crypto.randomUUID();
 
     console.log('[ClaudeCodeAgent] Fork operation:', {
       sourceSessionId,
@@ -684,10 +693,7 @@ export class ClaudeCodeAgent
       const adapter = ForkAdapterFactory.getAdapter('claude_code');
       if (!adapter) {
         return err(
-          agentError(
-            AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
-            'Fork adapter not available'
-          )
+          agentError(AgentErrorCode.CAPABILITY_NOT_SUPPORTED, 'Fork adapter not available')
         );
       }
 
@@ -714,15 +720,14 @@ export class ClaudeCodeAgent
         );
 
         if (forkResult.success === false) {
-          console.error('[ClaudeCodeAgent] Fork adapter failed to fork session', { error: forkResult.error });
+          console.error('[ClaudeCodeAgent] Fork adapter failed to fork session', {
+            error: forkResult.error,
+          });
           throw forkResult.error;
         }
       } catch (error) {
         return err(
-          agentError(
-            AgentErrorCode.UNKNOWN_ERROR,
-            `Failed to fork session file: ${error}`
-          )
+          agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to fork session file: ${error}`)
         );
       }
     }
@@ -776,8 +781,13 @@ export class ClaudeCodeAgent
     const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
     const res = fs.existsSync(sessionFilePath);
 
-    console.log('[ClaudeCodeAgent] Checking session active', { sessionId, workspacePath, sessionFilePath, res });
-    return res
+    console.log('[ClaudeCodeAgent] Checking session active', {
+      sessionId,
+      workspacePath,
+      sessionFilePath,
+      res,
+    });
+    return res;
   }
 
   async getSessionModificationTimes(
@@ -805,7 +815,7 @@ export class ClaudeCodeAgent
           if (projectName !== filter.projectName) continue;
         }
 
-        const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
+        const sessionFiles = fs.readdirSync(projectDirPath).filter((f) => f.endsWith('.jsonl'));
 
         for (const sessionFile of sessionFiles) {
           const sessionFilePath = path.join(projectDirPath, sessionFile);
@@ -864,7 +874,7 @@ export class ClaudeCodeAgent
         }
         if (filter?.projectName && projectName !== filter.projectName) continue;
 
-        const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
+        const sessionFiles = fs.readdirSync(projectDirPath).filter((f) => f.endsWith('.jsonl'));
 
         for (const sessionFile of sessionFiles) {
           const sessionFilePath = path.join(projectDirPath, sessionFile);
@@ -875,12 +885,18 @@ export class ClaudeCodeAgent
           if (mtime < Math.max(cutoffTime, minTime)) continue;
 
           const sessionId = path.basename(sessionFile, '.jsonl');
-          const summary = this.parseSessionSummary(sessionFilePath, sessionId, decodedProjectPath, projectName);
+          const summary = this.parseSessionSummary(
+            sessionFilePath,
+            sessionId,
+            decodedProjectPath,
+            projectName
+          );
 
           if (summary) {
             // Apply additional filters
             if (filter?.hasThinking && !summary.hasThinking) continue;
-            if (filter?.minToolCallCount && summary.toolCallCount < filter.minToolCallCount) continue;
+            if (filter?.minToolCallCount && summary.toolCallCount < filter.minToolCallCount)
+              continue;
 
             summaries.push(summary);
           }
@@ -898,10 +914,7 @@ export class ClaudeCodeAgent
       return ok(summaries);
     } catch (error) {
       return err(
-        agentError(
-          AgentErrorCode.UNKNOWN_ERROR,
-          `Failed to list session summaries: ${error}`
-        )
+        agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to list session summaries: ${error}`)
       );
     }
   }
@@ -967,9 +980,11 @@ export class ClaudeCodeAgent
           console.log('[ClaudeCodeAgent] Found session in target workspace', {
             sessionId,
             workspacePath: filter.workspacePath,
-            sessionFilePath
+            sessionFilePath,
           });
-          return ok(this.parseSessionContent(sessionFilePath, sessionId, filter.workspacePath, filter));
+          return ok(
+            this.parseSessionContent(sessionFilePath, sessionId, filter.workspacePath, filter)
+          );
         }
 
         // If not found in target workspace and strict mode would be helpful,
@@ -980,9 +995,12 @@ export class ClaudeCodeAgent
           workspacePath: filter.workspacePath,
         });
       } else {
-        console.log('[ClaudeCodeAgent] No workspacePath filter provided, searching all directories for session', {
-          sessionId,
-        });
+        console.log(
+          '[ClaudeCodeAgent] No workspacePath filter provided, searching all directories for session',
+          {
+            sessionId,
+          }
+        );
       }
 
       // Search for the session file across all project directories
@@ -1001,12 +1019,7 @@ export class ClaudeCodeAgent
 
       return ok(null);
     } catch (error) {
-      return err(
-        agentError(
-          AgentErrorCode.UNKNOWN_ERROR,
-          `Failed to get session: ${error}`
-        )
-      );
+      return err(agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to get session: ${error}`));
     }
   }
 
@@ -1021,13 +1034,20 @@ export class ClaudeCodeAgent
 
     // Apply filters
     const messages = allMessages.filter((msg) => {
-      if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
+      if (
+        filter?.messageTypes &&
+        msg.messageType &&
+        !filter.messageTypes.includes(msg.messageType)
+      ) {
         return false;
       }
       if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
         return false;
       }
-      if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
+      if (
+        filter?.searchText &&
+        !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())
+      ) {
         return false;
       }
       return true;
@@ -1076,13 +1096,20 @@ export class ClaudeCodeAgent
 
       for (const msg of this.jsonlParser.streamMessages(content)) {
         // Apply filters
-        if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
+        if (
+          filter?.messageTypes &&
+          msg.messageType &&
+          !filter.messageTypes.includes(msg.messageType)
+        ) {
           continue;
         }
         if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
           continue;
         }
-        if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
+        if (
+          filter?.searchText &&
+          !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())
+        ) {
           continue;
         }
 

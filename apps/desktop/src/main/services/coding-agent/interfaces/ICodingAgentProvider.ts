@@ -1,10 +1,10 @@
 import type {
-  Result,
+  AgentCapabilities,
   AgentError,
   CodingAgentType,
-  AgentCapabilities,
   GenerateRequest,
   GenerateResponse,
+  Result,
   StreamCallback,
 } from '../types';
 

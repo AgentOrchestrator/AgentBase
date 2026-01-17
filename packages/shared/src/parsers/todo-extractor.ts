@@ -5,9 +5,9 @@
  * and converts it to TodoListProgress format for UI rendering.
  */
 
-import type { ClaudeCodeJsonlLine, RawTodoItem, ExtractedTodoList } from './types.js';
 import type { TodoItem, TodoListProgress } from '../types/agent-node.js';
 import { parseJsonlLineString } from './claude-code-jsonl.js';
+import type { ClaudeCodeJsonlLine, ExtractedTodoList, RawTodoItem } from './types.js';
 
 /**
  * Extract the latest todo list from an array of JSONL lines.
@@ -66,7 +66,11 @@ export function extractTodosFromJsonlLine(data: ClaudeCodeJsonlLine): RawTodoIte
       (block as Record<string, unknown>).name === 'TodoWrite'
     ) {
       const input = (block as Record<string, unknown>).input;
-      if (input && typeof input === 'object' && Array.isArray((input as Record<string, unknown>).todos)) {
+      if (
+        input &&
+        typeof input === 'object' &&
+        Array.isArray((input as Record<string, unknown>).todos)
+      ) {
         return parseTodoItems((input as { todos: unknown[] }).todos);
       }
     }
@@ -133,11 +137,13 @@ function normalizeTimestamp(ts: string | number | undefined): string | undefined
 export function toTodoListProgress(extracted: ExtractedTodoList): TodoListProgress {
   return {
     type: 'todoList',
-    items: extracted.items.map((item, index): TodoItem => ({
-      id: `todo-${index}`,
-      content: item.content,
-      completed: item.status === 'completed',
-      activeForm: item.activeForm,
-    })),
+    items: extracted.items.map(
+      (item, index): TodoItem => ({
+        id: `todo-${index}`,
+        content: item.content,
+        completed: item.status === 'completed',
+        activeForm: item.activeForm,
+      })
+    ),
   };
 }

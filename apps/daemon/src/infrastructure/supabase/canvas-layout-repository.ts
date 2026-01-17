@@ -4,15 +4,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
-import type {
-  ICanvasLayoutRepository,
-  CanvasNodePosition,
-} from '../../interfaces/repositories.js';
+import type { CanvasNodePosition, ICanvasLayoutRepository } from '../../interfaces/repositories.js';
 
 export class SupabaseCanvasLayoutRepository implements ICanvasLayoutRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async getNodePositions(userId: string): Promise<CanvasNodePosition[]> {
@@ -27,7 +24,7 @@ export class SupabaseCanvasLayoutRepository implements ICanvasLayoutRepository {
       return [];
     }
 
-    return (data || []).map(row => this.mapToCanvasNodePosition(row));
+    return (data || []).map((row) => this.mapToCanvasNodePosition(row));
   }
 
   async saveNodePosition(
@@ -80,7 +77,7 @@ export class SupabaseCanvasLayoutRepository implements ICanvasLayoutRepository {
     try {
       const now = new Date().toISOString();
 
-      const records = positions.map(pos => ({
+      const records = positions.map((pos) => ({
         user_id: userId,
         node_id: pos.nodeId,
         position_x: pos.positionX,
@@ -88,12 +85,10 @@ export class SupabaseCanvasLayoutRepository implements ICanvasLayoutRepository {
         updated_at: now,
       }));
 
-      const { error } = await this.client
-        .from('user_canvas_layouts')
-        .upsert(records, {
-          onConflict: 'user_id,node_id',
-          ignoreDuplicates: false,
-        });
+      const { error } = await this.client.from('user_canvas_layouts').upsert(records, {
+        onConflict: 'user_id,node_id',
+        ignoreDuplicates: false,
+      });
 
       if (error) {
         console.error('[CanvasLayoutRepository] Error batch saving positions:', error.message);

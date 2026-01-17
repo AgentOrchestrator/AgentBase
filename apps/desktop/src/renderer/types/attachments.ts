@@ -8,13 +8,13 @@
 export type {
   BaseAttachment,
   LinearIssueAttachment,
-  WorkspaceMetadataAttachment,
   TerminalAttachment,
+  WorkspaceMetadataAttachment,
 } from '@agent-orchestrator/shared';
 
 export {
-  isLinearIssueAttachment,
-  isWorkspaceMetadataAttachment,
   createLinearIssueAttachment,
   createWorkspaceMetadataAttachment,
+  isLinearIssueAttachment,
+  isWorkspaceMetadataAttachment,
 } from '@agent-orchestrator/shared';

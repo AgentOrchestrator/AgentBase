@@ -6,12 +6,12 @@
  * Uses useConversationService() hook for data access.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 import { Handle, Position } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useConversationService, useNodeInitialized } from '../../context';
-import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 import './ConversationNode.css';
 
 export interface ConversationNodePresentationProps {
@@ -136,32 +136,20 @@ export function ConversationNodePresentation({
           <div className="conversation-node-title">{displayTitle}</div>
           <div className="conversation-node-meta">
             {messageCount !== undefined && (
-              <span className="conversation-node-meta-item">
-                {messageCount} messages
-              </span>
+              <span className="conversation-node-meta-item">{messageCount} messages</span>
             )}
             {timestamp && (
-              <span className="conversation-node-meta-item">
-                {formatTimestamp(timestamp)}
-              </span>
+              <span className="conversation-node-meta-item">{formatTimestamp(timestamp)}</span>
             )}
-            {projectName && (
-              <span className="conversation-node-meta-item">{projectName}</span>
-            )}
+            {projectName && <span className="conversation-node-meta-item">{projectName}</span>}
           </div>
         </div>
-        <span
-          className={`conversation-node-expand-icon ${isExpanded ? 'expanded' : ''}`}
-        >
-          ▼
-        </span>
+        <span className={`conversation-node-expand-icon ${isExpanded ? 'expanded' : ''}`}>▼</span>
       </div>
 
       {isExpanded && (
         <div ref={contentRef} className="conversation-node-content">
-          {isLoading && (
-            <div className="conversation-node-loading">Loading conversation...</div>
-          )}
+          {isLoading && <div className="conversation-node-loading">Loading conversation...</div>}
 
           {error && <div className="conversation-node-error">{error}</div>}
 
@@ -171,9 +159,7 @@ export function ConversationNodePresentation({
               <div key={message.id} className={`conversation-message ${message.role}`}>
                 <div className="conversation-message-role">{message.role}</div>
                 <div className="conversation-message-content">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {message.content}
-                  </ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                 </div>
               </div>
             ))}

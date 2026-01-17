@@ -9,15 +9,11 @@ import type { IUserRepository, User } from '../../interfaces/repositories.js';
 export class SupabaseUserRepository implements IUserRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async findById(userId: string): Promise<User | null> {
-    const { data, error } = await this.client
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    const { data, error } = await this.client.from('users').select('*').eq('id', userId).single();
 
     if (error) {
       if (error.code !== 'PGRST116') {
@@ -34,11 +30,7 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const { data, error } = await this.client
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const { data, error } = await this.client.from('users').select('*').eq('email', email).single();
 
     if (error) {
       if (error.code !== 'PGRST116') {

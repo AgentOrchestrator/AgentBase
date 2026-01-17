@@ -3,9 +3,9 @@
  * Defines the contract that all database implementations must follow
  */
 
-import { CanvasState, CanvasMetadata } from '../types/database';
-import type { CodingAgentState } from '../../../types/coding-agent-status';
 import type { RecentWorkspace } from '@agent-orchestrator/shared';
+import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type { CanvasMetadata, CanvasState } from '../types/database';
 
 export interface IDatabase {
   /**

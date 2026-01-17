@@ -1,7 +1,9 @@
 import electron from 'electron';
+
 type TrayType = electron.Tray;
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,10 +29,6 @@ export class TrayManager {
   private onSyncNowCallback?: () => void;
   private onOpenDashboardCallback?: () => void;
 
-  constructor() {
-    // Tray will be initialized when Electron app is ready
-  }
-
   initialize() {
     // Create icon - use text-based title for macOS menu bar
     // macOS menu bar can show text instead of just icons
@@ -51,16 +49,6 @@ export class TrayManager {
         this.updateTray();
       }
     }, 60000); // Every 60 seconds
-  }
-
-  private createIcon(status: DaemonStatus): string {
-    const iconMap: Record<DaemonStatus, string> = {
-      [DaemonStatus.UNAUTHENTICATED]: '🔒',
-      [DaemonStatus.IDLE]: '✅',
-      [DaemonStatus.SYNCING]: '🔄',
-      [DaemonStatus.ERROR]: '⚠️',
-    };
-    return iconMap[status];
   }
 
   private formatTimeAgo(date: Date): string {

@@ -8,12 +8,6 @@
 
 import type { CanvasState, CanvasMetadata } from '../main/types/database';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
-import type {
-  WorktreeInfo,
-  WorktreeProvisionOptions,
-  WorktreeReleaseOptions,
-} from '../main/types/worktree';
-import type { CodingAgentState } from '../../types/coding-agent-status';
 
 // Re-export types from shared for consumers that import from this file
 export type {
@@ -53,5 +47,3 @@ declare global {
     agentStatusAPI?: AgentStatusAPI;
   }
 }
-
-export {};

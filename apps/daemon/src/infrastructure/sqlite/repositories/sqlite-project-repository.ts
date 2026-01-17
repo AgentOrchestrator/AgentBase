@@ -2,9 +2,13 @@
  * SQLite implementation of IProjectRepository
  */
 
+import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import type { IProjectRepository, Project, ProjectInput } from '../../../interfaces/repositories.js';
-import { randomUUID } from 'crypto';
+import type {
+  IProjectRepository,
+  Project,
+  ProjectInput,
+} from '../../../interfaces/repositories.js';
 
 interface ProjectRow {
   id: string;
@@ -21,7 +25,7 @@ interface ProjectRow {
 export class SQLiteProjectRepository implements IProjectRepository {
   constructor(
     private db: Database.Database,
-    private userId: string
+    _userId: string
   ) {}
 
   async findDefaultProject(userId: string): Promise<Project | null> {
@@ -145,9 +149,7 @@ export class SQLiteProjectRepository implements IProjectRepository {
       path: row.project_path,
       description: row.description,
       isDefault: row.is_default === 1,
-      workspaceMetadata: row.workspace_metadata
-        ? JSON.parse(row.workspace_metadata)
-        : undefined,
+      workspaceMetadata: row.workspace_metadata ? JSON.parse(row.workspace_metadata) : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

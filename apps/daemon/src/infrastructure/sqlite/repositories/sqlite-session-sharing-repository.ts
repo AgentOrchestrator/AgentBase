@@ -5,10 +5,10 @@
 
 import type {
   ISessionSharingRepository,
-  SessionShare,
-  SessionWorkspaceShare,
-  SessionShareExclusion,
   PermissionLevel,
+  SessionShare,
+  SessionShareExclusion,
+  SessionWorkspaceShare,
 } from '../../../interfaces/repositories.js';
 
 export class SQLiteSessionSharingRepository implements ISessionSharingRepository {

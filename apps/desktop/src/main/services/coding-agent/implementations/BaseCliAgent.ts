@@ -1,15 +1,15 @@
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import type { IProcessLifecycle } from '../interfaces';
 import type {
-  Result,
-  AgentError,
-  AgentConfig,
   AgentCapabilities,
+  AgentConfig,
+  AgentError,
   CodingAgentType,
   GenerateResponse,
+  Result,
 } from '../types';
-import { AgentErrorCode, ok, err, agentError } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
 
 /**
  * Managed process handle
@@ -231,7 +231,10 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           this.activeProcesses.delete(handle.id);
           resolve(
             err(
-              agentError(AgentErrorCode.PROCESS_TIMEOUT, `Process timed out after ${effectiveTimeout}ms`)
+              agentError(
+                AgentErrorCode.PROCESS_TIMEOUT,
+                `Process timed out after ${effectiveTimeout}ms`
+              )
             )
           );
         }
@@ -251,14 +254,7 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           clearTimeout(timeoutId);
           this.activeProcesses.delete(handle.id);
           resolve(
-            err(
-              agentError(
-                AgentErrorCode.PROCESS_SPAWN_FAILED,
-                error.message,
-                undefined,
-                error
-              )
-            )
+            err(agentError(AgentErrorCode.PROCESS_SPAWN_FAILED, error.message, undefined, error))
           );
         }
       });
@@ -339,7 +335,10 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           this.activeProcesses.delete(handle.id);
           resolve(
             err(
-              agentError(AgentErrorCode.PROCESS_TIMEOUT, `Process timed out after ${effectiveTimeout}ms`)
+              agentError(
+                AgentErrorCode.PROCESS_TIMEOUT,
+                `Process timed out after ${effectiveTimeout}ms`
+              )
             )
           );
         }
@@ -389,14 +388,7 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           });
           this.activeProcesses.delete(handle.id);
           resolve(
-            err(
-              agentError(
-                AgentErrorCode.PROCESS_SPAWN_FAILED,
-                error.message,
-                undefined,
-                error
-              )
-            )
+            err(agentError(AgentErrorCode.PROCESS_SPAWN_FAILED, error.message, undefined, error))
           );
         }
       });

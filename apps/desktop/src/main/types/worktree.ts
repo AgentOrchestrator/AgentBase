@@ -8,11 +8,11 @@
  */
 
 export type {
-  WorktreeStatus,
   WorktreeInfo,
+  WorktreeManagerConfig,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
-  WorktreeManagerConfig,
+  WorktreeStatus,
 } from '@agent-orchestrator/shared';
 
 import type { WorktreeStatus } from '@agent-orchestrator/shared';

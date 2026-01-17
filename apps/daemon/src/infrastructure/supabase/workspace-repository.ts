@@ -7,14 +7,14 @@ import type { Database } from '../../database.types.js';
 import type {
   IWorkspaceRepository,
   Workspace,
-  WorkspaceMember,
   WorkspaceInput,
+  WorkspaceMember,
 } from '../../interfaces/repositories.js';
 
 export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async findById(workspaceId: string): Promise<Workspace | null> {
@@ -75,7 +75,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
       return [];
     }
 
-    const workspaceIds = memberData.map(m => m.workspace_id);
+    const workspaceIds = memberData.map((m) => m.workspace_id);
 
     const { data, error } = await this.client
       .from('workspaces')
@@ -88,7 +88,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
       return [];
     }
 
-    return (data || []).map(row => this.mapToWorkspace(row));
+    return (data || []).map((row) => this.mapToWorkspace(row));
   }
 
   async create(userId: string, input: WorkspaceInput): Promise<Workspace | null> {
@@ -102,7 +102,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
           slug: input.slug,
           description: input.description ?? null,
           created_by_user_id: userId,
-          workspace_metadata: input.workspaceMetadata as any ?? null,
+          workspace_metadata: (input.workspaceMetadata as any) ?? null,
           created_at: now,
           updated_at: now,
         })
@@ -179,10 +179,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
 
   async delete(workspaceId: string): Promise<boolean> {
     try {
-      const { error } = await this.client
-        .from('workspaces')
-        .delete()
-        .eq('id', workspaceId);
+      const { error } = await this.client.from('workspaces').delete().eq('id', workspaceId);
 
       if (error) {
         console.error('[WorkspaceRepository] Error deleting workspace:', error.message);
@@ -208,7 +205,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
       return [];
     }
 
-    return (data || []).map(row => this.mapToWorkspaceMember(row));
+    return (data || []).map((row) => this.mapToWorkspaceMember(row));
   }
 
   async addMember(

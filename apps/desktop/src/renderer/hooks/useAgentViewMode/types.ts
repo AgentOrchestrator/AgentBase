@@ -6,7 +6,7 @@
  * Claude Code session conflicts.
  */
 
-import type { ITerminalService, IAgentService } from '../../context/node-services';
+import type { IAgentService, ITerminalService } from '../../context/node-services';
 import type { AgentNodeView } from '../../types/agent-node';
 
 /**

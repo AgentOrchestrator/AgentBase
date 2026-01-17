@@ -19,7 +19,7 @@ interface ApiKeyRow {
 export class SQLiteApiKeyRepository implements IApiKeyRepository {
   constructor(
     private db: Database.Database,
-    private userId: string
+    _userId: string
   ) {}
 
   async findActiveKey(
@@ -68,9 +68,11 @@ export class SQLiteApiKeyRepository implements IApiKeyRepository {
 
     // If setting as default, unset other defaults
     if (isDefault) {
-      this.db.prepare(`
+      this.db
+        .prepare(`
         UPDATE llm_api_keys SET is_default = 0 WHERE account_id = ?
-      `).run(userId);
+      `)
+        .run(userId);
     }
 
     const stmt = this.db.prepare(`

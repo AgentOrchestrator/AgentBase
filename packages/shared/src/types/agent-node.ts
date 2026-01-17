@@ -5,9 +5,9 @@
  * Uses discriminated unions for type-safe progress tracking.
  */
 
-import type { CodingAgentStatus, CodingAgentStatusInfo, AgentType } from './coding-agent.js';
-import type { TerminalAttachment } from './attachments.js';
 import type { CodingAgentMessage, GitInfo } from '../types.js';
+import type { TerminalAttachment } from './attachments.js';
+import type { AgentType, CodingAgentStatus, CodingAgentStatusInfo } from './coding-agent.js';
 
 // =============================================================================
 // Progress Variants (Discriminated Union)
@@ -69,18 +69,14 @@ export type AgentProgress = PercentageProgress | TodoListProgress;
 /**
  * Type guard to check if progress is percentage-based
  */
-export function isPercentageProgress(
-  progress: AgentProgress
-): progress is PercentageProgress {
+export function isPercentageProgress(progress: AgentProgress): progress is PercentageProgress {
   return progress.type === 'percentage';
 }
 
 /**
  * Type guard to check if progress is todo list based
  */
-export function isTodoListProgress(
-  progress: AgentProgress
-): progress is TodoListProgress {
+export function isTodoListProgress(progress: AgentProgress): progress is TodoListProgress {
   return progress.type === 'todoList';
 }
 
@@ -196,10 +192,7 @@ export function createDefaultAgentTitle(value = 'Untitled Agent'): AgentTitle {
 /**
  * Create a percentage progress object
  */
-export function createPercentageProgress(
-  value: number,
-  label?: string
-): PercentageProgress {
+export function createPercentageProgress(value: number, label?: string): PercentageProgress {
   return {
     type: 'percentage',
     value: Math.min(100, Math.max(0, value)),

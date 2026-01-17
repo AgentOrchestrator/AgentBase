@@ -5,8 +5,8 @@
  * Currently only supports Claude Code, but designed for extensibility.
  */
 
-import type { ICodingAgentAdapter } from '../../context/node-services/coding-agent-adapter';
 import type { AgentType } from '../../../../types/coding-agent-status';
+import type { ICodingAgentAdapter } from '../../context/node-services/coding-agent-adapter';
 import { ClaudeCodeAdapter } from './ClaudeCodeAdapter';
 
 /**

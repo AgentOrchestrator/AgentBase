@@ -1,10 +1,10 @@
 import type {
-  Result,
   AgentError,
-  SessionIdentifier,
-  GenerateResponse,
-  StreamCallback,
   ContinueOptions,
+  GenerateResponse,
+  Result,
+  SessionIdentifier,
+  StreamCallback,
 } from '../types';
 
 /**

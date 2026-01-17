@@ -5,10 +5,10 @@
  * to the last user message in the session.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
 import type { CodingAgentType } from '@agent-orchestrator/shared';
-import { useSessionFileWatcher } from './useSessionFileWatcher';
+import { useCallback, useEffect, useRef } from 'react';
 import type { IAgentService } from '../context';
+import { useSessionFileWatcher } from './useSessionFileWatcher';
 
 interface UseAutoTitleFromSessionOptions {
   /** Session ID to watch */
@@ -71,7 +71,7 @@ export function useAutoTitleFromSession({
           const content = lastUserMessage.content.trim();
           const newTitle =
             content.length > MAX_TITLE_LENGTH
-              ? content.slice(0, MAX_TITLE_LENGTH) + '...'
+              ? `${content.slice(0, MAX_TITLE_LENGTH)}...`
               : content;
 
           // Only call onTitleChange if title actually changed

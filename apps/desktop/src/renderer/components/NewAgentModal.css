@@ -284,7 +284,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .new-agent-modal-window-control:hover {
@@ -381,19 +383,19 @@
 /* Fork input - minimal, no border */
 .new-agent-modal-fork-input {
   flex: 1;
-  border: none !important;
-  background: transparent !important;
-  outline: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
+  border: none;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  padding: 0;
   min-height: auto;
   resize: none;
 }
 
 .new-agent-modal-fork-input:focus {
-  border: none !important;
-  outline: none !important;
-  box-shadow: none !important;
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 /* Worktree checkbox next to fork input */
@@ -419,7 +421,7 @@
 }
 
 .new-agent-modal-fork-worktree-value {
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
   color: var(--color-text-secondary, #888);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -497,7 +499,7 @@
 
 .new-agent-modal-session-id {
   font-size: 10px;
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
   color: var(--color-text-tertiary, #555);
   opacity: 0.7;
   overflow: hidden;

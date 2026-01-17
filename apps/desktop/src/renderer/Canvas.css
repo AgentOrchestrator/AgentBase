@@ -14,7 +14,9 @@
   background: var(--color-bg-primary);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease, transform 0.3s ease;
+  transition:
+    width 0.3s ease,
+    transform 0.3s ease;
   flex-shrink: 0;
   z-index: 1;
   position: relative;
@@ -100,7 +102,7 @@
   color: var(--color-text-primary);
   font-size: 18px;
   font-weight: 600;
-  font-family: 'Averia Serif Libre', serif;
+  font-family: "Averia Serif Libre", serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -117,7 +119,7 @@
   color: var(--color-text-primary);
   margin-top: 4px;
   font-weight: 400;
-  font-family: 'Averia Serif Libre', serif;
+  font-family: "Averia Serif Libre", serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -249,7 +251,7 @@
 .sidebar-shortcut {
   font-size: 11px;
   color: var(--color-text-secondary);
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   background: var(--color-bg-primary);
   padding: 2px 6px;
   border-radius: 3px;
@@ -323,7 +325,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s ease, padding-right 0.2s ease;
+  transition:
+    all 0.2s ease,
+    padding-right 0.2s ease;
   position: relative;
   z-index: 1;
   min-width: 0;
@@ -498,7 +502,9 @@
   align-items: center;
   gap: 12px;
   z-index: 1000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0.85;
 }
@@ -506,12 +512,15 @@
 .mode-indicator:hover {
   opacity: 1;
   border-color: rgba(139, 157, 195, 0.2);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2), 0 3px 10px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.2),
+    0 3px 10px rgba(0, 0, 0, 0.15);
 }
 
 /* Pulsation animations */
 @keyframes pulse-blue {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.4;
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(74, 158, 255, 0.7);
@@ -524,7 +533,8 @@
 }
 
 @keyframes pulse-orange {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.4;
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.7);
@@ -541,7 +551,7 @@
 }
 
 .mode-indicator.terminal-mode::before {
-  content: '';
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -555,7 +565,7 @@
 }
 
 .mode-indicator.drag-mode::before {
-  content: '';
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -606,7 +616,7 @@
 
 /* Global handle styles - remove all borders from React Flow handles */
 .react-flow__handle {
-  border: none !important;
+  border: none;
 }
 
 .custom-node .react-flow__handle-top {
@@ -683,7 +693,7 @@
   padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid var(--color-border);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
 }
 
 .context-menu-item:hover .context-menu-shortcut,
@@ -716,7 +726,7 @@
 
 /* Hide React Flow attribution */
 .react-flow__attribution {
-  display: none !important;
+  display: none;
 }
 
 /* Highlight All FAB */
@@ -944,7 +954,7 @@
 }
 
 .settings-mesh-welcome-title {
-  font-family: 'Averia Serif Libre', serif;
+  font-family: "Averia Serif Libre", serif;
   color: var(--color-text-primary);
   font-size: 25.6px;
   font-weight: 400;
@@ -953,7 +963,9 @@
 }
 
 .settings-mesh-welcome-subtitle {
-  font-family: 'SF UI Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family:
+    "SF UI Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 400;
@@ -972,7 +984,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: 'SF UI Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family:
+    "SF UI Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
   color: var(--color-text-primary);
   font-size: 13px;
   gap: 16px;
@@ -984,7 +998,7 @@
 }
 
 .settings-mesh-shortcut-key {
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: 4px;
@@ -1011,7 +1025,7 @@
 }
 
 .settings-mesh-username {
-  font-family: 'Averia Serif Libre', serif;
+  font-family: "Averia Serif Libre", serif;
   color: white;
   font-size: 25.6px;
   font-weight: 400;
@@ -1020,7 +1034,7 @@
 }
 
 .settings-mesh-subtitle {
-  font-family: 'Averia Serif Libre', serif;
+  font-family: "Averia Serif Libre", serif;
   color: white;
   font-size: 14.4px;
   font-weight: 300;
@@ -1102,7 +1116,7 @@
 }
 
 .settings-toggle:checked::after {
-  content: '✓';
+  content: "✓";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1133,7 +1147,7 @@
 .settings-shortcut {
   font-size: 12px;
   color: var(--color-text-secondary);
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   background: var(--color-bg-primary);
   padding: 4px 8px;
   border-radius: 4px;
@@ -1313,7 +1327,9 @@
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
-  transition: opacity 1s ease-out, filter 1s ease-out;
+  transition:
+    opacity 1s ease-out,
+    filter 1s ease-out;
   opacity: 0;
   filter: blur(4px);
 }
@@ -1341,7 +1357,9 @@
   background: #888;
   border-radius: 2px;
   cursor: pointer;
-  transition: all 1s ease-out, background 0.2s ease;
+  transition:
+    all 1s ease-out,
+    background 0.2s ease;
   opacity: 0;
   filter: blur(4px);
   z-index: 10;
@@ -1365,7 +1383,9 @@
   bottom: 0;
   overflow-y: auto;
   padding: 0 16px 16px;
-  transition: opacity 1s ease-out, filter 1s ease-out;
+  transition:
+    opacity 1s ease-out,
+    filter 1s ease-out;
   opacity: 0;
   filter: blur(4px);
 }
@@ -1522,7 +1542,7 @@
 .issue-identifier {
   color: var(--color-text-secondary);
   font-size: 12px;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-weight: 600;
 }
 
@@ -1698,7 +1718,7 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: none !important;
+  background-image: none;
 }
 
 /* Remove dropdown arrow in IE/Edge */
@@ -1785,7 +1805,7 @@
 .sidebar-issue-identifier {
   color: var(--color-text-secondary);
   font-size: 11px;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-weight: 600;
 }
 
@@ -1890,7 +1910,7 @@
 
 /* Save status indicator */
 .save-indicator {
-  display: none !important;
+  display: none;
 }
 
 .save-indicator:not(:empty) {

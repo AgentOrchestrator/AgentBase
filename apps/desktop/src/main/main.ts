@@ -1,22 +1,22 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { execFileSync, spawn } from 'node:child_process';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import type {
+  AddWorkspaceOptions,
+  GitInfo,
+  RecentWorkspace,
+  TerminalSessionState,
+} from '@agent-orchestrator/shared';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import * as pty from 'node-pty';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import * as os from 'os';
-import { spawn, execFileSync } from 'child_process';
-import * as fs from 'fs';
+import type { CodingAgentState } from '../../types/coding-agent-status';
 import { DatabaseFactory } from './database';
-import { IDatabase } from './database/IDatabase';
-import { CanvasState } from './types/database';
+import type { IDatabase } from './database/IDatabase';
+import type { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
-import type { CodingAgentState } from '../../types/coding-agent-status';
-import type {
-  GitInfo,
-  TerminalSessionState,
-  AddWorkspaceOptions,
-  RecentWorkspace,
-} from '@agent-orchestrator/shared';
 
 /**
  * Fix PATH for packaged macOS apps.
@@ -57,13 +57,7 @@ function fixPath(): void {
 
 // Fix PATH before anything else
 fixPath();
-import {
-  CodingAgentFactory,
-  isSessionResumable,
-  isSessionForkable,
-  isChatHistoryProvider,
-  isSessionValidator,
-} from './services/coding-agent';
+
 import type {
   AgentActionResponse,
   AgentEvent,
@@ -73,34 +67,41 @@ import type {
 } from '@agent-orchestrator/shared';
 import type {
   CodingAgentType,
-  GenerateRequest,
-  SessionIdentifier,
-  ForkOptions,
   ContinueOptions,
-  SessionFilterOptions,
+  ForkOptions,
+  GenerateRequest,
   MessageFilterOptions,
+  SessionFilterOptions,
+  SessionIdentifier,
   StreamingChunk,
 } from './services/coding-agent';
 import {
-  LLMServiceFactory,
-  registerLLMIpcHandlers,
-  DEFAULT_LLM_CONFIG,
-} from './services/llm';
+  CodingAgentFactory,
+  isChatHistoryProvider,
+  isSessionForkable,
+  isSessionResumable,
+  isSessionValidator,
+} from './services/coding-agent';
 import {
-  registerSessionWatcherIpcHandlers,
-  disposeSessionWatcher,
-} from './services/session-watcher';
+  awaitAgentActionResponse,
+  emitAgentEvent,
+  registerAgentActionHandlers,
+} from './services/coding-agent/agent-event-bridge';
 import { gitBranchService } from './services/git';
+import { DEFAULT_LLM_CONFIG, LLMServiceFactory, registerLLMIpcHandlers } from './services/llm';
 import {
-  RepresentationService,
-  type RepresentationInput,
-  type ImageTransformOptions,
-  type SummaryTransformOptions,
   type AudioTransformOptions,
-  type ILogger,
   type IIdGenerator,
+  type ILogger,
+  type ImageTransformOptions,
+  type RepresentationInput,
+  RepresentationService,
+  type SummaryTransformOptions,
 } from './services/representation';
-import { awaitAgentActionResponse, emitAgentEvent, registerAgentActionHandlers } from './services/coding-agent/agent-event-bridge';
+import {
+  disposeSessionWatcher,
+  registerSessionWatcherIpcHandlers,
+} from './services/session-watcher';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
@@ -174,8 +175,8 @@ function mapActionResponseToEventResult(
   }
 
   if (response.type === 'clarifying_question') {
-    const toolInput = (event.raw as { toolInput?: Record<string, unknown> } | undefined)
-      ?.toolInput ?? {};
+    const toolInput =
+      (event.raw as { toolInput?: Record<string, unknown> } | undefined)?.toolInput ?? {};
     return {
       action: 'modify',
       modifiedPayload: {
@@ -231,8 +232,8 @@ const createWindow = (): void => {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webviewTag: true
-    }
+      webviewTag: true,
+    },
   });
 
   // Load from Vite dev server in development, otherwise load from dist
@@ -280,17 +281,17 @@ const createWindow = (): void => {
   const terminalCreationTimes = new Map<string, number>();
 
   // Create a new terminal instance
-  ipcMain.on('terminal-create', (event, terminalId: string) => {
+  ipcMain.on('terminal-create', (_event, terminalId: string) => {
     const callTime = Date.now();
     const lastCreationTime = terminalCreationTimes.get(terminalId);
     const timeSinceLastCreation = lastCreationTime ? callTime - lastCreationTime : null;
-    
-    console.log('[Main] terminal-create IPC received', { 
-      terminalId, 
+
+    console.log('[Main] terminal-create IPC received', {
+      terminalId,
       timeSinceLastCreation: timeSinceLastCreation ? `${timeSinceLastCreation}ms` : 'never',
       existingInMap: terminalProcesses.has(terminalId),
       beingCreated: terminalsBeingCreated.has(terminalId),
-      stackTrace: new Error().stack?.split('\n').slice(2, 5).join('\n')
+      stackTrace: new Error().stack?.split('\n').slice(2, 5).join('\n'),
     });
 
     // If terminal already exists, skip creation (prevent duplicates)
@@ -302,7 +303,9 @@ const createWindow = (): void => {
 
     // If terminal is currently being created, skip to prevent race conditions
     if (terminalsBeingCreated.has(terminalId)) {
-      console.log('[Main] ⚠️ Terminal is already being created, skipping duplicate request', { terminalId });
+      console.log('[Main] ⚠️ Terminal is already being created, skipping duplicate request', {
+        terminalId,
+      });
       return;
     }
 
@@ -315,25 +318,21 @@ const createWindow = (): void => {
     // This is needed for commands like 'claude' that are installed in user-specific locations
     const shellArgs: string[] = process.platform === 'win32' ? [] : ['-l'];
 
-    const ptyProcess = pty.spawn(
-      shell,
-      shellArgs,
-      {
-        name: 'xterm-256color',
-        cols: 80,
-        rows: 30,
-        cwd: process.env.HOME || process.cwd(),
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          // Ensure shell runs in interactive mode via environment
-          PS1: process.env.PS1 || '$ ',
-          // For zsh, ensure it runs interactively
-          ...(shell.includes('zsh') ? { ZDOTDIR: process.env.HOME } : {})
-        } as { [key: string]: string }
-      }
-    );
+    const ptyProcess = pty.spawn(shell, shellArgs, {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 30,
+      cwd: process.env.HOME || process.cwd(),
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        // Ensure shell runs in interactive mode via environment
+        PS1: process.env.PS1 || '$ ',
+        // For zsh, ensure it runs interactively
+        ...(shell.includes('zsh') ? { ZDOTDIR: process.env.HOME } : {}),
+      } as { [key: string]: string },
+    });
 
     // Add to map immediately after creation to prevent duplicates
     terminalProcesses.set(terminalId, ptyProcess);
@@ -376,7 +375,7 @@ const createWindow = (): void => {
         win.webContents.send('terminal-exit', {
           terminalId,
           code: exitInfo.exitCode,
-          signal: exitInfo.signal
+          signal: exitInfo.signal,
         });
       }
       // Remove from map when process exits so it can be recreated
@@ -390,52 +389,59 @@ const createWindow = (): void => {
   });
 
   // Handle resize from renderer (throttled on renderer side, but log less frequently here too)
-  let lastResizeLog: { [key: string]: { cols: number; rows: number; time: number } } = {};
-  ipcMain.on('terminal-resize', (_event, { terminalId, cols, rows }: { terminalId: string; cols: number; rows: number }) => {
-    const ptyProcess = terminalProcesses.get(terminalId);
-    if (ptyProcess) {
-      // Validate dimensions are positive (node-pty requires this)
-      if (cols <= 0 || rows <= 0) {
-        return;
-      }
+  const lastResizeLog: { [key: string]: { cols: number; rows: number; time: number } } = {};
+  ipcMain.on(
+    'terminal-resize',
+    (_event, { terminalId, cols, rows }: { terminalId: string; cols: number; rows: number }) => {
+      const ptyProcess = terminalProcesses.get(terminalId);
+      if (ptyProcess) {
+        // Validate dimensions are positive (node-pty requires this)
+        if (cols <= 0 || rows <= 0) {
+          return;
+        }
 
-      // Only log resize if it's been more than 2000ms since last log OR dimensions changed significantly (>5 cols or >1 row)
-      const lastLog = lastResizeLog[terminalId];
-      const now = Date.now();
-      const dimensionChanged = !lastLog || lastLog.cols !== cols || lastLog.rows !== rows;
-      const significantChange = lastLog && (Math.abs(lastLog.cols - cols) > 5 || Math.abs(lastLog.rows - rows) > 1);
-      const timeThreshold = !lastLog || (now - lastLog.time > 2000);
+        // Only log resize if it's been more than 2000ms since last log OR dimensions changed significantly (>5 cols or >1 row)
+        const lastLog = lastResizeLog[terminalId];
+        const now = Date.now();
+        const dimensionChanged = !lastLog || lastLog.cols !== cols || lastLog.rows !== rows;
+        const significantChange =
+          lastLog && (Math.abs(lastLog.cols - cols) > 5 || Math.abs(lastLog.rows - rows) > 1);
+        const timeThreshold = !lastLog || now - lastLog.time > 2000;
 
-      if (timeThreshold || (dimensionChanged && significantChange)) {
-        console.log('[Main] Terminal resize', { terminalId, cols, rows });
-        lastResizeLog[terminalId] = { cols, rows, time: now };
+        if (timeThreshold || (dimensionChanged && significantChange)) {
+          console.log('[Main] Terminal resize', { terminalId, cols, rows });
+          lastResizeLog[terminalId] = { cols, rows, time: now };
+        }
+        ptyProcess.resize(cols, rows);
       }
-      ptyProcess.resize(cols, rows);
     }
-  });
+  );
 
   // Handle input from renderer
-  ipcMain.on('terminal-input', (_event, { terminalId, data }: { terminalId: string; data: string }) => {
-    // Don't log every input - too verbose (logs every keystroke)
-    const ptyProcess = terminalProcesses.get(terminalId);
-    if (ptyProcess) {
-      ptyProcess.write(data);
+  ipcMain.on(
+    'terminal-input',
+    (_event, { terminalId, data }: { terminalId: string; data: string }) => {
+      // Don't log every input - too verbose (logs every keystroke)
+      const ptyProcess = terminalProcesses.get(terminalId);
+      if (ptyProcess) {
+        ptyProcess.write(data);
+      }
     }
-  });
+  );
 
   // Handle terminal destroy
-  ipcMain.on('terminal-destroy', (event, terminalId: string) => {
+  ipcMain.on('terminal-destroy', (_event, terminalId: string) => {
     const destroyTime = Date.now();
     const creationTime = terminalCreationTimes.get(terminalId);
     const lifetime = creationTime ? destroyTime - creationTime : null;
-    
-    console.log('[Main] ⚠️ terminal-destroy IPC received', { 
+
+    console.log('[Main] ⚠️ terminal-destroy IPC received', {
       terminalId,
       lifetime: lifetime ? `${lifetime}ms` : 'unknown',
       existsInMap: terminalProcesses.has(terminalId),
-      stackTrace: new Error().stack?.split('\n').slice(2, 5).join('\n')
+      stackTrace: new Error().stack?.split('\n').slice(2, 5).join('\n'),
     });
-    
+
     const ptyProcess = terminalProcesses.get(terminalId);
     if (ptyProcess) {
       console.log('[Main] 🗑️ Destroying terminal process', { terminalId });
@@ -486,11 +492,14 @@ const createWindow = (): void => {
   });
 
   // Set terminal session state
-  ipcMain.handle('terminal-set-session-state', async (_event, terminalId: string, state: TerminalSessionState) => {
-    terminalSessionStates.set(terminalId, state);
-    console.log('[Main] Terminal session state set', { terminalId, state });
-    return { success: true };
-  });
+  ipcMain.handle(
+    'terminal-set-session-state',
+    async (_event, terminalId: string, state: TerminalSessionState) => {
+      terminalSessionStates.set(terminalId, state);
+      console.log('[Main] Terminal session state set', { terminalId, state });
+      return { success: true };
+    }
+  );
 
   // Clear terminal session state
   ipcMain.handle('terminal-clear-session-state', async (_event, terminalId: string) => {
@@ -507,7 +516,10 @@ const createWindow = (): void => {
 type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
 
 // Editor command configurations for macOS
-const EDITOR_COMMANDS: Record<EditorApp, { app?: string; command?: string; args: (dir: string) => string[] }> = {
+const EDITOR_COMMANDS: Record<
+  EditorApp,
+  { app?: string; command?: string; args: (dir: string) => string[] }
+> = {
   vscode: { command: 'code', args: (dir) => [dir] },
   cursor: { command: 'cursor', args: (dir) => [dir] },
   zed: { command: 'zed', args: (dir) => [dir] },
@@ -636,19 +648,16 @@ function registerIpcHandlers(): void {
   });
 
   // Agent Status IPC handlers
-  ipcMain.handle(
-    'agent-status:save',
-    async (_event, agentId: string, state: CodingAgentState) => {
-      try {
-        await database.saveAgentStatus(agentId, state);
-        console.log('[Main] Agent status saved', { agentId });
-        return { success: true };
-      } catch (error) {
-        console.error('[Main] Error saving agent status', { agentId, error });
-        return { success: false, error: (error as Error).message };
-      }
+  ipcMain.handle('agent-status:save', async (_event, agentId: string, state: CodingAgentState) => {
+    try {
+      await database.saveAgentStatus(agentId, state);
+      console.log('[Main] Agent status saved', { agentId });
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error saving agent status', { agentId, error });
+      return { success: false, error: (error as Error).message };
     }
-  );
+  });
 
   // File reading API for debug mode
   ipcMain.handle('file:read', async (_event, filePath: string) => {
@@ -856,15 +865,14 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'coding-agent:generate',
-    async (
-      _event,
-      agentType: CodingAgentType,
-      request: GenerateRequest
-    ) => {
+    async (_event, agentType: CodingAgentType, request: GenerateRequest) => {
       try {
         const agentResult = await CodingAgentFactory.getAgent(agentType);
         if (agentResult.success === false) {
-          console.error('[Main] Error getting coding agent', { agentType, error: agentResult.error });
+          console.error('[Main] Error getting coding agent', {
+            agentType,
+            error: agentResult.error,
+          });
           return { success: false, error: agentResult.error.message };
         }
 
@@ -875,7 +883,10 @@ function registerIpcHandlers(): void {
           return { success: false, error: result.error.message };
         }
 
-        console.log('[Main] Generated response', { agentType, contentLength: result.data.content.length });
+        console.log('[Main] Generated response', {
+          agentType,
+          contentLength: result.data.content.length,
+        });
         return { success: true, data: result.data };
       } catch (error) {
         console.error('[Main] Error in coding-agent:generate', { agentType, error });
@@ -1061,44 +1072,40 @@ function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle(
-    'coding-agent:get-capabilities',
-    async (_event, agentType: CodingAgentType) => {
-      try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
-        if (agentResult.success === false) {
-          return { success: false, error: agentResult.error.message };
-        }
-
-        const capabilities = agentResult.data.getCapabilities();
-        console.log('[Main] Agent capabilities', { agentType, capabilities });
-        return { success: true, data: capabilities };
-      } catch (error) {
-        console.error('[Main] Error getting capabilities', { agentType, error });
-        return { success: false, error: (error as Error).message };
+  ipcMain.handle('coding-agent:get-capabilities', async (_event, agentType: CodingAgentType) => {
+    try {
+      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      if (agentResult.success === false) {
+        return { success: false, error: agentResult.error.message };
       }
-    }
-  );
 
-  ipcMain.handle(
-    'coding-agent:is-available',
-    async (_event, agentType: CodingAgentType) => {
-      try {
-        const available = await CodingAgentFactory.isAgentAvailable(agentType);
-        return { success: true, data: available };
-      } catch (error) {
-        console.error('[Main] Error checking agent availability', { agentType, error });
-        return { success: false, error: (error as Error).message };
-      }
+      const capabilities = agentResult.data.getCapabilities();
+      console.log('[Main] Agent capabilities', { agentType, capabilities });
+      return { success: true, data: capabilities };
+    } catch (error) {
+      console.error('[Main] Error getting capabilities', { agentType, error });
+      return { success: false, error: (error as Error).message };
     }
-  );
+  });
+
+  ipcMain.handle('coding-agent:is-available', async (_event, agentType: CodingAgentType) => {
+    try {
+      const available = await CodingAgentFactory.isAgentAvailable(agentType);
+      return { success: true, data: available };
+    } catch (error) {
+      console.error('[Main] Error checking agent availability', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
 
   ipcMain.handle(
     'coding-agent:list-session-summaries',
     async (_event, agentType: CodingAgentType, filter?: SessionFilterOptions) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
+        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+          skipCliVerification: true,
+        });
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
@@ -1110,7 +1117,10 @@ function registerIpcHandlers(): void {
 
         const result = await agent.listSessionSummaries(filter);
         if (result.success === false) {
-          console.error('[Main] Error listing session summaries', { agentType, error: result.error });
+          console.error('[Main] Error listing session summaries', {
+            agentType,
+            error: result.error,
+          });
           return { success: false, error: result.error.message };
         }
 
@@ -1133,7 +1143,9 @@ function registerIpcHandlers(): void {
     ) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
+        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+          skipCliVerification: true,
+        });
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
@@ -1145,11 +1157,19 @@ function registerIpcHandlers(): void {
 
         const result = await agent.getFilteredSession(sessionId, filter);
         if (result.success === false) {
-          console.error('[Main] Error getting session', { agentType, sessionId, error: result.error });
+          console.error('[Main] Error getting session', {
+            agentType,
+            sessionId,
+            error: result.error,
+          });
           return { success: false, error: result.error.message };
         }
 
-        console.log('[Main] Got session', { agentType, sessionId, messageCount: result.data?.messages?.length ?? 0 });
+        console.log('[Main] Got session', {
+          agentType,
+          sessionId,
+          messageCount: result.data?.messages?.length ?? 0,
+        });
         return { success: true, data: result.data };
       } catch (error) {
         console.error('[Main] Error in coding-agent:get-session', { agentType, sessionId, error });
@@ -1164,7 +1184,9 @@ function registerIpcHandlers(): void {
     async (_event, agentType: CodingAgentType, workspacePath: string) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
+        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+          skipCliVerification: true,
+        });
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
@@ -1191,7 +1213,10 @@ function registerIpcHandlers(): void {
         })[0];
 
         console.log('[Main] Latest session found', { workspacePath, sessionId: latestSession.id });
-        return { success: true, data: { id: latestSession.id, updatedAt: latestSession.updatedAt } };
+        return {
+          success: true,
+          data: { id: latestSession.id, updatedAt: latestSession.updatedAt },
+        };
       } catch (error) {
         console.error('[Main] Error getting latest session', { agentType, workspacePath, error });
         return { success: false, error: (error as Error).message };
@@ -1204,7 +1229,9 @@ function registerIpcHandlers(): void {
     'coding-agent:check-session-active',
     async (_event, agentType: CodingAgentType, sessionId: string, workspacePath: string) => {
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType, { skipCliVerification: true });
+        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+          skipCliVerification: true,
+        });
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
@@ -1217,7 +1244,12 @@ function registerIpcHandlers(): void {
         const isActive = await agent.checkSessionActive(sessionId, workspacePath);
         return { success: true, data: isActive };
       } catch (error) {
-        console.error('[Main] Error checking session active', { agentType, sessionId, workspacePath, error });
+        console.error('[Main] Error checking session active', {
+          agentType,
+          sessionId,
+          workspacePath,
+          error,
+        });
         return { success: false, error: (error as Error).message };
       }
     }
@@ -1226,12 +1258,7 @@ function registerIpcHandlers(): void {
   // Streaming generation handler
   ipcMain.handle(
     'coding-agent:generate-streaming',
-    async (
-      event,
-      requestId: string,
-      agentType: CodingAgentType,
-      request: GenerateRequest
-    ) => {
+    async (event, requestId: string, agentType: CodingAgentType, request: GenerateRequest) => {
       const startTime = Date.now();
       let chunksSent = 0;
       let totalBytesSent = 0;
@@ -1321,12 +1348,7 @@ function registerIpcHandlers(): void {
   // Structured streaming generation handler (with content blocks)
   ipcMain.handle(
     'coding-agent:generate-streaming-structured',
-    async (
-      event,
-      requestId: string,
-      agentType: CodingAgentType,
-      request: GenerateRequest
-    ) => {
+    async (event, requestId: string, agentType: CodingAgentType, request: GenerateRequest) => {
       const startTime = Date.now();
       let chunksSent = 0;
 
@@ -1524,56 +1546,68 @@ function registerIpcHandlers(): void {
   // Shell API handlers
   // ============================================================================
 
-  ipcMain.handle('shell:open-with-editor', async (_event, directoryPath: string, editor: EditorApp) => {
-    try {
-      console.log('[Main] Opening directory with editor', { directoryPath, editor });
+  ipcMain.handle(
+    'shell:open-with-editor',
+    async (_event, directoryPath: string, editor: EditorApp) => {
+      try {
+        console.log('[Main] Opening directory with editor', { directoryPath, editor });
 
-      // Verify directory exists
-      if (!fs.existsSync(directoryPath)) {
-        return { success: false, error: `Directory does not exist: ${directoryPath}` };
-      }
+        // Verify directory exists
+        if (!fs.existsSync(directoryPath)) {
+          return { success: false, error: `Directory does not exist: ${directoryPath}` };
+        }
 
-      const config = EDITOR_COMMANDS[editor];
-      if (!config) {
-        return { success: false, error: `Unknown editor: ${editor}` };
-      }
+        const config = EDITOR_COMMANDS[editor];
+        if (!config) {
+          return { success: false, error: `Unknown editor: ${editor}` };
+        }
 
-      // Special case for Finder
-      if (editor === 'finder') {
-        shell.openPath(directoryPath);
-        return { success: true };
-      }
-
-      // Try command-line tool first
-      if (config.command) {
-        const exists = await commandExists(config.command);
-        if (exists) {
-          spawn(config.command, config.args(directoryPath), { detached: true, stdio: 'ignore' }).unref();
+        // Special case for Finder
+        if (editor === 'finder') {
+          shell.openPath(directoryPath);
           return { success: true };
         }
-      }
 
-      // Fall back to opening the app directly (macOS)
-      if (config.app) {
-        const exists = await appExists(config.app);
-        if (exists) {
-          spawn('open', ['-a', config.app, directoryPath], { detached: true, stdio: 'ignore' }).unref();
-          return { success: true };
+        // Try command-line tool first
+        if (config.command) {
+          const exists = await commandExists(config.command);
+          if (exists) {
+            spawn(config.command, config.args(directoryPath), {
+              detached: true,
+              stdio: 'ignore',
+            }).unref();
+            return { success: true };
+          }
         }
-      }
 
-      return { success: false, error: `Editor ${editor} is not installed or not found in PATH` };
-    } catch (error) {
-      console.error('[Main] Error opening with editor', { error });
-      return { success: false, error: (error as Error).message };
+        // Fall back to opening the app directly (macOS)
+        if (config.app) {
+          const exists = await appExists(config.app);
+          if (exists) {
+            spawn('open', ['-a', config.app, directoryPath], {
+              detached: true,
+              stdio: 'ignore',
+            }).unref();
+            return { success: true };
+          }
+        }
+
+        return { success: false, error: `Editor ${editor} is not installed or not found in PATH` };
+      } catch (error) {
+        console.error('[Main] Error opening with editor', { error });
+        return { success: false, error: (error as Error).message };
+      }
     }
-  });
+  );
 
   ipcMain.handle('shell:get-available-editors', async () => {
     try {
       const available: EditorApp[] = [];
 
-      for (const [editor, config] of Object.entries(EDITOR_COMMANDS) as [EditorApp, typeof EDITOR_COMMANDS[EditorApp]][]) {
+      for (const [editor, config] of Object.entries(EDITOR_COMMANDS) as [
+        EditorApp,
+        (typeof EDITOR_COMMANDS)[EditorApp],
+      ][]) {
         // Check command
         if (config.command) {
           const exists = await commandExists(config.command);
@@ -1614,54 +1648,66 @@ function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('shell:open-directory-dialog', async (_event, options?: { title?: string; defaultPath?: string }) => {
-    try {
-      const result = await dialog.showOpenDialog({
-        title: options?.title || 'Select Directory',
-        defaultPath: options?.defaultPath || process.env.HOME,
-        properties: ['openDirectory', 'createDirectory'],
-      });
+  ipcMain.handle(
+    'shell:open-directory-dialog',
+    async (_event, options?: { title?: string; defaultPath?: string }) => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: options?.title || 'Select Directory',
+          defaultPath: options?.defaultPath || process.env.HOME,
+          properties: ['openDirectory', 'createDirectory'],
+        });
 
-      if (result.canceled || result.filePaths.length === 0) {
-        return { success: true, data: null };
+        if (result.canceled || result.filePaths.length === 0) {
+          return { success: true, data: null };
+        }
+
+        return { success: true, data: result.filePaths[0] };
+      } catch (error) {
+        console.error('[Main] Error opening directory dialog', { error });
+        return { success: false, error: (error as Error).message };
       }
-
-      return { success: true, data: result.filePaths[0] };
-    } catch (error) {
-      console.error('[Main] Error opening directory dialog', { error });
-      return { success: false, error: (error as Error).message };
     }
-  });
+  );
 
   // ============================================================================
   // Git API handlers
   // ============================================================================
 
-  ipcMain.handle('git:list-branches', async (_event, workspacePath: string): Promise<{ success: boolean; data?: string[]; error?: string }> => {
-    try {
-      // Verify path exists and is a git repo
-      if (!fs.existsSync(workspacePath)) {
-        return { success: false, error: `Path does not exist: ${workspacePath}` };
-      }
-
-      // Get all local branches
+  ipcMain.handle(
+    'git:list-branches',
+    async (
+      _event,
+      workspacePath: string
+    ): Promise<{ success: boolean; data?: string[]; error?: string }> => {
       try {
-        const branchesOutput = await runGitCommand(workspacePath, ['branch', '--format=%(refname:short)']);
-        const branches = branchesOutput
-          .split('\n')
-          .map((b) => b.trim())
-          .filter((b) => b.length > 0);
+        // Verify path exists and is a git repo
+        if (!fs.existsSync(workspacePath)) {
+          return { success: false, error: `Path does not exist: ${workspacePath}` };
+        }
 
-        console.log('[Main] Branches retrieved', { workspacePath, branches });
-        return { success: true, data: branches };
-      } catch {
-        return { success: false, error: 'Not a git repository' };
+        // Get all local branches
+        try {
+          const branchesOutput = await runGitCommand(workspacePath, [
+            'branch',
+            '--format=%(refname:short)',
+          ]);
+          const branches = branchesOutput
+            .split('\n')
+            .map((b) => b.trim())
+            .filter((b) => b.length > 0);
+
+          console.log('[Main] Branches retrieved', { workspacePath, branches });
+          return { success: true, data: branches };
+        } catch {
+          return { success: false, error: 'Not a git repository' };
+        }
+      } catch (error) {
+        console.error('[Main] Error listing branches', { workspacePath, error });
+        return { success: false, error: (error as Error).message };
       }
-    } catch (error) {
-      console.error('[Main] Error listing branches', { workspacePath, error });
-      return { success: false, error: (error as Error).message };
     }
-  });
+  );
 
   // Git info handler - throws if not a git repository
   ipcMain.handle('git:get-info-strict', async (_event, workspacePath: string): Promise<GitInfo> => {
@@ -1669,119 +1715,142 @@ function registerIpcHandlers(): void {
     return gitBranchService.getGitInfo(workspacePath);
   });
 
-  ipcMain.handle('git:create-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      // Verify path exists and is a git repo
-      if (!fs.existsSync(workspacePath)) {
-        return { success: false, error: `Path does not exist: ${workspacePath}` };
-      }
-
-      // Validate branch name
-      if (!branchName || !branchName.trim()) {
-        return { success: false, error: 'Branch name is required' };
-      }
-
-      // Sanitize branch name (remove invalid characters)
-      const sanitizedBranchName = branchName.trim().replace(/[^a-zA-Z0-9._/-]/g, '-');
-      if (!sanitizedBranchName) {
-        return { success: false, error: 'Invalid branch name' };
-      }
-
+  ipcMain.handle(
+    'git:create-branch',
+    async (
+      _event,
+      workspacePath: string,
+      branchName: string
+    ): Promise<{ success: boolean; error?: string }> => {
       try {
-        // Create and checkout the new branch
-        await runGitCommand(workspacePath, ['checkout', '-b', sanitizedBranchName]);
-        console.log('[Main] Branch created and checked out', { workspacePath, branchName: sanitizedBranchName });
-        return { success: true };
-      } catch (error) {
-        const errorMessage = (error as Error).message;
-        // Check if branch already exists
-        if (errorMessage.includes('already exists')) {
-          // Try to checkout the existing branch instead
-          try {
-            await runGitCommand(workspacePath, ['checkout', sanitizedBranchName]);
-            console.log('[Main] Branch already exists, checked out existing branch', { workspacePath, branchName: sanitizedBranchName });
-            return { success: true };
-          } catch (checkoutError) {
-            return { success: false, error: (checkoutError as Error).message };
-          }
+        // Verify path exists and is a git repo
+        if (!fs.existsSync(workspacePath)) {
+          return { success: false, error: `Path does not exist: ${workspacePath}` };
         }
-        return { success: false, error: errorMessage };
-      }
-    } catch (error) {
-      console.error('[Main] Error creating branch', { workspacePath, branchName, error });
-      return { success: false, error: (error as Error).message };
-    }
-  });
 
-  ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      // Verify path exists and is a git repo
-      if (!fs.existsSync(workspacePath)) {
-        return { success: false, error: `Path does not exist: ${workspacePath}` };
-      }
+        // Validate branch name
+        if (!branchName || !branchName.trim()) {
+          return { success: false, error: 'Branch name is required' };
+        }
 
-      // Validate branch name
-      if (!branchName || !branchName.trim()) {
-        return { success: false, error: 'Branch name is required' };
-      }
+        // Sanitize branch name (remove invalid characters)
+        const sanitizedBranchName = branchName.trim().replace(/[^a-zA-Z0-9._/-]/g, '-');
+        if (!sanitizedBranchName) {
+          return { success: false, error: 'Invalid branch name' };
+        }
 
-      try {
-        // Checkout the branch
-        await runGitCommand(workspacePath, ['checkout', branchName.trim()]);
-        console.log('[Main] Branch checked out', { workspacePath, branchName });
-        return { success: true };
+        try {
+          // Create and checkout the new branch
+          await runGitCommand(workspacePath, ['checkout', '-b', sanitizedBranchName]);
+          console.log('[Main] Branch created and checked out', {
+            workspacePath,
+            branchName: sanitizedBranchName,
+          });
+          return { success: true };
+        } catch (error) {
+          const errorMessage = (error as Error).message;
+          // Check if branch already exists
+          if (errorMessage.includes('already exists')) {
+            // Try to checkout the existing branch instead
+            try {
+              await runGitCommand(workspacePath, ['checkout', sanitizedBranchName]);
+              console.log('[Main] Branch already exists, checked out existing branch', {
+                workspacePath,
+                branchName: sanitizedBranchName,
+              });
+              return { success: true };
+            } catch (checkoutError) {
+              return { success: false, error: (checkoutError as Error).message };
+            }
+          }
+          return { success: false, error: errorMessage };
+        }
       } catch (error) {
+        console.error('[Main] Error creating branch', { workspacePath, branchName, error });
         return { success: false, error: (error as Error).message };
       }
-    } catch (error) {
-      console.error('[Main] Error checking out branch', { workspacePath, branchName, error });
-      return { success: false, error: (error as Error).message };
     }
-  });
+  );
 
-  ipcMain.handle('git:get-github-username', async (): Promise<{ success: boolean; data?: { username: string }; error?: string }> => {
-    try {
-      const gh = spawn('gh', ['api', 'user', '--jq', '.login'], { shell: true });
-      let stdout = '';
-      let stderr = '';
+  ipcMain.handle(
+    'git:checkout-branch',
+    async (
+      _event,
+      workspacePath: string,
+      branchName: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        // Verify path exists and is a git repo
+        if (!fs.existsSync(workspacePath)) {
+          return { success: false, error: `Path does not exist: ${workspacePath}` };
+        }
 
-      gh.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+        // Validate branch name
+        if (!branchName || !branchName.trim()) {
+          return { success: false, error: 'Branch name is required' };
+        }
 
-      gh.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      const username = await new Promise<string>((resolve, reject) => {
-        gh.on('close', (code) => {
-          if (code === 0) {
-            const trimmed = stdout.trim();
-            if (trimmed) {
-              resolve(trimmed);
-            } else {
-              reject(new Error('GitHub CLI returned empty username'));
-            }
-          } else {
-            reject(new Error(stderr.trim() || `GitHub CLI failed with code ${code}`));
-          }
-        });
-        gh.on('error', (err) => {
-          reject(new Error(`Failed to execute GitHub CLI: ${err.message}`));
-        });
-      });
-
-      if (username) {
-        console.log('[Main] GitHub username retrieved:', username);
-        return { success: true, data: { username } };
+        try {
+          // Checkout the branch
+          await runGitCommand(workspacePath, ['checkout', branchName.trim()]);
+          console.log('[Main] Branch checked out', { workspacePath, branchName });
+          return { success: true };
+        } catch (error) {
+          return { success: false, error: (error as Error).message };
+        }
+      } catch (error) {
+        console.error('[Main] Error checking out branch', { workspacePath, branchName, error });
+        return { success: false, error: (error as Error).message };
       }
-
-      return { success: false, error: 'Could not determine GitHub username' };
-    } catch (error) {
-      console.error('[Main] Error getting GitHub username', { error });
-      return { success: false, error: (error as Error).message };
     }
-  });
+  );
+
+  ipcMain.handle(
+    'git:get-github-username',
+    async (): Promise<{ success: boolean; data?: { username: string }; error?: string }> => {
+      try {
+        const gh = spawn('gh', ['api', 'user', '--jq', '.login'], { shell: true });
+        let stdout = '';
+        let stderr = '';
+
+        gh.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        gh.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        const username = await new Promise<string>((resolve, reject) => {
+          gh.on('close', (code) => {
+            if (code === 0) {
+              const trimmed = stdout.trim();
+              if (trimmed) {
+                resolve(trimmed);
+              } else {
+                reject(new Error('GitHub CLI returned empty username'));
+              }
+            } else {
+              reject(new Error(stderr.trim() || `GitHub CLI failed with code ${code}`));
+            }
+          });
+          gh.on('error', (err) => {
+            reject(new Error(`Failed to execute GitHub CLI: ${err.message}`));
+          });
+        });
+
+        if (username) {
+          console.log('[Main] GitHub username retrieved:', username);
+          return { success: true, data: { username } };
+        }
+
+        return { success: false, error: 'Could not determine GitHub username' };
+      } catch (error) {
+        console.error('[Main] Error getting GitHub username', { error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
 
   console.log('[Main] IPC handlers registered successfully');
 }
@@ -1845,7 +1914,9 @@ app.whenReady().then(async () => {
 
 // Clean up on app quit
 app.on('will-quit', async () => {
-  console.log('[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, and representation service');
+  console.log(
+    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, and representation service'
+  );
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
   disposeSessionWatcher();

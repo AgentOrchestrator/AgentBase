@@ -197,7 +197,7 @@
   color: #d4d4d4;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
 }
 
 .progress-label {
@@ -398,6 +398,6 @@
 .agent-session-label {
   color: #666;
   font-size: 10px;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   word-break: break-all;
 }

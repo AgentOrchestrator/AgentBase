@@ -46,9 +46,7 @@ const dummyBranches: Branch[] = [
     repo: 'agent-base',
     isExpanded: false,
     lastActive: '1 hour ago',
-    terminals: [
-      { id: 't6', name: 'Deploy v2.1.0', status: 'completed' },
-    ],
+    terminals: [{ id: 't6', name: 'Deploy v2.1.0', status: 'completed' }],
   },
   {
     id: '4',
@@ -68,9 +66,7 @@ const dummyBranches: Branch[] = [
     repo: 'backend-service',
     isExpanded: false,
     lastActive: 'Yesterday',
-    terminals: [
-      { id: 't10', name: 'Increase timeout limits', status: 'completed' },
-    ],
+    terminals: [{ id: 't10', name: 'Increase timeout limits', status: 'completed' }],
   },
 ];
 
@@ -79,11 +75,11 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleBranch = (branchId: string) => {
-    setBranches(branches.map(branch =>
-      branch.id === branchId
-        ? { ...branch, isExpanded: !branch.isExpanded }
-        : branch
-    ));
+    setBranches(
+      branches.map((branch) =>
+        branch.id === branchId ? { ...branch, isExpanded: !branch.isExpanded } : branch
+      )
+    );
   };
 
   const getStatusIcon = (status: Terminal['status']) => {
@@ -123,25 +119,22 @@ export default function Sidebar() {
       </div>
 
       <div className="sidebar-content">
-        {branches.map(branch => (
+        {branches.map((branch) => (
           <div key={branch.id} className="branch-group">
-            <div
-              className="branch-header"
-              onClick={() => toggleBranch(branch.id)}
-            >
-              <span className={`branch-chevron ${branch.isExpanded ? 'expanded' : ''}`}>
-                ›
-              </span>
+            <div className="branch-header" onClick={() => toggleBranch(branch.id)}>
+              <span className={`branch-chevron ${branch.isExpanded ? 'expanded' : ''}`}>›</span>
               <span className="branch-icon">⎇</span>
               <div className="branch-info">
                 <span className="branch-name">{branch.name}</span>
-                <span className="branch-meta">{branch.repo} · {branch.lastActive}</span>
+                <span className="branch-meta">
+                  {branch.repo} · {branch.lastActive}
+                </span>
               </div>
             </div>
 
             {branch.isExpanded && (
               <div className="terminal-list">
-                {branch.terminals.map(terminal => (
+                {branch.terminals.map((terminal) => (
                   <div key={terminal.id} className="terminal-item">
                     {getStatusIcon(terminal.status)}
                     <span className="terminal-name">{terminal.name}</span>

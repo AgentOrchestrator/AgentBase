@@ -79,9 +79,7 @@ export function MessagePreviewPanel({
                 }
               }}
             >
-              <div className="message-preview-role">
-                {message.role === 'user' ? '👤' : '🤖'}
-              </div>
+              <div className="message-preview-role">{message.role === 'user' ? '👤' : '🤖'}</div>
               <div className="message-preview-content">
                 <span className="message-preview-text">{message.preview}</span>
                 {isOriginalTarget && (

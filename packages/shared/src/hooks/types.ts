@@ -5,7 +5,7 @@
  * agent implementations (Claude Code, Codex, etc.) via adapters.
  */
 
-import { AgentType, ToolCategory } from '../loaders/types.js';
+import type { AgentType, ToolCategory } from '../loaders/types.js';
 
 // =============================================================================
 // VENDOR-AGNOSTIC EVENT TYPES

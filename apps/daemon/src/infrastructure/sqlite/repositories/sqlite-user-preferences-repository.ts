@@ -3,7 +3,10 @@
  */
 
 import type Database from 'better-sqlite3';
-import type { IUserPreferencesRepository, UserPreferences } from '../../../interfaces/repositories.js';
+import type {
+  IUserPreferencesRepository,
+  UserPreferences,
+} from '../../../interfaces/repositories.js';
 
 interface UserPreferencesRow {
   user_id: string;

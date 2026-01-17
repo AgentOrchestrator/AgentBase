@@ -6,14 +6,14 @@
  * Displays messages exactly like ConversationNode.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { marked } from 'marked';
-import { useReactFlow } from '@xyflow/react';
-import { useChatMessages } from './hooks/useChatMessages';
-import { useAgentService } from './context';
-import { TextSelectionButton } from './components/TextSelectionButton';
-import type { AgentChatMessage } from './types/agent-node';
 import type { AgentContentBlock } from '@agent-orchestrator/shared';
+import { useReactFlow } from '@xyflow/react';
+import { marked } from 'marked';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { TextSelectionButton } from './components/TextSelectionButton';
+import { useAgentService } from './context';
+import { useChatMessages } from './hooks/useChatMessages';
+import type { AgentChatMessage } from './types/agent-node';
 import './AgentChatView.css';
 
 // Configure marked for tight spacing
@@ -42,7 +42,12 @@ interface AgentChatViewProps {
 type DisplayItem =
   | { type: 'text'; content: { text: string }; key: string }
   | { type: 'thinking'; content: { thinking: string }; key: string }
-  | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
+  | {
+      type: 'tool_summary';
+      toolType: 'read' | 'edit' | 'grep' | 'glob';
+      count: number;
+      key: string;
+    };
 
 export default function AgentChatView({
   sessionId,
@@ -69,7 +74,7 @@ export default function AgentChatView({
   } | null>(null);
   const [isCommandPressed, setIsCommandPressed] = useState(false);
   const [stickyUserMessageId, setStickyUserMessageId] = useState<string | null>(null);
-  const [stickyMessageTop, setStickyMessageTop] = useState<number>(0);
+  const [_stickyMessageTop, setStickyMessageTop] = useState<number>(0);
   const hasSentInitialPrompt = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,12 +87,7 @@ export default function AgentChatView({
   const agentService = useAgentService();
 
   // Use unified chat messages hook - handles loading, file watching, and sending
-  const {
-    messages,
-    isLoaded,
-    isStreaming,
-    sendMessage,
-  } = useChatMessages({
+  const { messages, isLoaded, isStreaming, sendMessage } = useChatMessages({
     sessionId,
     workspacePath,
     agentService,
@@ -138,7 +138,7 @@ export default function AgentChatView({
       }, 0);
       return () => clearTimeout(timeoutId);
     }
-  }, [messages]);
+  }, []);
 
   // Detect Command/Ctrl key press for cursor change
   useEffect(() => {
@@ -175,30 +175,33 @@ export default function AgentChatView({
   }, []);
 
   // Convert a viewport Y coordinate to content coordinates (accounts for zoom and scroll)
-  const viewportYToContentY = useCallback((clientY: number): number => {
-    if (!messagesContainerRef.current) return 0;
+  const viewportYToContentY = useCallback(
+    (clientY: number): number => {
+      if (!messagesContainerRef.current) return 0;
 
-    const viewport = getViewport();
-    const zoom = viewport.zoom;
+      const viewport = getViewport();
+      const zoom = viewport.zoom;
 
-    // Get the content element's bounding rect (already accounts for React Flow zoom transform)
-    const contentRect = messagesContainerRef.current.getBoundingClientRect();
-    const scrollTop = messagesContainerRef.current.scrollTop;
+      // Get the content element's bounding rect (already accounts for React Flow zoom transform)
+      const contentRect = messagesContainerRef.current.getBoundingClientRect();
+      const scrollTop = messagesContainerRef.current.scrollTop;
 
-    // Calculate Y position relative to content container
-    // When React Flow zooms, it applies a CSS transform to the node
-    // getBoundingClientRect() returns coordinates in viewport space (already transformed)
-    // clientY is also in viewport space
-    // scrollTop is in content space (not transformed)
-    //
-    // The visible content area is scaled by zoom, so:
-    // - (clientY - contentRect.top) gives position in the visible viewport (scaled by zoom)
-    // - Divide by zoom to convert from viewport-scaled to content coordinates
-    // - Add scrollTop to get absolute position in the scrollable content
-    const viewportRelativeY = clientY - contentRect.top;
-    const contentRelativeY = viewportRelativeY / zoom;
-    return contentRelativeY + scrollTop;
-  }, [getViewport]);
+      // Calculate Y position relative to content container
+      // When React Flow zooms, it applies a CSS transform to the node
+      // getBoundingClientRect() returns coordinates in viewport space (already transformed)
+      // clientY is also in viewport space
+      // scrollTop is in content space (not transformed)
+      //
+      // The visible content area is scaled by zoom, so:
+      // - (clientY - contentRect.top) gives position in the visible viewport (scaled by zoom)
+      // - Divide by zoom to convert from viewport-scaled to content coordinates
+      // - Add scrollTop to get absolute position in the scrollable content
+      const viewportRelativeY = clientY - contentRect.top;
+      const contentRelativeY = viewportRelativeY / zoom;
+      return contentRelativeY + scrollTop;
+    },
+    [getViewport]
+  );
 
   // Find the message ID from the current selection by walking up the DOM tree
   const findMessageIdFromSelection = useCallback((): string | undefined => {
@@ -305,7 +308,9 @@ export default function AgentChatView({
     if (!container) return;
 
     const updateStickyMessage = () => {
-      const userMessages = Array.from(container.querySelectorAll('.conversation-user-message')) as HTMLElement[];
+      const userMessages = Array.from(
+        container.querySelectorAll('.conversation-user-message')
+      ) as HTMLElement[];
       if (userMessages.length === 0) {
         setStickyUserMessageId(null);
         setStickyMessageTop(0);
@@ -381,21 +386,21 @@ export default function AgentChatView({
       container.removeEventListener('scroll', updateStickyMessage);
       clearTimeout(timeoutId);
     };
-  }, [messages]);
+  }, []);
 
   const handleSend = async () => {
     if (!isSessionReady || !inputValue.trim() || isStreaming) return;
 
     const userInput = inputValue.trim();
     let messageToSend = userInput;
-    
+
     // If this is the first message and we have attached text, prepend it
     if (!hasSentFirstMessage.current && attachedText) {
       messageToSend = `${attachedText}\n\n${userInput}`;
       setAttachedText(undefined); // Clear box immediately
       hasSentFirstMessage.current = true;
     }
-    
+
     setInputValue('');
     setError(null);
 
@@ -431,7 +436,7 @@ export default function AgentChatView({
           type: 'tool_summary',
           toolType: currentToolType,
           count: currentToolCount,
-          key: `tool-summary-${itemIndex++}`
+          key: `tool-summary-${itemIndex++}`,
         });
         currentToolType = null;
         currentToolCount = 0;
@@ -446,10 +451,18 @@ export default function AgentChatView({
         }
       } else if (block.type === 'thinking') {
         flushToolGroup();
-        items.push({ type: 'thinking', content: { thinking: block.thinking }, key: `thinking-${itemIndex++}` });
+        items.push({
+          type: 'thinking',
+          content: { thinking: block.thinking },
+          key: `thinking-${itemIndex++}`,
+        });
       } else if (block.type === 'redacted_thinking') {
         flushToolGroup();
-        items.push({ type: 'thinking', content: { thinking: 'Thinking redacted' }, key: `thinking-${itemIndex++}` });
+        items.push({
+          type: 'thinking',
+          content: { thinking: 'Thinking redacted' },
+          key: `thinking-${itemIndex++}`,
+        });
       } else if (block.type === 'tool_use' || block.type === 'server_tool_use') {
         const toolType = getToolType(block.name);
         if (toolType) {
@@ -484,10 +497,7 @@ export default function AgentChatView({
 
     if (item.type === 'thinking') {
       return (
-        <div 
-          key={item.key} 
-          className="conversation-thinking-content"
-        >
+        <div key={item.key} className="conversation-thinking-content">
           <span className="thinking-label">Thinking:</span>
           <span className="thinking-text">{item.content.thinking}</span>
         </div>
@@ -507,10 +517,7 @@ export default function AgentChatView({
       }
 
       return (
-        <div 
-          key={item.key} 
-          className="conversation-tool-summary"
-        >
+        <div key={item.key} className="conversation-tool-summary">
           {label}
         </div>
       );
@@ -521,24 +528,22 @@ export default function AgentChatView({
 
   const renderUserMessage = (msg: AgentChatMessage, msgIndex: number) => {
     const isSticky = stickyUserMessageId === msg.id;
-    
+
     // Find the index of the sticky message
-    const stickyIndex = stickyUserMessageId 
-      ? messages.findIndex(m => m.id === stickyUserMessageId)
+    const stickyIndex = stickyUserMessageId
+      ? messages.findIndex((m) => m.id === stickyUserMessageId)
       : -1;
-    
+
     // Only fade out messages that come BEFORE (are older than) the sticky one
     const shouldFade = stickyIndex !== -1 && msgIndex < stickyIndex;
-    
+
     return (
-      <div 
-        key={msg.id} 
+      <div
+        key={msg.id}
         className={`conversation-user-message ${isSticky ? 'sticky-active' : ''} ${shouldFade ? 'sticky-fade' : ''}`}
         data-message-id={msg.id}
       >
-        <div className="conversation-user-content">
-          {msg.content}
-        </div>
+        <div className="conversation-user-content">{msg.content}</div>
       </div>
     );
   };
@@ -553,10 +558,8 @@ export default function AgentChatView({
       return (
         <div key={msg.id} className="conversation-assistant-message" data-message-id={msg.id}>
           <div className="conversation-assistant-content">
-            {displayItems.map(item => renderDisplayItem(item))}
-            {showCursor && (
-              <span className="agent-chat-view-cursor">▊</span>
-            )}
+            {displayItems.map((item) => renderDisplayItem(item))}
+            {showCursor && <span className="agent-chat-view-cursor">▊</span>}
           </div>
         </div>
       );
@@ -571,9 +574,7 @@ export default function AgentChatView({
             className="conversation-assistant-text-content"
             dangerouslySetInnerHTML={{ __html: html }}
           />
-          {showCursor && (
-            <span className="agent-chat-view-cursor">▊</span>
-          )}
+          {showCursor && <span className="agent-chat-view-cursor">▊</span>}
         </div>
       </div>
     );
@@ -582,12 +583,10 @@ export default function AgentChatView({
   return (
     <div className="agent-chat-view">
       {/* Forehead - covers everything above the top sticky user message */}
-      {stickyUserMessageId && (
-        <div className="agent-chat-view-forehead" />
-      )}
-      
+      {stickyUserMessageId && <div className="agent-chat-view-forehead" />}
+
       {/* Messages */}
-      <div 
+      <div
         className={`conversation-content ${isCommandPressed ? 'command-pressed' : ''}`}
         ref={messagesContainerRef}
       >
@@ -606,7 +605,7 @@ export default function AgentChatView({
           }
         })}
         <div ref={messagesEndRef} />
-        
+
         {/* Plus button - appears when text is selected, snaps to selection */}
         {textSelection && (
           <TextSelectionButton
@@ -621,24 +620,20 @@ export default function AgentChatView({
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="agent-chat-view-error">
-          {error}
-        </div>
-      )}
+      {error && <div className="agent-chat-view-error">{error}</div>}
 
       {/* Input */}
       <div className="agent-chat-view-input-area" ref={inputAreaRef}>
         {/* Chin - covers everything from 50% of input bar downwards */}
         <div className="agent-chat-view-chin" />
-        
+
         {/* Attached text display box - shows selected text from parent conversation */}
         {attachedText && (
           <div className="agent-chat-view-attached-text">
             <div className="agent-chat-view-attached-text-content">{attachedText}</div>
           </div>
         )}
-        
+
         <div className="agent-chat-view-input-container">
           <textarea
             ref={inputRef}

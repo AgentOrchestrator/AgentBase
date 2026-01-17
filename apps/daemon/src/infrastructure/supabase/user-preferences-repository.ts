@@ -17,7 +17,7 @@ const DEFAULT_PREFERENCES = {
 export class SupabaseUserPreferencesRepository implements IUserPreferencesRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async findByUserId(userId: string): Promise<UserPreferences> {
@@ -78,12 +78,12 @@ export class SupabaseUserPreferencesRepository implements IUserPreferencesReposi
         error
       );
       return {
-          userId,
-          aiSummaryEnabled: DEFAULT_PREFERENCES.aiSummaryEnabled,
-          aiTitleEnabled: DEFAULT_PREFERENCES.aiTitleEnabled,
-          aiModelProvider: DEFAULT_PREFERENCES.aiModelProvider,
-          aiModelName: DEFAULT_PREFERENCES.aiModelName,
-        };
+        userId,
+        aiSummaryEnabled: DEFAULT_PREFERENCES.aiSummaryEnabled,
+        aiTitleEnabled: DEFAULT_PREFERENCES.aiTitleEnabled,
+        aiModelProvider: DEFAULT_PREFERENCES.aiModelProvider,
+        aiModelName: DEFAULT_PREFERENCES.aiModelName,
+      };
     }
   }
 }

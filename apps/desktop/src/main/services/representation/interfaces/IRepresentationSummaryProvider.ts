@@ -1,10 +1,10 @@
-import type { IRepresentationProvider } from './IRepresentationProvider';
 import type {
-  RepresentationResult,
   RepresentationError,
   RepresentationInput,
+  RepresentationResult,
   SummaryRepresentationOutput,
 } from '../types';
+import type { IRepresentationProvider } from './IRepresentationProvider';
 
 /**
  * Extended options for summary transformation

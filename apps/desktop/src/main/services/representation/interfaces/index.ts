@@ -1,19 +1,19 @@
-export type { IRepresentationProvider } from './IRepresentationProvider';
 export type {
-  IRepresentationImageProvider,
-  ImageTransformOptions,
-} from './IRepresentationImageProvider';
-export type {
-  IRepresentationSummaryProvider,
-  SummaryTransformOptions,
-  SummaryStreamCallback,
-} from './IRepresentationSummaryProvider';
-export type {
-  IRepresentationAudioProvider,
   AudioTransformOptions,
+  IRepresentationAudioProvider,
 } from './IRepresentationAudioProvider';
 export type {
+  ImageTransformOptions,
+  IRepresentationImageProvider,
+} from './IRepresentationImageProvider';
+export type { IRepresentationProvider } from './IRepresentationProvider';
+export type {
+  IRepresentationProviderRegistry,
   IRepresentationService,
   IRepresentationServiceLifecycle,
-  IRepresentationProviderRegistry,
 } from './IRepresentationService';
+export type {
+  IRepresentationSummaryProvider,
+  SummaryStreamCallback,
+  SummaryTransformOptions,
+} from './IRepresentationSummaryProvider';

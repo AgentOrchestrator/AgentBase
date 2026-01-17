@@ -5,11 +5,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type {
-  IChatHistoryRepository,
-  ChatHistoryRecord,
   ChatHistoryInput,
+  ChatHistoryRecord,
+  IChatHistoryRepository,
 } from '../../interfaces/repositories.js';
-import type { ChatMessage, AgentType } from '../../types.js';
+import type { AgentType, ChatMessage } from '../../types.js';
 
 export class SupabaseChatHistoryRepository implements IChatHistoryRepository {
   constructor(
@@ -84,7 +84,7 @@ export class SupabaseChatHistoryRepository implements IChatHistoryRepository {
       return [];
     }
 
-    return (data || []).map(row => this.mapToChatHistoryRecord(row));
+    return (data || []).map((row) => this.mapToChatHistoryRecord(row));
   }
 
   async updateAiSummary(id: string, summary: string, messageCount: number): Promise<boolean> {

@@ -1,18 +1,23 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import type {
-  ChatMessage,
   ChatHistory,
-  SessionMetadata,
-  ProjectInfo,
-  LoaderOptions,
+  ChatMessage,
   IChatHistoryLoader,
+  LoaderOptions,
+  ProjectInfo,
+  SessionMetadata,
 } from '@agent-orchestrator/shared';
 import { IDE_DATA_PATHS } from '@agent-orchestrator/shared';
 
 // Re-export types for backward compatibility
-export type { ChatMessage, ChatHistory, SessionMetadata, ProjectInfo } from '@agent-orchestrator/shared';
+export type {
+  ChatHistory,
+  ChatMessage,
+  ProjectInfo,
+  SessionMetadata,
+} from '@agent-orchestrator/shared';
 
 interface JsonlLine {
   type?: string;
@@ -52,7 +57,10 @@ export function getClaudeConfigPath(): string {
 function parseSessionFile(filePath: string, projectPath: string): ChatHistory | null {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
+    const lines = content
+      .trim()
+      .split('\n')
+      .filter((line) => line.trim());
 
     if (lines.length === 0) return null;
 
@@ -89,14 +97,20 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
                 display: part,
                 pastedContents: {},
                 role: 'user',
-                timestamp: timestamp || new Date().toISOString()
+                timestamp: timestamp || new Date().toISOString(),
               });
-            } else if (part && typeof part === 'object' && 'type' in part && part.type === 'text' && 'text' in part) {
+            } else if (
+              part &&
+              typeof part === 'object' &&
+              'type' in part &&
+              part.type === 'text' &&
+              'text' in part
+            ) {
               messages.push({
                 display: String(part.text),
                 pastedContents: {},
                 role: 'user',
-                timestamp: timestamp || new Date().toISOString()
+                timestamp: timestamp || new Date().toISOString(),
               });
             }
           }
@@ -117,28 +131,32 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
                 display: part,
                 pastedContents: {},
                 role: 'assistant',
-                timestamp: timestamp || new Date().toISOString()
+                timestamp: timestamp || new Date().toISOString(),
               });
-            } else if (part && typeof part === 'object' && 'type' in part && part.type === 'text' && 'text' in part) {
+            } else if (
+              part &&
+              typeof part === 'object' &&
+              'type' in part &&
+              part.type === 'text' &&
+              'text' in part
+            ) {
               messages.push({
                 display: String(part.text),
                 pastedContents: {},
                 role: 'assistant',
-                timestamp: timestamp || new Date().toISOString()
+                timestamp: timestamp || new Date().toISOString(),
               });
             }
           }
         }
-      } catch {
-        continue;
-      }
+      } catch {}
     }
 
     const projectName = projectPath ? path.basename(projectPath) : undefined;
 
     const metadata: SessionMetadata = {
       projectPath,
-      source: 'claude_code'
+      source: 'claude_code',
     };
 
     if (projectName) {
@@ -154,7 +172,7 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
       timestamp: lastTimestamp || firstTimestamp || new Date().toISOString(),
       messages,
       agent_type: 'claude_code',
-      metadata
+      metadata,
     };
   } catch (error) {
     console.error(`Error parsing session file ${filePath}:`, error);
@@ -181,11 +199,15 @@ export function readChatHistories(lookbackDays?: number, sinceTimestamp?: number
     let cutoffDate: Date | null = null;
     if (sinceTimestamp && sinceTimestamp > 0) {
       cutoffDate = new Date(sinceTimestamp);
-      console.log(`[Claude Code Reader] Filtering files modified after ${cutoffDate.toISOString()} (incremental sync)`);
+      console.log(
+        `[Claude Code Reader] Filtering files modified after ${cutoffDate.toISOString()} (incremental sync)`
+      );
     } else if (lookbackDays && lookbackDays > 0) {
       cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
-      console.log(`[Claude Code Reader] Filtering files modified after ${cutoffDate.toISOString()}`);
+      console.log(
+        `[Claude Code Reader] Filtering files modified after ${cutoffDate.toISOString()}`
+      );
     }
 
     const projectDirs = fs.readdirSync(projectsDir);
@@ -196,7 +218,7 @@ export function readChatHistories(lookbackDays?: number, sinceTimestamp?: number
       if (!fs.statSync(projectDirPath).isDirectory()) continue;
 
       const projectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
-      const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
+      const sessionFiles = fs.readdirSync(projectDirPath).filter((f) => f.endsWith('.jsonl'));
 
       for (const sessionFile of sessionFiles) {
         const sessionFilePath = path.join(projectDirPath, sessionFile);
@@ -227,15 +249,16 @@ export function readChatHistories(lookbackDays?: number, sinceTimestamp?: number
 /**
  * Extract project information from Claude Code chat histories
  */
-export function extractProjectsFromClaudeCodeHistories(
-  histories: ChatHistory[]
-): ProjectInfo[] {
-  const projectsMap = new Map<string, {
-    name: string;
-    path: string;
-    sessionCount: number;
-    lastActivity: Date;
-  }>();
+export function extractProjectsFromClaudeCodeHistories(histories: ChatHistory[]): ProjectInfo[] {
+  const projectsMap = new Map<
+    string,
+    {
+      name: string;
+      path: string;
+      sessionCount: number;
+      lastActivity: Date;
+    }
+  >();
 
   for (const history of histories) {
     const projectPath = history.metadata?.projectPath;
@@ -251,7 +274,7 @@ export function extractProjectsFromClaudeCodeHistories(
         name: projectName,
         path: projectPath,
         sessionCount: 0,
-        lastActivity: new Date(history.timestamp)
+        lastActivity: new Date(history.timestamp),
       });
     }
 
@@ -264,12 +287,12 @@ export function extractProjectsFromClaudeCodeHistories(
     }
   }
 
-  return Array.from(projectsMap.values()).map(project => ({
+  return Array.from(projectsMap.values()).map((project) => ({
     name: project.name,
     path: project.path,
     workspaceIds: [],
     claudeCodeSessionCount: project.sessionCount,
-    lastActivity: project.lastActivity.toISOString()
+    lastActivity: project.lastActivity.toISOString(),
   }));
 }
 

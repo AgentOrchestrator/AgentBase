@@ -1,8 +1,8 @@
+import { spawn } from 'node:child_process';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import electron from 'electron';
-import { TrayManager, DaemonStatus } from './tray-manager.js';
-import { spawn } from 'child_process';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { DaemonStatus, TrayManager } from './tray-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +32,7 @@ function startDaemon() {
 
     // Capture auth URL from daemon output
     const urlMatch = output.match(/Or copy this URL: (http[^\s]+)/);
-    if (urlMatch && urlMatch[1]) {
+    if (urlMatch?.[1]) {
       authUrl = urlMatch[1];
       console.log('[Electron] Captured auth URL:', authUrl);
     }
@@ -40,20 +40,21 @@ function startDaemon() {
     // Update tray status based on daemon output
     if (output.includes('🔐 Authentication Required')) {
       updateTrayStatus(DaemonStatus.UNAUTHENTICATED);
-    } else if (output.includes('⚠️') ||
-               output.includes('Error') ||
-               output.includes('failed')) {
+    } else if (output.includes('⚠️') || output.includes('Error') || output.includes('failed')) {
       updateTrayStatus(DaemonStatus.ERROR);
-    } else if (output.includes('[Periodic Sync]') ||
-               output.includes('Processing chat histories') ||
-               (output.includes('Total:') && output.includes('chat histories'))) {
+    } else if (
+      output.includes('[Periodic Sync]') ||
+      output.includes('Processing chat histories') ||
+      (output.includes('Total:') && output.includes('chat histories'))
+    ) {
       updateTrayStatus(DaemonStatus.SYNCING);
-    } else if (output.includes('Upload complete') ||
-               output.includes('No chat histories found')) {
+    } else if (output.includes('Upload complete') || output.includes('No chat histories found')) {
       updateTrayStatus(DaemonStatus.IDLE);
-    } else if (output.includes('✓ Using existing authentication session') ||
-               output.includes('✓ Authentication successful') ||
-               output.includes('✓ Authenticated as user:')) {
+    } else if (
+      output.includes('✓ Using existing authentication session') ||
+      output.includes('✓ Authentication successful') ||
+      output.includes('✓ Authenticated as user:')
+    ) {
       // Only set to IDLE if we're not currently syncing
       if (currentStatus !== DaemonStatus.SYNCING) {
         updateTrayStatus(DaemonStatus.IDLE);

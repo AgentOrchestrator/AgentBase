@@ -1,6 +1,6 @@
+import type { LlmChatMessage } from '@agent-orchestrator/shared';
 import type { VendorId } from './config.types';
 import type { ToolCall } from './tool.types';
-import type { LlmChatMessage } from '@agent-orchestrator/shared';
 
 /**
  * A single message in a chat conversation

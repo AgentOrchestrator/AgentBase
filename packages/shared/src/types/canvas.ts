@@ -177,4 +177,3 @@ export function isAgentNodeData(data: NodeData): data is AgentNodeData {
 export function isTerminalNodeData(data: NodeData): data is TerminalNodeData {
   return 'terminalId' in data && !('agentId' in data);
 }
-

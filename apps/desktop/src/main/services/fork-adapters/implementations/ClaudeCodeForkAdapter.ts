@@ -1,12 +1,12 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import type { IForkAdapter } from '../interfaces/IForkAdapter';
-import type { Result, AgentError } from '../../coding-agent/types';
-import { ok, err, agentError, AgentErrorCode } from '../../coding-agent/types';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import type { JsonlFilterOptions } from '@agent-orchestrator/shared';
 import { JSONLFile } from '@agent-orchestrator/shared';
+import type { AgentError, Result } from '../../coding-agent/types';
+import { AgentErrorCode, agentError, err, ok } from '../../coding-agent/types';
 import { filterJsonl } from '../filter';
+import type { IForkAdapter } from '../interfaces/IForkAdapter';
 
 /**
  * Fork adapter for Claude Code sessions
@@ -132,12 +132,11 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
-
       console.log('[ClaudeCodeForkAdapter] Read source session file:', {
         sourceFilePath,
         sourceSessionId,
         targetSessionId,
-        filterOptions
+        filterOptions,
       });
 
       // Apply filtering if options provided (filter by messageId or timestamp)

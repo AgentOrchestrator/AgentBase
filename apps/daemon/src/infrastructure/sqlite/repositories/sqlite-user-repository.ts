@@ -4,7 +4,6 @@
 
 import type Database from 'better-sqlite3';
 import type { IUserRepository, User } from '../../../interfaces/repositories.js';
-import { randomUUID } from 'crypto';
 
 interface UserRow {
   id: string;

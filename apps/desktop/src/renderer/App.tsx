@@ -1,8 +1,8 @@
-import { useMemo, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import Canvas from './Canvas';
+import { TitleBar } from './components/TitleBar';
 import { NodeServicesRegistryProvider, ThemeProvider } from './context';
 import { createServiceFactories, sharedEventDispatcher } from './services';
-import { TitleBar } from './components/TitleBar';
 import './App.css';
 
 function App() {
@@ -33,4 +33,3 @@ function App() {
 }
 
 export default App;
-

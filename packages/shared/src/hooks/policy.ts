@@ -159,7 +159,7 @@ export const SAFE_COMMAND_PATTERNS: RegExp[] = [
  */
 export const DANGEROUS_COMMAND_PATTERNS: RegExp[] = [
   // Destructive file operations
-  /rm\s+(-[rfv]+\s+)*[\/~]/,
+  /rm\s+(-[rfv]+\s+)*[/~]/,
   /rm\s+-rf\s/,
   // Elevated permissions
   /^sudo\s/,
@@ -329,9 +329,7 @@ export const POLICY_CONFIG_FILENAME = '.agent-base/permissions.json';
  * @param workspacePath - Path to the workspace root
  * @returns Loaded or default permission policy
  */
-export async function loadPermissionPolicy(
-  _workspacePath: string
-): Promise<PermissionPolicy> {
+export async function loadPermissionPolicy(_workspacePath: string): Promise<PermissionPolicy> {
   // This is a placeholder - actual file loading would be done in the consumer
   // (e.g., desktop app) since we don't want to add fs dependencies to shared
 
@@ -342,9 +340,7 @@ export async function loadPermissionPolicy(
 /**
  * Merge multiple policies (later policies override earlier ones)
  */
-export function mergePolicies(
-  ...policies: PermissionPolicy[]
-): PermissionPolicy {
+export function mergePolicies(...policies: PermissionPolicy[]): PermissionPolicy {
   const merged: PermissionPolicy = {
     tools: { allowed: [], denied: [] },
     commands: { allowed: [], denied: [] },
@@ -358,41 +354,31 @@ export function mergePolicies(
 
     if (policy.tools) {
       if (policy.tools.allowed) {
-        merged.tools!.allowed = [
-          ...new Set([...merged.tools!.allowed!, ...policy.tools.allowed]),
-        ];
+        merged.tools!.allowed = [...new Set([...merged.tools?.allowed!, ...policy.tools.allowed])];
       }
       if (policy.tools.denied) {
-        merged.tools!.denied = [
-          ...new Set([...merged.tools!.denied!, ...policy.tools.denied]),
-        ];
+        merged.tools!.denied = [...new Set([...merged.tools?.denied!, ...policy.tools.denied])];
       }
     }
 
     if (policy.commands) {
       if (policy.commands.allowed) {
-        merged.commands!.allowed = [
-          ...merged.commands!.allowed!,
-          ...policy.commands.allowed,
-        ];
+        merged.commands!.allowed = [...merged.commands?.allowed!, ...policy.commands.allowed];
       }
       if (policy.commands.denied) {
-        merged.commands!.denied = [
-          ...merged.commands!.denied!,
-          ...policy.commands.denied,
-        ];
+        merged.commands!.denied = [...merged.commands?.denied!, ...policy.commands.denied];
       }
     }
 
     if (policy.paths) {
       if (policy.paths.writable) {
         merged.paths!.writable = [
-          ...new Set([...merged.paths!.writable!, ...policy.paths.writable]),
+          ...new Set([...merged.paths?.writable!, ...policy.paths.writable]),
         ];
       }
       if (policy.paths.protected) {
         merged.paths!.protected = [
-          ...new Set([...merged.paths!.protected!, ...policy.paths.protected]),
+          ...new Set([...merged.paths?.protected!, ...policy.paths.protected]),
         ];
       }
     }

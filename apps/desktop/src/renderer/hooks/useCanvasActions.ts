@@ -5,13 +5,10 @@
  * Wraps CanvasNodeService with React state management.
  */
 
-import { useCallback } from 'react';
 import type { Node } from '@xyflow/react';
 import { useReactFlow } from '@xyflow/react';
-import {
-  canvasNodeService,
-  type CreateAgentOptions,
-} from '../services/CanvasNodeService';
+import { useCallback } from 'react';
+import { type CreateAgentOptions, canvasNodeService } from '../services/CanvasNodeService';
 
 // =============================================================================
 // Types
@@ -117,7 +114,9 @@ export function useCanvasActions({
       }
 
       // Modal is required for agent creation (gitInfo validation)
-      console.warn('[useCanvasActions] addAgentNode called without onShowAgentModal - cannot create agent without git validation');
+      console.warn(
+        '[useCanvasActions] addAgentNode called without onShowAgentModal - cannot create agent without git validation'
+      );
       closeContextMenu();
     },
     [contextMenu, screenToFlowPosition, closeContextMenu, onShowAgentModal]
@@ -158,7 +157,6 @@ export function useCanvasActions({
     [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
   );
 
-
   /**
    * Add a starter node
    */
@@ -175,7 +173,6 @@ export function useCanvasActions({
     },
     [contextMenu, screenToFlowPosition, setNodes, closeContextMenu]
   );
-
 
   /**
    * Add a Claude Code terminal node

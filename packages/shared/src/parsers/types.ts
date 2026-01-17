@@ -2,8 +2,8 @@
  * Types for JSONL parsing utilities
  */
 
-import type { AgentContentBlock, CodingAgentMessage } from '../types.js';
 import type { ChatMessage } from '../loaders/types.js';
+import type { AgentContentBlock, CodingAgentMessage } from '../types.js';
 
 // =============================================================================
 // Claude Code JSONL Input Types

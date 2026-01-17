@@ -1,7 +1,12 @@
-import { useRef, useEffect, useMemo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, type NodeProps, Position } from '@xyflow/react';
 import { marked } from 'marked';
-import type { AssistantMessageGroup, MessageContent, ToolUseContent, ThinkingContent } from '../types/conversation';
+import { useEffect, useMemo, useRef } from 'react';
+import type {
+  AssistantMessageGroup,
+  MessageContent,
+  ThinkingContent,
+  ToolUseContent,
+} from '../types/conversation';
 import './AssistantMessageNode.css';
 
 // Configure marked for tight spacing
@@ -18,7 +23,12 @@ interface AssistantMessageNodeData {
 type DisplayItem =
   | { type: 'text'; content: MessageContent; key: string }
   | { type: 'thinking'; content: ThinkingContent; key: string }
-  | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
+  | {
+      type: 'tool_summary';
+      toolType: 'read' | 'edit' | 'grep' | 'glob';
+      count: number;
+      key: string;
+    };
 
 function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
   const nodeData = data as unknown as AssistantMessageNodeData;
@@ -38,7 +48,7 @@ function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
     // Small delay to ensure content is rendered
     const timeoutId = setTimeout(scrollToBottom, 0);
     return () => clearTimeout(timeoutId);
-  }, [messageGroup.entries]);
+  }, []);
 
   // Handle scroll events when node is selected
   useEffect(() => {
@@ -70,7 +80,7 @@ function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
           type: 'tool_summary',
           toolType: currentToolType,
           count: currentToolCount,
-          key: `tool-summary-${itemIndex++}`
+          key: `tool-summary-${itemIndex++}`,
         });
         currentToolType = null;
         currentToolCount = 0;
@@ -92,7 +102,11 @@ function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
           items.push({ type: 'text', content, key: `text-${itemIndex++}` });
         } else if (content.type === 'thinking') {
           flushToolGroup();
-          items.push({ type: 'thinking', content: content as ThinkingContent, key: `thinking-${itemIndex++}` });
+          items.push({
+            type: 'thinking',
+            content: content as ThinkingContent,
+            key: `thinking-${itemIndex++}`,
+          });
         } else if (content.type === 'tool_use') {
           const toolContent = content as ToolUseContent;
           const toolType = getToolType(toolContent.name);
@@ -170,11 +184,8 @@ function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
         <span className="assistant-message-label">Assistant</span>
       </div>
 
-      <div
-        ref={contentRef}
-        className="assistant-message-content"
-      >
-        {displayItems.map(item => renderItem(item))}
+      <div ref={contentRef} className="assistant-message-content">
+        {displayItems.map((item) => renderItem(item))}
       </div>
 
       <Handle type="source" position={Position.Bottom} />

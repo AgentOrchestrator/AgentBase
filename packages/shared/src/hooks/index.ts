@@ -39,17 +39,14 @@
  * ```
  */
 
-// Core types
-export * from './types.js';
-
-// Event registry
-export * from './registry.js';
-
-// Permission policies
-export * from './policy.js';
-
+// Agent adapters
+export * from './adapters/index.js';
 // Event handlers
 export * from './handlers/index.js';
 
-// Agent adapters
-export * from './adapters/index.js';
+// Permission policies
+export * from './policy.js';
+// Event registry
+export * from './registry.js';
+// Core types
+export * from './types.js';

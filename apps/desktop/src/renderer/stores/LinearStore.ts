@@ -7,13 +7,13 @@
 
 import type {
   ILinearStore,
-  LinearState,
-  LinearStateListener,
   LinearFilterState,
   LinearIssue,
   LinearProject,
-  MilestoneOption,
+  LinearState,
+  LinearStateListener,
   LinearWorkflowState,
+  MilestoneOption,
 } from './ILinearStore';
 
 const STORAGE_KEY = 'linear_api_key';
@@ -119,9 +119,7 @@ export class LinearStore implements ILinearStore {
     if (this.filters.selectedProjectId === 'none') {
       return [];
     }
-    return milestones.filter(
-      (milestone) => milestone.projectId === this.filters.selectedProjectId
-    );
+    return milestones.filter((milestone) => milestone.projectId === this.filters.selectedProjectId);
   }
 
   /**
@@ -306,10 +304,7 @@ export class LinearStore implements ILinearStore {
   /**
    * Set a filter value
    */
-  setFilter<K extends keyof LinearFilterState>(
-    filterKey: K,
-    value: LinearFilterState[K]
-  ): void {
+  setFilter<K extends keyof LinearFilterState>(filterKey: K, value: LinearFilterState[K]): void {
     this.filters[filterKey] = value;
 
     // When project changes, validate milestone filter

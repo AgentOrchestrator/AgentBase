@@ -5,5 +5,5 @@
  */
 
 export { default } from './ConversationNode';
-export { ConversationNodePresentation } from './ConversationNodePresentation';
 export type { ConversationNodePresentationProps } from './ConversationNodePresentation';
+export { ConversationNodePresentation } from './ConversationNodePresentation';

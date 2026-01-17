@@ -1,4 +1,4 @@
-import type { Result, LLMError, ToolDefinition, ToolExecutor } from '../types';
+import type { LLMError, Result, ToolDefinition, ToolExecutor } from '../types';
 
 /**
  * Registry for managing LLM tools.
@@ -10,10 +10,7 @@ export interface IToolRegistry {
    * @param definition - Tool schema and metadata
    * @param executor - Function to execute the tool
    */
-  register(
-    definition: ToolDefinition,
-    executor: ToolExecutor
-  ): Result<void, LLMError>;
+  register(definition: ToolDefinition, executor: ToolExecutor): Result<void, LLMError>;
 
   /**
    * Unregister a tool by name
@@ -37,10 +34,7 @@ export interface IToolRegistry {
    * @param name - Tool name
    * @param args - Arguments to pass to the tool
    */
-  execute(
-    name: string,
-    args: Record<string, unknown>
-  ): Promise<Result<unknown, LLMError>>;
+  execute(name: string, args: Record<string, unknown>): Promise<Result<unknown, LLMError>>;
 
   /**
    * Check if a tool is registered

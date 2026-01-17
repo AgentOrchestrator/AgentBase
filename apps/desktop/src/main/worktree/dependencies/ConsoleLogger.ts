@@ -1,4 +1,4 @@
-import { ILogger } from './ILogger';
+import type { ILogger } from './ILogger';
 
 /**
  * Production implementation of ILogger using console

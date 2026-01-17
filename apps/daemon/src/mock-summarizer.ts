@@ -26,7 +26,7 @@ export function generateMockSummary(messages: Message[]): string {
     return JSON.stringify({
       summary: 'No messages yet',
       problems: [],
-      progress: 'smooth'
+      progress: 'smooth',
     });
   }
 
@@ -38,7 +38,7 @@ export function generateMockSummary(messages: Message[]): string {
   const summary = summaryWords || 'Session activity';
 
   // Check for common error patterns
-  const allText = messages.map(m => m.display.toLowerCase()).join(' ');
+  const allText = messages.map((m) => m.display.toLowerCase()).join(' ');
   const problems: string[] = [];
 
   if (allText.includes('error') || allText.includes('failed')) {
@@ -58,7 +58,7 @@ export function generateMockSummary(messages: Message[]): string {
   return JSON.stringify({
     summary,
     problems: problems.slice(0, 3), // Max 3 problems
-    progress
+    progress,
   });
 }
 
@@ -72,9 +72,7 @@ export function generateMockKeywords(messages: Message[]): KeywordClassification
   }
 
   // Combine all message text
-  const allText = messages
-    .map(m => m.display.toLowerCase())
-    .join(' ');
+  const allText = messages.map((m) => m.display.toLowerCase()).join(' ');
 
   // Determine work type based on keywords
   const types: string[] = [];
@@ -91,7 +89,11 @@ export function generateMockKeywords(messages: Message[]): KeywordClassification
   if (allText.includes('test') || allText.includes('spec') || allText.includes('jest')) {
     types.push('testing');
   }
-  if (allText.includes('debug') || allText.includes('console.log') || allText.includes('breakpoint')) {
+  if (
+    allText.includes('debug') ||
+    allText.includes('console.log') ||
+    allText.includes('breakpoint')
+  ) {
     types.push('debugging');
   }
   if (allText.includes('deploy') || allText.includes('release') || allText.includes('production')) {
@@ -100,7 +102,11 @@ export function generateMockKeywords(messages: Message[]): KeywordClassification
   if (allText.includes('config') || allText.includes('setup') || allText.includes('install')) {
     types.push('configuration');
   }
-  if (allText.includes('optimize') || allText.includes('performance') || allText.includes('speed')) {
+  if (
+    allText.includes('optimize') ||
+    allText.includes('performance') ||
+    allText.includes('speed')
+  ) {
     types.push('optimization');
   }
   if (allText.includes('document') || allText.includes('readme') || allText.includes('comment')) {
@@ -120,16 +126,48 @@ export function generateMockKeywords(messages: Message[]): KeywordClassification
 
   // Common tech keywords
   const techPatterns = [
-    'react', 'vue', 'angular', 'svelte',
-    'typescript', 'javascript', 'python', 'java', 'go', 'rust',
-    'api', 'rest', 'graphql', 'websocket',
-    'database', 'sql', 'mongodb', 'postgres', 'mysql',
-    'auth', 'authentication', 'login', 'oauth',
-    'docker', 'kubernetes', 'aws', 'azure', 'gcp',
-    'git', 'github', 'gitlab',
-    'node', 'express', 'fastify', 'nest',
-    'supabase', 'firebase', 'vercel',
-    'email', 'gmail', 'whatsapp', 'telegram',
+    'react',
+    'vue',
+    'angular',
+    'svelte',
+    'typescript',
+    'javascript',
+    'python',
+    'java',
+    'go',
+    'rust',
+    'api',
+    'rest',
+    'graphql',
+    'websocket',
+    'database',
+    'sql',
+    'mongodb',
+    'postgres',
+    'mysql',
+    'auth',
+    'authentication',
+    'login',
+    'oauth',
+    'docker',
+    'kubernetes',
+    'aws',
+    'azure',
+    'gcp',
+    'git',
+    'github',
+    'gitlab',
+    'node',
+    'express',
+    'fastify',
+    'nest',
+    'supabase',
+    'firebase',
+    'vercel',
+    'email',
+    'gmail',
+    'whatsapp',
+    'telegram',
   ];
 
   for (const pattern of techPatterns) {
@@ -141,7 +179,7 @@ export function generateMockKeywords(messages: Message[]): KeywordClassification
 
   // If no topics found, extract some common words
   if (topics.length === 0) {
-    const words = allText.split(/\s+/).filter(w => w.length > 4);
+    const words = allText.split(/\s+/).filter((w) => w.length > 4);
     const wordFreq = new Map<string, number>();
 
     for (const word of words) {

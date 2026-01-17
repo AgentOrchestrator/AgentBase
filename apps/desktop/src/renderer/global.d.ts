@@ -14,7 +14,11 @@ import type {
   ShellAPI,
   SessionSummaryCacheAPI,
 } from '../main/preload';
-import type { TerminalSessionAPI, SessionWatcherAPI, RecentWorkspacesAPI } from '@agent-orchestrator/shared';
+import type {
+  TerminalSessionAPI,
+  SessionWatcherAPI,
+  RecentWorkspacesAPI,
+} from '@agent-orchestrator/shared';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
 
 // SVG module declarations moved to vite-env.d.ts
@@ -36,5 +40,3 @@ declare global {
     sessionSummaryCacheAPI?: SessionSummaryCacheAPI;
   }
 }
-
-export {};

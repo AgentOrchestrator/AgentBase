@@ -5,18 +5,13 @@
  * Supports callbacks for 'ask' decisions to prompt the user.
  */
 
-import type {
-  EventHandler,
-  EventResult,
-  PermissionPayload,
-  AgentEvent,
-} from '../types.js';
 import type { PermissionPolicy } from '../policy.js';
 import {
+  DANGEROUS_COMMAND_PATTERNS,
   evaluatePermission,
   SAFE_COMMAND_PATTERNS,
-  DANGEROUS_COMMAND_PATTERNS,
 } from '../policy.js';
+import type { AgentEvent, EventHandler, EventResult, PermissionPayload } from '../types.js';
 
 // =============================================================================
 // HANDLER OPTIONS
@@ -79,17 +74,9 @@ export interface PermissionHandlerOptions {
 export function createPermissionHandler(
   options: PermissionHandlerOptions
 ): EventHandler<PermissionPayload> {
-  const {
-    policy,
-    onAsk,
-    onDecision,
-    askTimeout = 30000,
-    timeoutAction = 'deny',
-  } = options;
+  const { policy, onAsk, onDecision, askTimeout = 30000, timeoutAction = 'deny' } = options;
 
-  return async (
-    event: AgentEvent<PermissionPayload>
-  ): Promise<EventResult> => {
+  return async (event: AgentEvent<PermissionPayload>): Promise<EventResult> => {
     const payload = event.payload;
 
     // Evaluate the permission request against the policy

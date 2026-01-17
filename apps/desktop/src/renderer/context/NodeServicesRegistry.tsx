@@ -5,19 +5,20 @@
  * Caches services per node and handles disposal.
  */
 
-import React, { createContext, useContext, useRef, useCallback } from 'react';
+import type React from 'react';
+import { createContext, useCallback, useContext, useRef } from 'react';
 import type { AgentType } from '../../../types/coding-agent-status';
 import type {
-  NodeType,
-  ITerminalService,
-  IWorkspaceService,
+  AgentNodeServices,
+  ConversationNodeServices,
+  CustomNodeServices,
   IAgentService,
   IConversationService,
+  ITerminalService,
+  IWorkspaceService,
   NodeServices,
+  NodeType,
   TerminalNodeServices,
-  AgentNodeServices,
-  CustomNodeServices,
-  ConversationNodeServices,
 } from './node-services';
 
 // =============================================================================
@@ -169,8 +170,6 @@ export function NodeServicesRegistryProvider({
           } as ConversationNodeServices;
           break;
         }
-
-        case 'custom':
         default: {
           services = { type: 'custom' } as CustomNodeServices;
           break;
@@ -252,9 +251,7 @@ export function NodeServicesRegistryProvider({
 export function useNodeServicesRegistry(): NodeServicesRegistryValue {
   const context = useContext(NodeServicesRegistryContext);
   if (!context) {
-    throw new Error(
-      'useNodeServicesRegistry must be used within NodeServicesRegistryProvider'
-    );
+    throw new Error('useNodeServicesRegistry must be used within NodeServicesRegistryProvider');
   }
   return context;
 }

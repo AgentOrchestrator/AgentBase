@@ -2,17 +2,15 @@
 // Add common interfaces, types, and constants here
 
 import type {
-  MessageType,
-  ToolInfo,
-  ThinkingInfo,
-  McpInfo,
-  ErrorInfo,
   AgentType,
+  ErrorInfo,
+  McpInfo,
+  MessageType,
+  ThinkingInfo,
+  ToolInfo,
 } from './loaders/types.js';
 
-export interface BaseConfig {
-  // Add shared configuration types
-}
+export type BaseConfig = {};
 
 /**
  * Git repository information

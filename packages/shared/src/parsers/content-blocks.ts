@@ -6,8 +6,8 @@
 
 import type {
   AgentContentBlock,
-  AgentWebSearchToolResultContent,
   AgentWebSearchResultBlock,
+  AgentWebSearchToolResultContent,
   AgentWebSearchToolResultErrorCode,
 } from '../types.js';
 

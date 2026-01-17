@@ -8,12 +8,12 @@
  * - running: Recent activity (within threshold)
  */
 
-import type { IStatusService } from './IStatusService';
-import type { IAgentService } from '../../context/node-services/types';
 import type {
   CodingAgentStatusInfo,
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
+import type { IAgentService } from '../../context/node-services/types';
+import type { IStatusService } from './IStatusService';
 
 /**
  * Configuration for status service
@@ -71,10 +71,7 @@ export class StatusService implements IStatusService {
    */
   async refreshLastActivity(): Promise<void> {
     try {
-      const session = await this.agentService.getSession(
-        this.sessionId,
-        this.workspacePath
-      );
+      const session = await this.agentService.getSession(this.sessionId, this.workspacePath);
 
       if (!session || session.messages.length === 0) {
         this.lastKnownMessageTimestamp = null;
@@ -128,10 +125,8 @@ export function createStatusService(
   workspacePath: string,
   config?: Partial<StatusServiceConfig>
 ): StatusService {
-  return new StatusService(
-    agentService,
-    sessionId,
-    workspacePath,
-    { ...DEFAULT_CONFIG, ...config }
-  );
+  return new StatusService(agentService, sessionId, workspacePath, {
+    ...DEFAULT_CONFIG,
+    ...config,
+  });
 }

@@ -1,7 +1,7 @@
-import type { IRepresentationProvider } from '../interfaces/IRepresentationProvider';
-import type { IRepresentationImageProvider } from '../interfaces/IRepresentationImageProvider';
-import type { IRepresentationSummaryProvider } from '../interfaces/IRepresentationSummaryProvider';
 import type { IRepresentationAudioProvider } from '../interfaces/IRepresentationAudioProvider';
+import type { IRepresentationImageProvider } from '../interfaces/IRepresentationImageProvider';
+import type { IRepresentationProvider } from '../interfaces/IRepresentationProvider';
+import type { IRepresentationSummaryProvider } from '../interfaces/IRepresentationSummaryProvider';
 
 /**
  * Type guard to check if a provider produces images

@@ -1,5 +1,5 @@
+import type { AgentActionResponse, AgentEvent } from '@agent-orchestrator/shared';
 import { BrowserWindow, ipcMain } from 'electron';
-import type { AgentEvent, AgentActionResponse } from '@agent-orchestrator/shared';
 
 interface PendingAction {
   resolve: (response: AgentActionResponse) => void;
@@ -42,16 +42,19 @@ export function awaitAgentActionResponse(
 }
 
 export function registerAgentActionHandlers(): void {
-  ipcMain.handle('coding-agent:respond-to-action', async (_event, response: AgentActionResponse) => {
-    const pending = pendingActions.get(response.actionId);
-    if (!pending) {
-      return { success: false, error: 'No pending action for response' };
+  ipcMain.handle(
+    'coding-agent:respond-to-action',
+    async (_event, response: AgentActionResponse) => {
+      const pending = pendingActions.get(response.actionId);
+      if (!pending) {
+        return { success: false, error: 'No pending action for response' };
+      }
+
+      pending.abortHandler?.();
+
+      pendingActions.delete(response.actionId);
+      pending.resolve(response);
+      return { success: true };
     }
-
-    pending.abortHandler?.();
-
-    pendingActions.delete(response.actionId);
-    pending.resolve(response);
-    return { success: true };
-  });
+  );
 }

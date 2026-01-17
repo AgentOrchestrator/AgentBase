@@ -71,7 +71,7 @@ export class AgentActionStore {
       this.listenersByAgent.set(agentId, new Set());
     }
 
-    this.listenersByAgent.get(agentId)!.add(listener);
+    this.listenersByAgent.get(agentId)?.add(listener);
     return () => {
       const listeners = this.listenersByAgent.get(agentId);
       if (listeners) {

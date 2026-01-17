@@ -132,7 +132,4 @@ export interface AuthContext {
 /**
  * Factory function type for creating auth contexts
  */
-export type CreateAuthContext = (
-  accessToken: string,
-  refreshToken: string
-) => Promise<AuthContext>;
+export type CreateAuthContext = (accessToken: string, refreshToken: string) => Promise<AuthContext>;

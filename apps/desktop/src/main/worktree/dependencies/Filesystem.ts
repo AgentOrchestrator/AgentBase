@@ -1,5 +1,5 @@
-import * as fs from 'fs/promises';
-import { IFilesystem } from './IFilesystem';
+import * as fs from 'node:fs/promises';
+import type { IFilesystem } from './IFilesystem';
 
 /**
  * Production implementation of IFilesystem using fs/promises

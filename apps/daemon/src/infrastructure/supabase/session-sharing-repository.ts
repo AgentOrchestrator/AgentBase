@@ -6,10 +6,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type {
   ISessionSharingRepository,
-  SessionShare,
-  SessionWorkspaceShare,
-  SessionShareExclusion,
   PermissionLevel,
+  SessionShare,
+  SessionShareExclusion,
+  SessionWorkspaceShare,
 } from '../../interfaces/repositories.js';
 
 export class SupabaseSessionSharingRepository implements ISessionSharingRepository {
@@ -66,7 +66,7 @@ export class SupabaseSessionSharingRepository implements ISessionSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToSessionShare(row));
+    return (data || []).map((row) => this.mapToSessionShare(row));
   }
 
   async getSharesForSession(sessionId: string): Promise<SessionShare[]> {
@@ -81,15 +81,12 @@ export class SupabaseSessionSharingRepository implements ISessionSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToSessionShare(row));
+    return (data || []).map((row) => this.mapToSessionShare(row));
   }
 
   async removeSessionUserShare(shareId: string): Promise<boolean> {
     try {
-      const { error } = await this.client
-        .from('session_shares')
-        .delete()
-        .eq('id', shareId);
+      const { error } = await this.client.from('session_shares').delete().eq('id', shareId);
 
       if (error) {
         console.error('[SessionSharingRepository] Error removing user share:', error.message);
@@ -151,7 +148,7 @@ export class SupabaseSessionSharingRepository implements ISessionSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToSessionWorkspaceShare(row));
+    return (data || []).map((row) => this.mapToSessionWorkspaceShare(row));
   }
 
   async removeSessionWorkspaceShare(shareId: string): Promise<boolean> {
@@ -193,7 +190,10 @@ export class SupabaseSessionSharingRepository implements ISessionSharingReposito
         .single();
 
       if (error) {
-        console.error('[SessionSharingRepository] Error excluding from project share:', error.message);
+        console.error(
+          '[SessionSharingRepository] Error excluding from project share:',
+          error.message
+        );
         return null;
       }
 
@@ -226,7 +226,10 @@ export class SupabaseSessionSharingRepository implements ISessionSharingReposito
         .single();
 
       if (error) {
-        console.error('[SessionSharingRepository] Error excluding from workspace share:', error.message);
+        console.error(
+          '[SessionSharingRepository] Error excluding from workspace share:',
+          error.message
+        );
         return null;
       }
 
@@ -253,7 +256,7 @@ export class SupabaseSessionSharingRepository implements ISessionSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToSessionShareExclusion(row));
+    return (data || []).map((row) => this.mapToSessionShareExclusion(row));
   }
 
   async removeExclusion(exclusionId: string): Promise<boolean> {

@@ -5,10 +5,10 @@
  * Renders chat UI with messages, input area, and streaming support.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { useChatMessages } from '../../hooks/useChatMessages';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAgentService } from '../../context';
+import { useChatMessages } from '../../hooks/useChatMessages';
 import './AgentChatNode.css';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
@@ -49,11 +49,7 @@ export function AgentChatNodePresentation({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    messages,
-    isStreaming,
-    sendMessage,
-  } = useChatMessages({
+  const { messages, isStreaming, sendMessage } = useChatMessages({
     sessionId,
     workspacePath,
     agentService,
@@ -70,7 +66,7 @@ export function AgentChatNodePresentation({
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, []);
 
   const handleToggleExpand = useCallback(() => {
     const newExpanded = !isExpanded;
@@ -98,8 +94,15 @@ export function AgentChatNodePresentation({
   const displayTitle = title || (isDraft ? 'New Chat' : `Chat ${sessionId?.slice(0, 8) || ''}`);
 
   return (
-    <div className={`agent-chat-node ${selected ? 'selected' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}>
-      <Handle type="target" position={Position.Top} id="chat-target" className="agent-chat-handle" />
+    <div
+      className={`agent-chat-node ${selected ? 'selected' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="chat-target"
+        className="agent-chat-handle"
+      />
 
       {/* Header */}
       <div className="agent-chat-header" onClick={handleToggleExpand}>
@@ -117,23 +120,20 @@ export function AgentChatNodePresentation({
           {/* Messages */}
           <div className="agent-chat-messages">
             {messages.length === 0 && (
-              <div className="agent-chat-empty">
-                Start a conversation with Claude Code
-              </div>
+              <div className="agent-chat-empty">Start a conversation with Claude Code</div>
             )}
             {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`agent-chat-message ${msg.role}`}
-              >
+              <div key={msg.id} className={`agent-chat-message ${msg.role}`}>
                 <div className="agent-chat-message-role">
                   {msg.role === 'user' ? 'You' : 'Claude'}
                 </div>
                 <div className="agent-chat-message-content">
                   {msg.content}
-                  {isStreaming && msg === messages[messages.length - 1] && msg.role === 'assistant' && (
-                    <span className="agent-chat-streaming-cursor">▊</span>
-                  )}
+                  {isStreaming &&
+                    msg === messages[messages.length - 1] &&
+                    msg.role === 'assistant' && (
+                      <span className="agent-chat-streaming-cursor">▊</span>
+                    )}
                 </div>
               </div>
             ))}
@@ -141,11 +141,7 @@ export function AgentChatNodePresentation({
           </div>
 
           {/* Error */}
-          {error && (
-            <div className="agent-chat-error">
-              {error}
-            </div>
-          )}
+          {error && <div className="agent-chat-error">{error}</div>}
 
           {/* Input */}
           <div className="agent-chat-input-area">
@@ -162,11 +158,7 @@ export function AgentChatNodePresentation({
               disabled={isStreaming}
               rows={1}
             />
-            <button
-              className="agent-chat-mic-button"
-              type="button"
-              aria-label="Voice input"
-            >
+            <button className="agent-chat-mic-button" type="button" aria-label="Voice input">
               <span className="agent-chat-mic-icon">🎤</span>
             </button>
             <button

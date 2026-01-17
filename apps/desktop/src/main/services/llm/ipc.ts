@@ -47,11 +47,7 @@ export function registerLLMIpcHandlers(): void {
   // Streaming chat (uses IPC events for chunks)
   ipcMain.handle(
     'llm:chat-stream',
-    async (
-      event,
-      requestId: string,
-      request: ChatRequest
-    ): Promise<IPCResponse<unknown>> => {
+    async (event, requestId: string, request: ChatRequest): Promise<IPCResponse<unknown>> => {
       try {
         const service = await LLMServiceFactory.getService();
         const result = await service.chatStream(request, (chunk) => {
@@ -73,11 +69,7 @@ export function registerLLMIpcHandlers(): void {
   // Chat with tools (agentic loop)
   ipcMain.handle(
     'llm:chat-with-tools',
-    async (
-      _event,
-      request: ChatRequest,
-      maxIterations?: number
-    ): Promise<IPCResponse<unknown>> => {
+    async (_event, request: ChatRequest, maxIterations?: number): Promise<IPCResponse<unknown>> => {
       try {
         const service = await LLMServiceFactory.getService();
         const result = await service.chatWithTools(request, maxIterations);
@@ -97,11 +89,7 @@ export function registerLLMIpcHandlers(): void {
   // API key management
   ipcMain.handle(
     'llm:set-api-key',
-    async (
-      _event,
-      vendor: VendorId,
-      apiKey: string
-    ): Promise<IPCResponse<void>> => {
+    async (_event, vendor: VendorId, apiKey: string): Promise<IPCResponse<void>> => {
       try {
         const repo = LLMServiceFactory.getApiKeyRepository();
         const result = await repo.setApiKey(vendor, apiKey);
@@ -148,42 +136,36 @@ export function registerLLMIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle(
-    'llm:list-vendors-with-keys',
-    async (): Promise<IPCResponse<VendorId[]>> => {
-      try {
-        const repo = LLMServiceFactory.getApiKeyRepository();
-        const result = await repo.listStoredVendors();
+  ipcMain.handle('llm:list-vendors-with-keys', async (): Promise<IPCResponse<VendorId[]>> => {
+    try {
+      const repo = LLMServiceFactory.getApiKeyRepository();
+      const result = await repo.listStoredVendors();
 
-        if (!result.success) {
-          return errorResponse(result.error.message);
-        }
-
-        return successResponse(result.data);
-      } catch (error) {
-        return errorResponse((error as Error).message);
+      if (!result.success) {
+        return errorResponse(result.error.message);
       }
+
+      return successResponse(result.data);
+    } catch (error) {
+      return errorResponse((error as Error).message);
     }
-  );
+  });
 
   // Available models
-  ipcMain.handle(
-    'llm:get-available-models',
-    async (): Promise<IPCResponse<unknown>> => {
-      try {
-        const service = await LLMServiceFactory.getService();
-        const result = await service.getAvailableModels();
+  ipcMain.handle('llm:get-available-models', async (): Promise<IPCResponse<unknown>> => {
+    try {
+      const service = await LLMServiceFactory.getService();
+      const result = await service.getAvailableModels();
 
-        if (!result.success) {
-          return errorResponse(result.error.message);
-        }
-
-        return successResponse(result.data);
-      } catch (error) {
-        return errorResponse((error as Error).message);
+      if (!result.success) {
+        return errorResponse(result.error.message);
       }
+
+      return successResponse(result.data);
+    } catch (error) {
+      return errorResponse((error as Error).message);
     }
-  );
+  });
 
   // Check if configured
   ipcMain.handle('llm:is-configured', async (): Promise<IPCResponse<boolean>> => {
@@ -197,18 +179,15 @@ export function registerLLMIpcHandlers(): void {
   });
 
   // Get capabilities
-  ipcMain.handle(
-    'llm:get-capabilities',
-    async (): Promise<IPCResponse<unknown>> => {
-      try {
-        const service = await LLMServiceFactory.getService();
-        const capabilities = service.getCapabilities();
-        return successResponse(capabilities);
-      } catch (error) {
-        return errorResponse((error as Error).message);
-      }
+  ipcMain.handle('llm:get-capabilities', async (): Promise<IPCResponse<unknown>> => {
+    try {
+      const service = await LLMServiceFactory.getService();
+      const capabilities = service.getCapabilities();
+      return successResponse(capabilities);
+    } catch (error) {
+      return errorResponse((error as Error).message);
     }
-  );
+  });
 
   console.log('[Main] LLM IPC handlers registered');
 }

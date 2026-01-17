@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { Node, Edge, Viewport } from '@xyflow/react';
+import type { Edge, Node, Viewport } from '@xyflow/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CanvasState } from '../../main/types/database';
 import '../main.d'; // Import type declarations for Window.canvasAPI
 import {
-  nodesToCanvasNodes,
-  canvasNodesToNodes,
-  edgesToCanvasEdges,
   canvasEdgesToEdges,
-  viewportToDbViewport,
+  canvasNodesToNodes,
   dbViewportToViewport,
+  edgesToCanvasEdges,
   generateCanvasId,
+  nodesToCanvasNodes,
+  viewportToDbViewport,
 } from './canvasConverters';
 
 interface UseCanvasPersistenceOptions {
@@ -131,10 +131,7 @@ export function useCanvasPersistence(
   }, []);
 
   // Debounced save
-  const debouncedSave = useMemo(
-    () => debounce(saveCanvas, debounceMs),
-    [saveCanvas, debounceMs]
-  );
+  const debouncedSave = useMemo(() => debounce(saveCanvas, debounceMs), [saveCanvas, debounceMs]);
 
   // Auto-restore on mount
   useEffect(() => {
@@ -160,7 +157,7 @@ export function useCanvasPersistence(
 
           if (loadedState) {
             console.log('[CanvasPersistence] Restored canvas:', loadedState);
-  
+
             setCanvasId(loadedState.id);
             setInitialNodes(canvasNodesToNodes(loadedState.nodes));
             setInitialEdges(canvasEdgesToEdges(loadedState.edges));

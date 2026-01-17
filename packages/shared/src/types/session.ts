@@ -4,8 +4,8 @@
  * Types for managing coding agent sessions, including continue and fork operations.
  */
 
-import type { AgentType } from './coding-agent.js';
 import type { CodingAgentMessage } from '../types.js';
+import type { AgentType } from './coding-agent.js';
 
 // =============================================================================
 // Session Identifier

@@ -2,14 +2,14 @@
  * Tests for CodingAgentStatusManager
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CodingAgentStatusManager } from '../CodingAgentStatusManager';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
-  ITitleComputer,
-  ISummaryComputer,
-  IStatusPersistence,
   CodingAgentState,
+  IStatusPersistence,
+  ISummaryComputer,
+  ITitleComputer,
 } from '../../../../types/coding-agent-status';
+import { CodingAgentStatusManager } from '../CodingAgentStatusManager';
 
 // =============================================================================
 // Mock Implementations
@@ -69,11 +69,7 @@ describe('CodingAgentStatusManager', () => {
     titleComputer = new MockTitleComputer();
     summaryComputer = new MockSummaryComputer();
     persistence = new MockPersistence();
-    manager = new CodingAgentStatusManager(
-      titleComputer,
-      summaryComputer,
-      persistence
-    );
+    manager = new CodingAgentStatusManager(titleComputer, summaryComputer, persistence);
   });
 
   // ===========================================================================
@@ -299,11 +295,7 @@ describe('CodingAgentStatusManager', () => {
 
       const states = manager.getAllStates();
       expect(states).toHaveLength(3);
-      expect(states.map((s) => s.agentId).sort()).toEqual([
-        'agent-1',
-        'agent-2',
-        'agent-3',
-      ]);
+      expect(states.map((s) => s.agentId).sort()).toEqual(['agent-1', 'agent-2', 'agent-3']);
     });
 
     it('should return empty array when no agents registered', () => {
@@ -418,11 +410,7 @@ describe('CodingAgentStatusManager', () => {
       await manager.persist('agent-1');
 
       // Create new manager instance
-      const newManager = new CodingAgentStatusManager(
-        titleComputer,
-        summaryComputer,
-        persistence
-      );
+      const newManager = new CodingAgentStatusManager(titleComputer, summaryComputer, persistence);
 
       await newManager.restore('agent-1');
 
@@ -441,11 +429,7 @@ describe('CodingAgentStatusManager', () => {
       await manager.persist('agent-2');
 
       // Create new manager instance
-      const newManager = new CodingAgentStatusManager(
-        titleComputer,
-        summaryComputer,
-        persistence
-      );
+      const newManager = new CodingAgentStatusManager(titleComputer, summaryComputer, persistence);
 
       await newManager.restoreAll();
 

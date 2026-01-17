@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
-import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { Terminal } from '@xterm/xterm';
+import { useEffect, useRef } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import './AgentTerminalView.css';
-import { useTerminalService, useAgentService, useNodeInitialized } from './context';
+import { useAgentService, useNodeInitialized, useTerminalService } from './context';
 
 interface AgentTerminalViewProps {
   /** Workspace path for agent REPL */
@@ -94,7 +94,7 @@ export default function AgentTerminalView({
     try {
       const webglAddon = new WebglAddon();
       terminal.loadAddon(webglAddon);
-    } catch (error) {
+    } catch (_error) {
       console.warn('[AgentTerminalView] WebGL addon failed, using canvas renderer');
     }
 
@@ -104,7 +104,7 @@ export default function AgentTerminalView({
     // Initial fit
     try {
       fitAddon.fit();
-    } catch (error) {
+    } catch (_error) {
       setTimeout(() => {
         try {
           fitAddonRef.current?.fit();
@@ -117,23 +117,26 @@ export default function AgentTerminalView({
     terminal.focus();
 
     // Create terminal process and start agent REPL
-    terminalService.create().then(async () => {
-      // Restore terminal buffer after process creation
-      const buffer = await terminalService.getBuffer();
-      if (buffer) {
-        console.log('[AgentTerminalView] Restoring terminal buffer', {
-          terminalId: terminalService.terminalId,
-          bufferLength: buffer.length,
-        });
-        terminal.write(buffer);
-      }
+    terminalService
+      .create()
+      .then(async () => {
+        // Restore terminal buffer after process creation
+        const buffer = await terminalService.getBuffer();
+        if (buffer) {
+          console.log('[AgentTerminalView] Restoring terminal buffer', {
+            terminalId: terminalService.terminalId,
+            bufferLength: buffer.length,
+          });
+          terminal.write(buffer);
+        }
 
-      // Start agent REPL in the terminal
-      // agent.start() is idempotent - it checks if already running
-      await agentService.start(workspacePath, sessionId, initialPrompt);
-    }).catch((error) => {
-      console.warn('[AgentTerminalView] Failed to create terminal or start agent', error);
-    });
+        // Start agent REPL in the terminal
+        // agent.start() is idempotent - it checks if already running
+        await agentService.start(workspacePath, sessionId, initialPrompt);
+      })
+      .catch((error) => {
+        console.warn('[AgentTerminalView] Failed to create terminal or start agent', error);
+      });
 
     // Connect xterm.js input to terminal service
     terminal.onData((inputData: string) => {
@@ -223,7 +226,14 @@ export default function AgentTerminalView({
 
       isInitializedRef.current = false;
     };
-  }, [terminalService, agentService, workspacePath, sessionId, initialPrompt, isServicesInitialized]);
+  }, [
+    terminalService,
+    agentService,
+    workspacePath,
+    sessionId,
+    initialPrompt,
+    isServicesInitialized,
+  ]);
 
   // Handle scroll events when node is selected
   // Only prevent canvas scrolling when node is selected (clicked)
@@ -248,11 +258,5 @@ export default function AgentTerminalView({
     terminalInstanceRef.current?.focus();
   };
 
-  return (
-    <div
-      ref={terminalRef}
-      className="agent-terminal-view"
-      onClick={handleClick}
-    />
-  );
+  return <div ref={terminalRef} className="agent-terminal-view" onClick={handleClick} />;
 }

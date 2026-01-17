@@ -1,5 +1,5 @@
-import type { IForkAdapter } from '../interfaces/IForkAdapter';
 import { ClaudeCodeForkAdapter } from '../implementations/ClaudeCodeForkAdapter';
+import type { IForkAdapter } from '../interfaces/IForkAdapter';
 
 /**
  * Factory for creating fork adapters based on agent type
@@ -22,7 +22,7 @@ export class ForkAdapterFactory {
    * @returns Fork adapter instance or null if not supported
    */
   static getAdapter(agentType: string): IForkAdapter | null {
-    const adapter = this.adapters.find(a => a.supportsAgentType(agentType));
+    const adapter = ForkAdapterFactory.adapters.find((a) => a.supportsAgentType(agentType));
     return adapter || null;
   }
 
@@ -30,7 +30,7 @@ export class ForkAdapterFactory {
    * Check if forking is supported for the given agent type
    */
   static isSupported(agentType: string): boolean {
-    return this.adapters.some(a => a.supportsAgentType(agentType));
+    return ForkAdapterFactory.adapters.some((a) => a.supportsAgentType(agentType));
   }
 
   /**
@@ -43,7 +43,7 @@ export class ForkAdapterFactory {
     const commonTypes = ['claude_code', 'cursor', 'vscode', 'factory'];
 
     for (const type of commonTypes) {
-      if (this.isSupported(type)) {
+      if (ForkAdapterFactory.isSupported(type)) {
         types.add(type);
       }
     }

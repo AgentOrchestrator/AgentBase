@@ -16,11 +16,11 @@
 
 import { LoaderRegistry } from '@agent-orchestrator/shared';
 import { claudeCodeLoader } from '../claude-code-reader.js';
-import { cursorLoader, CursorLoader } from '../cursor-reader.js';
-import { vscodeLoader } from '../vscode-reader.js';
 import { codexLoader } from '../codex-reader.js';
+import { CursorLoader, cursorLoader } from '../cursor-reader.js';
 import { factoryLoader } from '../factory-reader.js';
 import type { IRepositoryFactory } from '../interfaces/repositories.js';
+import { vscodeLoader } from '../vscode-reader.js';
 
 /**
  * Create a LoaderRegistry with all daemon loaders pre-registered
@@ -61,12 +61,11 @@ export function createDaemonLoaderRegistry(options?: {
  */
 export const loaderRegistry = createDaemonLoaderRegistry();
 
+// Re-export registry class for custom registries
+export { createLoaderRegistry, LoaderRegistry } from '@agent-orchestrator/shared';
 // Re-export individual loaders for direct access
 export { claudeCodeLoader } from '../claude-code-reader.js';
-export { cursorLoader, CursorLoader } from '../cursor-reader.js';
-export { vscodeLoader, VSCodeLoader } from '../vscode-reader.js';
-export { codexLoader, CodexLoader } from '../codex-reader.js';
-export { factoryLoader, FactoryLoader } from '../factory-reader.js';
-
-// Re-export registry class for custom registries
-export { LoaderRegistry, createLoaderRegistry } from '@agent-orchestrator/shared';
+export { CodexLoader, codexLoader } from '../codex-reader.js';
+export { CursorLoader, cursorLoader } from '../cursor-reader.js';
+export { FactoryLoader, factoryLoader } from '../factory-reader.js';
+export { VSCodeLoader, vscodeLoader } from '../vscode-reader.js';

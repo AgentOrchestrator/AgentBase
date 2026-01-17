@@ -3,15 +3,15 @@
  * Always returns authenticated state using a deterministic local user ID
  */
 
+import { randomUUID } from 'node:crypto';
+import type { AppDatabase } from '../../database.js';
 import type {
-  IAuthProvider,
+  AuthProviderInfo,
   AuthTokens,
   DeviceAuthSession,
-  AuthProviderInfo,
+  IAuthProvider,
   TokenValidationResult,
 } from '../../interfaces/auth.js';
-import type { AppDatabase } from '../../database.js';
-import { randomUUID } from 'crypto';
 
 export class LocalAuthProvider implements IAuthProvider {
   private db: AppDatabase;

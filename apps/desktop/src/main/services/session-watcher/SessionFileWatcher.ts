@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
-import * as fs from 'fs';
-import * as path from 'path';
+import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
   CodingAgentType,
   SessionFileChangeEvent,
@@ -88,16 +88,12 @@ export class SessionFileWatcher extends EventEmitter {
 
       try {
         // Watch recursively for nested project directories
-        const watcher = fs.watch(
-          basePath,
-          { recursive: true },
-          (eventType, filename) => {
-            if (!filename || !filename.endsWith('.jsonl')) return;
+        const watcher = fs.watch(basePath, { recursive: true }, (eventType, filename) => {
+          if (!filename || !filename.endsWith('.jsonl')) return;
 
-            const fullPath = path.join(basePath, filename);
-            this.handleFileChange(eventType, fullPath, agentType, basePath);
-          }
-        );
+          const fullPath = path.join(basePath, filename);
+          this.handleFileChange(eventType, fullPath, agentType, basePath);
+        });
 
         watcher.on('error', (error) => {
           console.error('[SessionFileWatcher] Watcher error:', { watchKey, error });

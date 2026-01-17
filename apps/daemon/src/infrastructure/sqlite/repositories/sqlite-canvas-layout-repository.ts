@@ -2,12 +2,12 @@
  * SQLite implementation of ICanvasLayoutRepository
  */
 
+import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type {
-  ICanvasLayoutRepository,
   CanvasNodePosition,
+  ICanvasLayoutRepository,
 } from '../../../interfaces/repositories.js';
-import { randomUUID } from 'crypto';
 
 interface CanvasLayoutRow {
   id: string;
@@ -22,7 +22,7 @@ interface CanvasLayoutRow {
 export class SQLiteCanvasLayoutRepository implements ICanvasLayoutRepository {
   constructor(
     private db: Database.Database,
-    private userId: string
+    _userId: string
   ) {}
 
   async getNodePositions(userId: string): Promise<CanvasNodePosition[]> {

@@ -3,10 +3,10 @@
  */
 
 import type {
-  IAuthProvider,
+  AuthProviderInfo,
   AuthTokens,
   DeviceAuthSession,
-  AuthProviderInfo,
+  IAuthProvider,
   TokenValidationResult,
 } from '../../interfaces/auth.js';
 import { supabaseClient } from './client.js';

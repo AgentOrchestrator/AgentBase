@@ -73,11 +73,7 @@ export interface IAuthStateStore {
    * Used for token refresh operations
    * @param tokens Updated token information
    */
-  updateTokens(tokens: {
-    accessToken: string;
-    refreshToken: string;
-    expiresAt: number;
-  }): void;
+  updateTokens(tokens: { accessToken: string; refreshToken: string; expiresAt: number }): void;
 
   /**
    * Clear all auth state (logout)

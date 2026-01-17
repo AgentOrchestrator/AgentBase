@@ -35,8 +35,8 @@
 
 /* Hide React Flow's default selection border/outline */
 .react-flow__node.agentNode.react-flow__node-selected {
-  outline: none !important;
-  border: none !important;
+  outline: none;
+  border: none;
 }
 
 .agent-node.drag-over {
@@ -96,7 +96,8 @@
 }
 
 @keyframes status-blink {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -193,7 +194,7 @@
 }
 
 .agent-node-view-switcher.terminal-active .agent-view-button::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 24px;
   height: 24px;
@@ -214,35 +215,41 @@
 
 /* Handle styles - fully invisible but functional (except fork anchors) */
 .agent-node .react-flow__handle:not(.agent-node-bottom-handle):not(.agent-node-fork-anchor) {
-  background: transparent !important;
+  background: transparent;
   width: 10px;
   height: 10px;
-  border: none !important;
-  opacity: 0 !important;
+  border: none;
+  opacity: 0;
 }
 
 /* Resize handles - increase size and hit area (but not corner handles) - invisible but functional */
-.react-flow__node.agentNode .react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(.handle-top-right):not(.handle-bottom-left),
-.agent-node .react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(.handle-top-right):not(.handle-bottom-left) {
-  width: 20px !important;
-  height: 20px !important;
-  min-width: 20px !important;
-  min-height: 20px !important;
-  border: none !important;
-  background: transparent !important;
-  border-radius: 0 !important;
-  opacity: 0 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  box-shadow: none !important;
-  transform: none !important;
-  box-sizing: border-box !important;
+.react-flow__node.agentNode
+.react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(
+  .handle-top-right
+):not(.handle-bottom-left),
+.agent-node
+  .react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(
+    .handle-top-right
+  ):not(.handle-bottom-left) {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+  box-sizing: border-box;
 }
 
 .react-flow__node.agentNode .react-flow__resize-control.handle:hover,
 .agent-node .react-flow__resize-control.handle:hover {
-  opacity: 0 !important;
-  transform: none !important;
+  opacity: 0;
+  transform: none;
 }
 
 /* Corner handles - 100px for easy grabbing, completely invisible */
@@ -254,22 +261,22 @@
 .agent-node .react-flow__resize-control.handle-top-left,
 .agent-node .react-flow__resize-control.handle-top-right,
 .agent-node .react-flow__resize-control.handle-bottom-left {
-  width: 100px !important;
-  height: 100px !important;
-  min-width: 100px !important;
-  min-height: 100px !important;
-  max-width: 100px !important;
-  max-height: 100px !important;
-  border: none !important;
-  background: transparent !important;
-  border-radius: 0 !important;
-  opacity: 0 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  box-shadow: none !important;
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  min-height: 100px;
+  max-width: 100px;
+  max-height: 100px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
   /* Override any transforms or other visual properties */
-  transform: none !important;
-  box-sizing: border-box !important;
+  transform: none;
+  box-sizing: border-box;
 }
 
 /* Hide any child elements, pseudo-elements, and visual content inside corner handles */
@@ -281,11 +288,11 @@
 .agent-node .react-flow__resize-control.handle-top-left > *,
 .agent-node .react-flow__resize-control.handle-top-right > *,
 .agent-node .react-flow__resize-control.handle-bottom-left > * {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  background: transparent !important;
-  border: none !important;
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  background: transparent;
+  border: none;
 }
 
 /* Visual indicator inside corner handles - hidden */
@@ -297,33 +304,33 @@
 .agent-node .react-flow__resize-control.handle-top-left::before,
 .agent-node .react-flow__resize-control.handle-top-right::before,
 .agent-node .react-flow__resize-control.handle-bottom-left::before {
-  display: none !important;
+  display: none;
 }
 
 /* Ensure corner handles have proper cursor */
 .react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right,
 .agent-node .react-flow__resize-control.handle-bottom-right {
-  cursor: nwse-resize !important;
+  cursor: nwse-resize;
 }
 
 .react-flow__node.agentNode .react-flow__resize-control.handle-top-left,
 .agent-node .react-flow__resize-control.handle-top-left {
-  cursor: nwse-resize !important;
+  cursor: nwse-resize;
 }
 
 .react-flow__node.agentNode .react-flow__resize-control.handle-top-right,
 .agent-node .react-flow__resize-control.handle-top-right {
-  cursor: nesw-resize !important;
+  cursor: nesw-resize;
 }
 
 .react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left,
 .agent-node .react-flow__resize-control.handle-bottom-left {
-  cursor: nesw-resize !important;
+  cursor: nesw-resize;
 }
 
 .agent-node .react-flow__handle:not(.agent-node-bottom-handle):not(.agent-node-fork-anchor):hover {
-  background: transparent !important;
-  opacity: 0 !important;
+  background: transparent;
+  opacity: 0;
 }
 
 /* Bottom buttons container - holds fork handles */
@@ -339,28 +346,30 @@
 
 /* Fork anchor points - discrete points around the border */
 .agent-node-fork-anchor {
-  width: 24px !important;
-  height: 24px !important;
-  background: #000 !important;
-  border: none !important;
-  border-radius: 4px !important;
-  cursor: pointer !important;
-  transition: opacity 0.15s ease, background 0.2s ease !important;
-  z-index: 20 !important;
+  width: 24px;
+  height: 24px;
+  background: #000;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    background 0.2s ease;
+  z-index: 20;
 }
 
 .agent-node-fork-anchor.active {
-  opacity: 1 !important;
-  pointer-events: auto !important;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .agent-node-fork-anchor:hover {
-  background: #333 !important;
+  background: #333;
 }
 
 /* Git fork icon for anchor points */
 .agent-node-fork-anchor::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -389,18 +398,18 @@
 
 /* Margin from border - offset handles outside the node */
 .agent-node .react-flow__handle-top.agent-node-fork-anchor {
-  top: -16px !important;
+  top: -16px;
 }
 .agent-node .react-flow__handle-bottom.agent-node-fork-anchor {
-  bottom: -16px !important;
-  top: auto !important;
+  bottom: -16px;
+  top: auto;
 }
 .agent-node .react-flow__handle-left.agent-node-fork-anchor {
-  left: -16px !important;
+  left: -16px;
 }
 .agent-node .react-flow__handle-right.agent-node-fork-anchor {
-  right: -16px !important;
-  left: auto !important;
+  right: -16px;
+  left: auto;
 }
 
 /* Resize handles - hidden (removed, using visible handles above) */
@@ -578,69 +587,69 @@
 
 /* Side handles - fully invisible but functional for edge connections */
 .agent-node-side-handle {
-  width: 12px !important;
-  height: 12px !important;
-  background: transparent !important;
-  border: none !important;
-  border-radius: 50% !important;
-  opacity: 0 !important;
+  width: 12px;
+  height: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  opacity: 0;
 }
 
 .agent-node:hover .agent-node-side-handle {
-  opacity: 0 !important;
+  opacity: 0;
 }
 
 .agent-node-side-handle:hover {
-  background: transparent !important;
-  border: none !important;
-  opacity: 0 !important;
+  background: transparent;
+  border: none;
+  opacity: 0;
 }
 
 /* Position source and target handles on same side with offset to avoid overlap */
 /* Top handles - source left of center, target right of center */
 .agent-node .react-flow__handle[data-handleid="source-top"] {
-  left: 40% !important;
+  left: 40%;
 }
 .agent-node .react-flow__handle[data-handleid="target-top"] {
-  left: 60% !important;
+  left: 60%;
 }
 
 /* Bottom handles - source left of center, target right of center */
 .agent-node .react-flow__handle[data-handleid="source-bottom"] {
-  left: 40% !important;
+  left: 40%;
 }
 .agent-node .react-flow__handle[data-handleid="target-bottom"] {
-  left: 60% !important;
+  left: 60%;
 }
 
 /* Left handles - source above center, target below center */
 .agent-node .react-flow__handle[data-handleid="source-left"] {
-  top: 40% !important;
+  top: 40%;
 }
 .agent-node .react-flow__handle[data-handleid="target-left"] {
-  top: 60% !important;
+  top: 60%;
 }
 
 /* Right handles - source above center, target below center */
 .agent-node .react-flow__handle[data-handleid="source-right"] {
-  top: 40% !important;
+  top: 40%;
 }
 .agent-node .react-flow__handle[data-handleid="target-right"] {
-  top: 60% !important;
+  top: 60%;
 }
 
 /* When connecting (dragging from a handle), keep handles invisible */
 .react-flow__node.connecting .agent-node-side-handle {
-  opacity: 0 !important;
-  border: none !important;
+  opacity: 0;
+  border: none;
 }
 
 .react-flow__node.connecting .agent-node-side-handle.valid {
-  opacity: 0 !important;
-  border: none !important;
+  opacity: 0;
+  border: none;
 }
 
 .react-flow__node.connecting .agent-node-side-handle.valid:hover {
-  background: transparent !important;
-  opacity: 0 !important;
+  background: transparent;
+  opacity: 0;
 }

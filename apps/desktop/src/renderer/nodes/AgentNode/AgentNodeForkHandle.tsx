@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { Handle, Position } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface AgentNodeForkHandleProps {
   nodeId?: string;
@@ -26,10 +26,10 @@ interface AnchorPoint {
  */
 const ANCHOR_POINTS: AnchorPoint[] = [
   // Corners (positioned at edges, React Flow will place at corner intersections)
-  { id: 'fork-corner-tl', position: Position.Top, percent: 0 },    // Top-left
-  { id: 'fork-corner-tr', position: Position.Top, percent: 100 },  // Top-right
+  { id: 'fork-corner-tl', position: Position.Top, percent: 0 }, // Top-left
+  { id: 'fork-corner-tr', position: Position.Top, percent: 100 }, // Top-right
   { id: 'fork-corner-br', position: Position.Bottom, percent: 100 }, // Bottom-right
-  { id: 'fork-corner-bl', position: Position.Bottom, percent: 0 },  // Bottom-left
+  { id: 'fork-corner-bl', position: Position.Bottom, percent: 0 }, // Bottom-left
   // Top edge (2 points)
   { id: 'fork-top-1', position: Position.Top, percent: 33 },
   { id: 'fork-top-2', position: Position.Top, percent: 67 },
@@ -47,11 +47,7 @@ const ANCHOR_POINTS: AnchorPoint[] = [
 /**
  * Find the closest anchor point to the mouse position.
  */
-function findClosestAnchor(
-  mouseX: number,
-  mouseY: number,
-  nodeRect: DOMRect
-): AnchorPoint | null {
+function findClosestAnchor(mouseX: number, mouseY: number, nodeRect: DOMRect): AnchorPoint | null {
   const { left, top, width, height } = nodeRect;
   const right = left + width;
   const bottom = top + height;
@@ -98,9 +94,7 @@ function findClosestAnchor(
         continue;
     }
 
-    const distance = Math.sqrt(
-      Math.pow(mouseX - anchorX, 2) + Math.pow(mouseY - anchorY, 2)
-    );
+    const distance = Math.sqrt((mouseX - anchorX) ** 2 + (mouseY - anchorY) ** 2);
 
     if (distance < closestDistance) {
       closestDistance = distance;
@@ -126,35 +120,38 @@ export function AgentNodeForkHandle({ nodeId }: AgentNodeForkHandleProps) {
   const [activeAnchor, setActiveAnchor] = useState<AnchorPoint | null>(null);
   const nodeRef = useRef<HTMLElement | null>(null);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!nodeRef.current) {
-      const nodeElement = document.querySelector(`[data-id="${nodeId}"]`) as HTMLElement;
-      if (!nodeElement) return;
-      nodeRef.current = nodeElement;
-    }
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!nodeRef.current) {
+        const nodeElement = document.querySelector(`[data-id="${nodeId}"]`) as HTMLElement;
+        if (!nodeElement) return;
+        nodeRef.current = nodeElement;
+      }
 
-    const nodeRect = nodeRef.current.getBoundingClientRect();
+      const nodeRect = nodeRef.current.getBoundingClientRect();
 
-    // Check if mouse is within the expanded bounding box (node + outer padding)
-    const expandedLeft = nodeRect.left - OUTER_PADDING;
-    const expandedRight = nodeRect.right + OUTER_PADDING;
-    const expandedTop = nodeRect.top - OUTER_PADDING;
-    const expandedBottom = nodeRect.bottom + OUTER_PADDING;
+      // Check if mouse is within the expanded bounding box (node + outer padding)
+      const expandedLeft = nodeRect.left - OUTER_PADDING;
+      const expandedRight = nodeRect.right + OUTER_PADDING;
+      const expandedTop = nodeRect.top - OUTER_PADDING;
+      const expandedBottom = nodeRect.bottom + OUTER_PADDING;
 
-    const isInExpandedArea =
-      e.clientX >= expandedLeft &&
-      e.clientX <= expandedRight &&
-      e.clientY >= expandedTop &&
-      e.clientY <= expandedBottom;
+      const isInExpandedArea =
+        e.clientX >= expandedLeft &&
+        e.clientX <= expandedRight &&
+        e.clientY >= expandedTop &&
+        e.clientY <= expandedBottom;
 
-    if (!isInExpandedArea) {
-      setActiveAnchor(null);
-      return;
-    }
+      if (!isInExpandedArea) {
+        setActiveAnchor(null);
+        return;
+      }
 
-    const closest = findClosestAnchor(e.clientX, e.clientY, nodeRect);
-    setActiveAnchor(closest);
-  }, [nodeId]);
+      const closest = findClosestAnchor(e.clientX, e.clientY, nodeRect);
+      setActiveAnchor(closest);
+    },
+    [nodeId]
+  );
 
   useEffect(() => {
     if (!nodeId) return;
@@ -186,14 +183,17 @@ export function AgentNodeForkHandle({ nodeId }: AgentNodeForkHandleProps) {
     }
   };
 
-  const handleForkClick = useCallback((anchor: AnchorPoint) => {
-    if (!nodeId) return;
-    window.dispatchEvent(
-      new CustomEvent('agent-node:fork-click', {
-        detail: { nodeId, position: anchor.position },
-      })
-    );
-  }, [nodeId]);
+  const handleForkClick = useCallback(
+    (anchor: AnchorPoint) => {
+      if (!nodeId) return;
+      window.dispatchEvent(
+        new CustomEvent('agent-node:fork-click', {
+          detail: { nodeId, position: anchor.position },
+        })
+      );
+    },
+    [nodeId]
+  );
 
   const createMouseDownHandler = (anchor: AnchorPoint) => (e: React.MouseEvent) => {
     if (!nodeId) return;

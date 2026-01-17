@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
+import { useCallback, useState } from 'react';
 
 const HIGHLIGHT_COLORS = ['#F24F1F', '#FF7362', '#A259FF', '#1ABCFE', '#0ECF84', '#F5C348'];
 

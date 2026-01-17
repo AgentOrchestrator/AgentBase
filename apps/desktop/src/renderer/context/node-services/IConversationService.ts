@@ -5,8 +5,8 @@
  * Each service instance is lifecycle-scoped to its node.
  */
 
-import type { INodeService } from './types';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+import type { INodeService } from './types';
 
 // =============================================================================
 // Types

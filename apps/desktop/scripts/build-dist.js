@@ -11,9 +11,9 @@
  *
  * Usage: node scripts/build-dist.js
  */
-const { execSync, spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { execSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const APP_DIR = path.resolve(__dirname, '..');
 const MONOREPO_ROOT = path.resolve(APP_DIR, '../..');
@@ -36,7 +36,7 @@ function log(message, color = colors.reset) {
 }
 
 function logStep(step, message) {
-  log(`\n[${ step }] ${message}`, colors.bright + colors.blue);
+  log(`\n[${step}] ${message}`, colors.bright + colors.blue);
 }
 
 function logSuccess(message) {
@@ -123,7 +123,7 @@ function copyModule(moduleName) {
   }
 
   // Remove symlink if exists
-  if (destStat && destStat.isSymbolicLink()) {
+  if (destStat?.isSymbolicLink()) {
     fs.unlinkSync(destPath);
   }
 
@@ -201,7 +201,7 @@ async function main() {
     // List output files
     const releaseDir = path.join(APP_DIR, 'release');
     if (fs.existsSync(releaseDir)) {
-      const files = fs.readdirSync(releaseDir).filter(f => f.endsWith('.dmg'));
+      const files = fs.readdirSync(releaseDir).filter((f) => f.endsWith('.dmg'));
       for (const file of files) {
         const filePath = path.join(releaseDir, file);
         const stats = fs.statSync(filePath);
@@ -210,7 +210,6 @@ async function main() {
       }
     }
     log('');
-
   } catch (error) {
     logError(`Build failed: ${error.message}`);
     process.exit(1);

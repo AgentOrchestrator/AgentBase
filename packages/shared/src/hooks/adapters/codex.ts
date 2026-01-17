@@ -10,15 +10,16 @@
 
 // Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
 const randomUUID = (): string => globalThis.crypto.randomUUID();
+
 import type { AgentType } from '../../loaders/types.js';
 import type {
   AgentEvent,
   AgentEventType,
-  SessionPayload,
-  PermissionPayload,
-  ToolPayload,
-  ContextPayload,
   AgentOutputPayload,
+  ContextPayload,
+  PermissionPayload,
+  SessionPayload,
+  ToolPayload,
   UserInputPayload,
 } from '../types.js';
 import type { IAgentAdapter } from './base.js';
@@ -30,12 +31,7 @@ import type { IAgentAdapter } from './base.js';
 /**
  * Codex Operation types (user-initiated)
  */
-export type CodexOpType =
-  | 'UserInput'
-  | 'ExecApproval'
-  | 'Interrupt'
-  | 'Compact'
-  | 'NewTurn';
+export type CodexOpType = 'UserInput' | 'ExecApproval' | 'Interrupt' | 'Compact' | 'NewTurn';
 
 /**
  * Codex Event types (agent-emitted)
@@ -144,8 +140,7 @@ const CODEX_EVENT_MAP: Record<CodexEventType, AgentEventType> = {
  */
 const TERMINAL_PATTERNS = {
   // Codex approval request
-  approvalRequest:
-    /(?:\[APPROVAL\s*REQUIRED\]|Allow|Confirm)\s*[:\s]*([^\n]+)/i,
+  approvalRequest: /(?:\[APPROVAL\s*REQUIRED\]|Allow|Confirm)\s*[:\s]*([^\n]+)/i,
 
   // Tool execution
   toolBegin: /(?:Executing|Running)\s+(?:tool\s+)?["']?(\w+)["']?/i,
@@ -180,8 +175,7 @@ export class CodexAdapter implements IAgentAdapter {
     // Special handling for ExecApproval - check if it's approve or deny
     let finalEventType = eventType;
     if (rawData.type === 'ExecApproval' && 'approval' in rawData) {
-      finalEventType =
-        rawData.approval === 'deny' ? 'permission:deny' : 'permission:approve';
+      finalEventType = rawData.approval === 'deny' ? 'permission:deny' : 'permission:approve';
     }
 
     const baseEvent = {
@@ -328,8 +322,7 @@ export class CodexAdapter implements IAgentAdapter {
           return {
             toolName: metadata?.tool_name ?? 'shell',
             toolCategory: 'shell',
-            status:
-              metadata?.exit_code === 0 ? 'success' : 'error',
+            status: metadata?.exit_code === 0 ? 'success' : 'error',
             duration: metadata?.duration_ms,
           } satisfies ToolPayload;
         }

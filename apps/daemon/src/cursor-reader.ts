@@ -1,20 +1,20 @@
-import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
   ChatHistory,
+  IDatabaseLoader,
+  LoaderOptions,
   SessionMetadata,
   ProjectInfo as SharedProjectInfo,
-  LoaderOptions,
-  IDatabaseLoader,
 } from '@agent-orchestrator/shared';
 import {
-  IDE_DATA_PATHS,
-  normalizeTimestamp,
   extractProjectNameFromPath,
   generateDeterministicUUID,
   getHomeDir,
+  IDE_DATA_PATHS,
+  normalizeTimestamp,
 } from '@agent-orchestrator/shared';
+import Database from 'better-sqlite3';
 import type { IChatHistoryRepository, IRepositoryFactory } from './interfaces/repositories.js';
 import type { ServiceContainer } from './service-container.js';
 
@@ -158,7 +158,12 @@ async function getStateDbModificationTime(): Promise<string> {
  * Fetch an existing session from the database by ID
  * Returns null if session not found or database unavailable
  */
-async function fetchExistingSession(sessionId: string): Promise<{ id: string; messages: any[]; timestamp: string; latestMessageTimestamp: string | null } | null> {
+async function fetchExistingSession(sessionId: string): Promise<{
+  id: string;
+  messages: any[];
+  timestamp: string;
+  latestMessageTimestamp: string | null;
+} | null> {
   if (!chatHistoryRepo || !authenticatedUserId) {
     return null;
   }
@@ -186,7 +191,12 @@ async function fetchExistingSession(sessionId: string): Promise<{ id: string; me
  * Returns information about new messages
  */
 function detectNewMessages(
-  existingSession: { id: string; messages: any[]; timestamp: string; latestMessageTimestamp: string | null } | null,
+  existingSession: {
+    id: string;
+    messages: any[];
+    timestamp: string;
+    latestMessageTimestamp: string | null;
+  } | null,
   newMessages: CursorMessage[]
 ): { hasNewMessages: boolean; newMessageStartIndex: number } {
   if (!existingSession || !existingSession.messages) {
@@ -224,7 +234,7 @@ function parseRichText(richText: string): string {
       data.root.children.forEach(extractText);
       return textParts.join(' ');
     }
-  } catch (e) {
+  } catch (_e) {
     // If parsing fails, return as-is
   }
   return richText;
@@ -234,7 +244,10 @@ function parseRichText(richText: string): string {
  * Extract project information from composer data
  * Uses workspace ID to look up the actual workspace folder from workspace storage
  */
-function extractProjectInfo(composerData: ComposerData, workspaceMap: Map<string, WorkspaceInfo>): {
+function extractProjectInfo(
+  composerData: ComposerData,
+  workspaceMap: Map<string, WorkspaceInfo>
+): {
   projectName?: string | undefined;
   projectPath?: string | undefined;
   conversationName?: string | undefined;
@@ -345,9 +358,9 @@ function getWorkspaceInfo(workspaceDir: string): WorkspaceInfo | null {
     return {
       workspaceId,
       folder,
-      workspace: workspaceJson
+      workspace: workspaceJson,
     };
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 }
@@ -364,9 +377,10 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
     return conversations;
   }
 
-  const workspaceDirs = fs.readdirSync(workspaceStoragePath)
-    .map(name => path.join(workspaceStoragePath, name))
-    .filter(p => fs.statSync(p).isDirectory());
+  const workspaceDirs = fs
+    .readdirSync(workspaceStoragePath)
+    .map((name) => path.join(workspaceStoragePath, name))
+    .filter((p) => fs.statSync(p).isDirectory());
 
   console.log(`[Cursor Copilot] Scanning ${workspaceDirs.length} workspace-specific databases...`);
 
@@ -390,9 +404,9 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
 
       try {
         // Check if ItemTable exists
-        const tables = db.prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='ItemTable'"
-        ).all();
+        const tables = db
+          .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ItemTable'")
+          .all();
 
         if (tables.length === 0) {
           db.close();
@@ -400,9 +414,9 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
         }
 
         // Get interactive sessions - stored as an array in 'interactive.sessions' key
-        const sessionRow = db.prepare(
-          "SELECT value FROM ItemTable WHERE key = 'interactive.sessions'"
-        ).get() as { value: string } | undefined;
+        const sessionRow = db
+          .prepare("SELECT value FROM ItemTable WHERE key = 'interactive.sessions'")
+          .get() as { value: string } | undefined;
 
         if (sessionRow) {
           try {
@@ -416,7 +430,9 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
             for (let sessionIndex = 0; sessionIndex < sessionsArray.length; sessionIndex++) {
               const sessionData = sessionsArray[sessionIndex];
               // Generate a deterministic UUID based on workspace ID and session index
-              const sessionId = generateDeterministicUUID(`${workspaceInfo.workspaceId}-session-${sessionIndex}`);
+              const sessionId = generateDeterministicUUID(
+                `${workspaceInfo.workspaceId}-session-${sessionIndex}`
+              );
 
               if (!sessionData.requests || !Array.isArray(sessionData.requests)) {
                 continue;
@@ -436,7 +452,7 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
                     role: 'user',
                     content: request.message.text,
                     timestamp: sessionTimestamp,
-                    sessionId
+                    sessionId,
                   });
                 }
 
@@ -454,7 +470,7 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
                       role: 'assistant',
                       content: responseText,
                       timestamp: sessionTimestamp,
-                      sessionId
+                      sessionId,
                     });
                   }
                 }
@@ -469,7 +485,10 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
                 try {
                   // Check if this session exists in the database and if new messages were added
                   const existingSession = await fetchExistingSession(sessionId);
-                  const { hasNewMessages, newMessageStartIndex } = detectNewMessages(existingSession, messages);
+                  const { hasNewMessages, newMessageStartIndex } = detectNewMessages(
+                    existingSession,
+                    messages
+                  );
 
                   if (hasNewMessages || !existingSession) {
                     // Get workspace state.vscdb modification time
@@ -478,7 +497,9 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
 
                     if (!existingSession) {
                       // First time reading this session - use workspace DB mtime for ALL messages
-                      console.log(`[Cursor Reader] 🕐 New session detected - applying heuristic timestamp to all ${messages.length} message(s) in copilot session ${sessionId.substring(0, 8)}...`);
+                      console.log(
+                        `[Cursor Reader] 🕐 New session detected - applying heuristic timestamp to all ${messages.length} message(s) in copilot session ${sessionId.substring(0, 8)}...`
+                      );
                       console.log(`[Cursor Reader]   Heuristic timestamp: ${workspaceDbModTime}`);
 
                       for (const message of messages) {
@@ -490,8 +511,12 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
                     } else if (hasNewMessages) {
                       // Session exists - only update new messages
                       const newMessageCount = messages.length - newMessageStartIndex;
-                      console.log(`[Cursor Reader] 🕐 Applying heuristic timestamp to ${newMessageCount} new message(s) in copilot session ${sessionId.substring(0, 8)}...`);
-                      console.log(`[Cursor Reader]   Existing: ${existingSession?.messages?.length || 0} messages, Current: ${messages.length} messages`);
+                      console.log(
+                        `[Cursor Reader] 🕐 Applying heuristic timestamp to ${newMessageCount} new message(s) in copilot session ${sessionId.substring(0, 8)}...`
+                      );
+                      console.log(
+                        `[Cursor Reader]   Existing: ${existingSession?.messages?.length || 0} messages, Current: ${messages.length} messages`
+                      );
                       console.log(`[Cursor Reader]   Heuristic timestamp: ${workspaceDbModTime}`);
 
                       // Apply heuristic timestamp only to new messages
@@ -506,7 +531,10 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
                   }
                 } catch (error) {
                   // Don't let heuristic timestamp errors stop the whole import
-                  console.warn(`[Cursor Reader] Error applying heuristic timestamp to copilot session ${sessionId.substring(0, 8)}:`, error);
+                  console.warn(
+                    `[Cursor Reader] Error applying heuristic timestamp to copilot session ${sessionId.substring(0, 8)}:`,
+                    error
+                  );
                 }
               }
 
@@ -526,7 +554,7 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
               // Build metadata with only defined values
               const metadata: SessionMetadata = {
                 workspaceId: workspaceInfo.workspaceId,
-                source: 'cursor-copilot'
+                source: 'cursor-copilot',
               };
 
               if (workspaceInfo.folder) {
@@ -555,28 +583,24 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
                 timestamp: lastMessage.timestamp,
                 messages,
                 conversationType: 'copilot',
-                metadata
+                metadata,
               });
             }
-
-          } catch (e) {
+          } catch (_e) {
             // Skip malformed session data
           }
         }
-
       } finally {
         db.close();
       }
-
-    } catch (error) {
-      // Skip databases we can't read
-      continue;
-    }
+    } catch (_error) {}
   }
 
   console.log(`[Cursor Copilot] ✓ Found ${totalSessions} copilot sessions`);
   if (copilotHeuristicTimestampsApplied > 0) {
-    console.log(`[Cursor Copilot] 🕐 Applied heuristic timestamps to ${copilotHeuristicTimestampsApplied} session(s) with new messages`);
+    console.log(
+      `[Cursor Copilot] 🕐 Applied heuristic timestamps to ${copilotHeuristicTimestampsApplied} session(s) with new messages`
+    );
   }
 
   return conversations;
@@ -589,14 +613,17 @@ async function readCopilotSessions(cutoffDate: Date | null = null): Promise<Curs
 export function extractProjectsFromConversations(
   conversations: CursorConversation[]
 ): ProjectInfo[] {
-  const projectsMap = new Map<string, {
-    name: string;
-    path: string;
-    workspaceIds: Set<string>;
-    composerCount: number;
-    copilotSessionCount: number;
-    lastActivity: Date;
-  }>();
+  const projectsMap = new Map<
+    string,
+    {
+      name: string;
+      path: string;
+      workspaceIds: Set<string>;
+      composerCount: number;
+      copilotSessionCount: number;
+      lastActivity: Date;
+    }
+  >();
 
   for (const conv of conversations) {
     const projectPath = conv.metadata?.projectPath;
@@ -613,7 +640,7 @@ export function extractProjectsFromConversations(
         workspaceIds: new Set(),
         composerCount: 0,
         copilotSessionCount: 0,
-        lastActivity: new Date(conv.timestamp)
+        lastActivity: new Date(conv.timestamp),
       });
     }
 
@@ -638,13 +665,13 @@ export function extractProjectsFromConversations(
     }
   }
 
-  return Array.from(projectsMap.values()).map(project => ({
+  return Array.from(projectsMap.values()).map((project) => ({
     name: project.name,
     path: project.path,
     workspaceIds: Array.from(project.workspaceIds),
     composerCount: project.composerCount,
     copilotSessionCount: project.copilotSessionCount,
-    lastActivity: project.lastActivity.toISOString()
+    lastActivity: project.lastActivity.toISOString(),
   }));
 }
 
@@ -654,9 +681,9 @@ export function extractProjectsFromConversations(
 function detectStorageFormat(db: Database.Database): 'cursorDiskKV' | 'ItemTable' {
   try {
     // Check if cursorDiskKV has data
-    const cursorDiskKVCount = db.prepare(
-      "SELECT COUNT(*) as count FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
-    ).get() as { count: number };
+    const cursorDiskKVCount = db
+      .prepare("SELECT COUNT(*) as count FROM cursorDiskKV WHERE key LIKE 'composerData:%'")
+      .get() as { count: number };
 
     if (cursorDiskKVCount.count > 0) {
       console.log('[Cursor] Detected cursorDiskKV format (legacy)');
@@ -664,9 +691,9 @@ function detectStorageFormat(db: Database.Database): 'cursorDiskKV' | 'ItemTable
     }
 
     // Check if ItemTable has composer data
-    const itemTableCount = db.prepare(
-      "SELECT COUNT(*) as count FROM ItemTable WHERE key = 'composer.composerData'"
-    ).get() as { count: number };
+    const itemTableCount = db
+      .prepare("SELECT COUNT(*) as count FROM ItemTable WHERE key = 'composer.composerData'")
+      .get() as { count: number };
 
     if (itemTableCount.count > 0) {
       console.log('[Cursor] Detected ItemTable format (new)');
@@ -689,9 +716,9 @@ function readComposersFromItemTable(db: Database.Database): Map<string, Composer
   const composers = new Map<string, ComposerData>();
 
   try {
-    const row = db.prepare(
-      "SELECT value FROM ItemTable WHERE key = 'composer.composerData'"
-    ).get() as { value: string } | undefined;
+    const row = db
+      .prepare("SELECT value FROM ItemTable WHERE key = 'composer.composerData'")
+      .get() as { value: string } | undefined;
 
     if (!row) {
       console.log('[Cursor] No composer data found in ItemTable');
@@ -717,7 +744,7 @@ function readComposersFromItemTable(db: Database.Database): Map<string, Composer
           workspace: composer.workspace,
           // Note: The new format doesn't store full conversation data here
           // Messages would need to be reconstructed from other sources
-          conversation: []
+          conversation: [],
         } as ComposerData);
       }
     }
@@ -736,9 +763,9 @@ function readComposersFromItemTable(db: Database.Database): Map<string, Composer
 function readComposersFromCursorDiskKV(db: Database.Database): Map<string, ComposerData> {
   const composers = new Map<string, ComposerData>();
 
-  const composerRows = db.prepare(
-    'SELECT key, value FROM cursorDiskKV WHERE key LIKE ?'
-  ).all('composerData:%') as Array<{ key: string; value: string }>;
+  const composerRows = db
+    .prepare('SELECT key, value FROM cursorDiskKV WHERE key LIKE ?')
+    .all('composerData:%') as Array<{ key: string; value: string }>;
 
   for (const row of composerRows) {
     try {
@@ -746,10 +773,7 @@ function readComposersFromCursorDiskKV(db: Database.Database): Map<string, Compo
       const composerId = row.key.replace('composerData:', '');
       composerData.composerId = composerId;
       composers.set(composerId, composerData);
-    } catch (e) {
-      // Skip malformed composer data
-      continue;
-    }
+    } catch (_e) {}
   }
 
   console.log(`[Cursor] Found ${composers.size} composers in cursorDiskKV format`);
@@ -768,13 +792,14 @@ function buildWorkspaceMap(): Map<string, WorkspaceInfo> {
   }
 
   try {
-    const workspaceDirs = fs.readdirSync(workspaceStoragePath)
-      .map(name => path.join(workspaceStoragePath, name))
-      .filter(p => fs.statSync(p).isDirectory());
+    const workspaceDirs = fs
+      .readdirSync(workspaceStoragePath)
+      .map((name) => path.join(workspaceStoragePath, name))
+      .filter((p) => fs.statSync(p).isDirectory());
 
     for (const workspaceDir of workspaceDirs) {
       const workspaceInfo = getWorkspaceInfo(workspaceDir);
-      if (workspaceInfo && workspaceInfo.workspaceId) {
+      if (workspaceInfo?.workspaceId) {
         workspaceMap.set(workspaceInfo.workspaceId, workspaceInfo);
       }
     }
@@ -808,18 +833,29 @@ export async function readCursorHistories(
   // Initialize repositories based on what was provided
   if (containerOrFactory) {
     // Check if it's a ServiceContainer (has isInitialized method)
-    if ('isInitialized' in containerOrFactory && typeof containerOrFactory.isInitialized === 'function') {
+    if (
+      'isInitialized' in containerOrFactory &&
+      typeof containerOrFactory.isInitialized === 'function'
+    ) {
       // It's a ServiceContainer
       const container = containerOrFactory as ServiceContainer;
       if (container.isInitialized()) {
         initializeFromContainer(container);
-        console.log('[Cursor Reader] Repositories initialized from ServiceContainer for heuristic timestamps');
+        console.log(
+          '[Cursor Reader] Repositories initialized from ServiceContainer for heuristic timestamps'
+        );
       } else {
-        console.log('[Cursor Reader] ServiceContainer not initialized - heuristic timestamps disabled');
+        console.log(
+          '[Cursor Reader] ServiceContainer not initialized - heuristic timestamps disabled'
+        );
       }
     } else if (accessToken && refreshToken) {
       // It's a factory, use the old method
-      await initializeRepositoriesFromFactory(accessToken, refreshToken, containerOrFactory as IRepositoryFactory);
+      await initializeRepositoriesFromFactory(
+        accessToken,
+        refreshToken,
+        containerOrFactory as IRepositoryFactory
+      );
       console.log('[Cursor Reader] Repositories initialized from factory for heuristic timestamps');
     } else {
       console.log('[Cursor Reader] Factory provided but no tokens - heuristic timestamps disabled');
@@ -832,7 +868,9 @@ export async function readCursorHistories(
   let cutoffDate: Date | null = null;
   if (sinceTimestamp && sinceTimestamp > 0) {
     cutoffDate = new Date(sinceTimestamp);
-    console.log(`[Cursor Reader] Filtering conversations after ${cutoffDate.toISOString()} (incremental sync)`);
+    console.log(
+      `[Cursor Reader] Filtering conversations after ${cutoffDate.toISOString()} (incremental sync)`
+    );
   } else if (lookbackDays && lookbackDays > 0) {
     cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
@@ -873,9 +911,9 @@ export async function readCursorHistories(
       const bubblesByComposer = new Map<string, BubbleData[]>();
 
       if (format === 'cursorDiskKV') {
-        const bubbleRows = db.prepare(
-          'SELECT key, value FROM cursorDiskKV WHERE key LIKE ?'
-        ).all('bubbleId:%') as Array<{ key: string; value: string }>;
+        const bubbleRows = db
+          .prepare('SELECT key, value FROM cursorDiskKV WHERE key LIKE ?')
+          .all('bubbleId:%') as Array<{ key: string; value: string }>;
 
         for (const row of bubbleRows) {
           try {
@@ -893,12 +931,9 @@ export async function readCursorHistories(
               if (!bubblesByComposer.has(composerId)) {
                 bubblesByComposer.set(composerId, []);
               }
-              bubblesByComposer.get(composerId)!.push(bubbleData);
+              bubblesByComposer.get(composerId)?.push(bubbleData);
             }
-          } catch (e) {
-            // Skip malformed bubble data
-            continue;
-          }
+          } catch (_e) {}
         }
       }
       // For ItemTable format, bubble data would need to be read from a different location
@@ -906,8 +941,8 @@ export async function readCursorHistories(
 
       // Build conversations
       let conversationsWithNoMessages = 0;
-      let conversationsFromConversationArray = 0;
-      let conversationsFromBubbleEntries = 0;
+      let _conversationsFromConversationArray = 0;
+      let _conversationsFromBubbleEntries = 0;
       let totalMessagesExtracted = 0;
       let composerHeuristicTimestampsApplied = 0;
       let processedCount = 0;
@@ -934,7 +969,9 @@ export async function readCursorHistories(
 
         // Log progress every 100 composers
         if (processedCount % 100 === 0) {
-          console.log(`[Cursor] Progress: ${processedCount}/${totalComposers} composers processed (filtered by date)...`);
+          console.log(
+            `[Cursor] Progress: ${processedCount}/${totalComposers} composers processed (filtered by date)...`
+          );
         }
         let bubbles: BubbleData[] = [];
 
@@ -942,7 +979,7 @@ export async function readCursorHistories(
         if (composerData.conversation && Array.isArray(composerData.conversation)) {
           bubbles = composerData.conversation;
           if (bubbles.length > 0) {
-            conversationsFromConversationArray++;
+            _conversationsFromConversationArray++;
           }
         }
 
@@ -951,7 +988,7 @@ export async function readCursorHistories(
           const separateBubbles = bubblesByComposer.get(composerId) || [];
           if (separateBubbles.length > 0) {
             bubbles = separateBubbles;
-            conversationsFromBubbleEntries++;
+            _conversationsFromBubbleEntries++;
           }
         }
 
@@ -993,7 +1030,7 @@ export async function readCursorHistories(
             timestamp,
             composerId,
             bubbleId: bubble.bubbleId,
-            modelName: bubble.modelInfo?.modelName
+            modelName: bubble.modelInfo?.modelName,
           });
         }
 
@@ -1002,7 +1039,10 @@ export async function readCursorHistories(
           try {
             // Check if this session exists in the database and if new messages were added
             const existingSession = await fetchExistingSession(composerId);
-            const { hasNewMessages, newMessageStartIndex } = detectNewMessages(existingSession, messages);
+            const { hasNewMessages, newMessageStartIndex } = detectNewMessages(
+              existingSession,
+              messages
+            );
 
             if (hasNewMessages || !existingSession) {
               // Get state.vscdb modification time
@@ -1011,7 +1051,9 @@ export async function readCursorHistories(
               if (!existingSession) {
                 // First time reading this session - use state.vscdb mtime for ALL messages
                 // since createdAt is often stale (when conversation was first created, not when messages were added)
-                console.log(`[Cursor Reader] 🕐 New session detected - applying heuristic timestamp to all ${messages.length} message(s) in composer ${composerId.substring(0, 8)}...`);
+                console.log(
+                  `[Cursor Reader] 🕐 New session detected - applying heuristic timestamp to all ${messages.length} message(s) in composer ${composerId.substring(0, 8)}...`
+                );
                 console.log(`[Cursor Reader]   Heuristic timestamp: ${stateDbModTime}`);
 
                 for (const message of messages) {
@@ -1023,8 +1065,12 @@ export async function readCursorHistories(
               } else if (hasNewMessages) {
                 // Session exists - only update new messages
                 const newMessageCount = messages.length - newMessageStartIndex;
-                console.log(`[Cursor Reader] 🕐 Applying heuristic timestamp to ${newMessageCount} new message(s) in composer ${composerId.substring(0, 8)}...`);
-                console.log(`[Cursor Reader]   Existing: ${existingSession?.messages?.length || 0} messages, Current: ${messages.length} messages`);
+                console.log(
+                  `[Cursor Reader] 🕐 Applying heuristic timestamp to ${newMessageCount} new message(s) in composer ${composerId.substring(0, 8)}...`
+                );
+                console.log(
+                  `[Cursor Reader]   Existing: ${existingSession?.messages?.length || 0} messages, Current: ${messages.length} messages`
+                );
                 console.log(`[Cursor Reader]   Heuristic timestamp: ${stateDbModTime}`);
 
                 // Apply heuristic timestamp only to new messages
@@ -1039,7 +1085,10 @@ export async function readCursorHistories(
             }
           } catch (error) {
             // Don't let heuristic timestamp errors stop the whole import
-            console.warn(`[Cursor Reader] Error applying heuristic timestamp to composer ${composerId.substring(0, 8)}:`, error);
+            console.warn(
+              `[Cursor Reader] Error applying heuristic timestamp to composer ${composerId.substring(0, 8)}:`,
+              error
+            );
           }
         }
 
@@ -1061,7 +1110,7 @@ export async function readCursorHistories(
 
         // Build metadata with only defined values
         const metadata: SessionMetadata = {
-          source: 'cursor-composer'
+          source: 'cursor-composer',
         };
 
         if (composerData.workspace) {
@@ -1091,29 +1140,37 @@ export async function readCursorHistories(
           timestamp: conversationTimestamp,
           messages,
           conversationType: 'composer',
-          metadata
+          metadata,
         });
       }
 
-      console.log(`\n[Cursor Composer] ✓ Parsed ${conversations.length} composer conversations with messages`);
+      console.log(
+        `\n[Cursor Composer] ✓ Parsed ${conversations.length} composer conversations with messages`
+      );
       console.log(`[Cursor Composer] Total messages: ${totalMessagesExtracted}`);
       if (skippedByDate > 0) {
-        console.log(`[Cursor Composer] Skipped ${skippedByDate} old conversations (outside ${lookbackDays || 30}-day window)`);
+        console.log(
+          `[Cursor Composer] Skipped ${skippedByDate} old conversations (outside ${lookbackDays || 30}-day window)`
+        );
       }
       if (composerHeuristicTimestampsApplied > 0) {
-        console.log(`[Cursor Composer] 🕐 Applied heuristic timestamps to ${composerHeuristicTimestampsApplied} conversation(s) with new messages`);
+        console.log(
+          `[Cursor Composer] 🕐 Applied heuristic timestamps to ${composerHeuristicTimestampsApplied} conversation(s) with new messages`
+        );
       }
 
       if (format === 'ItemTable' && conversationsWithNoMessages > 0) {
-        console.log(`[Cursor] WARNING: New ItemTable format detected with ${conversationsWithNoMessages} conversations without messages`);
-        console.log(`[Cursor] The new format stores conversation metadata separately from messages`);
+        console.log(
+          `[Cursor] WARNING: New ItemTable format detected with ${conversationsWithNoMessages} conversations without messages`
+        );
+        console.log(
+          `[Cursor] The new format stores conversation metadata separately from messages`
+        );
         console.log(`[Cursor] Full conversation history may not be available in this format yet`);
       }
-
     } finally {
       db.close();
     }
-
   } catch (error) {
     console.error('[Cursor] Error reading Cursor histories:', error);
   }
@@ -1127,8 +1184,8 @@ export async function readCursorHistories(
     console.error('[Cursor Copilot] Error reading Copilot sessions:', error);
   }
 
-  const composerCount = conversations.filter(c => c.conversationType === 'composer').length;
-  const copilotCount = conversations.filter(c => c.conversationType === 'copilot').length;
+  const composerCount = conversations.filter((c) => c.conversationType === 'composer').length;
+  const copilotCount = conversations.filter((c) => c.conversationType === 'copilot').length;
 
   console.log(`\n[Cursor] ✓ Total conversations collected: ${conversations.length}`);
   console.log(`[Cursor]   • Composer: ${composerCount}`);
@@ -1140,23 +1197,21 @@ export async function readCursorHistories(
 /**
  * Convert Cursor conversations to the standard ChatHistory format
  */
-export function convertCursorToStandardFormat(
-  conversations: CursorConversation[]
-): ChatHistory[] {
-  return conversations.map(conv => ({
+export function convertCursorToStandardFormat(conversations: CursorConversation[]): ChatHistory[] {
+  return conversations.map((conv) => ({
     id: conv.id,
     timestamp: conv.timestamp,
     agent_type: 'cursor' as const,
-    messages: conv.messages.map(msg => ({
+    messages: conv.messages.map((msg) => ({
       display: msg.content,
       pastedContents: {},
       role: msg.role,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
     })),
     metadata: {
       ...conv.metadata,
-      source: 'cursor'
-    }
+      source: 'cursor',
+    },
   }));
 }
 
@@ -1198,7 +1253,7 @@ export class CursorLoader implements IDatabaseLoader {
 
   extractProjects(histories: ChatHistory[]): SharedProjectInfo[] {
     // Convert back to CursorConversation format for project extraction
-    const conversations: CursorConversation[] = histories.map(h => ({
+    const conversations: CursorConversation[] = histories.map((h) => ({
       id: h.id,
       timestamp: h.timestamp,
       messages: h.messages
@@ -1207,10 +1262,10 @@ export class CursorLoader implements IDatabaseLoader {
           id: `${h.id}-${i}`,
           role: (m.role || 'user') as 'user' | 'assistant',
           content: m.display,
-          timestamp: m.timestamp || h.timestamp
+          timestamp: m.timestamp || h.timestamp,
         })),
       conversationType: (h.metadata?.conversationType as 'composer' | 'copilot') || 'composer',
-      metadata: h.metadata
+      metadata: h.metadata,
     }));
     return extractProjectsFromConversations(conversations);
   }

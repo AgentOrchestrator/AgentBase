@@ -6,10 +6,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../database.types.js';
 import type {
   IProjectSharingRepository,
+  PermissionLevel,
+  ProjectOrganizationShare,
   ProjectShare,
   ProjectWorkspaceShare,
-  ProjectOrganizationShare,
-  PermissionLevel,
 } from '../../interfaces/repositories.js';
 
 export class SupabaseProjectSharingRepository implements IProjectSharingRepository {
@@ -66,7 +66,7 @@ export class SupabaseProjectSharingRepository implements IProjectSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToProjectShare(row));
+    return (data || []).map((row) => this.mapToProjectShare(row));
   }
 
   async getSharesForProject(projectId: string): Promise<ProjectShare[]> {
@@ -81,15 +81,12 @@ export class SupabaseProjectSharingRepository implements IProjectSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToProjectShare(row));
+    return (data || []).map((row) => this.mapToProjectShare(row));
   }
 
   async removeUserShare(shareId: string): Promise<boolean> {
     try {
-      const { error } = await this.client
-        .from('project_shares')
-        .delete()
-        .eq('id', shareId);
+      const { error } = await this.client.from('project_shares').delete().eq('id', shareId);
 
       if (error) {
         console.error('[ProjectSharingRepository] Error removing user share:', error.message);
@@ -103,10 +100,7 @@ export class SupabaseProjectSharingRepository implements IProjectSharingReposito
     }
   }
 
-  async updateUserSharePermission(
-    shareId: string,
-    permission: PermissionLevel
-  ): Promise<boolean> {
+  async updateUserSharePermission(shareId: string, permission: PermissionLevel): Promise<boolean> {
     try {
       const { error } = await this.client
         .from('project_shares')
@@ -173,7 +167,7 @@ export class SupabaseProjectSharingRepository implements IProjectSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToProjectWorkspaceShare(row));
+    return (data || []).map((row) => this.mapToProjectWorkspaceShare(row));
   }
 
   async removeWorkspaceShare(shareId: string): Promise<boolean> {
@@ -243,7 +237,7 @@ export class SupabaseProjectSharingRepository implements IProjectSharingReposito
       return [];
     }
 
-    return (data || []).map(row => this.mapToProjectOrganizationShare(row));
+    return (data || []).map((row) => this.mapToProjectOrganizationShare(row));
   }
 
   async removeOrganizationShare(shareId: string): Promise<boolean> {

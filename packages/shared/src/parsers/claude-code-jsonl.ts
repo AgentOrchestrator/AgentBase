@@ -7,11 +7,16 @@
  * - Simple format (ChatMessage) for daemon with display text only
  */
 
-import type { CodingAgentMessage } from '../types.js';
 import type { ChatMessage } from '../loaders/types.js';
 import { normalizeTimestamp } from '../loaders/utilities.js';
+import type { CodingAgentMessage } from '../types.js';
 import { parseContentBlocks } from './content-blocks.js';
-import type { ClaudeCodeJsonlLine, JsonlParseOptions, ParsedJsonlLine, ParsedChatLine } from './types.js';
+import type {
+  ClaudeCodeJsonlLine,
+  JsonlParseOptions,
+  ParsedChatLine,
+  ParsedJsonlLine,
+} from './types.js';
 
 // =============================================================================
 // ID Generation

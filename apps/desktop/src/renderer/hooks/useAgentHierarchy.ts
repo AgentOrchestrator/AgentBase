@@ -8,8 +8,8 @@
  * providing a clean separation of concerns.
  */
 
+import type { Edge, Node } from '@xyflow/react';
 import { useMemo } from 'react';
-import type { Node, Edge } from '@xyflow/react';
 import type { AgentNodeData } from '../types/agent-node';
 
 // =============================================================================
@@ -61,11 +61,7 @@ function getFolderName(path: string): string {
 /**
  * Finds workspace path from a connected workspace node
  */
-function findWorkspacePathFromEdges(
-  nodeId: string,
-  nodes: Node[],
-  edges: Edge[]
-): string | null {
+function findWorkspacePathFromEdges(nodeId: string, nodes: Node[], edges: Edge[]): string | null {
   const connectedEdge = edges.find((e) => e.target === nodeId || e.source === nodeId);
   if (!connectedEdge) return null;
 

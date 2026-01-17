@@ -169,10 +169,7 @@ export interface ILinearStore {
   /**
    * Set a filter value
    */
-  setFilter<K extends keyof LinearFilterState>(
-    filterKey: K,
-    value: LinearFilterState[K]
-  ): void;
+  setFilter<K extends keyof LinearFilterState>(filterKey: K, value: LinearFilterState[K]): void;
 
   /**
    * Reset all filters to defaults

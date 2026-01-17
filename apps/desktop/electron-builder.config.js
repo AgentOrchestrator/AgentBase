@@ -8,7 +8,7 @@ module.exports = {
 
   directories: {
     output: 'release',
-    buildResources: 'build-resources'
+    buildResources: 'build-resources',
   },
 
   // Include app code and node_modules
@@ -17,7 +17,7 @@ module.exports = {
     {
       from: 'src/renderer/dist',
       to: 'dist/renderer',
-      filter: ['**/*']
+      filter: ['**/*'],
     },
     'package.json',
     // Explicitly include node_modules with from/to to bypass workspace detection issues
@@ -31,13 +31,13 @@ module.exports = {
         '!**/{test,tests,__tests__}/**',
         '!**/*.md',
         '!**/LICENSE*',
-        '!**/.git/**'
-      ]
-    }
+        '!**/.git/**',
+      ],
+    },
   ],
 
   extraMetadata: {
-    main: 'dist/main/src/main/main.js'
+    main: 'dist/main/src/main/main.js',
   },
 
   // Disable npm rebuild since we handle it in prepare-build.js
@@ -49,20 +49,21 @@ module.exports = {
     '**/node_modules/node-pty/**/*',
     '**/node_modules/sqlite3/**/*',
     '**/node_modules/keytar/**/*',
-    '**/*.node'
+    '**/*.node',
   ],
 
   mac: {
     target: ['dmg'],
     category: 'public.app-category.developer-tools',
-    identity: null
+    identity: null,
   },
 
   dmg: {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: electron-builder template syntax
     title: '${productName} ${version}',
     contents: [
       { x: 130, y: 220 },
-      { x: 410, y: 220, type: 'link', path: '/Applications' }
-    ]
-  }
+      { x: 410, y: 220, type: 'link', path: '/Applications' },
+    ],
+  },
 };

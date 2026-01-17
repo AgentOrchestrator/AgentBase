@@ -5,22 +5,22 @@
 
 // Auth interfaces
 export type {
-  AuthTokens,
-  AuthSession,
-  DeviceAuthSession,
+  AuthContext,
   AuthProviderCapabilities,
   AuthProviderInfo,
-  TokenValidationResult,
-  IAuthProvider,
-  AuthContext,
+  AuthSession,
+  AuthTokens,
   CreateAuthContext,
+  DeviceAuthSession,
+  IAuthProvider,
+  TokenValidationResult,
 } from './auth.js';
 
 // Auth state store interfaces (local persistence)
 export type {
-  PersistedAuthState,
   DeviceIdentity,
   IAuthStateStore,
+  PersistedAuthState,
 } from './auth-state-store.js';
 
 // Authenticated client factory interfaces
@@ -31,17 +31,17 @@ export type {
 
 // Repository interfaces and domain types
 export type {
+  ApiKeyRecord,
+  ChatHistoryInput,
+  ChatHistoryRecord,
+  IApiKeyRepository,
+  IChatHistoryRepository,
+  // Repository interfaces
+  IProjectRepository,
+  IRepositoryFactory,
+  IUserPreferencesRepository,
   // Domain types
   Project,
   ProjectInput,
-  ChatHistoryRecord,
-  ChatHistoryInput,
   UserPreferences,
-  ApiKeyRecord,
-  // Repository interfaces
-  IProjectRepository,
-  IChatHistoryRepository,
-  IApiKeyRepository,
-  IUserPreferencesRepository,
-  IRepositoryFactory,
 } from './repositories.js';

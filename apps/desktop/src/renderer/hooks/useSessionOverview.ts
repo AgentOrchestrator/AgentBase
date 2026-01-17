@@ -6,15 +6,15 @@
  * Replaces individual sync mechanisms (useAutoTitleFromSession, direct status subscriptions).
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { CodingAgentType, CodingAgentMessage } from '@agent-orchestrator/shared';
+import type { CodingAgentMessage, CodingAgentType } from '@agent-orchestrator/shared';
 import { extractLatestTodoList, toTodoListProgress } from '@agent-orchestrator/shared';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CodingAgentStatusInfo } from '../../../types/coding-agent-status';
 import type { IAgentService } from '../context/node-services/types';
-import type { AgentProgress } from '../types/agent-node';
-import { useSessionFileWatcher } from './useSessionFileWatcher';
 import { createStatusService } from '../services/status';
+import type { AgentProgress } from '../types/agent-node';
 import { getConversationFilePath } from '../utils/getConversationFilePath';
+import { useSessionFileWatcher } from './useSessionFileWatcher';
 
 // =============================================================================
 // Types
@@ -75,9 +75,7 @@ function extractTitle(messages: CodingAgentMessage[]): string | null {
   if (!firstUserMessage?.content) return null;
 
   const content = firstUserMessage.content.trim();
-  return content.length > MAX_TITLE_LENGTH
-    ? content.slice(0, MAX_TITLE_LENGTH) + '...'
-    : content;
+  return content.length > MAX_TITLE_LENGTH ? `${content.slice(0, MAX_TITLE_LENGTH)}...` : content;
 }
 
 /**
@@ -219,7 +217,9 @@ export function useSessionOverview({
       // Extract todo progress from raw JSONL file
       try {
         const filePath = getConversationFilePath(currentSessionId, currentWorkspacePath);
-        const fileAPI = (window as unknown as { fileAPI?: { readFile: (path: string) => Promise<string> } }).fileAPI;
+        const fileAPI = (
+          window as unknown as { fileAPI?: { readFile: (path: string) => Promise<string> } }
+        ).fileAPI;
         if (fileAPI) {
           const content = await fileAPI.readFile(filePath);
           if (content) {
@@ -304,7 +304,10 @@ export function useSessionOverview({
             return;
           }
         } catch (cacheError) {
-          console.warn('[useSessionOverview] Cache read failed, generating new summary:', cacheError);
+          console.warn(
+            '[useSessionOverview] Cache read failed, generating new summary:',
+            cacheError
+          );
         }
       }
 
@@ -318,7 +321,10 @@ export function useSessionOverview({
       if (USE_MOCK_SUMMARY) {
         // Mock summary for testing cache behavior
         cleanSummary = `[MOCK] Session summary for testing (msgs: ${messageCount})`;
-        console.log('[useSessionOverview] MOCK: Generated fake summary for session:', currentSessionId);
+        console.log(
+          '[useSessionOverview] MOCK: Generated fake summary for session:',
+          currentSessionId
+        );
       } else {
         // Build prompt from first 2 user messages
         const prompt = buildSummaryPrompt(userMessages);
@@ -339,10 +345,7 @@ export function useSessionOverview({
         }
 
         // Clean up the summary - take first line, trim whitespace
-        cleanSummary = response.content
-          .split('\n')[0]
-          .trim()
-          .slice(0, 100); // Safety limit
+        cleanSummary = response.content.split('\n')[0].trim().slice(0, 100); // Safety limit
       }
 
       setSummary(cleanSummary);
@@ -351,7 +354,12 @@ export function useSessionOverview({
       // Save to cache
       if (cacheAPI) {
         try {
-          await cacheAPI.saveSummary(currentSessionId, currentWorkspacePath, cleanSummary, messageCount);
+          await cacheAPI.saveSummary(
+            currentSessionId,
+            currentWorkspacePath,
+            cleanSummary,
+            messageCount
+          );
           console.log('[useSessionOverview] Summary cached:', cleanSummary);
         } catch (cacheError) {
           console.warn('[useSessionOverview] Failed to cache summary:', cacheError);
@@ -383,11 +391,9 @@ export function useSessionOverview({
     void statusService.refreshLastActivity();
 
     // Subscribe to status changes
-    const unsubscribe = statusService.onStatusChange(
-      (_agentId, _oldStatus, newStatus) => {
-        setStatus(newStatus);
-      }
-    );
+    const unsubscribe = statusService.onStatusChange((_agentId, _oldStatus, newStatus) => {
+      setStatus(newStatus);
+    });
 
     return unsubscribe;
   }, [statusService, agentService.agentId, enabled]);

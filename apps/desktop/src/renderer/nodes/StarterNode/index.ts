@@ -5,5 +5,5 @@
  */
 
 export { default } from './StarterNode';
-export { StarterNodePresentation } from './StarterNodePresentation';
 export type { StarterNodePresentationProps } from './StarterNodePresentation';
+export { StarterNodePresentation } from './StarterNodePresentation';

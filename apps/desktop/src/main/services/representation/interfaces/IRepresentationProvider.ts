@@ -1,10 +1,10 @@
 import type {
-  RepresentationResult,
-  RepresentationError,
-  RepresentationType,
   RepresentationCapabilities,
+  RepresentationError,
   RepresentationInput,
   RepresentationOutput,
+  RepresentationResult,
+  RepresentationType,
 } from '../types';
 
 /**
@@ -56,7 +56,9 @@ export interface IRepresentationProvider<
    * @param input - The transformation input
    * @returns The transformed representation or an error
    */
-  transform(input: RepresentationInput): Promise<RepresentationResult<TOutput, RepresentationError>>;
+  transform(
+    input: RepresentationInput
+  ): Promise<RepresentationResult<TOutput, RepresentationError>>;
 
   /**
    * Dispose of resources

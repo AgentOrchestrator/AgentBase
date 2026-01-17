@@ -5,12 +5,8 @@
  * Enables compile-time checking that nodes only access appropriate services.
  */
 
-import type {
-  ITerminalService,
-  IWorkspaceService,
-  IAgentService,
-} from './types';
 import type { IConversationService } from './IConversationService';
+import type { IAgentService, ITerminalService, IWorkspaceService } from './types';
 
 // =============================================================================
 // Service Bundles (Discriminated Unions)
@@ -66,27 +62,21 @@ export type NodeServices =
 /**
  * Type guard for TerminalNodeServices
  */
-export function isTerminalNodeServices(
-  services: NodeServices
-): services is TerminalNodeServices {
+export function isTerminalNodeServices(services: NodeServices): services is TerminalNodeServices {
   return services.type === 'terminal';
 }
 
 /**
  * Type guard for AgentNodeServices
  */
-export function isAgentNodeServices(
-  services: NodeServices
-): services is AgentNodeServices {
+export function isAgentNodeServices(services: NodeServices): services is AgentNodeServices {
   return services.type === 'agent';
 }
 
 /**
  * Type guard for CustomNodeServices
  */
-export function isCustomNodeServices(
-  services: NodeServices
-): services is CustomNodeServices {
+export function isCustomNodeServices(services: NodeServices): services is CustomNodeServices {
   return services.type === 'custom';
 }
 
@@ -118,18 +108,13 @@ export function hasTerminalService(
 export function hasWorkspaceService(
   services: NodeServices
 ): services is TerminalNodeServices | AgentNodeServices {
-  return (
-    services.type === 'terminal' ||
-    services.type === 'agent'
-  );
+  return services.type === 'terminal' || services.type === 'agent';
 }
 
 /**
  * Check if services bundle has agent service
  */
-export function hasAgentService(
-  services: NodeServices
-): services is AgentNodeServices {
+export function hasAgentService(services: NodeServices): services is AgentNodeServices {
   return services.type === 'agent';
 }
 

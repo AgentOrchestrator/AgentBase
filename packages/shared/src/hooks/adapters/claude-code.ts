@@ -12,16 +12,17 @@
 
 // Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
 const randomUUID = (): string => globalThis.crypto.randomUUID();
+
 import type { AgentType } from '../../loaders/types.js';
 import type {
   AgentEvent,
   AgentEventType,
-  SessionPayload,
-  PermissionPayload,
-  ToolPayload,
-  DelegationPayload,
   ContextPayload,
+  DelegationPayload,
+  PermissionPayload,
+  SessionPayload,
   SystemPayload,
+  ToolPayload,
   UserInputPayload,
 } from '../types.js';
 import type { IAgentAdapter } from './base.js';

@@ -1,9 +1,4 @@
-import type {
-  Result,
-  AgentError,
-  SessionInfo,
-  ForkOptions,
-} from '../types';
+import type { AgentError, ForkOptions, Result, SessionInfo } from '../types';
 
 /**
  * Interface for forking sessions

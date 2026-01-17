@@ -13,7 +13,7 @@
  * following the boundary abstraction architecture.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { AgentNodeView } from '../../types/agent-node';
 import type { UseAgentViewModeInput, UseAgentViewModeReturn } from './types';
 
@@ -58,7 +58,9 @@ export function useAgentViewMode({
         // Terminal might still be running if user went overview→terminal→overview→chat
         // Need to exit REPL and destroy terminal to be safe
         if (previousView === 'overview' && newView === 'chat' && terminalService.isRunning()) {
-          console.log('[useAgentViewMode] Exiting REPL and destroying terminal (was running) for chat view');
+          console.log(
+            '[useAgentViewMode] Exiting REPL and destroying terminal (was running) for chat view'
+          );
         }
 
         // Update state
@@ -69,7 +71,7 @@ export function useAgentViewMode({
         setIsTransitioning(false);
       }
     },
-    [terminalService, agentService, onViewChange]
+    [terminalService, onViewChange]
   );
 
   return {

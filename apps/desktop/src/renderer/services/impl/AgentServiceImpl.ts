@@ -17,17 +17,17 @@ import type {
 } from '../../../../types/coding-agent-status';
 import type { IAgentService, ITerminalService } from '../../context/node-services';
 import type {
-  ICodingAgentAdapter,
+  AgentAdapterEventType,
+  AgentError,
+  AgentEventHandler,
+  CodingAgentSessionContent,
   GenerateResponse,
+  ICodingAgentAdapter,
+  MessageFilterOptions,
+  Result,
+  SessionInfo,
   StreamCallback,
   StructuredStreamCallback,
-  SessionInfo,
-  CodingAgentSessionContent,
-  MessageFilterOptions,
-  AgentAdapterEventType,
-  AgentEventHandler,
-  Result,
-  AgentError,
 } from '../../context/node-services/coding-agent-adapter';
 
 /**
@@ -184,7 +184,7 @@ export class AgentServiceImpl implements IAgentService {
         state,
       });
 
-      if (state && state.agentRunning) {
+      if (state?.agentRunning) {
         console.log('[AgentService] Restoring isRunning=true from main process state', {
           agentId: this.agentId,
           terminalId: this.terminalService.terminalId,
@@ -212,15 +212,12 @@ export class AgentServiceImpl implements IAgentService {
     }
 
     try {
-      await window.terminalSessionAPI.setTerminalSessionState(
-        this.terminalService.terminalId,
-        {
-          agentRunning: true,
-          agentType: this.agentType,
-          sessionId,
-          startedAt: Date.now(),
-        }
-      );
+      await window.terminalSessionAPI.setTerminalSessionState(this.terminalService.terminalId, {
+        agentRunning: true,
+        agentType: this.agentType,
+        sessionId,
+        startedAt: Date.now(),
+      });
     } catch (error) {
       console.warn('[AgentService] Failed to persist session state', error);
     }
@@ -235,9 +232,7 @@ export class AgentServiceImpl implements IAgentService {
     }
 
     try {
-      await window.terminalSessionAPI.clearTerminalSessionState(
-        this.terminalService.terminalId
-      );
+      await window.terminalSessionAPI.clearTerminalSessionState(this.terminalService.terminalId);
     } catch (error) {
       console.warn('[AgentService] Failed to clear session state', error);
     }
@@ -549,7 +544,11 @@ export class AgentServiceImpl implements IAgentService {
    * @param sessionId - Session ID (required)
    * @throws Error if adapter fails
    */
-  async sendMessage(prompt: string, workspacePath: string, sessionId: string): Promise<GenerateResponse> {
+  async sendMessage(
+    prompt: string,
+    workspacePath: string,
+    sessionId: string
+  ): Promise<GenerateResponse> {
     const adapter = this.requireAdapter();
 
     this.updateStatus('running');
@@ -700,7 +699,7 @@ export class AgentServiceImpl implements IAgentService {
     console.log('[AgentServiceImpl] getSession called', {
       sessionId,
       workspacePath,
-      filter
+      filter,
     });
 
     const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);

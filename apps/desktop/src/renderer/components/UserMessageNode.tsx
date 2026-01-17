@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, type NodeProps, Position } from '@xyflow/react';
+import { useEffect, useRef } from 'react';
 import type { UserMessageGroup } from '../types/conversation';
 import './UserMessageNode.css';
 
@@ -32,18 +32,15 @@ function UserMessageNode({ data, id: _id, selected }: NodeProps) {
   return (
     <div className={`user-message-node ${selected ? 'selected' : ''}`}>
       <Handle type="target" position={Position.Top} />
-      
+
       <div className="user-message-header">
         <span className="user-message-label">User</span>
       </div>
-      
-      <div 
-        ref={contentRef}
-        className="user-message-content"
-      >
+
+      <div ref={contentRef} className="user-message-content">
         {messageGroup.text}
       </div>
-      
+
       <Handle type="source" position={Position.Bottom} />
     </div>
   );

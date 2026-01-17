@@ -2,12 +2,12 @@
  * SQLite implementation of IPinnedConversationRepository
  */
 
+import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type {
   IPinnedConversationRepository,
   PinnedConversation,
 } from '../../../interfaces/repositories.js';
-import { randomUUID } from 'crypto';
 
 interface PinnedConversationRow {
   id: string;
@@ -21,7 +21,7 @@ interface PinnedConversationRow {
 export class SQLitePinnedConversationRepository implements IPinnedConversationRepository {
   constructor(
     private db: Database.Database,
-    private userId: string
+    _userId: string
   ) {}
 
   async getPinnedConversations(userId: string): Promise<PinnedConversation[]> {
@@ -86,10 +86,7 @@ export class SQLitePinnedConversationRepository implements IPinnedConversationRe
     return !!row;
   }
 
-  private findByConversationId(
-    userId: string,
-    conversationId: string
-  ): PinnedConversation | null {
+  private findByConversationId(userId: string, conversationId: string): PinnedConversation | null {
     const stmt = this.db.prepare(`
       SELECT * FROM pinned_conversations
       WHERE user_id = ? AND conversation_id = ?

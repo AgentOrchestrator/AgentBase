@@ -3,16 +3,16 @@
 // Shared types for Electron main/renderer process communication
 // =============================================================================
 
+import type { AgentType } from './loaders/types.js';
 // Import domain types used in this file's interfaces
 // These types are exported from './types/index.js' via the main index
 import type { CodingAgentState } from './types/coding-agent.js';
+import type { AddWorkspaceOptions, RecentWorkspace } from './types/workspace.js';
 import type {
   WorktreeInfo,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
 } from './types/worktree.js';
-import type { AgentType } from './loaders/types.js';
-import type { RecentWorkspace, AddWorkspaceOptions } from './types/workspace.js';
 
 /**
  * Coding agent types - alias for AgentType from loaders.
@@ -32,9 +32,7 @@ export interface ElectronAPI {
   /** Create a new terminal instance */
   createTerminal: (terminalId: string) => void;
   /** Subscribe to terminal output data */
-  onTerminalData: (
-    callback: (data: { terminalId: string; data: string }) => void
-  ) => void;
+  onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
   /** Subscribe to terminal exit events */
   onTerminalExit: (
     callback: (data: { terminalId: string; code: number; signal?: number }) => void
@@ -113,14 +111,7 @@ export interface CanvasAPI {
 /**
  * Supported editor applications for opening directories.
  */
-export type EditorApp =
-  | 'vscode'
-  | 'cursor'
-  | 'zed'
-  | 'sublime'
-  | 'atom'
-  | 'webstorm'
-  | 'finder';
+export type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
 
 /**
  * Shell API for system-level operations.
@@ -219,9 +210,7 @@ export interface SessionWatcherAPI {
   /** Stop watching session files for an agent type */
   unwatch: (agentType: CodingAgentType) => Promise<void>;
   /** Subscribe to session file change events. Returns cleanup function. */
-  onSessionFileChanged: (
-    callback: (event: SessionFileChangeEvent) => void
-  ) => () => void;
+  onSessionFileChanged: (callback: (event: SessionFileChangeEvent) => void) => () => void;
 }
 
 // =============================================================================

@@ -33,7 +33,4 @@ export function createDefaultAdapterRegistry(): AdapterRegistry {
 /**
  * Default adapter instances
  */
-export const defaultAdapters = [
-  new ClaudeCodeAdapter(),
-  new CodexAdapter(),
-];
+export const defaultAdapters = [new ClaudeCodeAdapter(), new CodexAdapter()];

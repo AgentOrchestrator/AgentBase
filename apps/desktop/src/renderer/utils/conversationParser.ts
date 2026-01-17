@@ -1,7 +1,7 @@
 import type {
-  ConversationEntry,
   AssistantMessageEntry,
   AssistantMessageGroup,
+  ConversationEntry,
   MessageGroup,
 } from '../types/conversation';
 
@@ -30,9 +30,7 @@ export function parseConversationFile(jsonlContent: string): ConversationEntry[]
  * Assistant messages are grouped together until the next user message
  * User messages with only tool_result content are treated as part of the assistant flow
  */
-export function groupConversationMessages(
-  entries: ConversationEntry[]
-): MessageGroup[] {
+export function groupConversationMessages(entries: ConversationEntry[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   let currentAssistantGroup: AssistantMessageEntry[] | null = null;
 
@@ -50,7 +48,7 @@ export function groupConversationMessages(
       const isToolResult = contentArray.some(
         (c) => c && typeof c === 'object' && 'type' in c && c.type === 'tool_result'
       );
-      
+
       // If it's a tool result, skip it (it's part of the assistant's tool use flow)
       if (isToolResult) {
         continue;
@@ -127,11 +125,11 @@ export function groupConversationMessages(
   // Debug: Log grouping results
   console.log('[ConversationParser] Grouped messages:', {
     totalGroups: groups.length,
-    userGroups: groups.filter(g => g.type === 'user').length,
-    assistantGroups: groups.filter(g => g.type === 'assistant').length,
+    userGroups: groups.filter((g) => g.type === 'user').length,
+    assistantGroups: groups.filter((g) => g.type === 'assistant').length,
     assistantGroupSizes: groups
-      .filter(g => g.type === 'assistant')
-      .map(g => (g as AssistantMessageGroup).entries.length)
+      .filter((g) => g.type === 'assistant')
+      .map((g) => (g as AssistantMessageGroup).entries.length),
   });
 
   return groups;

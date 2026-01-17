@@ -5,10 +5,10 @@
  * when SDK hook events are received.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { HookInput } from '@anthropic-ai/claude-agent-sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgentEvent, EventRegistry, SDKHookBridge } from '../index.js';
 import { createEventRegistry, createSDKHookBridge, SDK_HOOK_EVENTS } from '../index.js';
-import type { EventRegistry, SDKHookBridge, AgentEvent, EventResult } from '../index.js';
 
 // Mock SDK hook input base - cast to HookInput for test flexibility
 const createMockInput = (hookEventName: string, overrides = {}): HookInput =>
@@ -81,7 +81,7 @@ describe('SDK Hook Bridge', () => {
         tool_input: { command: 'ls -la' },
       });
 
-      await hookCallback!(input, 'tool-use-123', createMockContext());
+      await hookCallback?.(input, 'tool-use-123', createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -105,7 +105,7 @@ describe('SDK Hook Bridge', () => {
         tool_response: 'file contents...',
       });
 
-      await hookCallback!(input, 'tool-use-456', createMockContext());
+      await hookCallback?.(input, 'tool-use-456', createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -128,7 +128,7 @@ describe('SDK Hook Bridge', () => {
         error: 'Command not found',
       });
 
-      await hookCallback!(input, 'tool-use-789', createMockContext());
+      await hookCallback?.(input, 'tool-use-789', createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -149,7 +149,7 @@ describe('SDK Hook Bridge', () => {
         source: 'cli',
       });
 
-      await hookCallback!(input, undefined, createMockContext());
+      await hookCallback?.(input, undefined, createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -166,7 +166,7 @@ describe('SDK Hook Bridge', () => {
         reason: 'completed',
       });
 
-      await hookCallback!(input, undefined, createMockContext());
+      await hookCallback?.(input, undefined, createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -185,7 +185,7 @@ describe('SDK Hook Bridge', () => {
         prompt: 'Hello, can you help me?',
       });
 
-      await hookCallback!(input, undefined, createMockContext());
+      await hookCallback?.(input, undefined, createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -205,7 +205,7 @@ describe('SDK Hook Bridge', () => {
         tool_input: { command: 'rm -rf temp/' },
       });
 
-      await hookCallback!(input, 'tool-use-perm', createMockContext());
+      await hookCallback?.(input, 'tool-use-perm', createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -226,7 +226,7 @@ describe('SDK Hook Bridge', () => {
         agent_type: 'Explore',
       });
 
-      await hookCallback!(input, undefined, createMockContext());
+      await hookCallback?.(input, undefined, createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -247,7 +247,7 @@ describe('SDK Hook Bridge', () => {
         message: 'Operation completed successfully',
       });
 
-      await hookCallback!(input, undefined, createMockContext());
+      await hookCallback?.(input, undefined, createMockContext());
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as AgentEvent;
@@ -273,7 +273,7 @@ describe('SDK Hook Bridge', () => {
         tool_input: { command: 'rm -rf /' },
       });
 
-      const result = await hookCallback!(input, 'tool-use-danger', createMockContext());
+      const result = await hookCallback?.(input, 'tool-use-danger', createMockContext());
 
       expect(result).toMatchObject({
         hookSpecificOutput: {
@@ -294,7 +294,7 @@ describe('SDK Hook Bridge', () => {
       const hookCallback = bridge.hooks.SessionStart?.[0]?.hooks?.[0];
       const input = createMockInput('SessionStart');
 
-      const result = await hookCallback!(input, undefined, createMockContext());
+      const result = await hookCallback?.(input, undefined, createMockContext());
 
       expect(result).toMatchObject({
         continue: false,
@@ -312,7 +312,7 @@ describe('SDK Hook Bridge', () => {
         tool_input: { file_path: '/safe/file.txt' },
       });
 
-      const result = await hookCallback!(input, 'tool-use-safe', createMockContext());
+      const result = await hookCallback?.(input, 'tool-use-safe', createMockContext());
 
       expect(result).toEqual({});
     });
@@ -325,7 +325,7 @@ describe('SDK Hook Bridge', () => {
 
       // Fire tool:begin
       const beginCallback = bridge.hooks.PreToolUse?.[0]?.hooks?.[0];
-      await beginCallback!(
+      await beginCallback?.(
         createMockInput('PreToolUse', { tool_name: 'Test' }),
         'id1',
         createMockContext()
@@ -333,7 +333,7 @@ describe('SDK Hook Bridge', () => {
 
       // Fire tool:complete
       const completeCallback = bridge.hooks.PostToolUse?.[0]?.hooks?.[0];
-      await completeCallback!(
+      await completeCallback?.(
         createMockInput('PostToolUse', { tool_name: 'Test' }),
         'id2',
         createMockContext()
@@ -341,7 +341,7 @@ describe('SDK Hook Bridge', () => {
 
       // Fire tool:error
       const errorCallback = bridge.hooks.PostToolUseFailure?.[0]?.hooks?.[0];
-      await errorCallback!(
+      await errorCallback?.(
         createMockInput('PostToolUseFailure', { tool_name: 'Test', error: 'fail' }),
         'id3',
         createMockContext()
@@ -357,17 +357,17 @@ describe('SDK Hook Bridge', () => {
       registry.onAll(globalHandler);
 
       // Fire various events
-      await bridge.hooks.PreToolUse?.[0]?.hooks?.[0]!(
+      await bridge.hooks.PreToolUse?.[0]?.hooks?.[0]?.(
         createMockInput('PreToolUse', { tool_name: 'Test' }),
         'id1',
         createMockContext()
       );
-      await bridge.hooks.SessionStart?.[0]?.hooks?.[0]!(
+      await bridge.hooks.SessionStart?.[0]?.hooks?.[0]?.(
         createMockInput('SessionStart'),
         undefined,
         createMockContext()
       );
-      await bridge.hooks.Notification?.[0]?.hooks?.[0]!(
+      await bridge.hooks.Notification?.[0]?.hooks?.[0]?.(
         createMockInput('Notification', { message: 'test' }),
         undefined,
         createMockContext()

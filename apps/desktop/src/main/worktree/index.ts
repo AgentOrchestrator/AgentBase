@@ -1,22 +1,21 @@
 // Public API
-export { IWorktreeManager } from './IWorktreeManager';
-export { WorktreeManager } from './WorktreeManager';
-export { WorktreeManagerFactory } from './WorktreeManagerFactory';
-export { registerWorktreeIpcHandlers } from './ipc';
 
 // Types (re-export from types folder)
 export type {
-  WorktreeStatus,
   WorktreeInfo,
+  WorktreeManagerConfig,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
-  WorktreeManagerConfig,
   WorktreeRow,
+  WorktreeStatus,
 } from '../types/worktree';
-
+export type { IFilesystem } from './dependencies/IFilesystem';
 // Dependency interfaces (for testing/mocking)
 export type { IGitExecutor } from './dependencies/IGitExecutor';
-export type { IFilesystem } from './dependencies/IFilesystem';
-export type { IWorktreeStore } from './dependencies/IWorktreeStore';
 export type { IIdGenerator } from './dependencies/IIdGenerator';
 export type { ILogger } from './dependencies/ILogger';
+export type { IWorktreeStore } from './dependencies/IWorktreeStore';
+export { IWorktreeManager } from './IWorktreeManager';
+export { registerWorktreeIpcHandlers } from './ipc';
+export { WorktreeManager } from './WorktreeManager';
+export { WorktreeManagerFactory } from './WorktreeManagerFactory';

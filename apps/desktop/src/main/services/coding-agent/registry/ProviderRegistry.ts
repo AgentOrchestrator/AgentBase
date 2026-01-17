@@ -21,15 +21,15 @@
 
 import type { IChatHistoryProvider } from '../interfaces';
 import type {
-  CodingAgentType,
-  SessionSummary,
+  AgentError,
   CodingAgentSessionContent,
-  SessionFilterOptions,
+  CodingAgentType,
   MessageFilterOptions,
   Result,
-  AgentError,
+  SessionFilterOptions,
+  SessionSummary,
 } from '../types';
-import { ok, err, agentError, AgentErrorCode } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
 
 /**
  * Extended filter options that include agent selection
@@ -294,12 +294,10 @@ export class ProviderRegistry {
       dataPaths: string[];
     }>;
   } {
-    const providers = Array.from(this.providers.entries()).map(
-      ([agentType, provider]) => ({
-        agentType,
-        dataPaths: provider.getDataPaths(),
-      })
-    );
+    const providers = Array.from(this.providers.entries()).map(([agentType, provider]) => ({
+      agentType,
+      dataPaths: provider.getDataPaths(),
+    }));
 
     return {
       registered: this.providers.size,

@@ -1,6 +1,6 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { IGitExecutor } from './IGitExecutor';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import type { IGitExecutor } from './IGitExecutor';
 
 const execFileAsync = promisify(execFile);
 

@@ -1,7 +1,7 @@
-import type { IMinimalCodingAgent } from '../interfaces';
-import type { Result, AgentError, CodingAgentType, AgentConfig } from '../types';
-import { AgentErrorCode, ok, err, agentError } from '../types';
 import { ClaudeCodeAgent } from '../implementations';
+import type { IMinimalCodingAgent } from '../interfaces';
+import type { AgentConfig, AgentError, CodingAgentType, Result } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
 
 /**
  * Options for getAgent
@@ -50,9 +50,10 @@ export class CodingAgentFactory {
     options?: GetAgentOptions | Partial<Omit<AgentConfig, 'type'>>
   ): Promise<Result<IMinimalCodingAgent, AgentError>> {
     // Normalize options - support both old config-only signature and new options object
-    const normalizedOptions: GetAgentOptions = options && 'skipCliVerification' in options
-      ? options as GetAgentOptions
-      : { config: options as Partial<Omit<AgentConfig, 'type'>> | undefined };
+    const normalizedOptions: GetAgentOptions =
+      options && 'skipCliVerification' in options
+        ? (options as GetAgentOptions)
+        : { config: options as Partial<Omit<AgentConfig, 'type'>> | undefined };
 
     const { config, skipCliVerification } = normalizedOptions;
 
@@ -71,16 +72,13 @@ export class CodingAgentFactory {
 
         default:
           return err(
-            agentError(
-              AgentErrorCode.AGENT_NOT_AVAILABLE,
-              `Unsupported agent type: ${type}`
-            )
+            agentError(AgentErrorCode.AGENT_NOT_AVAILABLE, `Unsupported agent type: ${type}`)
           );
       }
     }
 
     // Return cached instance if available
-    const existing = this.instances.get(type);
+    const existing = CodingAgentFactory.instances.get(type);
     if (existing) {
       return ok(existing);
     }
@@ -108,10 +106,7 @@ export class CodingAgentFactory {
 
       default:
         return err(
-          agentError(
-            AgentErrorCode.AGENT_NOT_AVAILABLE,
-            `Unsupported agent type: ${type}`
-          )
+          agentError(AgentErrorCode.AGENT_NOT_AVAILABLE, `Unsupported agent type: ${type}`)
         );
     }
 
@@ -122,7 +117,7 @@ export class CodingAgentFactory {
     }
 
     // Cache and return
-    this.instances.set(type, agent);
+    CodingAgentFactory.instances.set(type, agent);
     return ok(agent);
   }
 
@@ -136,7 +131,7 @@ export class CodingAgentFactory {
     const available: CodingAgentType[] = [];
 
     for (const type of potentialAgents) {
-      const result = await this.getAgent(type);
+      const result = await CodingAgentFactory.getAgent(type);
       if (result.success) {
         available.push(type);
       }
@@ -149,7 +144,7 @@ export class CodingAgentFactory {
    * Check if a specific agent type is available
    */
   static async isAgentAvailable(type: CodingAgentType): Promise<boolean> {
-    const result = await this.getAgent(type);
+    const result = await CodingAgentFactory.getAgent(type);
     return result.success;
   }
 
@@ -157,10 +152,10 @@ export class CodingAgentFactory {
    * Dispose a specific agent
    */
   static async disposeAgent(type: CodingAgentType): Promise<void> {
-    const agent = this.instances.get(type);
+    const agent = CodingAgentFactory.instances.get(type);
     if (agent) {
       await agent.dispose();
-      this.instances.delete(type);
+      CodingAgentFactory.instances.delete(type);
     }
   }
 
@@ -168,17 +163,17 @@ export class CodingAgentFactory {
    * Dispose all cached agents
    */
   static async disposeAll(): Promise<void> {
-    const disposePromises = Array.from(this.instances.values()).map((agent) =>
+    const disposePromises = Array.from(CodingAgentFactory.instances.values()).map((agent) =>
       agent.dispose()
     );
     await Promise.all(disposePromises);
-    this.instances.clear();
+    CodingAgentFactory.instances.clear();
   }
 
   /**
    * Reset the factory (for testing)
    */
   static async reset(): Promise<void> {
-    await this.disposeAll();
+    await CodingAgentFactory.disposeAll();
   }
 }

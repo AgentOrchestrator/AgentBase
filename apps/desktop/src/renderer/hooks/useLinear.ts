@@ -6,16 +6,16 @@
  * Handles initialization from localStorage and fetch triggers.
  */
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { linearStore } from '../stores';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { linearService } from '../services/LinearService';
+import { linearStore } from '../stores';
 import type {
-  LinearState,
   LinearFilterState,
   LinearIssue,
   LinearProject,
-  MilestoneOption,
+  LinearState,
   LinearWorkflowState,
+  MilestoneOption,
 } from '../stores/ILinearStore';
 
 // =============================================================================
@@ -52,16 +52,16 @@ export type UseLinearReturn = {
   // Actions
   connect: (apiKey: string) => void;
   disconnect: () => void;
-  setFilter: <K extends keyof LinearFilterState>(
-    filterKey: K,
-    value: LinearFilterState[K]
-  ) => void;
+  setFilter: <K extends keyof LinearFilterState>(filterKey: K, value: LinearFilterState[K]) => void;
   resetFilters: () => void;
 
   // Fetch actions
   fetchIssues: () => Promise<void>;
   fetchProjects: () => Promise<void>;
-  createTicket: (title: string, description?: string) => Promise<{
+  createTicket: (
+    title: string,
+    description?: string
+  ) => Promise<{
     success: boolean;
     issue?: { id: string; identifier: string; title: string; url: string };
     error?: string;
@@ -170,7 +170,12 @@ export function useLinear(): UseLinearReturn {
 
   // Automatically fetch issues and workspace name when connected (only once on initial connection)
   useEffect(() => {
-    if (state.isConnected && state.apiKey && !state.isLoading && !hasAttemptedInitialFetch.current) {
+    if (
+      state.isConnected &&
+      state.apiKey &&
+      !state.isLoading &&
+      !hasAttemptedInitialFetch.current
+    ) {
       // Only fetch if we don't have workspace name yet (indicates we haven't fetched successfully)
       if (!state.workspaceName) {
         hasAttemptedInitialFetch.current = true;
@@ -181,7 +186,14 @@ export function useLinear(): UseLinearReturn {
         hasAttemptedInitialFetch.current = true;
       }
     }
-  }, [state.isConnected, state.apiKey, state.workspaceName, state.isLoading, fetchIssues, fetchProjects]);
+  }, [
+    state.isConnected,
+    state.apiKey,
+    state.workspaceName,
+    state.isLoading,
+    fetchIssues,
+    fetchProjects,
+  ]);
 
   const createTicket = useCallback(
     async (title: string, description?: string) => {
@@ -193,11 +205,7 @@ export function useLinear(): UseLinearReturn {
         };
       }
 
-      const result = await linearService.createTicket(
-        currentState.apiKey,
-        title,
-        description
-      );
+      const result = await linearService.createTicket(currentState.apiKey, title, description);
 
       // If successful, refresh issues list
       if (result.success) {
@@ -253,16 +261,7 @@ export function useLinear(): UseLinearReturn {
       fetchProjects,
       createTicket,
     }),
-    [
-      state,
-      connect,
-      disconnect,
-      setFilter,
-      resetFilters,
-      fetchIssues,
-      fetchProjects,
-      createTicket,
-    ]
+    [state, connect, disconnect, setFilter, resetFilters, fetchIssues, fetchProjects, createTicket]
   );
 }
 
@@ -271,10 +270,10 @@ export function useLinear(): UseLinearReturn {
 // =============================================================================
 
 export type {
+  LinearFilterState,
   LinearIssue,
-  LinearProject,
   LinearMilestone,
+  LinearProject,
   LinearWorkflowState,
   MilestoneOption,
-  LinearFilterState,
 } from '../stores/ILinearStore';

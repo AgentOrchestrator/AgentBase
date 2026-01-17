@@ -1,4 +1,11 @@
-import type { ICodingAgentProvider, ISessionManager, ISessionResumable, ISessionForkable, IChatHistoryProvider, ISessionValidator } from '../interfaces';
+import type {
+  IChatHistoryProvider,
+  ICodingAgentProvider,
+  ISessionForkable,
+  ISessionManager,
+  ISessionResumable,
+  ISessionValidator,
+} from '../interfaces';
 import type { AgentCapabilities } from '../types';
 
 /**
@@ -64,10 +71,7 @@ export function isSessionValidator(
   agent: ICodingAgentProvider
 ): agent is ICodingAgentProvider & ISessionValidator {
   const maybeValidator = agent as unknown as ISessionValidator;
-  return (
-    'checkSessionActive' in agent &&
-    typeof maybeValidator.checkSessionActive === 'function'
-  );
+  return 'checkSessionActive' in agent && typeof maybeValidator.checkSessionActive === 'function';
 }
 
 /**

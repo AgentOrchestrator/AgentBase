@@ -57,7 +57,9 @@
   padding: 12px 16px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
   color: var(--color-text-primary);
 }
 
@@ -84,8 +86,10 @@
   padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid var(--color-border);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .command-palette-item:hover .command-palette-shortcut,

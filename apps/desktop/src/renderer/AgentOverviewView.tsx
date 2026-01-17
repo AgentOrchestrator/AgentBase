@@ -1,12 +1,13 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './AgentOverviewView.css';
 import type { CodingAgentStatus, CodingAgentStatusInfo } from '../../types/coding-agent-status';
-import type { AgentTitle, AgentProgress } from './types/agent-node';
 import type { EditorApp } from './main.d';
+import type { AgentProgress, AgentTitle } from './types/agent-node';
 import {
+  getTodoListCompletionPercent,
   isPercentageProgress,
   isTodoListProgress,
-  getTodoListCompletionPercent,
 } from './types/agent-node';
 
 interface AgentOverviewViewProps {
@@ -38,10 +39,7 @@ interface AgentOverviewViewProps {
 /**
  * Status display configuration
  */
-const STATUS_CONFIG: Record<
-  CodingAgentStatus,
-  { label: string; color: string; icon: string }
-> = {
+const STATUS_CONFIG: Record<CodingAgentStatus, { label: string; color: string; icon: string }> = {
   idle: { label: 'Idle', color: '#888', icon: '○' },
   running: { label: 'Running', color: '#888', icon: '●' },
   thinking: { label: 'Thinking', color: '#888', icon: '◐' },
@@ -90,10 +88,7 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
     return (
       <div className="progress-percentage">
         <div className="progress-bar-container">
-          <div
-            className="progress-bar-fill"
-            style={{ width: `${progress.value}%` }}
-          />
+          <div className="progress-bar-fill" style={{ width: `${progress.value}%` }} />
         </div>
         <div className="progress-info">
           <span className="progress-value">{progress.value}%</span>
@@ -110,16 +105,8 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
         {progress.title && <div className="todolist-title">{progress.title}</div>}
         <div className="todolist-items">
           {progress.items.map((item) => (
-            <div
-              key={item.id}
-              className={`todolist-item ${item.completed ? 'completed' : ''}`}
-            >
-              <input
-                type="checkbox"
-                className="todo-checkbox"
-                checked={item.completed}
-                readOnly
-              />
+            <div key={item.id} className={`todolist-item ${item.completed ? 'completed' : ''}`}>
+              <input type="checkbox" className="todo-checkbox" checked={item.completed} readOnly />
               <span className="todo-content">{item.content}</span>
             </div>
           ))}
@@ -164,7 +151,8 @@ export default function AgentOverviewView({
   useEffect(() => {
     if (showEditorMenu && availableEditors.length === 0 && !isLoadingEditors) {
       setIsLoadingEditors(true);
-      window.shellAPI?.getAvailableEditors()
+      window.shellAPI
+        ?.getAvailableEditors()
         .then((editors) => {
           setAvailableEditors(editors);
         })
@@ -239,7 +227,6 @@ export default function AgentOverviewView({
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
             placeholder="Add Title"
-            autoFocus
           />
         ) : (
           <h2

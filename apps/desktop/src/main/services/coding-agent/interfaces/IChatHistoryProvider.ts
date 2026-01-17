@@ -1,7 +1,12 @@
-import type { Result, AgentError } from '../types/result.types';
-import type { SessionFilterOptions, MessageFilterOptions, SessionChange } from '../types/session.types';
-import type { SessionSummary, CodingAgentSessionContent } from '../types/session.types';
 import type { CodingAgentMessage } from '../types/message.types';
+import type { AgentError, Result } from '../types/result.types';
+import type {
+  CodingAgentSessionContent,
+  MessageFilterOptions,
+  SessionChange,
+  SessionFilterOptions,
+  SessionSummary,
+} from '../types/session.types';
 
 /**
  * Interface for chat history retrieval operations

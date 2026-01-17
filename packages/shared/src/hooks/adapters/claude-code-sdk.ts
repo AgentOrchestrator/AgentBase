@@ -25,38 +25,39 @@
 
 import type {
   HookCallback,
+  HookCallbackMatcher,
+  HookEvent,
   HookInput,
   HookJSONOutput,
-  PreToolUseHookInput,
-  PostToolUseHookInput,
+  NotificationHookInput,
+  PermissionRequestHookInput,
   PostToolUseFailureHookInput,
-  UserPromptSubmitHookInput,
-  SessionStartHookInput,
+  PostToolUseHookInput,
+  PreCompactHookInput,
+  PreToolUseHookInput,
   SessionEndHookInput,
+  SessionStartHookInput,
   StopHookInput,
   SubagentStartHookInput,
   SubagentStopHookInput,
-  PreCompactHookInput,
-  PermissionRequestHookInput,
-  NotificationHookInput,
-  HookEvent,
-  HookCallbackMatcher,
+  UserPromptSubmitHookInput,
 } from '@anthropic-ai/claude-agent-sdk';
 
 // Use globalThis.crypto for cross-platform UUID generation (Node.js 19+ and browsers)
 const randomUUID = (): string => globalThis.crypto.randomUUID();
+
 import type { EventRegistry } from '../registry.js';
 import type {
   AgentEvent,
   AgentEventType,
-  SessionPayload,
-  UserInputPayload,
-  ToolPayload,
-  PermissionPayload,
-  DelegationPayload,
   ContextPayload,
-  SystemPayload,
+  DelegationPayload,
   EventResult,
+  PermissionPayload,
+  SessionPayload,
+  SystemPayload,
+  ToolPayload,
+  UserInputPayload,
 } from '../types.js';
 
 // =============================================================================
@@ -375,7 +376,7 @@ export function createSDKHookBridge(
 
       // Check for modifications (only supported by PreToolUse)
       const modifyResult = results.find((r) => r.action === 'modify');
-      if (modifyResult && modifyResult.modifiedPayload && input.hook_event_name === 'PreToolUse') {
+      if (modifyResult?.modifiedPayload && input.hook_event_name === 'PreToolUse') {
         return {
           hookSpecificOutput: {
             hookEventName: 'PreToolUse' as const,
@@ -430,9 +431,7 @@ export function createSDKHookBridge(
     ],
     SessionEnd: [
       {
-        hooks: [
-          createBridgeCallback<SessionEndHookInput>('session:end', buildSessionEndPayload),
-        ],
+        hooks: [createBridgeCallback<SessionEndHookInput>('session:end', buildSessionEndPayload)],
       },
     ],
     Stop: [

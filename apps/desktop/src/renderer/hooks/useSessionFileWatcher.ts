@@ -1,8 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
-import type {
-  CodingAgentType,
-  SessionFileChangeEvent,
-} from '@agent-orchestrator/shared';
+import type { CodingAgentType, SessionFileChangeEvent } from '@agent-orchestrator/shared';
+import { useCallback, useEffect, useRef } from 'react';
 
 /**
  * Options for the useSessionFileWatcher hook

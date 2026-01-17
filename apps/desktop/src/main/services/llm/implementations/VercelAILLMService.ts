@@ -1,25 +1,25 @@
-import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, streamText } from 'ai';
 import type {
-  IToolCapableLLMService,
   IApiKeyRepository,
-  IToolRegistry,
   ILogger,
+  IToolCapableLLMService,
+  IToolRegistry,
 } from '../interfaces';
 import type {
-  Result,
-  LLMError,
-  LLMConfig,
   ChatRequest,
   ChatResponse,
-  StreamCallback,
   LLMCapabilities,
+  LLMConfig,
+  LLMError,
   ModelInfo,
+  Result,
+  StreamCallback,
   VendorId,
 } from '../types';
-import { ok, err, llmError, LLMErrorCode, KNOWN_MODELS } from '../types';
+import { err, KNOWN_MODELS, LLMErrorCode, llmError, ok } from '../types';
 
 // Type for language model returned by AI SDK providers
 type LanguageModel = ReturnType<ReturnType<typeof createOpenAI>>;
@@ -129,7 +129,9 @@ export class VercelAILLMService implements IToolCapableLLMService {
     // For now, just call chat without tools
     // Tool support requires more complex Vercel AI SDK integration
     // that needs careful type handling
-    this.logger.warn('chatWithTools called - tool execution not yet implemented, falling back to regular chat');
+    this.logger.warn(
+      'chatWithTools called - tool execution not yet implemented, falling back to regular chat'
+    );
     return this.chat(request);
   }
 
@@ -160,12 +162,7 @@ export class VercelAILLMService implements IToolCapableLLMService {
     }
 
     if (!keyResult.data) {
-      return err(
-        llmError(
-          LLMErrorCode.API_KEY_NOT_FOUND,
-          `No API key found for ${targetVendor}`
-        )
-      );
+      return err(llmError(LLMErrorCode.API_KEY_NOT_FOUND, `No API key found for ${targetVendor}`));
     }
 
     const apiKey = keyResult.data;
@@ -191,10 +188,7 @@ export class VercelAILLMService implements IToolCapableLLMService {
         }
         default:
           return err(
-            llmError(
-              LLMErrorCode.PROVIDER_NOT_SUPPORTED,
-              `Unsupported vendor: ${targetVendor}`
-            )
+            llmError(LLMErrorCode.PROVIDER_NOT_SUPPORTED, `Unsupported vendor: ${targetVendor}`)
           );
       }
 
@@ -204,7 +198,9 @@ export class VercelAILLMService implements IToolCapableLLMService {
     }
   }
 
-  private convertMessages(request: ChatRequest): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
+  private convertMessages(
+    request: ChatRequest
+  ): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
     return request.messages
       .filter((msg) => msg.role !== 'tool') // Filter out tool messages for now
       .map((msg) => ({
@@ -245,19 +241,14 @@ export class VercelAILLMService implements IToolCapableLLMService {
 
     // Handle API-specific errors
     if (err_?.statusCode === 429 || err_?.status === 429) {
-      return err(
-        llmError(LLMErrorCode.RATE_LIMITED, 'Rate limited by provider')
-      );
+      return err(llmError(LLMErrorCode.RATE_LIMITED, 'Rate limited by provider'));
     }
     if (err_?.statusCode === 401 || err_?.status === 401) {
       return err(llmError(LLMErrorCode.API_KEY_INVALID, 'Invalid API key'));
     }
     if (err_?.statusCode === 400 || err_?.status === 400) {
       return err(
-        llmError(
-          LLMErrorCode.INVALID_REQUEST,
-          (err_?.message as string) || 'Invalid request'
-        )
+        llmError(LLMErrorCode.INVALID_REQUEST, (err_?.message as string) || 'Invalid request')
       );
     }
 
@@ -268,9 +259,7 @@ export class VercelAILLMService implements IToolCapableLLMService {
       message.includes('max_tokens') ||
       message.includes('too long')
     ) {
-      return err(
-        llmError(LLMErrorCode.CONTEXT_LENGTH_EXCEEDED, 'Context length exceeded')
-      );
+      return err(llmError(LLMErrorCode.CONTEXT_LENGTH_EXCEEDED, 'Context length exceeded'));
     }
 
     // Network errors

@@ -5,8 +5,8 @@
  * Uses file system lookups via the main process to find session files.
  */
 
-import type { CodingAgentType } from '../../main/services/coding-agent';
 import type { AgentType } from '@agent-orchestrator/shared';
+import type { CodingAgentType } from '../../main/services/coding-agent';
 
 /**
  * Session information returned by the provider
@@ -50,10 +50,7 @@ export interface ISessionProvider {
    * @param workspacePath - Workspace/project path
    * @returns Session info or null if no active session or unsupported agent
    */
-  getActiveSession(
-    agentType: AgentType,
-    workspacePath: string
-  ): Promise<SessionInfo | null>;
+  getActiveSession(agentType: AgentType, workspacePath: string): Promise<SessionInfo | null>;
 
   /**
    * Subscribe to session start events (optional)
@@ -75,10 +72,7 @@ export class FileBasedSessionProvider implements ISessionProvider {
   /**
    * Get the most recent session for a workspace by scanning session files
    */
-  async getActiveSession(
-    agentType: AgentType,
-    workspacePath: string
-  ): Promise<SessionInfo | null> {
+  async getActiveSession(agentType: AgentType, workspacePath: string): Promise<SessionInfo | null> {
     // Only supported agent types can have sessions
     if (!isSupportedAgentType(agentType)) {
       console.log('[FileBasedSessionProvider] Agent type not supported for sessions:', agentType);

@@ -2,11 +2,11 @@
  * Tests for default implementations
  */
 
-import { describe, it, expect } from 'vitest';
-import { SimpleTitleComputer } from '../defaults/SimpleTitleComputer';
-import { SimpleSummaryComputer } from '../defaults/SimpleSummaryComputer';
-import { InMemoryPersistence } from '../defaults/CanvasDatabasePersistence';
+import { describe, expect, it } from 'vitest';
 import type { CodingAgentState } from '../../../../types/coding-agent-status';
+import { InMemoryPersistence } from '../defaults/CanvasDatabasePersistence';
+import { SimpleSummaryComputer } from '../defaults/SimpleSummaryComputer';
+import { SimpleTitleComputer } from '../defaults/SimpleTitleComputer';
 
 // =============================================================================
 // SimpleTitleComputer Tests
@@ -45,16 +45,10 @@ describe('SimpleTitleComputer', () => {
   });
 
   it('should remove common prefixes', async () => {
-    expect(await computer.computeTitle(['Hey, fix the bug'])).toBe(
-      'Fix the bug'
-    );
+    expect(await computer.computeTitle(['Hey, fix the bug'])).toBe('Fix the bug');
     // "Please" is removed, then "help me" is also removed (both are common prefixes)
-    expect(await computer.computeTitle(['Please help me with this'])).toBe(
-      'With this'
-    );
-    expect(await computer.computeTitle(['Can you refactor this code'])).toBe(
-      'Refactor this code'
-    );
+    expect(await computer.computeTitle(['Please help me with this'])).toBe('With this');
+    expect(await computer.computeTitle(['Can you refactor this code'])).toBe('Refactor this code');
     expect(await computer.computeTitle(['Help me understand the error'])).toBe(
       'Understand the error'
     );
@@ -94,13 +88,7 @@ describe('SimpleSummaryComputer', () => {
   });
 
   it('should only use first 3 messages', async () => {
-    const summary = await computer.computeSummary([
-      'One',
-      'Two',
-      'Three',
-      'Four',
-      'Five',
-    ]);
+    const summary = await computer.computeSummary(['One', 'Two', 'Three', 'Four', 'Five']);
     expect(summary).toBe('One | Two | Three');
     expect(summary).not.toContain('Four');
   });
@@ -114,9 +102,7 @@ describe('SimpleSummaryComputer', () => {
   });
 
   it('should replace inline code with [code] placeholder', async () => {
-    const summary = await computer.computeSummary([
-      'The variable `myVar` is undefined',
-    ]);
+    const summary = await computer.computeSummary(['The variable `myVar` is undefined']);
     expect(summary).toContain('[code]');
     expect(summary).not.toContain('myVar');
   });

@@ -25,7 +25,9 @@ declare global {
 
 export function TitleBar() {
   const [isHovering, setIsHovering] = useState(false);
-  const [pressedButton, setPressedButton] = useState<'close' | 'minimize' | 'maximize' | null>(null);
+  const [pressedButton, setPressedButton] = useState<'close' | 'minimize' | 'maximize' | null>(
+    null
+  );
 
   const handleMinimize = () => {
     window.windowAPI.minimize();
@@ -60,7 +62,7 @@ export function TitleBar() {
   return (
     <div className="titlebar">
       <div className="titlebar-drag-region" />
-      <div 
+      <div
         className="titlebar-controls"
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => {

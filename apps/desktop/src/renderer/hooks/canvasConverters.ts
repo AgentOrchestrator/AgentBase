@@ -1,9 +1,9 @@
-import type { Node, Edge, Viewport } from '@xyflow/react';
+import type { Edge, Node, Viewport } from '@xyflow/react';
 import type {
-  CanvasNode,
   CanvasEdge,
-  NodeData,
+  CanvasNode,
   Viewport as DbViewport,
+  NodeData,
 } from '../../main/types/database';
 import { nodeRegistry } from '../nodes/registry';
 

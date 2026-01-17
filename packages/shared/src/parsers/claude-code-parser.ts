@@ -5,9 +5,9 @@
  * Provides methods for both summary extraction and full message parsing.
  */
 
-import type { CodingAgentMessage } from '../types.js';
 import type { ChatMessage } from '../loaders/types.js';
 import { normalizeTimestamp } from '../loaders/utilities.js';
+import type { CodingAgentMessage } from '../types.js';
 import { parseContentBlocks } from './content-blocks.js';
 import type { ClaudeCodeJsonlLine, JsonlParseOptions } from './types.js';
 
@@ -226,7 +226,11 @@ export class ClaudeCodeJsonlParser {
    *
    * Use this for daemon sync where you don't need content blocks.
    */
-  parseToChatMessages(content: string): { messages: ChatMessage[]; sessionId?: string; summary?: string } {
+  parseToChatMessages(content: string): {
+    messages: ChatMessage[];
+    sessionId?: string;
+    summary?: string;
+  } {
     const lines = content.trim().split('\n');
     const messages: ChatMessage[] = [];
     let sessionId: string | undefined;

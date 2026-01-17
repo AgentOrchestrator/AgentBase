@@ -17,18 +17,24 @@ const LinearIssueAttachmentSchema = z.object({
   identifier: z.string(),
   title: z.string(),
   url: z.string(),
-  state: z.object({
-    name: z.string(),
-    color: z.string(),
-  }).optional(),
-  priority: z.object({
-    label: z.string(),
-    priority: z.number(),
-  }).optional(),
-  assignee: z.object({
-    name: z.string(),
-    avatarUrl: z.string().optional(),
-  }).optional(),
+  state: z
+    .object({
+      name: z.string(),
+      color: z.string(),
+    })
+    .optional(),
+  priority: z
+    .object({
+      label: z.string(),
+      priority: z.number(),
+    })
+    .optional(),
+  assignee: z
+    .object({
+      name: z.string(),
+      avatarUrl: z.string().optional(),
+    })
+    .optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -43,9 +49,11 @@ const TerminalAttachmentSchema = LinearIssueAttachmentSchema;
 /**
  * Schema for CustomNode data
  */
-export const CustomNodeDataSchema = z.object({
-  label: z.string().optional(),
-}).passthrough(); // Allow additional properties
+export const CustomNodeDataSchema = z
+  .object({
+    label: z.string().optional(),
+  })
+  .passthrough(); // Allow additional properties
 
 /**
  * Schema for TerminalNode data
@@ -54,20 +62,31 @@ export const TerminalNodeDataSchema = z.object({
   terminalId: z.string(),
   attachments: z.array(TerminalAttachmentSchema).optional(),
   // Legacy support
-  issue: z.object({
-    id: z.string().optional(),
-    identifier: z.string(),
-    title: z.string(),
-    url: z.string(),
-  }).optional(),
+  issue: z
+    .object({
+      id: z.string().optional(),
+      identifier: z.string(),
+      title: z.string(),
+      url: z.string(),
+    })
+    .optional(),
 });
 
 /**
  * MessageType enum values for schema validation
  */
 const MessageTypeValues = [
-  'user', 'assistant', 'tool_call', 'tool_result', 'mcp_tool',
-  'thinking', 'reasoning', 'system', 'summary', 'metadata', 'error'
+  'user',
+  'assistant',
+  'tool_call',
+  'tool_result',
+  'mcp_tool',
+  'thinking',
+  'reasoning',
+  'system',
+  'summary',
+  'metadata',
+  'error',
 ] as const;
 
 /**
@@ -86,11 +105,13 @@ export const ChatMessageSchema = z.object({
 /**
  * Schema for GitInfo
  */
-const GitInfoSchema = z.object({
-  branch: z.string().optional(),
-  remote: z.string().optional(),
-  status: z.string().optional(),
-}).nullable();
+const GitInfoSchema = z
+  .object({
+    branch: z.string().optional(),
+    remote: z.string().optional(),
+    status: z.string().optional(),
+  })
+  .nullable();
 
 /**
  * Schema for AgentNode data

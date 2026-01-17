@@ -7,13 +7,8 @@
  * - Providing default behavior
  */
 
-import type {
-  AgentEventType,
-  EventHandler,
-  EventResult,
-  UnsubscribeFn,
-} from '../types.js';
 import type { EventRegistry } from '../registry.js';
+import type { AgentEventType, EventHandler, EventResult, UnsubscribeFn } from '../types.js';
 
 // =============================================================================
 // ALL EVENT TYPES
@@ -149,13 +144,9 @@ export const stubHandlers: Record<AgentEventType, EventHandler> = {
 /**
  * Silent stub handlers (no logging)
  */
-export const silentStubHandlers: Record<AgentEventType, EventHandler> =
-  Object.fromEntries(
-    ALL_EVENT_TYPES.map((type) => [
-      type,
-      createStubHandler(type, { log: false }),
-    ])
-  ) as Record<AgentEventType, EventHandler>;
+export const silentStubHandlers: Record<AgentEventType, EventHandler> = Object.fromEntries(
+  ALL_EVENT_TYPES.map((type) => [type, createStubHandler(type, { log: false })])
+) as Record<AgentEventType, EventHandler>;
 
 // =============================================================================
 // REGISTRATION HELPERS

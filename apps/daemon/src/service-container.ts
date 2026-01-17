@@ -6,18 +6,18 @@
  */
 
 import type {
-  IRepositoryFactory,
-  IUserRepository,
-  IProjectRepository,
-  IChatHistoryRepository,
-  IApiKeyRepository,
-  IUserPreferencesRepository,
   IActiveSessionRepository,
-  IWorkspaceRepository,
-  IProjectSharingRepository,
-  ISessionSharingRepository,
+  IApiKeyRepository,
   ICanvasLayoutRepository,
+  IChatHistoryRepository,
   IPinnedConversationRepository,
+  IProjectRepository,
+  IProjectSharingRepository,
+  IRepositoryFactory,
+  ISessionSharingRepository,
+  IUserPreferencesRepository,
+  IUserRepository,
+  IWorkspaceRepository,
 } from './interfaces/repositories.js';
 
 /**
@@ -213,9 +213,7 @@ let globalContainer: ServiceContainer | null = null;
  */
 export function getServiceContainer(): ServiceContainer {
   if (!globalContainer) {
-    throw new Error(
-      'Global ServiceContainer not created. Call createServiceContainer() first.'
-    );
+    throw new Error('Global ServiceContainer not created. Call createServiceContainer() first.');
   }
   return globalContainer;
 }

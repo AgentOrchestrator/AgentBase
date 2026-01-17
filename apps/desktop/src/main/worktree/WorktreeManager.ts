@@ -1,17 +1,17 @@
-import * as path from 'path';
-import { IWorktreeManager } from './IWorktreeManager';
-import {
+import * as path from 'node:path';
+import type {
   WorktreeInfo,
+  WorktreeManagerConfig,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
-  WorktreeManagerConfig,
   WorktreeRow,
 } from '../types/worktree';
-import { IGitExecutor } from './dependencies/IGitExecutor';
-import { IFilesystem } from './dependencies/IFilesystem';
-import { IWorktreeStore } from './dependencies/IWorktreeStore';
-import { IIdGenerator } from './dependencies/IIdGenerator';
-import { ILogger } from './dependencies/ILogger';
+import type { IFilesystem } from './dependencies/IFilesystem';
+import type { IGitExecutor } from './dependencies/IGitExecutor';
+import type { IIdGenerator } from './dependencies/IIdGenerator';
+import type { ILogger } from './dependencies/ILogger';
+import type { IWorktreeStore } from './dependencies/IWorktreeStore';
+import type { IWorktreeManager } from './IWorktreeManager';
 
 /**
  * Manages git worktrees for agent isolation.
@@ -44,9 +44,7 @@ export class WorktreeManager implements IWorktreeManager {
     const provisionKey = `${repoPath}:${branchName}`;
 
     if (this.worktreesBeingProvisioned.has(provisionKey)) {
-      throw new Error(
-        `Worktree for branch "${branchName}" is already being provisioned`
-      );
+      throw new Error(`Worktree for branch "${branchName}" is already being provisioned`);
     }
 
     const existing = await this.store.getByRepoBranch(repoPath, branchName);
@@ -63,7 +61,9 @@ export class WorktreeManager implements IWorktreeManager {
 
       // worktreePath is now required - caller must provide explicit path
       if (!options?.worktreePath) {
-        throw new Error('worktreePath is required: caller must provide an explicit path for the worktree');
+        throw new Error(
+          'worktreePath is required: caller must provide an explicit path for the worktree'
+        );
       }
       const worktreePath = options.worktreePath;
 
@@ -104,11 +104,7 @@ export class WorktreeManager implements IWorktreeManager {
         agentId: options?.agentId,
       };
     } catch (error) {
-      await this.store.updateStatus(
-        worktreeId,
-        'error',
-        (error as Error).message
-      );
+      await this.store.updateStatus(worktreeId, 'error', (error as Error).message);
       this.logger.error('Failed to provision worktree', {
         id: worktreeId,
         error: (error as Error).message,
@@ -119,10 +115,7 @@ export class WorktreeManager implements IWorktreeManager {
     }
   }
 
-  async release(
-    worktreeId: string,
-    options?: WorktreeReleaseOptions
-  ): Promise<void> {
+  async release(worktreeId: string, options?: WorktreeReleaseOptions): Promise<void> {
     if (this.worktreesBeingReleased.has(worktreeId)) {
       throw new Error(`Worktree "${worktreeId}" is already being released`);
     }
@@ -167,11 +160,7 @@ export class WorktreeManager implements IWorktreeManager {
         path: worktree.worktree_path,
       });
     } catch (error) {
-      await this.store.updateStatus(
-        worktreeId,
-        'error',
-        (error as Error).message
-      );
+      await this.store.updateStatus(worktreeId, 'error', (error as Error).message);
       this.logger.error('Failed to release worktree', {
         id: worktreeId,
         error: (error as Error).message,
@@ -205,16 +194,9 @@ export class WorktreeManager implements IWorktreeManager {
     }
   }
 
-  private async branchExists(
-    repoPath: string,
-    branchName: string
-  ): Promise<boolean> {
+  private async branchExists(repoPath: string, branchName: string): Promise<boolean> {
     try {
-      await this.git.exec(repoPath, [
-        'rev-parse',
-        '--verify',
-        `refs/heads/${branchName}`,
-      ]);
+      await this.git.exec(repoPath, ['rev-parse', '--verify', `refs/heads/${branchName}`]);
       return true;
     } catch {
       return false;
@@ -255,11 +237,7 @@ export class WorktreeManager implements IWorktreeManager {
     await this.git.exec(repoPath, args);
   }
 
-  private async deleteBranch(
-    repoPath: string,
-    branchName: string,
-    force: boolean
-  ): Promise<void> {
+  private async deleteBranch(repoPath: string, branchName: string, force: boolean): Promise<void> {
     const flag = force ? '-D' : '-d';
     await this.git.exec(repoPath, ['branch', flag, branchName]);
   }
@@ -279,10 +257,7 @@ export class WorktreeManager implements IWorktreeManager {
   }
 
   private async recoverOrphanedWorktrees(): Promise<void> {
-    const stuckEntries = await this.store.listByStatus([
-      'provisioning',
-      'releasing',
-    ]);
+    const stuckEntries = await this.store.listByStatus(['provisioning', 'releasing']);
 
     for (const entry of stuckEntries) {
       await this.reconcileWorktreeState(entry);

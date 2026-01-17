@@ -1,14 +1,10 @@
 import { app } from 'electron';
-import type {
-  IToolCapableLLMService,
-  IApiKeyRepository,
-  IToolRegistry,
-} from '../interfaces';
-import type { LLMConfig } from '../types';
-import { VercelAILLMService } from '../implementations';
-import { KeychainApiKeyRepository } from '../dependencies';
-import { ToolRegistry } from '../registry/ToolRegistry';
 import { ConsoleLogger } from '../../../worktree/dependencies/ConsoleLogger';
+import { KeychainApiKeyRepository } from '../dependencies';
+import { VercelAILLMService } from '../implementations';
+import type { IApiKeyRepository, IToolCapableLLMService, IToolRegistry } from '../interfaces';
+import { ToolRegistry } from '../registry/ToolRegistry';
+import type { LLMConfig } from '../types';
 
 /**
  * Factory for creating LLM service instances.
@@ -42,12 +38,10 @@ export class LLMServiceFactory {
    * Must be called before getService().
    */
   static configure(config: LLMConfig): void {
-    if (this.instance) {
-      throw new Error(
-        'Cannot configure after service has been initialized. Call dispose() first.'
-      );
+    if (LLMServiceFactory.instance) {
+      throw new Error('Cannot configure after service has been initialized. Call dispose() first.');
     }
-    this.config = config;
+    LLMServiceFactory.config = config;
   }
 
   /**
@@ -55,33 +49,31 @@ export class LLMServiceFactory {
    * Lazily initializes the service on first call.
    */
   static async getService(): Promise<IToolCapableLLMService> {
-    if (this.instance) {
-      return this.instance;
+    if (LLMServiceFactory.instance) {
+      return LLMServiceFactory.instance;
     }
 
-    if (!this.config) {
-      throw new Error(
-        'LLMServiceFactory not configured. Call configure() first.'
-      );
+    if (!LLMServiceFactory.config) {
+      throw new Error('LLMServiceFactory not configured. Call configure() first.');
     }
 
     // Wire up dependencies
     const logger = new ConsoleLogger('[LLMService]');
-    const apiKeyRepo = this.getApiKeyRepository();
-    const toolRegistry = this.getToolRegistry();
+    const apiKeyRepo = LLMServiceFactory.getApiKeyRepository();
+    const toolRegistry = LLMServiceFactory.getToolRegistry();
 
-    this.instance = new VercelAILLMService(
-      this.config,
+    LLMServiceFactory.instance = new VercelAILLMService(
+      LLMServiceFactory.config,
       apiKeyRepo,
       toolRegistry,
       logger
     );
 
     logger.info('LLM Service initialized', {
-      defaultVendor: this.config.defaultVendor,
+      defaultVendor: LLMServiceFactory.config.defaultVendor,
     });
 
-    return this.instance;
+    return LLMServiceFactory.instance;
   }
 
   /**
@@ -89,11 +81,11 @@ export class LLMServiceFactory {
    * Can be used directly for API key management.
    */
   static getApiKeyRepository(): IApiKeyRepository {
-    if (!this.apiKeyRepository) {
+    if (!LLMServiceFactory.apiKeyRepository) {
       const serviceName = app?.getName?.() || 'AgentBase';
-      this.apiKeyRepository = new KeychainApiKeyRepository(serviceName);
+      LLMServiceFactory.apiKeyRepository = new KeychainApiKeyRepository(serviceName);
     }
-    return this.apiKeyRepository;
+    return LLMServiceFactory.apiKeyRepository;
   }
 
   /**
@@ -101,28 +93,28 @@ export class LLMServiceFactory {
    * Use this to register tools before making chat requests.
    */
   static getToolRegistry(): IToolRegistry {
-    if (!this.toolRegistry) {
-      this.toolRegistry = new ToolRegistry();
+    if (!LLMServiceFactory.toolRegistry) {
+      LLMServiceFactory.toolRegistry = new ToolRegistry();
     }
-    return this.toolRegistry;
+    return LLMServiceFactory.toolRegistry;
   }
 
   /**
    * Check if the factory has been configured.
    */
   static isConfigured(): boolean {
-    return this.config !== null;
+    return LLMServiceFactory.config !== null;
   }
 
   /**
    * Dispose the service and release resources.
    */
   static async dispose(): Promise<void> {
-    if (this.instance) {
-      await this.instance.dispose();
-      this.instance = null;
+    if (LLMServiceFactory.instance) {
+      await LLMServiceFactory.instance.dispose();
+      LLMServiceFactory.instance = null;
     }
-    this.toolRegistry?.clear();
+    LLMServiceFactory.toolRegistry?.clear();
   }
 
   /**
@@ -130,9 +122,9 @@ export class LLMServiceFactory {
    * Disposes the service and clears configuration.
    */
   static async reset(): Promise<void> {
-    await this.dispose();
-    this.config = null;
-    this.apiKeyRepository = null;
-    this.toolRegistry = null;
+    await LLMServiceFactory.dispose();
+    LLMServiceFactory.config = null;
+    LLMServiceFactory.apiKeyRepository = null;
+    LLMServiceFactory.toolRegistry = null;
   }
 }

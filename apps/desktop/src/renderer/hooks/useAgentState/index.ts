@@ -5,14 +5,14 @@
  * When debugging or understanding agent behavior, start here.
  */
 
-export { useAgentState } from './useAgentState';
 export type {
-  AgentState,
-  UseAgentStateInput,
-  WorkspaceState,
-  WorkspaceSource,
-  SessionState,
-  SessionReadiness,
-  AgentConfig,
   AgentActions,
+  AgentConfig,
+  AgentState,
+  SessionReadiness,
+  SessionState,
+  UseAgentStateInput,
+  WorkspaceSource,
+  WorkspaceState,
 } from './types';
+export { useAgentState } from './useAgentState';

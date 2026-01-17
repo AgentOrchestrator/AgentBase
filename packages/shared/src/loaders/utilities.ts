@@ -19,12 +19,12 @@ export function normalizeTimestamp(timestamp: string | number | undefined): stri
   if (typeof timestamp === 'string') {
     // Check if it's a numeric string (Unix timestamp)
     const numericTimestamp = parseInt(timestamp, 10);
-    if (!isNaN(numericTimestamp) && numericTimestamp > 0) {
+    if (!Number.isNaN(numericTimestamp) && numericTimestamp > 0) {
       timestamp = numericTimestamp;
     } else {
       // Try parsing as ISO string
       const date = new Date(timestamp);
-      if (!isNaN(date.getTime())) {
+      if (!Number.isNaN(date.getTime())) {
         return date.toISOString();
       }
       return new Date().toISOString();
@@ -71,7 +71,7 @@ export function extractProjectNameFromPath(folderPath: string): string | undefin
   // Handle vscode-remote URIs (e.g., vscode-remote://ssh-remote%2Bserver/path)
   if (cleanPath.startsWith('vscode-remote://')) {
     const match = cleanPath.match(/vscode-remote:\/\/[^/]+(.+)/);
-    if (match && match[1]) {
+    if (match?.[1]) {
       cleanPath = match[1];
     }
   }
@@ -184,7 +184,7 @@ export function getHomeDir(): string {
  */
 export function fileExists(filePath: string): boolean {
   try {
-    const fs = require('fs');
+    const fs = require('node:fs');
     return fs.existsSync(filePath);
   } catch {
     return false;

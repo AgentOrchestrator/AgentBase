@@ -5,9 +5,9 @@
  * to enable real-time synchronization between terminal and chat views.
  */
 
-export { SessionFileWatcher } from './SessionFileWatcher';
-export type { SessionFileWatcherConfig } from './SessionFileWatcher';
 export {
-  registerSessionWatcherIpcHandlers,
   disposeSessionWatcher,
+  registerSessionWatcherIpcHandlers,
 } from './ipc';
+export type { SessionFileWatcherConfig } from './SessionFileWatcher';
+export { SessionFileWatcher } from './SessionFileWatcher';

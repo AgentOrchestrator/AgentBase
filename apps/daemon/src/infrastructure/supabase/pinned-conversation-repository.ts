@@ -12,7 +12,7 @@ import type {
 export class SupabasePinnedConversationRepository implements IPinnedConversationRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async getPinnedConversations(userId: string): Promise<PinnedConversation[]> {
@@ -23,11 +23,14 @@ export class SupabasePinnedConversationRepository implements IPinnedConversation
       .order('pinned_at', { ascending: false });
 
     if (error) {
-      console.error('[PinnedConversationRepository] Error getting pinned conversations:', error.message);
+      console.error(
+        '[PinnedConversationRepository] Error getting pinned conversations:',
+        error.message
+      );
       return [];
     }
 
-    return (data || []).map(row => this.mapToPinnedConversation(row));
+    return (data || []).map((row) => this.mapToPinnedConversation(row));
   }
 
   async pinConversation(
@@ -74,7 +77,10 @@ export class SupabasePinnedConversationRepository implements IPinnedConversation
         .eq('conversation_id', conversationId);
 
       if (error) {
-        console.error('[PinnedConversationRepository] Error unpinning conversation:', error.message);
+        console.error(
+          '[PinnedConversationRepository] Error unpinning conversation:',
+          error.message
+        );
         return false;
       }
 

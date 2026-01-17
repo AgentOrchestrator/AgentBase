@@ -10,11 +10,11 @@
  * types used by the renderer layer.
  */
 
-import type { CodingAgentType, SessionInfo, ForkOptions } from '../../main/services/coding-agent';
-import type { WorktreeInfo } from '../../main/types/worktree';
 import type { AgentType, JsonlFilterOptions } from '@agent-orchestrator/shared';
-import { worktreeService } from './WorktreeService';
+import type { CodingAgentType, ForkOptions, SessionInfo } from '../../main/services/coding-agent';
+import type { WorktreeInfo } from '../../main/types/worktree';
 import { sessionProvider } from './SessionProvider';
+import { worktreeService } from './WorktreeService';
 
 /**
  * Supported agent types for forking
@@ -94,7 +94,9 @@ export interface IForkService {
    * @param request - Fork request parameters
    * @returns Fork result or error
    */
-  forkAgent(request: ForkRequest): Promise<{ success: true; data: ForkResult } | { success: false; error: ForkError }>;
+  forkAgent(
+    request: ForkRequest
+  ): Promise<{ success: true; data: ForkResult } | { success: false; error: ForkError }>;
 
   /**
    * Validate if fork can proceed
@@ -255,7 +257,12 @@ export class ForkService implements IForkService {
 
     // Step 1: Create worktree
     const branchName = sanitizeBranchName(request.forkTitle);
-    console.log('[ForkService] Creating worktree with branch:', branchName, 'worktreePath:', request.worktreePath);
+    console.log(
+      '[ForkService] Creating worktree with branch:',
+      branchName,
+      'worktreePath:',
+      request.worktreePath
+    );
 
     const worktreeResult = await worktreeService.createWorktree(request.repoPath, branchName, {
       agentId: request.sourceAgentId,
@@ -297,7 +304,7 @@ export class ForkService implements IForkService {
 
     console.log('[ForkService] Fork options:', forkOptions);
 
-    const result = await window.codingAgentAPI!.forkSession(request.agentType, forkOptions);
+    const result = await window.codingAgentAPI?.forkSession(request.agentType, forkOptions);
 
     if (!result.success) {
       // Rollback: release the worktree if session fork failed
@@ -348,7 +355,7 @@ export class ForkService implements IForkService {
 
     console.log('[ForkService] Fork options:', forkOptions);
 
-    const result = await window.codingAgentAPI!.forkSession(request.agentType, forkOptions);
+    const result = await window.codingAgentAPI?.forkSession(request.agentType, forkOptions);
 
     if (!result.success) {
       return {

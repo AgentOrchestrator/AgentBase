@@ -5,11 +5,11 @@
  * Wraps ConversationNodePresentation with the appropriate context provider.
  */
 
+import type { NodeProps } from '@xyflow/react';
 import { useCallback } from 'react';
-import { NodeProps } from '@xyflow/react';
 import { NodeContextProvider } from '../../context';
-import { ConversationNodePresentation } from './ConversationNodePresentation';
 import type { ConversationNodeData } from '../schemas';
+import { ConversationNodePresentation } from './ConversationNodePresentation';
 
 /**
  * ConversationNode

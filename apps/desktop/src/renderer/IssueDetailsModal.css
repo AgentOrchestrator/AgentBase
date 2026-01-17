@@ -47,7 +47,7 @@
 
 .issue-id-badge {
   color: #888;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-weight: 600;
   font-size: 13px;
   background: #1e1e1e;
@@ -209,12 +209,24 @@
   margin-top: 0;
 }
 
-.issue-details-description h1 { font-size: 24px; }
-.issue-details-description h2 { font-size: 20px; }
-.issue-details-description h3 { font-size: 18px; }
-.issue-details-description h4 { font-size: 16px; }
-.issue-details-description h5 { font-size: 14px; }
-.issue-details-description h6 { font-size: 13px; }
+.issue-details-description h1 {
+  font-size: 24px;
+}
+.issue-details-description h2 {
+  font-size: 20px;
+}
+.issue-details-description h3 {
+  font-size: 18px;
+}
+.issue-details-description h4 {
+  font-size: 16px;
+}
+.issue-details-description h5 {
+  font-size: 14px;
+}
+.issue-details-description h6 {
+  font-size: 13px;
+}
 
 .issue-details-description p {
   margin: 8px 0;
@@ -243,7 +255,7 @@
   color: #f07178;
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
   font-size: 13px;
 }
 
@@ -595,7 +607,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

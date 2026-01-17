@@ -5,13 +5,13 @@
  * Uses useAgentState() as the single source of truth for all agent state.
  */
 
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { NodeProps, useUpdateNodeInternals } from '@xyflow/react';
-import type { AgentNodeData } from '../../types/agent-node';
-import { NodeContextProvider } from '../../context';
-import { AgentNodePresentation } from './AgentNodePresentation';
+import { type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { WorkspaceSelectionModal } from '../../components/WorkspaceSelectionModal';
+import { NodeContextProvider } from '../../context';
 import { useAgentState } from '../../hooks/useAgentState';
+import type { AgentNodeData } from '../../types/agent-node';
+import { AgentNodePresentation } from './AgentNodePresentation';
 
 /**
  * AgentNode

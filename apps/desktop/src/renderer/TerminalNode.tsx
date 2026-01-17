@@ -1,16 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { NodeProps, NodeResizer } from '@xyflow/react';
+import { Terminal } from '@xterm/xterm';
+import { type NodeProps, NodeResizer } from '@xyflow/react';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
-import IssueDetailsModal from './IssueDetailsModal';
 import AttachmentHeader from './AttachmentHeader';
+import IssueDetailsModal from './IssueDetailsModal';
 import {
-  TerminalAttachment,
-  isLinearIssueAttachment,
   createLinearIssueAttachment,
+  isLinearIssueAttachment,
+  type TerminalAttachment,
 } from './types/attachments';
 
 interface TerminalNodeData {
@@ -69,27 +70,27 @@ function TerminalNode({ data, id, selected }: NodeProps) {
 
   useEffect(() => {
     if (!terminalRef.current) return;
-    
+
     // Guard against double initialization (React StrictMode in development)
     // Check both the ref flag AND if an xterm already exists in the DOM
     const existingXterm = terminalRef.current.querySelector('.xterm');
     if (isInitializedRef.current || existingXterm) {
-      console.log('[TerminalNode] ⚠️ Terminal already initialized, skipping duplicate mount', { 
-        terminalId, 
+      console.log('[TerminalNode] ⚠️ Terminal already initialized, skipping duplicate mount', {
+        terminalId,
         refFlag: isInitializedRef.current,
-        hasXtermInDOM: !!existingXterm 
+        hasXtermInDOM: !!existingXterm,
       });
       return;
     }
 
     count.current++;
-    
+
     // Track mount time to detect StrictMode unmounts
     if (!(window as any).__terminalMountTimes) {
       (window as any).__terminalMountTimes = {};
     }
     (window as any).__terminalMountTimes[terminalId] = Date.now();
-    
+
     console.log('[TerminalNode] TerminalNode initializing', { terminalId, count: count.current });
     isInitializedRef.current = true;
 
@@ -109,12 +110,12 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         const range = selection.getRangeAt(0);
         const startContainer = range.startContainer;
         const endContainer = range.endContainer;
-        const isInXterm = 
-          (startContainer.nodeType === Node.TEXT_NODE 
-            ? (startContainer.parentElement?.closest('.xterm'))
+        const isInXterm =
+          (startContainer.nodeType === Node.TEXT_NODE
+            ? startContainer.parentElement?.closest('.xterm')
             : (startContainer as HTMLElement).closest('.xterm')) !== null ||
           (endContainer.nodeType === Node.TEXT_NODE
-            ? (endContainer.parentElement?.closest('.xterm'))
+            ? endContainer.parentElement?.closest('.xterm')
             : (endContainer as HTMLElement).closest('.xterm')) !== null;
 
         if (!isInXterm && selection.toString().length > 0) {
@@ -122,8 +123,14 @@ function TerminalNode({ data, id, selected }: NodeProps) {
             text: selection.toString().substring(0, 50),
             startContainer: startContainer.nodeName,
             endContainer: endContainer.nodeName,
-            startParent: startContainer.nodeType === Node.TEXT_NODE ? startContainer.parentElement?.className : (startContainer as HTMLElement).className,
-            endParent: endContainer.nodeType === Node.TEXT_NODE ? endContainer.parentElement?.className : (endContainer as HTMLElement).className
+            startParent:
+              startContainer.nodeType === Node.TEXT_NODE
+                ? startContainer.parentElement?.className
+                : (startContainer as HTMLElement).className,
+            endParent:
+              endContainer.nodeType === Node.TEXT_NODE
+                ? endContainer.parentElement?.className
+                : (endContainer as HTMLElement).className,
           });
         }
       }
@@ -137,7 +144,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const userSelect = computedStyle.userSelect || computedStyle.webkitUserSelect || 'not set';
       const selection = window.getSelection();
       const selectionText = selection?.toString() || '';
-      
+
       console.log(`[TerminalNode] ${eventName}`, {
         target: target.tagName,
         targetClass: target.className,
@@ -146,7 +153,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         selectionText: selectionText.substring(0, 50),
         selectionRangeCount: selection?.rangeCount || 0,
         mouseDownTarget: mouseDownTarget?.tagName,
-        ...additionalInfo
+        ...additionalInfo,
       });
     };
 
@@ -154,11 +161,11 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     const preventSelection = (e: Event) => {
       const target = e.target as HTMLElement;
       const isXterm = target.closest('.xterm') !== null;
-      
-      logEvent('selectstart', e, { 
-        isXterm, 
+
+      logEvent('selectstart', e, {
+        isXterm,
         willPrevent: !isXterm,
-        defaultPrevented: e.defaultPrevented 
+        defaultPrevented: e.defaultPrevented,
       });
 
       if (!isXterm) {
@@ -170,21 +177,21 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     const handleMouseDown = (e: MouseEvent) => {
       isMouseDown = true;
       mouseDownTarget = e.target as HTMLElement;
-      logEvent('mousedown', e, { 
+      logEvent('mousedown', e, {
         button: e.button,
         buttons: e.buttons,
         ctrlKey: e.ctrlKey,
-        shiftKey: e.shiftKey
+        shiftKey: e.shiftKey,
       });
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      logEvent('mouseup', e, { 
+      logEvent('mouseup', e, {
         button: e.button,
-        isMouseDown 
+        isMouseDown,
       });
       isMouseDown = false;
-      
+
       // Check selection after mouseup
       setTimeout(() => {
         const selection = window.getSelection();
@@ -193,7 +200,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
             text: selection.toString().substring(0, 100),
             rangeCount: selection.rangeCount,
             anchorNode: selection.anchorNode?.nodeName,
-            focusNode: selection.focusNode?.nodeName
+            focusNode: selection.focusNode?.nodeName,
           });
         }
       }, 0);
@@ -208,7 +215,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         if (selection && selection.toString().length > 0) {
           logEvent('mousemove (dragging)', e, {
             selectionLength: selection.toString().length,
-            rangeCount: selection.rangeCount
+            rangeCount: selection.rangeCount,
           });
         }
       } else {
@@ -217,7 +224,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         if (selection && selection.rangeCount > 0 && selection.toString().length > 0) {
           logEvent('mousemove (hovering with selection)', e, {
             selectionLength: selection.toString().length,
-            rangeCount: selection.rangeCount
+            rangeCount: selection.rangeCount,
           });
         }
       }
@@ -231,7 +238,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const selection = window.getSelection();
       logEvent('select', e, {
         selectionText: selection?.toString().substring(0, 100),
-        rangeCount: selection?.rangeCount || 0
+        rangeCount: selection?.rangeCount || 0,
       });
     };
 
@@ -246,7 +253,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
           anchorNode: selection.anchorNode?.nodeName,
           focusNode: selection.focusNode?.nodeName,
           isXterm,
-          targetClass: target?.className
+          targetClass: target?.className,
         });
       }
     };
@@ -254,10 +261,10 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     const handleDragStart = (e: DragEvent) => {
       const target = e.target as HTMLElement;
       const isXterm = target.closest('.xterm') !== null;
-      
-      logEvent('dragstart', e, { 
+
+      logEvent('dragstart', e, {
         isXterm,
-        willPrevent: !isXterm 
+        willPrevent: !isXterm,
       });
 
       if (!isXterm) {
@@ -297,12 +304,13 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         brightBlue: '#3b8eea',
         brightMagenta: '#d670d6',
         brightCyan: '#29b8db',
-        brightWhite: '#e5e5e5'
+        brightWhite: '#e5e5e5',
       },
       fontSize: 12,
-      fontFamily: '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
+      fontFamily:
+        '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace',
       cursorBlink: true,
-      cursorStyle: 'block'
+      cursorStyle: 'block',
     });
 
     const fitAddon = new FitAddon();
@@ -319,7 +327,10 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       webglAddonRef.current = webglAddon;
       console.log('[TerminalNode] ✅ WebGL renderer enabled', { terminalId });
     } catch (error) {
-      console.warn('[TerminalNode] ⚠️ WebGL addon failed to load, falling back to canvas renderer', error);
+      console.warn(
+        '[TerminalNode] ⚠️ WebGL addon failed to load, falling back to canvas renderer',
+        error
+      );
       // Terminal will continue to work with default canvas renderer
     }
 
@@ -350,7 +361,9 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       wrapperClass: wrapper.className,
       wrapperUserSelect: window.getComputedStyle(wrapper).userSelect,
       xtermElement: wrapper.querySelector('.xterm')?.className,
-      xtermUserSelect: wrapper.querySelector('.xterm') ? window.getComputedStyle(wrapper.querySelector('.xterm')!).userSelect : 'not found'
+      xtermUserSelect: wrapper.querySelector('.xterm')
+        ? window.getComputedStyle(wrapper.querySelector('.xterm')!).userSelect
+        : 'not found',
     });
 
     // Focus terminal
@@ -362,13 +375,13 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const buffer = terminal.buffer.active;
       const hasSelection = selection.length > 0;
       const isWhitespaceOnly = hasSelection && /^[\n\r\s]+$/.test(selection);
-      
-      let selectionInfo: any = {
+
+      const selectionInfo: any = {
         hasSelection,
         selectionLength: selection.length,
         selectionText: selection.substring(0, 100),
         isWhitespaceOnly,
-        terminalId
+        terminalId,
       };
 
       if (hasSelection) {
@@ -378,7 +391,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
           if (selectionStart) {
             selectionInfo.selectionPosition = selectionStart;
           }
-        } catch (e) {
+        } catch (_e) {
           // Position API might not be available
         }
 
@@ -388,24 +401,27 @@ function TerminalNode({ data, id, selected }: NodeProps) {
             baseY: buffer.baseY,
             length: buffer.length,
             cursorX: buffer.cursorX,
-            cursorY: buffer.cursorY
+            cursorY: buffer.cursorY,
           };
-        } catch (e) {
+        } catch (_e) {
           // Buffer API might vary
         }
 
         if (isWhitespaceOnly) {
-          selectionInfo.warning = '⚠️ Whitespace-only selection detected - this is likely causing the visual selection issue!';
+          selectionInfo.warning =
+            '⚠️ Whitespace-only selection detected - this is likely causing the visual selection issue!';
           selectionInfo.newlineCount = (selection.match(/\n/g) || []).length;
         }
       }
 
       console.log('[TerminalNode] 🔵 Xterm Selection Changed', selectionInfo);
-      
+
       // If it's whitespace only, try to clear it to prevent visual selection
       // This handles the case where xterm creates selections from false drag detection
       if (isWhitespaceOnly && selection.length > 0) {
-        console.log('[TerminalNode] ⚠️ Attempting to clear whitespace-only selection (false drag detection)');
+        console.log(
+          '[TerminalNode] ⚠️ Attempting to clear whitespace-only selection (false drag detection)'
+        );
         // Small delay to see if it clears naturally, otherwise we'll clear it
         setTimeout(() => {
           const currentSelection = terminal.getSelection();
@@ -427,41 +443,47 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     let selectionCheckInterval: NodeJS.Timeout | null = null;
     const startSelectionMonitoring = () => {
       if (selectionCheckInterval) return;
-      
+
       selectionCheckInterval = setInterval(() => {
         const selection = terminal.getSelection();
         const currentSelectionText = selection;
         const currentSelectionLength = selection.length;
-        
+
         // Only log if selection changed (new selection or cleared)
-        const selectionChanged = 
+        const selectionChanged =
           currentSelectionLength !== lastSelectionLength ||
           currentSelectionText !== lastSelectionText;
-        
+
         if (selection.length > 0 && selectionChanged) {
           // Filter out selections that are only whitespace/newlines
           const trimmedSelection = selection.trim();
           if (trimmedSelection.length === 0) {
             // This is a whitespace-only selection - this is likely the issue!
-            console.log('[TerminalNode] ⚠️ Xterm Whitespace-Only Selection Detected (this causes visual selection!)', {
-              length: selection.length,
-              isOnlyNewlines: /^[\n\r\s]+$/.test(selection),
-              newlineCount: (selection.match(/\n/g) || []).length,
-              terminalId
-            });
+            console.log(
+              '[TerminalNode] ⚠️ Xterm Whitespace-Only Selection Detected (this causes visual selection!)',
+              {
+                length: selection.length,
+                isOnlyNewlines: /^[\n\r\s]+$/.test(selection),
+                newlineCount: (selection.match(/\n/g) || []).length,
+                terminalId,
+              }
+            );
           } else {
             // This is a meaningful selection with actual content (only log when it's NEW)
-            console.log('[TerminalNode] 🔵 Xterm Selection Active (periodic check - NEW selection detected)', {
-              length: selection.length,
-              text: selection.substring(0, 100),
-              terminalId
-            });
+            console.log(
+              '[TerminalNode] 🔵 Xterm Selection Active (periodic check - NEW selection detected)',
+              {
+                length: selection.length,
+                text: selection.substring(0, 100),
+                terminalId,
+              }
+            );
           }
         } else if (selection.length === 0 && lastSelectionLength > 0) {
           // Selection was cleared
           console.log('[TerminalNode] 🔵 Xterm Selection Cleared (periodic check)', { terminalId });
         }
-        
+
         // Update tracked values
         lastSelectionText = currentSelectionText;
         lastSelectionLength = currentSelectionLength;
@@ -514,7 +536,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
           clientY: e.clientY,
           xtermRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
           relativeToXterm: { x: relativeX, y: relativeY },
-          terminalId
+          terminalId,
         });
       };
 
@@ -537,16 +559,20 @@ function TerminalNode({ data, id, selected }: NodeProps) {
           // Try to get the selection buffer range if available
           let selectionRange = null;
           try {
-            // @ts-ignore - accessing internal API for debugging
+            // @ts-expect-error - accessing internal API for debugging
             if (terminal._core?.buffer?.active && terminal._core?.selectionManager) {
-              // @ts-ignore
+              // @ts-expect-error
               const selectionModel = terminal._core?.selectionManager?.model;
               if (selectionModel) {
                 selectionRange = {
-                  // @ts-ignore
-                  start: selectionModel.finalSelectionStart ? [...selectionModel.finalSelectionStart] : null,
-                  // @ts-ignore
-                  end: selectionModel.finalSelectionEnd ? [...selectionModel.finalSelectionEnd] : null,
+                  // @ts-expect-error
+                  start: selectionModel.finalSelectionStart
+                    ? [...selectionModel.finalSelectionStart]
+                    : null,
+                  // @ts-expect-error
+                  end: selectionModel.finalSelectionEnd
+                    ? [...selectionModel.finalSelectionEnd]
+                    : null,
                 };
               }
             }
@@ -559,16 +585,22 @@ function TerminalNode({ data, id, selected }: NodeProps) {
             selectionText: selection.substring(0, 100),
             selectionLength: selection.length,
             mousePositions: {
-              down: { client: mouseDownPos, relative: { x: mouseDownRelativeX, y: mouseDownRelativeY } },
-              up: { client: { x: e.clientX, y: e.clientY }, relative: { x: mouseUpRelativeX, y: mouseUpRelativeY } },
+              down: {
+                client: mouseDownPos,
+                relative: { x: mouseDownRelativeX, y: mouseDownRelativeY },
+              },
+              up: {
+                client: { x: e.clientX, y: e.clientY },
+                relative: { x: mouseUpRelativeX, y: mouseUpRelativeY },
+              },
               dragDistance: {
                 x: Math.abs(e.clientX - mouseDownPos.x),
-                y: Math.abs(e.clientY - mouseDownPos.y)
-              }
+                y: Math.abs(e.clientY - mouseDownPos.y),
+              },
             },
             xtermRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
             selectionRange,
-            terminalId
+            terminalId,
           });
         }, 50); // Wait a bit for xterm to finalize selection
       };
@@ -588,9 +620,12 @@ function TerminalNode({ data, id, selected }: NodeProps) {
     // Create terminal process in main process (only once)
     if (window.electronAPI && !terminalProcessCreatedRef.current) {
       terminalProcessCreatedRef.current = true;
-      console.log('[TerminalNode] Creating terminal process', { terminalId, autoStartClaude: nodeData.autoStartClaude });
+      console.log('[TerminalNode] Creating terminal process', {
+        terminalId,
+        autoStartClaude: nodeData.autoStartClaude,
+      });
       window.electronAPI.createTerminal(terminalId);
-      
+
       // Auto-start claude command if flag is set
       if (nodeData.autoStartClaude) {
         // Wait for terminal to initialize, then send claude command
@@ -615,40 +650,61 @@ function TerminalNode({ data, id, selected }: NodeProps) {
 
     // Receive terminal output from main process (if API is available)
     let handleTerminalData: ((data: { terminalId: string; data: string }) => void) | null = null;
-    let handleTerminalExit: ((data: { terminalId: string; code: number; signal?: number }) => void) | null = null;
+    let handleTerminalExit:
+      | ((data: { terminalId: string; code: number; signal?: number }) => void)
+      | null = null;
 
     if (window.electronAPI) {
-      handleTerminalData = ({ terminalId: dataTerminalId, data: outputData }: { terminalId: string; data: string }) => {
+      handleTerminalData = ({
+        terminalId: dataTerminalId,
+        data: outputData,
+      }: {
+        terminalId: string;
+        data: string;
+      }) => {
         // Only process data for this specific terminal
         if (dataTerminalId === terminalId) {
           terminal.write(outputData);
         }
       };
 
-      handleTerminalExit = ({ terminalId: dataTerminalId, code, signal }: { terminalId: string; code: number; signal?: number }) => {
+      handleTerminalExit = ({
+        terminalId: dataTerminalId,
+        code,
+        signal,
+      }: {
+        terminalId: string;
+        code: number;
+        signal?: number;
+      }) => {
         // Only process exit for this specific terminal
         if (dataTerminalId === terminalId) {
           // Don't show exit message if it exited immediately on startup (likely a configuration issue)
           // Exit code 1 with signal often indicates the shell couldn't start properly
           const isImmediateExit = code === 1 && signal === 1;
-          
+
           if (!isImmediateExit) {
-            terminal.write(`\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`);
+            terminal.write(
+              `\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`
+            );
             terminal.write('\r\n[Terminal closed. Creating new session...]\r\n');
           } else {
             terminal.write(`\r\n\n[Shell exited immediately - check shell configuration]\r\n`);
             terminal.write(`[Shell: ${process.env.SHELL || '/bin/bash'}]\r\n`);
           }
-          
+
           // Automatically restart the terminal (but delay longer for immediate exits to avoid loop)
           if (window.electronAPI) {
-            setTimeout(() => {
-              // Reset the flag to allow recreation
-              terminalProcessCreatedRef.current = false;
-              console.log('[TerminalNode] Restarting terminal process', { terminalId });
-              window.electronAPI?.createTerminal(terminalId);
-              terminalProcessCreatedRef.current = true;
-            }, isImmediateExit ? 1000 : 100);
+            setTimeout(
+              () => {
+                // Reset the flag to allow recreation
+                terminalProcessCreatedRef.current = false;
+                console.log('[TerminalNode] Restarting terminal process', { terminalId });
+                window.electronAPI?.createTerminal(terminalId);
+                terminalProcessCreatedRef.current = true;
+              },
+              isImmediateExit ? 1000 : 100
+            );
           }
         }
       };
@@ -682,9 +738,11 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         const dimensions = fitAddonRef.current.proposeDimensions();
         if (dimensions && window.electronAPI) {
           // Only send resize if dimensions actually changed
-          if (!lastResizeDimensions ||
-              lastResizeDimensions.cols !== dimensions.cols ||
-              lastResizeDimensions.rows !== dimensions.rows) {
+          if (
+            !lastResizeDimensions ||
+            lastResizeDimensions.cols !== dimensions.cols ||
+            lastResizeDimensions.rows !== dimensions.rows
+          ) {
             lastResizeDimensions = { cols: dimensions.cols, rows: dimensions.rows };
             window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
           }
@@ -704,9 +762,11 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const currentHeight = container.clientHeight;
 
       // Only proceed if container size actually changed (prevents unnecessary fits)
-      if (lastContainerSize &&
-          lastContainerSize.width === currentWidth &&
-          lastContainerSize.height === currentHeight) {
+      if (
+        lastContainerSize &&
+        lastContainerSize.width === currentWidth &&
+        lastContainerSize.height === currentHeight
+      ) {
         return; // Container size hasn't changed, skip resize
       }
 
@@ -766,23 +826,24 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const cleanupTime = Date.now();
       const mountTime = (window as any).__terminalMountTimes?.[terminalId];
       const componentLifetime = mountTime ? cleanupTime - mountTime : null;
-      
+
       console.log('[TerminalNode] 🧹 Cleanup triggered', {
         terminalId,
         componentLifetime: componentLifetime ? `${componentLifetime}ms` : 'unknown',
         wasInitialized: isInitializedRef.current,
-        stackTrace: new Error().stack?.split('\n').slice(2, 6).join('\n')
+        stackTrace: new Error().stack?.split('\n').slice(2, 6).join('\n'),
       });
 
       // In React StrictMode, cleanup runs immediately after mount - don't destroy terminal process
       // Only destroy if component was actually initialized and had time to run
-      const isStrictModeUnmount = !isInitializedRef.current || (componentLifetime !== null && componentLifetime < 500);
-      
+      const isStrictModeUnmount =
+        !isInitializedRef.current || (componentLifetime !== null && componentLifetime < 500);
+
       if (isStrictModeUnmount) {
         console.log('[TerminalNode] ⚠️ Skipping terminal destroy - likely StrictMode unmount', {
           terminalId,
           componentLifetime,
-          wasInitialized: isInitializedRef.current
+          wasInitialized: isInitializedRef.current,
         });
         // Clean up DOM and listeners but don't destroy the terminal process
         if (webglAddonRef.current) {
@@ -821,13 +882,13 @@ function TerminalNode({ data, id, selected }: NodeProps) {
 
       isInitializedRef.current = false; // Reset on cleanup
       terminalProcessCreatedRef.current = false; // Reset process creation flag
-      
+
       // Clear resize timeout
       if (resizeTimeout) {
         clearTimeout(resizeTimeout);
         resizeTimeout = null;
       }
-      
+
       stopSelectionMonitoring();
       // Cleanup debug listeners
       if ((wrapper as any)._cleanupDebugListeners) {
@@ -861,7 +922,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         window.electronAPI.destroyTerminal(terminalId);
       }
     };
-  }, [terminalId]);
+  }, [terminalId, nodeData.autoStartClaude]);
 
   // Migrate legacy issue to attachments array
   const attachments = nodeData.attachments || [];
@@ -919,9 +980,11 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const updatedAttachments = [...currentAttachments, newAttachment];
 
       // Trigger a re-render by updating the node
-      window.dispatchEvent(new CustomEvent('update-node', {
-        detail: { nodeId: id, data: { ...nodeData, attachments: updatedAttachments } }
-      }));
+      window.dispatchEvent(
+        new CustomEvent('update-node', {
+          detail: { nodeId: id, data: { ...nodeData, attachments: updatedAttachments } },
+        })
+      );
     } catch (error) {
       console.error('Error handling drop on terminal:', error);
     }
@@ -967,10 +1030,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
 
       {/* Issue Details Modal */}
       {showIssueModal && linearIssue?.id && (
-        <IssueDetailsModal
-          issueId={linearIssue.id}
-          onClose={() => setShowIssueModal(false)}
-        />
+        <IssueDetailsModal issueId={linearIssue.id} onClose={() => setShowIssueModal(false)} />
       )}
     </div>
   );

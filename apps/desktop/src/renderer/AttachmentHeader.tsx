@@ -1,7 +1,4 @@
-import {
-  TerminalAttachment,
-  isLinearIssueAttachment,
-} from './types/attachments';
+import { isLinearIssueAttachment, type TerminalAttachment } from './types/attachments';
 
 interface AttachmentHeaderProps {
   attachment: TerminalAttachment;
@@ -11,7 +8,10 @@ interface AttachmentHeaderProps {
 /**
  * Renders a Linear issue attachment in the terminal header
  */
-function LinearIssueHeader({ attachment, onDetailsClick }: {
+function LinearIssueHeader({
+  attachment,
+  onDetailsClick,
+}: {
   attachment: Extract<TerminalAttachment, { type: 'linear-issue' }>;
   onDetailsClick?: () => void;
 }) {

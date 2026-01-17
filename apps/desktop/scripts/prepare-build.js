@@ -6,8 +6,8 @@
  * This script uses package-lock.json to find all transitive production dependencies
  * and copies them to the local node_modules for electron-builder to bundle.
  */
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const APP_DIR = path.resolve(__dirname, '..');
 const MONOREPO_ROOT = path.resolve(APP_DIR, '../..');
@@ -79,7 +79,7 @@ function copyModule(moduleName) {
   }
 
   // Remove symlink if exists
-  if (destStat && destStat.isSymbolicLink()) {
+  if (destStat?.isSymbolicLink()) {
     fs.unlinkSync(destPath);
   }
 

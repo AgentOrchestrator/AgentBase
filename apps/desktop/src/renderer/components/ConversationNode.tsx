@@ -1,7 +1,14 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { Handle, Position, NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
+import { Handle, type NodeProps, NodeResizer, Position, useReactFlow } from '@xyflow/react';
 import { marked } from 'marked';
-import type { MessageGroup, UserMessageGroup, AssistantMessageGroup, MessageContent, ToolUseContent, ThinkingContent } from '../types/conversation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  AssistantMessageGroup,
+  MessageContent,
+  MessageGroup,
+  ThinkingContent,
+  ToolUseContent,
+  UserMessageGroup,
+} from '../types/conversation';
 import './ConversationNode.css';
 
 // Configure marked for tight spacing
@@ -73,35 +80,38 @@ function ConversationNode({ data, id, selected }: NodeProps) {
 
     const timeoutId = setTimeout(scrollToBottom, 0);
     return () => clearTimeout(timeoutId);
-  }, [groups]);
+  }, []);
 
   // Update button position based on mouse Y coordinate
-  const updateButtonPositionFromMouse = useCallback((clientY: number) => {
-    if (!contentRef.current) return;
+  const updateButtonPositionFromMouse = useCallback(
+    (clientY: number) => {
+      if (!contentRef.current) return;
 
-    const viewport = getViewport();
-    const zoom = viewport.zoom;
-    
-    // Get the content element's bounding rect (already accounts for React Flow zoom transform)
-    const contentRect = contentRef.current.getBoundingClientRect();
-    const scrollTop = contentRef.current.scrollTop;
-    
-    // Calculate mouse Y position relative to content container
-    // When React Flow zooms, it applies a CSS transform to the node
-    // getBoundingClientRect() returns coordinates in viewport space (already transformed)
-    // clientY is also in viewport space
-    // scrollTop is in content space (not transformed)
-    //
-    // The visible content area is scaled by zoom, so:
-    // - (clientY - contentRect.top) gives position in the visible viewport (scaled by zoom)
-    // - Divide by zoom to convert from viewport-scaled to content coordinates
-    // - Add scrollTop to get absolute position in the scrollable content
-    const viewportRelativeY = clientY - contentRect.top;
-    const contentRelativeY = viewportRelativeY / zoom;
-    const absoluteY = contentRelativeY + scrollTop;
-    
-    setMouseY(absoluteY);
-  }, [getViewport]);
+      const viewport = getViewport();
+      const zoom = viewport.zoom;
+
+      // Get the content element's bounding rect (already accounts for React Flow zoom transform)
+      const contentRect = contentRef.current.getBoundingClientRect();
+      const scrollTop = contentRef.current.scrollTop;
+
+      // Calculate mouse Y position relative to content container
+      // When React Flow zooms, it applies a CSS transform to the node
+      // getBoundingClientRect() returns coordinates in viewport space (already transformed)
+      // clientY is also in viewport space
+      // scrollTop is in content space (not transformed)
+      //
+      // The visible content area is scaled by zoom, so:
+      // - (clientY - contentRect.top) gives position in the visible viewport (scaled by zoom)
+      // - Divide by zoom to convert from viewport-scaled to content coordinates
+      // - Add scrollTop to get absolute position in the scrollable content
+      const viewportRelativeY = clientY - contentRect.top;
+      const contentRelativeY = viewportRelativeY / zoom;
+      const absoluteY = contentRelativeY + scrollTop;
+
+      setMouseY(absoluteY);
+    },
+    [getViewport]
+  );
 
   // Detect text selection
   const handleSelectionChange = useCallback(() => {
@@ -247,13 +257,8 @@ function ConversationNode({ data, id, selected }: NodeProps) {
   const renderUserMessage = (group: UserMessageGroup, _index: number) => {
     const messageKey = `user-${group.uuid}`;
     return (
-      <div
-        key={messageKey}
-        className="conversation-user-message"
-      >
-        <div className="conversation-user-content">
-          {group.text}
-        </div>
+      <div key={messageKey} className="conversation-user-message">
+        <div className="conversation-user-content">{group.text}</div>
       </div>
     );
   };
@@ -262,7 +267,12 @@ function ConversationNode({ data, id, selected }: NodeProps) {
   type DisplayItem =
     | { type: 'text'; content: MessageContent; key: string }
     | { type: 'thinking'; content: ThinkingContent; key: string }
-    | { type: 'tool_summary'; toolType: 'read' | 'edit' | 'grep' | 'glob'; count: number; key: string };
+    | {
+        type: 'tool_summary';
+        toolType: 'read' | 'edit' | 'grep' | 'glob';
+        count: number;
+        key: string;
+      };
 
   const getToolType = (toolName: string): 'read' | 'edit' | 'grep' | 'glob' | null => {
     if (toolName === 'Read') return 'read';
@@ -284,7 +294,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
           type: 'tool_summary',
           toolType: currentToolType,
           count: currentToolCount,
-          key: `tool-summary-${itemIndex++}`
+          key: `tool-summary-${itemIndex++}`,
         });
         currentToolType = null;
         currentToolCount = 0;
@@ -298,7 +308,11 @@ function ConversationNode({ data, id, selected }: NodeProps) {
           items.push({ type: 'text', content, key: `text-${itemIndex++}` });
         } else if (content.type === 'thinking') {
           flushToolGroup();
-          items.push({ type: 'thinking', content: content as ThinkingContent, key: `thinking-${itemIndex++}` });
+          items.push({
+            type: 'thinking',
+            content: content as ThinkingContent,
+            key: `thinking-${itemIndex++}`,
+          });
         } else if (content.type === 'tool_use') {
           const toolContent = content as ToolUseContent;
           const toolType = getToolType(toolContent.name);
@@ -321,7 +335,6 @@ function ConversationNode({ data, id, selected }: NodeProps) {
   };
 
   const renderDisplayItem = (item: DisplayItem) => {
-
     if (item.type === 'text') {
       const html = marked.parse((item.content as any).text) as string;
       return (
@@ -335,10 +348,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
 
     if (item.type === 'thinking') {
       return (
-        <div 
-          key={item.key} 
-          className="conversation-thinking-content"
-        >
+        <div key={item.key} className="conversation-thinking-content">
           <span className="thinking-label">Thinking:</span>
           <span className="thinking-text">{item.content.thinking}</span>
         </div>
@@ -358,10 +368,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
       }
 
       return (
-        <div 
-          key={item.key} 
-          className="conversation-tool-summary"
-        >
+        <div key={item.key} className="conversation-tool-summary">
           {label}
         </div>
       );
@@ -375,12 +382,9 @@ function ConversationNode({ data, id, selected }: NodeProps) {
     const messageKey = `assistant-${group.uuid}`;
 
     return (
-      <div
-        key={messageKey}
-        className="conversation-assistant-message"
-      >
+      <div key={messageKey} className="conversation-assistant-message">
         <div className="conversation-assistant-content">
-          {displayItems.map(item => renderDisplayItem(item))}
+          {displayItems.map((item) => renderDisplayItem(item))}
         </div>
       </div>
     );
@@ -424,7 +428,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
             return renderAssistantMessage(group as AssistantMessageGroup, index);
           }
         })}
-        
+
         {/* Plus button - appears when text is selected, follows mouse */}
         {textSelection && mouseY !== null && (
           <div
@@ -434,13 +438,23 @@ function ConversationNode({ data, id, selected }: NodeProps) {
               right: `${textSelection.position.right}px`,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 162 162" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 162 162"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
               <g clipPath="url(#clip0_1022_356_conv)">
-                <path d="M89.3555 152.441V8.69141C89.3555 4.00391 85.3516 0 80.5664 0C75.7812 0 71.875 4.00391 71.875 8.69141V152.441C71.875 157.129 75.7812 161.133 80.5664 161.133C85.3516 161.133 89.3555 157.129 89.3555 152.441ZM8.69141 89.2578H152.441C157.129 89.2578 161.133 85.3516 161.133 80.5664C161.133 75.7812 157.129 71.7773 152.441 71.7773H8.69141C4.00391 71.7773 0 75.7812 0 80.5664C0 85.3516 4.00391 89.2578 8.69141 89.2578Z" fill="currentColor" fillOpacity="0.85"/>
+                <path
+                  d="M89.3555 152.441V8.69141C89.3555 4.00391 85.3516 0 80.5664 0C75.7812 0 71.875 4.00391 71.875 8.69141V152.441C71.875 157.129 75.7812 161.133 80.5664 161.133C85.3516 161.133 89.3555 157.129 89.3555 152.441ZM8.69141 89.2578H152.441C157.129 89.2578 161.133 85.3516 161.133 80.5664C161.133 75.7812 157.129 71.7773 152.441 71.7773H8.69141C4.00391 71.7773 0 75.7812 0 80.5664C0 85.3516 4.00391 89.2578 8.69141 89.2578Z"
+                  fill="currentColor"
+                  fillOpacity="0.85"
+                />
               </g>
               <defs>
                 <clipPath id="clip0_1022_356_conv">
-                  <rect width="161.133" height="161.23" fill="white"/>
+                  <rect width="161.133" height="161.23" fill="white" />
                 </clipPath>
               </defs>
             </svg>

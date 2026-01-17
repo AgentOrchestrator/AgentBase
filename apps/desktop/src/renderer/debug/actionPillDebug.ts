@@ -186,13 +186,15 @@ export function getActions(): void {
   import('../stores').then(({ agentActionStore }) => {
     const actions = agentActionStore.getAllActions();
     console.log('[ActionPill Debug] Current actions:', actions);
-    console.table(actions.map(a => ({
-      id: a.id,
-      type: a.type,
-      agentId: a.agentId,
-      createdAt: a.createdAt,
-      ...(a.type === 'tool_approval' ? { toolName: (a as any).toolName } : {}),
-    })));
+    console.table(
+      actions.map((a) => ({
+        id: a.id,
+        type: a.type,
+        agentId: a.agentId,
+        createdAt: a.createdAt,
+        ...(a.type === 'tool_approval' ? { toolName: (a as any).toolName } : {}),
+      }))
+    );
   });
 }
 

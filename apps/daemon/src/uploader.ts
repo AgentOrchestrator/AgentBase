@@ -1,12 +1,12 @@
 import type { ChatHistory } from './claude-code-reader.js';
-import type { UnifiedProjectInfo } from './project-aggregator.js';
-import { getDatabase } from './database.js';
 import type { FailedSyncData } from './database.js';
+import { getDatabase } from './database.js';
 import type {
-  IProjectRepository,
   IChatHistoryRepository,
+  IProjectRepository,
   IRepositoryFactory,
 } from './interfaces/repositories.js';
+import type { UnifiedProjectInfo } from './project-aggregator.js';
 
 /**
  * Find or create a project for a session based on metadata
@@ -64,7 +64,7 @@ export async function uploadChatHistory(
     if (history.messages && history.messages.length > 0) {
       // Find the most recent timestamp among all messages
       const timestamps = history.messages
-        .map(msg => msg.timestamp)
+        .map((msg) => msg.timestamp)
         .filter((ts): ts is string => !!ts)
         .sort()
         .reverse();
@@ -163,7 +163,8 @@ export async function upsertProject(
     const counts = [];
     if (project.composerCount > 0) counts.push(`Composer: ${project.composerCount}`);
     if (project.copilotSessionCount > 0) counts.push(`Copilot: ${project.copilotSessionCount}`);
-    if (project.claudeCodeSessionCount > 0) counts.push(`Claude Code: ${project.claudeCodeSessionCount}`);
+    if (project.claudeCodeSessionCount > 0)
+      counts.push(`Claude Code: ${project.claudeCodeSessionCount}`);
 
     console.log(`✓ Project: ${project.name} (${counts.join(', ')})`);
     return result.id;
@@ -251,7 +252,7 @@ export async function uploadAllHistories(
  */
 export async function uploadChatHistoryWithTokens(
   history: ChatHistory,
-  accountId: string | null,
+  _accountId: string | null,
   accessToken: string | null,
   refreshToken: string | null,
   repositoryFactory: IRepositoryFactory
@@ -279,7 +280,7 @@ export async function uploadChatHistoryWithTokens(
  */
 export async function upsertProjectWithTokens(
   project: UnifiedProjectInfo,
-  accountId: string | null,
+  _accountId: string | null,
   accessToken: string | null,
   refreshToken: string | null,
   repositoryFactory: IRepositoryFactory
@@ -290,7 +291,10 @@ export async function upsertProjectWithTokens(
   }
 
   try {
-    const { userId, projects } = await repositoryFactory.createRepositories(accessToken, refreshToken);
+    const { userId, projects } = await repositoryFactory.createRepositories(
+      accessToken,
+      refreshToken
+    );
     return upsertProject(project, userId, projects);
   } catch (error) {
     console.error('Failed to create repositories:', error);
@@ -304,7 +308,7 @@ export async function upsertProjectWithTokens(
  */
 export async function syncProjectsWithTokens(
   projectsList: UnifiedProjectInfo[],
-  accountId: string | null,
+  _accountId: string | null,
   accessToken: string | null,
   refreshToken: string | null,
   repositoryFactory: IRepositoryFactory
@@ -332,7 +336,7 @@ export async function syncProjectsWithTokens(
  */
 export async function uploadAllHistoriesWithTokens(
   histories: ChatHistory[],
-  accountId: string | null,
+  _accountId: string | null,
   accessToken: string | null,
   refreshToken: string | null,
   repositoryFactory: IRepositoryFactory,

@@ -1,4 +1,4 @@
-import type { Node, Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import type { MessageGroup } from '../types/conversation';
 // import { buildUuidMap } from './conversationParser'; // Will be used for parent linking
 
@@ -54,12 +54,12 @@ export function conversationToNodesAndEdges(
       const previousGroup = groups[i - 1];
       // Get the border color from CSS variable to match node borders
       // Use fallback if DOM is not available (e.g., in tests)
-      const borderColor = typeof document !== 'undefined'
-        ? (getComputedStyle(document.documentElement)
-            .getPropertyValue('--color-border')
-            .trim() || '#232323')
-        : '#232323';
-      
+      const borderColor =
+        typeof document !== 'undefined'
+          ? getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim() ||
+            '#232323'
+          : '#232323';
+
       edges.push({
         id: `edge-${previousGroup.uuid}-${group.uuid}`,
         source: previousGroup.uuid,

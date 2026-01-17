@@ -5,8 +5,8 @@
  * Uses NodeContextProvider to provide agentService to AgentChatView.
  */
 
+import { Handle, type NodeProps, NodeResizer, Position } from '@xyflow/react';
 import { useCallback, useRef } from 'react';
-import { NodeProps, NodeResizer, Handle, Position } from '@xyflow/react';
 import AgentChatView from '../../AgentChatView';
 import { NodeContextProvider } from '../../context';
 import { useAgentState } from '../../hooks/useAgentState';
@@ -79,15 +79,9 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
           id="chat-target"
           className="agent-chat-handle"
         />
-        <div style={{ padding: 20, color: '#888' }}>
-          No workspace selected
-        </div>
+        <div style={{ padding: 20, color: '#888' }}>No workspace selected</div>
         {/* Source handle for outgoing edges */}
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="agent-chat-handle"
-        />
+        <Handle type="source" position={Position.Bottom} className="agent-chat-handle" />
       </div>
     );
   }
@@ -131,11 +125,7 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
           selected={selected}
         />
         {/* Source handle for outgoing edges */}
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="agent-chat-handle"
-        />
+        <Handle type="source" position={Position.Bottom} className="agent-chat-handle" />
       </div>
     </NodeContextProvider>
   );

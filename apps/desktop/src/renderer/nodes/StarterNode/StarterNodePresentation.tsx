@@ -5,8 +5,8 @@
  * Handles textarea input, auto-resize, and keyboard events.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './StarterNode.css';
 
 export interface StarterNodePresentationProps {
@@ -45,7 +45,7 @@ export function StarterNodePresentation({
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, [inputValue]);
+  }, []);
 
   // Handle submit
   const handleSubmit = useCallback(() => {

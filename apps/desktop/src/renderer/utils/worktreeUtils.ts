@@ -36,20 +36,20 @@ export function extractLocalFilePath(urlOrPath: string): string | null {
     try {
       // Remove file:// prefix
       let pathPart = cleanedUrl.substring(7);
-      
+
       // Handle Windows paths: file:///C:/path or file://C:/path
       // After removing file://, we might have /C:/path or C:/path
       if (pathPart.match(/^\/[A-Za-z]:/)) {
         // Remove leading slash for Windows absolute paths
         pathPart = pathPart.substring(1);
       }
-      
+
       // Decode URI encoding
       const decoded = decodeURIComponent(pathPart);
-      
+
       // Normalize path separators (handle both / and \)
       const filePath = decoded.replace(/\\/g, '/');
-      
+
       return filePath;
     } catch {
       return null;
@@ -142,7 +142,9 @@ export async function findMatchingWorktrees(
   nodes: Node[],
   currentFilePath: string,
   _currentRepoRoot: string | null // Not used in simplified approach
-): Promise<Array<{ workspacePath: string; branch: string | undefined; nodeId: string; relativePath: string }>> {
+): Promise<
+  Array<{ workspacePath: string; branch: string | undefined; nodeId: string; relativePath: string }>
+> {
   // Extract just the filename from the current file path
   const fileName = basename(currentFilePath);
   console.log('[findMatchingWorktrees] Looking for file:', fileName, 'in opened workspaces');
@@ -151,37 +153,44 @@ export async function findMatchingWorktrees(
   // Check if the file path starts with any workspace path
   let currentFileWorkspace: string | null = null;
   const normalizedCurrentFilePath = normalize(currentFilePath);
-  
+
   console.log('[findMatchingWorktrees] Current file path:', normalizedCurrentFilePath);
-  
+
   for (const node of nodes) {
     if (node.type !== 'agent') continue;
     const agentData = node.data as unknown as AgentNodeData;
     if (!agentData.workspacePath) continue;
-    
+
     const normalizedWorkspacePath = normalize(agentData.workspacePath);
-    
+
     console.log('[findMatchingWorktrees] Checking if file is in workspace:', {
       filePath: normalizedCurrentFilePath,
       workspacePath: normalizedWorkspacePath,
-      startsWith: normalizedCurrentFilePath.startsWith(normalizedWorkspacePath + '/'),
+      startsWith: normalizedCurrentFilePath.startsWith(`${normalizedWorkspacePath}/`),
       equals: normalizedCurrentFilePath === normalizedWorkspacePath,
     });
-    
+
     // Check if current file is within this agent's workspace
-    if (normalizedCurrentFilePath.startsWith(normalizedWorkspacePath + '/') || 
-        normalizedCurrentFilePath === normalizedWorkspacePath) {
+    if (
+      normalizedCurrentFilePath.startsWith(`${normalizedWorkspacePath}/`) ||
+      normalizedCurrentFilePath === normalizedWorkspacePath
+    ) {
       currentFileWorkspace = agentData.workspacePath;
       console.log('[findMatchingWorktrees] ✓ Current file is in workspace:', currentFileWorkspace);
       break;
     }
   }
-  
+
   if (!currentFileWorkspace) {
     console.log('[findMatchingWorktrees] Current file is not in any known workspace');
   }
 
-  const matches: Array<{ workspacePath: string; branch: string | undefined; nodeId: string; relativePath: string }> = [];
+  const matches: Array<{
+    workspacePath: string;
+    branch: string | undefined;
+    nodeId: string;
+    relativePath: string;
+  }> = [];
 
   // Check fileAPI availability
   const fileAPI = (window as any).fileAPI;
@@ -206,8 +215,10 @@ export async function findMatchingWorktrees(
     }
 
     const normalizedAgentPath = normalize(agentData.workspacePath);
-    const normalizedCurrentWorkspace = currentFileWorkspace ? normalize(currentFileWorkspace) : null;
-    
+    const normalizedCurrentWorkspace = currentFileWorkspace
+      ? normalize(currentFileWorkspace)
+      : null;
+
     console.log('[findMatchingWorktrees] Checking node:', {
       nodeId: node.id,
       workspacePath: agentData.workspacePath,
@@ -221,10 +232,12 @@ export async function findMatchingWorktrees(
       console.log('[findMatchingWorktrees] ⏭️ Skipping - same workspace as current file');
       continue;
     }
-    
+
     // Also check if the current file path itself is in this workspace (more precise check)
-    if (normalizedCurrentFilePath.startsWith(normalizedAgentPath + '/') || 
-        normalizedCurrentFilePath === normalizedAgentPath) {
+    if (
+      normalizedCurrentFilePath.startsWith(`${normalizedAgentPath}/`) ||
+      normalizedCurrentFilePath === normalizedAgentPath
+    ) {
       console.log('[findMatchingWorktrees] ⏭️ Skipping - current file is in this workspace', {
         filePath: normalizedCurrentFilePath,
         workspace: normalizedAgentPath,
@@ -234,24 +247,24 @@ export async function findMatchingWorktrees(
 
     // Check if the file exists in this workspace (just check for the filename in the workspace root)
     const potentialFilePath = join(agentData.workspacePath, fileName);
-    
+
     console.log('[findMatchingWorktrees] Checking file existence:', potentialFilePath);
-    
+
     try {
       const fileExists = await fileAPI.exists(potentialFilePath);
       console.log('[findMatchingWorktrees] File exists?', fileExists, 'at:', potentialFilePath);
-      
+
       if (fileExists) {
         // Extract folder name from workspace path
         const folderName = basename(agentData.workspacePath);
-        
+
         console.log('[findMatchingWorktrees] ✓ Found file in workspace:', {
           workspacePath: agentData.workspacePath,
           folderName,
           fileName,
           potentialFilePath,
         });
-        
+
         matches.push({
           workspacePath: agentData.workspacePath,
           branch: undefined, // Not using branch names

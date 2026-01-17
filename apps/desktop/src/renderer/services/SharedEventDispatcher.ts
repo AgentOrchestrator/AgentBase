@@ -9,13 +9,13 @@
  * their own IPC listeners, causing duplicate event delivery.
  */
 
-import { agentActionStore } from '../stores';
-import type { AgentAdapterEvent } from '../context/node-services/coding-agent-adapter';
 import type {
   AgentAction,
-  ToolApprovalAction,
   ClarifyingQuestionAction,
+  ToolApprovalAction,
 } from '@agent-orchestrator/shared';
+import type { AgentAdapterEvent } from '../context/node-services/coding-agent-adapter';
+import { agentActionStore } from '../stores';
 
 type EventCallback<T = AgentAdapterEvent> = (event: T) => void;
 
@@ -60,7 +60,7 @@ class SharedEventDispatcher {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
-    this.listeners.get(type)!.add(callback as EventCallback);
+    this.listeners.get(type)?.add(callback as EventCallback);
 
     return () => {
       this.listeners.get(type)?.delete(callback as EventCallback);

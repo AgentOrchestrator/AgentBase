@@ -12,32 +12,32 @@
  * - Is stateless - all parameters must be provided per-request
  */
 
+import type { AgentType } from '../../../../types/coding-agent-status';
 import type {
-  ICodingAgentAdapter,
+  AgentAdapterEventType,
+  AgentError,
+  AgentEventHandler,
+  CodingAgentSessionContent,
+  ContinueOptions,
+  ForkOptions,
   GenerateRequest,
   GenerateResponse,
-  StreamCallback,
-  StructuredStreamCallback,
+  ICodingAgentAdapter,
+  MessageFilterOptions,
+  Result,
+  SessionFilterOptions,
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
-  CodingAgentSessionContent,
-  SessionFilterOptions,
-  MessageFilterOptions,
-  ContinueOptions,
-  ForkOptions,
-  AgentAdapterEventType,
-  AgentEventHandler,
-  Result,
-  AgentError,
+  StreamCallback,
+  StructuredStreamCallback,
 } from '../../context/node-services/coding-agent-adapter';
 import {
   AgentErrorCode,
-  ok,
-  err,
   agentError,
+  err,
+  ok,
 } from '../../context/node-services/coding-agent-adapter';
-import type { AgentType } from '../../../../types/coding-agent-status';
 import { sharedEventDispatcher } from '../SharedEventDispatcher';
 
 /**
@@ -67,7 +67,10 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     return null;
   }
 
-  private wrapError(error: unknown, defaultCode: AgentErrorCode = AgentErrorCode.UNKNOWN_ERROR): AgentError {
+  private wrapError(
+    error: unknown,
+    defaultCode: AgentErrorCode = AgentErrorCode.UNKNOWN_ERROR
+  ): AgentError {
     if (error instanceof Error) {
       return agentError(defaultCode, error.message, error);
     }
@@ -118,7 +121,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const response = await this.api!.generate(this.agentType, request);
+      const response = await this.api?.generate(this.agentType, request);
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));
@@ -135,7 +138,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const response = await this.api!.generateStreaming(this.agentType, request, onChunk);
+      const response = await this.api?.generateStreaming(this.agentType, request, onChunk);
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));
@@ -152,15 +155,21 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     // Check if the API supports structured streaming
-    if (!this.api!.generateStreamingStructured) {
-      return err(agentError(
-        AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
-        'Structured streaming is not supported by this API version'
-      ));
+    if (!this.api?.generateStreamingStructured) {
+      return err(
+        agentError(
+          AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
+          'Structured streaming is not supported by this API version'
+        )
+      );
     }
 
     try {
-      const response = await this.api!.generateStreamingStructured(this.agentType, request, onChunk);
+      const response = await this.api?.generateStreamingStructured(
+        this.agentType,
+        request,
+        onChunk
+      );
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));
@@ -182,12 +191,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const response = await this.api!.continueSession(
-        this.agentType,
-        identifier,
-        prompt,
-        options
-      );
+      const response = await this.api?.continueSession(this.agentType, identifier, prompt, options);
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.SESSION_NOT_FOUND));
@@ -206,7 +210,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const response = await this.api!.continueSessionStreaming(
+      const response = await this.api?.continueSessionStreaming(
         this.agentType,
         identifier,
         prompt,
@@ -235,7 +239,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     try {
       // Note: The IPC API uses slightly different types, cast as needed
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const session = await this.api!.getSession(this.agentType, sessionId, filter as any);
+      const session = await this.api?.getSession(this.agentType, sessionId, filter as any);
       return ok(session as CodingAgentSessionContent | null);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.SESSION_NOT_FOUND));
@@ -266,15 +270,13 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
 
     // The API now returns Result<SessionInfo, AgentError> directly
     // We need to map the main-side error to renderer-side AgentError
-    const result = await this.api!.forkSession(this.agentType, options);
+    const result = await this.api?.forkSession(this.agentType, options);
 
     if (!result.success) {
       // Convert main-side error to renderer-side AgentError
-      return err(agentError(
-        AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
-        result.error.message,
-        result.error
-      ));
+      return err(
+        agentError(AgentErrorCode.CAPABILITY_NOT_SUPPORTED, result.error.message, result.error)
+      );
     }
 
     return ok(result.data);
@@ -289,23 +291,21 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const summaries = await this.api!.listSessionSummaries(this.agentType, filter);
+      const summaries = await this.api?.listSessionSummaries(this.agentType, filter);
       return ok(summaries);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.UNKNOWN_ERROR));
     }
   }
 
-  async getLatestSession(
-    workspacePath: string
-  ): Promise<Result<SessionInfo | null, AgentError>> {
+  async getLatestSession(workspacePath: string): Promise<Result<SessionInfo | null, AgentError>> {
     const apiError = this.checkApiAvailable();
     if (apiError) {
       return err(apiError);
     }
 
     try {
-      const session = await this.api!.getLatestSession(this.agentType, workspacePath);
+      const session = await this.api?.getLatestSession(this.agentType, workspacePath);
       if (!session) {
         return ok(null);
       }
@@ -353,10 +353,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   // Events
   // ============================================
 
-  onEvent<T extends AgentAdapterEventType>(
-    type: T,
-    handler: AgentEventHandler<T>
-  ): () => void {
+  onEvent<T extends AgentAdapterEventType>(type: T, handler: AgentEventHandler<T>): () => void {
     // Delegate to SharedEventDispatcher for centralized event handling
     return sharedEventDispatcher.subscribe(type, handler);
   }

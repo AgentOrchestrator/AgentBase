@@ -3,9 +3,9 @@
  * Implements singleton pattern to ensure only one database instance exists
  */
 
-import * as path from 'path';
+import * as path from 'node:path';
 import { app } from 'electron';
-import { IDatabase } from './IDatabase';
+import type { IDatabase } from './IDatabase';
 import { SQLiteDatabase } from './SQLiteDatabase';
 
 export type DatabaseType = 'sqlite';
@@ -19,28 +19,25 @@ export class DatabaseFactory {
    * @param customPath - Optional custom path for the database file
    * @returns The database instance
    */
-  static async getDatabase(
-    type: DatabaseType = 'sqlite',
-    customPath?: string
-  ): Promise<IDatabase> {
-    if (this.instance) {
-      return this.instance;
+  static async getDatabase(type: DatabaseType = 'sqlite', customPath?: string): Promise<IDatabase> {
+    if (DatabaseFactory.instance) {
+      return DatabaseFactory.instance;
     }
 
-    const dbPath = customPath || this.getDefaultDatabasePath();
+    const dbPath = customPath || DatabaseFactory.getDefaultDatabasePath();
 
     switch (type) {
       case 'sqlite':
-        this.instance = new SQLiteDatabase(dbPath);
+        DatabaseFactory.instance = new SQLiteDatabase(dbPath);
         break;
       default:
         throw new Error(`Unsupported database type: ${type}`);
     }
 
     // Initialize the database (create tables, etc.)
-    await this.instance.initialize();
+    await DatabaseFactory.instance.initialize();
 
-    return this.instance;
+    return DatabaseFactory.instance;
   }
 
   /**
@@ -57,9 +54,9 @@ export class DatabaseFactory {
    * Resets the singleton instance
    */
   static closeDatabase(): void {
-    if (this.instance) {
-      this.instance.close();
-      this.instance = null;
+    if (DatabaseFactory.instance) {
+      DatabaseFactory.instance.close();
+      DatabaseFactory.instance = null;
     }
   }
 
@@ -67,6 +64,6 @@ export class DatabaseFactory {
    * Reset the singleton instance (useful for testing)
    */
   static reset(): void {
-    this.closeDatabase();
+    DatabaseFactory.closeDatabase();
   }
 }

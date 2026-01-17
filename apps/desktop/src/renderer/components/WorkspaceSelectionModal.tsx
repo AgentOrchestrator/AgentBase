@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import '../WorkspaceSelectionModal.css';
 
 export interface WorkspaceSelectionModalProps {
@@ -31,7 +31,10 @@ export function WorkspaceSelectionModal({
     try {
       // Debug: log what's in shellAPI
       console.log('[WorkspaceSelectionModal] shellAPI:', window.shellAPI);
-      console.log('[WorkspaceSelectionModal] shellAPI keys:', window.shellAPI ? Object.keys(window.shellAPI) : 'undefined');
+      console.log(
+        '[WorkspaceSelectionModal] shellAPI keys:',
+        window.shellAPI ? Object.keys(window.shellAPI) : 'undefined'
+      );
 
       if (!window.shellAPI?.openDirectoryDialog) {
         throw new Error('openDirectoryDialog not available in shellAPI');
@@ -72,12 +75,7 @@ export function WorkspaceSelectionModal({
               placeholder="/path/to/workspace"
             />
             <button onClick={handleBrowse} disabled={isSelecting} className="browse-button">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 512 512"
-                xmlns="http://www.w3.org/2000/svg"
-              >
+              <svg width="16" height="16" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
                   fill="none"
@@ -100,12 +98,10 @@ export function WorkspaceSelectionModal({
         </div>
 
         <div className="workspace-modal-footer">
-          <button className="cancel-button" onClick={onCancel}>Cancel</button>
-          <button
-            className="confirm-button"
-            onClick={handleConfirm}
-            disabled={!selectedPath}
-          >
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="confirm-button" onClick={handleConfirm} disabled={!selectedPath}>
             Select
           </button>
         </div>

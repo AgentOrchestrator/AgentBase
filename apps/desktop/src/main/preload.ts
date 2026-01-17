@@ -1,62 +1,64 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import type { CanvasState, CanvasMetadata } from './types/database';
 import type {
-  WorktreeInfo,
-  WorktreeProvisionOptions,
-  WorktreeReleaseOptions,
-} from './types/worktree';
-import type { CodingAgentState } from '../../types/coding-agent-status';
-import type {
+  AddWorkspaceOptions,
   GitInfo,
-  TerminalSessionState,
-  TerminalSessionAPI,
+  RecentWorkspace,
+  RecentWorkspacesAPI,
   SessionFileChangeEvent,
   SessionWatcherAPI,
   CodingAgentType as SharedCodingAgentType,
-  RecentWorkspace,
-  AddWorkspaceOptions,
-  RecentWorkspacesAPI,
+  TerminalSessionAPI,
+  TerminalSessionState,
 } from '@agent-orchestrator/shared';
+import { contextBridge, ipcRenderer } from 'electron';
+import type { CodingAgentState } from '../../types/coding-agent-status';
 import type {
-  CodingAgentType,
   AgentCapabilities,
+  CodingAgentAPI,
+  CodingAgentType,
+  ContinueOptions,
+  ForkOptions,
   GenerateRequest,
   GenerateResponse,
-  SessionIdentifier,
-  SessionSummary,
+  MessageFilterOptions,
   SessionContent,
   SessionFilterOptions,
-  MessageFilterOptions,
-  ForkOptions,
-  ContinueOptions,
-  CodingAgentAPI,
+  SessionIdentifier,
+  SessionSummary,
   StreamingChunk,
 } from './services/coding-agent';
 import type {
   ChatRequest,
   ChatResponse,
-  VendorId,
-  ModelInfo,
   LLMCapabilities,
+  ModelInfo,
+  VendorId,
 } from './services/llm';
 import type {
-  RepresentationType,
-  RepresentationInput,
-  RepresentationCapabilities,
   AnyRepresentationOutput,
-  ImageRepresentationOutput,
-  SummaryRepresentationOutput,
   AudioRepresentationOutput,
-  ImageTransformOptions,
-  SummaryTransformOptions,
   AudioTransformOptions,
+  ImageRepresentationOutput,
+  ImageTransformOptions,
+  RepresentationCapabilities,
+  RepresentationInput,
+  RepresentationType,
+  SummaryRepresentationOutput,
+  SummaryTransformOptions,
 } from './services/representation';
+import type { CanvasMetadata, CanvasState } from './types/database';
+import type {
+  WorktreeInfo,
+  WorktreeProvisionOptions,
+  WorktreeReleaseOptions,
+} from './types/worktree';
 
 // Type definitions for the electron API
 export interface ElectronAPI {
   createTerminal: (terminalId: string) => void;
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
-  onTerminalExit: (callback: (data: { terminalId: string; code: number; signal?: number }) => void) => void;
+  onTerminalExit: (
+    callback: (data: { terminalId: string; code: number; signal?: number }) => void
+  ) => void;
   sendTerminalInput: (terminalId: string, data: string) => void;
   sendTerminalResize: (terminalId: string, cols: number, rows: number) => void;
   destroyTerminal: (terminalId: string) => void;
@@ -107,10 +109,7 @@ export interface LLMAPI {
   ) => Promise<ChatResponse>;
 
   /** Chat with automatic tool execution */
-  chatWithTools: (
-    request: ChatRequest,
-    maxIterations?: number
-  ) => Promise<ChatResponse>;
+  chatWithTools: (request: ChatRequest, maxIterations?: number) => Promise<ChatResponse>;
 
   /** Store an API key in the keychain */
   setApiKey: (vendor: VendorId, apiKey: string) => Promise<void>;
@@ -134,9 +133,7 @@ export interface LLMAPI {
   getCapabilities: () => Promise<LLMCapabilities>;
 
   /** Subscribe to stream chunks (for use with chatStream) */
-  onStreamChunk: (
-    callback: (data: { requestId: string; chunk: string }) => void
-  ) => () => void;
+  onStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => () => void;
 }
 
 // Type definitions for provider info returned by the API
@@ -153,10 +150,7 @@ export interface RepresentationAPI {
   getAvailableTypes: () => Promise<RepresentationType[]>;
 
   /** Transform using a specific provider */
-  transform: (
-    providerId: string,
-    input: RepresentationInput
-  ) => Promise<AnyRepresentationOutput>;
+  transform: (providerId: string, input: RepresentationInput) => Promise<AnyRepresentationOutput>;
 
   /** Transform to image using the first available image provider */
   transformToImage: (
@@ -187,10 +181,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('terminal-create', terminalId);
   },
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => {
-    ipcRenderer.on('terminal-data', (_event, data: { terminalId: string; data: string }) => callback(data));
+    ipcRenderer.on('terminal-data', (_event, data: { terminalId: string; data: string }) =>
+      callback(data)
+    );
   },
-  onTerminalExit: (callback: (data: { terminalId: string; code: number; signal?: number }) => void) => {
-    ipcRenderer.on('terminal-exit', (_event, data: { terminalId: string; code: number; signal?: number }) => callback(data));
+  onTerminalExit: (
+    callback: (data: { terminalId: string; code: number; signal?: number }) => void
+  ) => {
+    ipcRenderer.on(
+      'terminal-exit',
+      (_event, data: { terminalId: string; code: number; signal?: number }) => callback(data)
+    );
   },
   sendTerminalInput: (terminalId: string, data: string) => {
     ipcRenderer.send('terminal-input', { terminalId, data });
@@ -245,8 +246,7 @@ contextBridge.exposeInMainWorld('canvasAPI', {
   },
   loadCanvas: (canvasId: string) =>
     unwrapResponse<CanvasState | null>(ipcRenderer.invoke('canvas:load', canvasId)),
-  listCanvases: () =>
-    unwrapResponse<CanvasMetadata[]>(ipcRenderer.invoke('canvas:list')),
+  listCanvases: () => unwrapResponse<CanvasMetadata[]>(ipcRenderer.invoke('canvas:list')),
   deleteCanvas: async (canvasId: string) => {
     await unwrapResponse(ipcRenderer.invoke('canvas:delete', canvasId));
   },
@@ -259,11 +259,7 @@ contextBridge.exposeInMainWorld('canvasAPI', {
 
 // Expose worktree API
 contextBridge.exposeInMainWorld('worktreeAPI', {
-  provision: (
-    repoPath: string,
-    branchName: string,
-    options?: WorktreeProvisionOptions
-  ) =>
+  provision: (repoPath: string, branchName: string, options?: WorktreeProvisionOptions) =>
     unwrapResponse<WorktreeInfo>(
       ipcRenderer.invoke('worktree:provision', repoPath, branchName, options)
     ),
@@ -282,9 +278,7 @@ contextBridge.exposeInMainWorld('agentStatusAPI', {
     await unwrapResponse(ipcRenderer.invoke('agent-status:save', agentId, state));
   },
   loadAgentStatus: (agentId: string) =>
-    unwrapResponse<CodingAgentState | null>(
-      ipcRenderer.invoke('agent-status:load', agentId)
-    ),
+    unwrapResponse<CodingAgentState | null>(ipcRenderer.invoke('agent-status:load', agentId)),
   deleteAgentStatus: async (agentId: string) => {
     await unwrapResponse(ipcRenderer.invoke('agent-status:delete', agentId));
   },
@@ -346,7 +340,12 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
 
     try {
       return await unwrapResponse<GenerateResponse>(
-        ipcRenderer.invoke('coding-agent:generate-streaming-structured', requestId, agentType, request)
+        ipcRenderer.invoke(
+          'coding-agent:generate-streaming-structured',
+          requestId,
+          agentType,
+          request
+        )
       );
     } finally {
       ipcRenderer.removeListener('coding-agent:stream-chunk-structured', handler);
@@ -423,9 +422,7 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
       ipcRenderer.invoke('coding-agent:get-session', agentType, sessionId, filter)
     ),
 
-  onStreamChunk: (
-    callback: (data: { requestId: string; chunk: string }) => void
-  ) => {
+  onStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
       data: { requestId: string; chunk: string }
@@ -446,10 +443,7 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     return () => ipcRenderer.removeListener('coding-agent:stream-chunk-structured', handler);
   },
   onAgentEvent: (callback: (event: unknown) => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      data: unknown
-    ) => callback(data);
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('coding-agent:event', handler);
     return () => ipcRenderer.removeListener('coding-agent:event', handler);
   },
@@ -471,11 +465,7 @@ contextBridge.exposeInMainWorld('llmAPI', {
   chat: (request: ChatRequest) =>
     unwrapResponse<ChatResponse>(ipcRenderer.invoke('llm:chat', request)),
 
-  chatStream: async (
-    requestId: string,
-    request: ChatRequest,
-    onChunk: (chunk: string) => void
-  ) => {
+  chatStream: async (requestId: string, request: ChatRequest, onChunk: (chunk: string) => void) => {
     // Set up chunk listener
     const handler = (
       _event: Electron.IpcRendererEvent,
@@ -497,9 +487,7 @@ contextBridge.exposeInMainWorld('llmAPI', {
   },
 
   chatWithTools: (request: ChatRequest, maxIterations?: number) =>
-    unwrapResponse<ChatResponse>(
-      ipcRenderer.invoke('llm:chat-with-tools', request, maxIterations)
-    ),
+    unwrapResponse<ChatResponse>(ipcRenderer.invoke('llm:chat-with-tools', request, maxIterations)),
 
   setApiKey: async (vendor: VendorId, apiKey: string) => {
     await unwrapResponse(ipcRenderer.invoke('llm:set-api-key', vendor, apiKey));
@@ -518,15 +506,12 @@ contextBridge.exposeInMainWorld('llmAPI', {
   getAvailableModels: () =>
     unwrapResponse<ModelInfo[]>(ipcRenderer.invoke('llm:get-available-models')),
 
-  isConfigured: () =>
-    unwrapResponse<boolean>(ipcRenderer.invoke('llm:is-configured')),
+  isConfigured: () => unwrapResponse<boolean>(ipcRenderer.invoke('llm:is-configured')),
 
   getCapabilities: () =>
     unwrapResponse<LLMCapabilities>(ipcRenderer.invoke('llm:get-capabilities')),
 
-  onStreamChunk: (
-    callback: (data: { requestId: string; chunk: string }) => void
-  ) => {
+  onStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
       data: { requestId: string; chunk: string }
@@ -578,7 +563,10 @@ export interface ShellAPI {
   /** Open a path in the system file manager */
   showInFolder: (path: string) => Promise<void>;
   /** Open a directory picker dialog */
-  openDirectoryDialog: (options?: { title?: string; defaultPath?: string }) => Promise<string | null>;
+  openDirectoryDialog: (options?: {
+    title?: string;
+    defaultPath?: string;
+  }) => Promise<string | null>;
 }
 
 // Expose shell API
@@ -603,8 +591,7 @@ export interface FileAPI {
 
 // Expose file API for debug mode
 contextBridge.exposeInMainWorld('fileAPI', {
-  readFile: (filePath: string) =>
-    unwrapResponse<string>(ipcRenderer.invoke('file:read', filePath)),
+  readFile: (filePath: string) => unwrapResponse<string>(ipcRenderer.invoke('file:read', filePath)),
   exists: async (filePath: string) => {
     const result = await ipcRenderer.invoke('file:exists', filePath);
     if (result.success) {
@@ -625,9 +612,15 @@ export interface GitAPI {
   /** List all local git branches for a workspace path */
   listBranches: (workspacePath: string) => Promise<string[] | null>;
   /** Create and checkout a new branch */
-  createBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
+  createBranch: (
+    workspacePath: string,
+    branchName: string
+  ) => Promise<{ success: boolean; error?: string }>;
   /** Checkout an existing branch */
-  checkoutBranch: (workspacePath: string, branchName: string) => Promise<{ success: boolean; error?: string }>;
+  checkoutBranch: (
+    workspacePath: string,
+    branchName: string
+  ) => Promise<{ success: boolean; error?: string }>;
   /** Get GitHub username via GitHub CLI */
   getGithubUsername: () => Promise<{ success: boolean; username?: string; error?: string }>;
 }
@@ -704,10 +697,8 @@ contextBridge.exposeInMainWorld('sessionWatcherAPI', {
     }
   },
   onSessionFileChanged: (callback: (event: SessionFileChangeEvent) => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      data: SessionFileChangeEvent
-    ) => callback(data);
+    const handler = (_event: Electron.IpcRendererEvent, data: SessionFileChangeEvent) =>
+      callback(data);
     ipcRenderer.on('session:file-changed', handler);
     return () => ipcRenderer.removeListener('session:file-changed', handler);
   },

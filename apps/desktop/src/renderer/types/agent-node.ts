@@ -6,28 +6,28 @@
  */
 
 export type {
+  AgentChatMessage,
+  // Main node data
+  AgentNodeData,
+  // View types
+  AgentNodeView,
+  AgentProgress,
+  // Title types
+  AgentTitle,
   // Progress types
   BaseProgress,
   PercentageProgress,
   TodoItem,
   TodoListProgress,
-  AgentProgress,
-  // Title types
-  AgentTitle,
-  // View types
-  AgentNodeView,
-  AgentChatMessage,
-  // Main node data
-  AgentNodeData,
 } from '@agent-orchestrator/shared';
 
 export {
-  // Type guards
-  isPercentageProgress,
-  isTodoListProgress,
   // Helper functions
   createDefaultAgentTitle,
   createPercentageProgress,
   createTodoListProgress,
   getTodoListCompletionPercent,
+  // Type guards
+  isPercentageProgress,
+  isTodoListProgress,
 } from '@agent-orchestrator/shared';
