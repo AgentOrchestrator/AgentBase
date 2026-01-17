@@ -212,8 +212,8 @@
   min-height: 0;
 }
 
-/* Handle styles - fully invisible but functional */
-.agent-node .react-flow__handle {
+/* Handle styles - fully invisible but functional (except fork handle) */
+.agent-node .react-flow__handle:not(.agent-node-bottom-handle) {
   background: transparent !important;
   width: 10px;
   height: 10px;
@@ -321,7 +321,7 @@
   cursor: nesw-resize !important;
 }
 
-.agent-node .react-flow__handle:hover {
+.agent-node .react-flow__handle:not(.agent-node-bottom-handle):hover {
   background: transparent !important;
   opacity: 0 !important;
 }

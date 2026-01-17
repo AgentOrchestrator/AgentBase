@@ -240,6 +240,11 @@ export class ClaudeCodeJsonlParser {
       if (data.type === 'summary' && data.summary) summary = data.summary;
 
       if ((data.type === 'user' || data.type === 'assistant') && data.message?.content) {
+        // Skip user messages that contain only tool_result content
+        if (data.type === 'user' && this.isToolResultOnlyMessage(data.message.content)) {
+          continue;
+        }
+
         const displayText = this.extractDisplayText(data.message.content);
         if (displayText) {
           messages.push({
@@ -267,6 +272,29 @@ export class ClaudeCodeJsonlParser {
   // ===========================================================================
 
   /**
+   * Check if message content contains only tool_result blocks (not actual user input).
+   * These are automatic responses to tool_use and should not be displayed in chat.
+   */
+  private isToolResultOnlyMessage(content: unknown): boolean {
+    if (!Array.isArray(content)) return false;
+    if (content.length === 0) return false;
+
+    for (const item of content) {
+      // If there's a plain string, it's actual user text
+      if (typeof item === 'string') return false;
+
+      if (typeof item === 'object' && item !== null) {
+        const obj = item as Record<string, unknown>;
+        // If any content block is NOT tool_result, keep the message
+        if (obj.type !== 'tool_result') return false;
+      }
+    }
+
+    // All content items are tool_result - skip this message
+    return true;
+  }
+
+  /**
    * Parse a single JSONL line to CodingAgentMessage array
    */
   private parseJsonlLineToMessages(data: ClaudeCodeJsonlLine): CodingAgentMessage[] {
@@ -274,6 +302,11 @@ export class ClaudeCodeJsonlParser {
 
     if (!data.message?.content) return messages;
     if (data.type !== 'user' && data.type !== 'assistant') return messages;
+
+    // Skip user messages that contain only tool_result content (not actual user input)
+    if (data.type === 'user' && this.isToolResultOnlyMessage(data.message.content)) {
+      return messages;
+    }
 
     const { blocks, displayText } = parseContentBlocks(data.message.content, {
       generateId: this.generateId,
