@@ -1951,9 +1951,9 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         >
           <Background
             variant={BackgroundVariant.Lines}
-            gap={12}
-            size={1}
-            color={theme === 'light-web' ? '#F5F6F8' : '#3a3a3a'}
+            gap={24}
+            size={2}
+            color={theme === 'light-web' ? '#F5F6F8' : theme === 'dark' ? '#171717' : '#3a3a3a'}
           />
           <ForkGhostNode />
         </ReactFlow>
