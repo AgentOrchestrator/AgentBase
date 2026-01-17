@@ -1,7 +1,7 @@
 -- ============================================================================
--- Consolidated Schema Baseline Migration
--- This migration creates the complete database schema in its final state
--- All incremental patches have been consolidated into this single file
+-- CONSOLIDATED SCHEMA - Agent Orchestrator
+-- This single migration contains the complete database schema
+-- Generated: 2025-10-27
 -- ============================================================================
 
 -- ============================================================================
@@ -397,6 +397,216 @@ COMMENT ON COLUMN public.user_preferences.ai_model_provider IS 'LLM provider to 
 COMMENT ON COLUMN public.user_preferences.ai_model_name IS 'Specific model to use (e.g., gpt-4o-mini, claude-3-5-sonnet)';
 
 -- ============================================================================
+-- SESSION SHARING TABLES
+-- ============================================================================
+
+-- Session Shares (Individual User Shares)
+CREATE TABLE IF NOT EXISTS public.session_shares (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES public.chat_histories(id) ON DELETE CASCADE,
+  shared_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  shared_with_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  permission_level TEXT NOT NULL DEFAULT 'view' CHECK (permission_level IN ('view', 'edit')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(session_id, shared_by_user_id, shared_with_user_id)
+);
+
+-- Session Workspace Shares
+CREATE TABLE IF NOT EXISTS public.session_workspace_shares (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES public.chat_histories(id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  shared_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  permission_level TEXT NOT NULL DEFAULT 'view' CHECK (permission_level IN ('view', 'edit')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(session_id, workspace_id)
+);
+
+-- Session Share Exclusions
+CREATE TABLE IF NOT EXISTS public.session_share_exclusions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES public.chat_histories(id) ON DELETE CASCADE,
+  project_share_id UUID REFERENCES public.project_shares(id) ON DELETE CASCADE,
+  project_workspace_share_id UUID REFERENCES public.project_workspace_shares(id) ON DELETE CASCADE,
+  excluded_by_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CHECK (
+    (project_share_id IS NOT NULL AND project_workspace_share_id IS NULL) OR
+    (project_share_id IS NULL AND project_workspace_share_id IS NOT NULL)
+  ),
+  UNIQUE(session_id, project_share_id),
+  UNIQUE(session_id, project_workspace_share_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_shares_session_id ON public.session_shares(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_shares_shared_with_user_id ON public.session_shares(shared_with_user_id);
+CREATE INDEX IF NOT EXISTS idx_session_shares_shared_by_user_id ON public.session_shares(shared_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_session_workspace_shares_session_id ON public.session_workspace_shares(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_workspace_shares_workspace_id ON public.session_workspace_shares(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_session_share_exclusions_session_id ON public.session_share_exclusions(session_id);
+
+ALTER TABLE public.session_shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_workspace_shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_share_exclusions ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.session_shares IS 'Stores individual session sharing permissions between users';
+COMMENT ON TABLE public.session_workspace_shares IS 'Shares sessions with entire workspaces (all members get access)';
+COMMENT ON TABLE public.session_share_exclusions IS 'Tracks sessions excluded from project-level shares. By default, sharing a project shares all sessions.';
+COMMENT ON COLUMN public.session_share_exclusions.project_share_id IS 'Reference to project_shares if excluding from user share';
+COMMENT ON COLUMN public.session_share_exclusions.project_workspace_share_id IS 'Reference to project_workspace_shares if excluding from workspace share';
+
+-- ============================================================================
+-- SHARED MEMORY SYSTEM TABLES
+-- ============================================================================
+
+-- Extracted Rules Table
+CREATE TABLE IF NOT EXISTS extracted_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rule_text TEXT NOT NULL,
+  rule_category TEXT,
+  source_session_ids UUID[] NOT NULL,
+  mem0_memory_id TEXT,
+  confidence_score FLOAT CHECK (confidence_score >= 0 AND confidence_score <= 1),
+  usage_count INTEGER DEFAULT 0,
+  last_used_at TIMESTAMPTZ,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  extracted_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_extracted_rules_workspace ON extracted_rules(workspace_id);
+CREATE INDEX idx_extracted_rules_project ON extracted_rules(project_id);
+CREATE INDEX idx_extracted_rules_category ON extracted_rules(rule_category);
+CREATE INDEX idx_extracted_rules_confidence ON extracted_rules(confidence_score);
+CREATE INDEX idx_extracted_rules_created_at ON extracted_rules(created_at DESC);
+
+CREATE TRIGGER update_extracted_rules_updated_at
+  BEFORE UPDATE ON extracted_rules
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE extracted_rules IS 'Stores coding rules extracted from chat histories using mem0';
+COMMENT ON COLUMN extracted_rules.source_session_ids IS 'Array of chat_history IDs that provided evidence for this rule';
+COMMENT ON COLUMN extracted_rules.mem0_memory_id IS 'Reference to mem0 memory entry for full context';
+COMMENT ON COLUMN extracted_rules.confidence_score IS 'LLM confidence score (0-1) for rule validity';
+
+-- Rule Approvals Table
+CREATE TABLE IF NOT EXISTS rule_approvals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rule_id UUID NOT NULL REFERENCES extracted_rules(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (
+    status IN ('pending', 'approved', 'rejected', 'needs_revision', 'archived', 'under_review', 'escalated')
+  ),
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMPTZ,
+  rejection_reason TEXT,
+  revision_notes TEXT,
+  required_approvals INTEGER DEFAULT 1 CHECK (required_approvals > 0),
+  current_approvals INTEGER DEFAULT 0 CHECK (current_approvals >= 0),
+  required_role TEXT,
+  auto_approved BOOLEAN DEFAULT FALSE,
+  approval_conditions JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(rule_id)
+);
+
+CREATE INDEX idx_rule_approvals_status ON rule_approvals(status);
+CREATE INDEX idx_rule_approvals_rule_id ON rule_approvals(rule_id);
+CREATE INDEX idx_rule_approvals_reviewed_by ON rule_approvals(reviewed_by);
+CREATE INDEX idx_rule_approvals_pending ON rule_approvals(status) WHERE status = 'pending';
+
+CREATE TRIGGER update_rule_approvals_updated_at
+  BEFORE UPDATE ON rule_approvals
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE rule_approvals IS 'Approval workflow for extracted rules (separated for extensibility)';
+COMMENT ON COLUMN rule_approvals.required_approvals IS 'Number of approvals needed (for multi-step approval)';
+COMMENT ON COLUMN rule_approvals.approval_conditions IS 'JSONB field for custom conditional approval logic';
+
+-- Rule Approval History Table
+CREATE TABLE IF NOT EXISTS rule_approval_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rule_id UUID NOT NULL REFERENCES extracted_rules(id) ON DELETE CASCADE,
+  previous_status TEXT,
+  new_status TEXT NOT NULL,
+  changed_by UUID NOT NULL REFERENCES auth.users(id),
+  change_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_rule_approval_history_rule ON rule_approval_history(rule_id, created_at DESC);
+CREATE INDEX idx_rule_approval_history_changed_by ON rule_approval_history(changed_by);
+
+COMMENT ON TABLE rule_approval_history IS 'Audit trail for all rule approval status changes';
+
+-- Extraction Prompts Table
+CREATE TABLE IF NOT EXISTS extraction_prompts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  prompt_text TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  is_active BOOLEAN DEFAULT TRUE,
+  target_categories TEXT[],
+  min_confidence FLOAT DEFAULT 0.7 CHECK (min_confidence >= 0 AND min_confidence <= 1),
+  created_by UUID REFERENCES auth.users(id),
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE NULLS NOT DISTINCT (name, workspace_id)
+);
+
+CREATE INDEX idx_extraction_prompts_active ON extraction_prompts(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_extraction_prompts_workspace ON extraction_prompts(workspace_id);
+CREATE INDEX idx_extraction_prompts_name ON extraction_prompts(name);
+
+CREATE TRIGGER update_extraction_prompts_updated_at
+  BEFORE UPDATE ON extraction_prompts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE extraction_prompts IS 'Modular prompts for rule extraction (stored in DB for easy modification)';
+COMMENT ON COLUMN extraction_prompts.workspace_id IS 'NULL for global prompts, workspace ID for workspace-specific';
+
+-- Rule File Configs Table
+CREATE TABLE IF NOT EXISTS rule_file_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  file_path TEXT NOT NULL,
+  file_type TEXT NOT NULL CHECK (file_type IN ('cursorrules', 'claude_md', 'custom')),
+  last_generated_at TIMESTAMPTZ,
+  last_generated_by UUID REFERENCES auth.users(id),
+  last_generated_content TEXT,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  auto_sync_enabled BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE NULLS NOT DISTINCT (file_path, workspace_id, project_id)
+);
+
+CREATE INDEX idx_rule_file_configs_workspace ON rule_file_configs(workspace_id);
+CREATE INDEX idx_rule_file_configs_project ON rule_file_configs(project_id);
+CREATE INDEX idx_rule_file_configs_auto_sync ON rule_file_configs(auto_sync_enabled) WHERE auto_sync_enabled = TRUE;
+
+CREATE TRIGGER update_rule_file_configs_updated_at
+  BEFORE UPDATE ON rule_file_configs
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE rule_file_configs IS 'Configuration and tracking for generated rule files';
+COMMENT ON COLUMN rule_file_configs.last_generated_content IS 'Stored for diff generation';
+
+ALTER TABLE extracted_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rule_approvals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rule_approval_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE extraction_prompts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rule_file_configs ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
 -- HELPER FUNCTIONS (depend on tables above)
 -- ============================================================================
 
@@ -588,8 +798,6 @@ COMMENT ON FUNCTION public.user_has_project_edit_permission(UUID, UUID) IS
   'Check if user has edit permission on a project';
 
 -- Function to check if current user is a system admin
--- IMPORTANT: Uses SECURITY DEFINER to bypass RLS and prevent recursive policy checks
--- This function is used in RLS policies, so it must not trigger RLS on tables it queries
 CREATE OR REPLACE FUNCTION public.is_system_admin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -599,9 +807,6 @@ AS $$
 DECLARE
   is_admin_user BOOLEAN;
 BEGIN
-  -- Query public.users with SECURITY DEFINER privileges
-  -- This bypasses RLS to prevent infinite recursion when this function
-  -- is called from RLS policies that themselves query users table
   SELECT is_admin INTO is_admin_user
   FROM public.users
   WHERE id = auth.uid()
@@ -613,6 +818,129 @@ $$;
 
 COMMENT ON FUNCTION public.is_system_admin() IS
   'Check if current user has system admin privileges. Uses SECURITY DEFINER to bypass RLS and prevent recursive policy checks.';
+
+-- Helper function to check if user owns a session (bypasses RLS to avoid recursion)
+CREATE OR REPLACE FUNCTION public.user_owns_session(session_uuid UUID, user_uuid UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.chat_histories
+    WHERE id = session_uuid
+    AND account_id = user_uuid
+  );
+$$;
+
+-- Helper function to check if user is workspace member (bypasses RLS to avoid recursion)
+CREATE OR REPLACE FUNCTION public.user_in_workspace(user_uuid UUID, workspace_uuid UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE user_id = user_uuid
+    AND workspace_id = workspace_uuid
+  );
+$$;
+
+-- Function: Get approved rules for a workspace/project
+CREATE OR REPLACE FUNCTION get_approved_rules(
+  p_workspace_id UUID DEFAULT NULL,
+  p_project_id UUID DEFAULT NULL,
+  p_category TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+  id UUID,
+  rule_text TEXT,
+  rule_category TEXT,
+  confidence_score FLOAT,
+  usage_count INTEGER,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    r.id,
+    r.rule_text,
+    r.rule_category,
+    r.confidence_score,
+    r.usage_count,
+    r.created_at
+  FROM extracted_rules r
+  INNER JOIN rule_approvals ra ON r.id = ra.rule_id
+  WHERE ra.status = 'approved'
+    AND (p_workspace_id IS NULL OR r.workspace_id = p_workspace_id)
+    AND (p_project_id IS NULL OR r.project_id = p_project_id)
+    AND (p_category IS NULL OR r.rule_category = p_category)
+  ORDER BY r.rule_category, r.confidence_score DESC, r.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION get_approved_rules IS 'Get all approved rules filtered by workspace/project/category';
+
+-- Function: Approve a rule (with history tracking)
+CREATE OR REPLACE FUNCTION approve_rule(
+  p_rule_id UUID,
+  p_reviewed_by UUID,
+  p_notes TEXT DEFAULT NULL
+)
+RETURNS VOID AS $$
+DECLARE
+  v_previous_status TEXT;
+BEGIN
+  SELECT status INTO v_previous_status
+  FROM rule_approvals
+  WHERE rule_id = p_rule_id;
+
+  UPDATE rule_approvals
+  SET
+    status = 'approved',
+    reviewed_by = p_reviewed_by,
+    reviewed_at = NOW(),
+    revision_notes = p_notes,
+    updated_at = NOW()
+  WHERE rule_id = p_rule_id;
+
+  INSERT INTO rule_approval_history (rule_id, previous_status, new_status, changed_by, change_reason)
+  VALUES (p_rule_id, v_previous_status, 'approved', p_reviewed_by, p_notes);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION approve_rule IS 'Approve a rule and log the change to history';
+
+-- Function: Reject a rule (with history tracking)
+CREATE OR REPLACE FUNCTION reject_rule(
+  p_rule_id UUID,
+  p_reviewed_by UUID,
+  p_rejection_reason TEXT
+)
+RETURNS VOID AS $$
+DECLARE
+  v_previous_status TEXT;
+BEGIN
+  SELECT status INTO v_previous_status
+  FROM rule_approvals
+  WHERE rule_id = p_rule_id;
+
+  UPDATE rule_approvals
+  SET
+    status = 'rejected',
+    reviewed_by = p_reviewed_by,
+    reviewed_at = NOW(),
+    rejection_reason = p_rejection_reason,
+    updated_at = NOW()
+  WHERE rule_id = p_rule_id;
+
+  INSERT INTO rule_approval_history (rule_id, previous_status, new_status, changed_by, change_reason)
+  VALUES (p_rule_id, v_previous_status, 'rejected', p_reviewed_by, p_rejection_reason);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION reject_rule IS 'Reject a rule and log the change to history';
 
 -- ============================================================================
 -- AUTH TRIGGER FUNCTIONS (handle user creation and synchronization)
@@ -678,6 +1006,69 @@ $$;
 COMMENT ON FUNCTION public.create_default_project_for_user() IS
   'Trigger function to create default Uncategorized project for new users';
 
+-- Function to create a default workspace for new users
+CREATE OR REPLACE FUNCTION public.create_default_workspace_for_user()
+RETURNS TRIGGER
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  new_workspace_id UUID;
+  user_email TEXT;
+  workspace_name TEXT;
+  workspace_slug TEXT;
+BEGIN
+  SELECT email INTO user_email
+  FROM auth.users
+  WHERE id = NEW.id;
+
+  workspace_name := 'Personal Workspace';
+  workspace_slug := 'personal-' || REPLACE(CAST(NEW.id AS TEXT), '-', '');
+
+  INSERT INTO public.workspaces (
+    name,
+    slug,
+    description,
+    created_by_user_id,
+    workspace_metadata
+  )
+  VALUES (
+    workspace_name,
+    workspace_slug,
+    'Your personal workspace for managing coding rules and projects.',
+    NEW.id,
+    jsonb_build_object('is_default', true, 'created_via', 'auto_signup')
+  )
+  RETURNING id INTO new_workspace_id;
+
+  INSERT INTO public.workspace_members (
+    workspace_id,
+    user_id,
+    role,
+    invitation_status,
+    invited_by_user_id
+  )
+  VALUES (
+    new_workspace_id,
+    NEW.id,
+    'owner',
+    'accepted',
+    NEW.id
+  )
+  ON CONFLICT (workspace_id, user_id) DO NOTHING;
+
+  RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'Failed to create default workspace for user %: %', NEW.id, SQLERRM;
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.create_default_workspace_for_user() IS
+  'Automatically creates a default "Personal Workspace" for new users upon signup.';
+
 -- ============================================================================
 -- AUTH TRIGGERS (on auth.users table)
 -- ============================================================================
@@ -695,6 +1086,49 @@ CREATE TRIGGER create_default_project_on_user_creation
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.create_default_project_for_user();
+
+-- ============================================================================
+-- WORKSPACE TRIGGER FUNCTIONS
+-- ============================================================================
+
+-- Function to add workspace creator as owner when workspace is created
+CREATE OR REPLACE FUNCTION public.add_creator_as_workspace_owner()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    SET LOCAL row_security = off;
+    INSERT INTO public.workspace_members (workspace_id, user_id, role, invitation_status, joined_at, invited_at)
+    VALUES (NEW.id, NEW.created_by_user_id, 'owner', 'accepted', now(), now());
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.add_creator_as_workspace_owner() IS
+'Trigger function that automatically adds the workspace creator as an owner when a new workspace is created.';
+
+-- Trigger to add creator as workspace owner
+DROP TRIGGER IF EXISTS add_creator_as_owner_on_workspace_creation ON public.workspaces;
+CREATE TRIGGER add_creator_as_owner_on_workspace_creation
+  AFTER INSERT ON public.workspaces
+  FOR EACH ROW
+  EXECUTE FUNCTION public.add_creator_as_workspace_owner();
+
+-- Trigger to update workspaces.updated_at
+DROP TRIGGER IF EXISTS update_workspaces_updated_at ON public.workspaces;
+CREATE TRIGGER update_workspaces_updated_at
+  BEFORE UPDATE ON public.workspaces
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Trigger to create default workspace on user creation
+DROP TRIGGER IF EXISTS create_default_workspace_on_user_creation ON public.users;
+CREATE TRIGGER create_default_workspace_on_user_creation
+  AFTER INSERT ON public.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.create_default_workspace_for_user();
 
 -- ============================================================================
 -- ROW LEVEL SECURITY POLICIES
@@ -907,8 +1341,6 @@ CREATE POLICY "Users can delete their own canvas layouts"
 CREATE POLICY "Users can view their workspaces"
   ON public.workspaces FOR SELECT
   USING (
-    -- Allow users to view workspaces they created OR are members of
-    -- This allows .insert().select() to work after workspace creation
     auth.uid() = created_by_user_id
     OR EXISTS (
       SELECT 1 FROM workspace_members wm
@@ -925,7 +1357,6 @@ CREATE POLICY "System admin can view all workspaces"
 CREATE POLICY "Users can create workspaces"
   ON public.workspaces FOR INSERT
   WITH CHECK (
-    -- Allow authenticated users to create workspaces only for themselves
     auth.uid() IS NOT NULL
     AND auth.uid() = created_by_user_id
   );
@@ -1093,44 +1524,411 @@ CREATE POLICY "Users can delete own preferences"
   ON public.user_preferences FOR DELETE
   USING (auth.uid() = user_id);
 
+-- Session Shares Policies
+CREATE POLICY "session_shares_select"
+  ON public.session_shares FOR SELECT
+  USING (
+    shared_by_user_id = auth.uid() OR
+    shared_with_user_id = auth.uid() OR
+    public.user_owns_session(session_id, auth.uid())
+  );
+
+CREATE POLICY "session_shares_insert"
+  ON public.session_shares FOR INSERT
+  WITH CHECK (
+    shared_by_user_id = auth.uid() AND
+    public.user_owns_session(session_id, auth.uid())
+  );
+
+CREATE POLICY "session_shares_delete"
+  ON public.session_shares FOR DELETE
+  USING (shared_by_user_id = auth.uid());
+
+-- Session Workspace Shares Policies
+CREATE POLICY "session_workspace_shares_select"
+  ON public.session_workspace_shares FOR SELECT
+  USING (
+    shared_by_user_id = auth.uid() OR
+    public.user_owns_session(session_id, auth.uid()) OR
+    public.user_in_workspace(auth.uid(), workspace_id)
+  );
+
+CREATE POLICY "session_workspace_shares_insert"
+  ON public.session_workspace_shares FOR INSERT
+  WITH CHECK (
+    shared_by_user_id = auth.uid() AND
+    public.user_owns_session(session_id, auth.uid())
+  );
+
+CREATE POLICY "session_workspace_shares_delete"
+  ON public.session_workspace_shares FOR DELETE
+  USING (shared_by_user_id = auth.uid());
+
+-- Session Share Exclusions Policies
+CREATE POLICY "session_exclusions_select"
+  ON public.session_share_exclusions FOR SELECT
+  USING (
+    excluded_by_user_id = auth.uid() OR
+    public.user_owns_session(session_id, auth.uid())
+  );
+
+CREATE POLICY "session_exclusions_insert"
+  ON public.session_share_exclusions FOR INSERT
+  WITH CHECK (
+    excluded_by_user_id = auth.uid() AND
+    public.user_owns_session(session_id, auth.uid())
+  );
+
+CREATE POLICY "session_exclusions_delete"
+  ON public.session_share_exclusions FOR DELETE
+  USING (excluded_by_user_id = auth.uid());
+
 -- ============================================================================
--- WORKSPACE TRIGGER FUNCTIONS
+-- SHARED MEMORY SYSTEM RLS POLICIES
 -- ============================================================================
 
--- Function to add workspace creator as owner when workspace is created
-CREATE OR REPLACE FUNCTION public.add_creator_as_workspace_owner()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-    -- Temporarily disable RLS for this operation
-    -- This allows the trigger to insert the workspace creator as owner
-    -- even though they're not yet a workspace admin (chicken-and-egg problem)
-    SET LOCAL row_security = off;
+-- Extracted Rules Policies
+CREATE POLICY "Users can view rules from their workspaces"
+  ON extracted_rules
+  FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IN (
+        SELECT workspace_id
+        FROM workspace_members
+        WHERE user_id = auth.uid()
+      )
+      OR project_id IN (
+        SELECT id
+        FROM projects
+        WHERE user_id = auth.uid()
+      )
+      OR (extracted_by = auth.uid() AND workspace_id IS NULL AND project_id IS NULL)
+      OR (workspace_id IS NULL AND project_id IS NULL)
+    )
+  );
 
-    -- Add the creator as the workspace owner with accepted status (no invitation needed)
-    INSERT INTO public.workspace_members (workspace_id, user_id, role, invitation_status, joined_at, invited_at)
-    VALUES (NEW.id, NEW.created_by_user_id, 'owner', 'accepted', now(), now());
+CREATE POLICY "Users can create rules for their workspaces"
+  ON extracted_rules
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IN (
+        SELECT workspace_id
+        FROM workspace_members
+        WHERE user_id = auth.uid()
+      )
+      OR project_id IN (
+        SELECT id
+        FROM projects
+        WHERE user_id = auth.uid()
+      )
+      OR (workspace_id IS NULL AND project_id IS NULL AND extracted_by = auth.uid())
+    )
+  );
 
-    RETURN NEW;
-END;
-$$;
+CREATE POLICY "Users can update their own rules or workspace rules"
+  ON extracted_rules
+  FOR UPDATE
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      extracted_by = auth.uid()
+      OR workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+    )
+  );
 
-COMMENT ON FUNCTION public.add_creator_as_workspace_owner() IS
-'Trigger function that automatically adds the workspace creator as an owner when a new workspace is created. Uses SECURITY DEFINER and disables RLS to bypass the workspace_members INSERT policy.';
+CREATE POLICY "Users can delete their own rules or workspace rules"
+  ON extracted_rules
+  FOR DELETE
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      extracted_by = auth.uid()
+      OR workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+    )
+  );
 
--- Trigger to add creator as workspace owner
-DROP TRIGGER IF EXISTS add_creator_as_owner_on_workspace_creation ON public.workspaces;
-CREATE TRIGGER add_creator_as_owner_on_workspace_creation
-  AFTER INSERT ON public.workspaces
-  FOR EACH ROW
-  EXECUTE FUNCTION public.add_creator_as_workspace_owner();
+-- Rule Approvals Policies
+CREATE POLICY "Users can view approvals for accessible rules"
+  ON rule_approvals
+  FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL
+    AND rule_id IN (
+      SELECT id FROM extracted_rules
+    )
+  );
 
--- Trigger to update workspaces.updated_at
-DROP TRIGGER IF EXISTS update_workspaces_updated_at ON public.workspaces;
-CREATE TRIGGER update_workspaces_updated_at
-  BEFORE UPDATE ON public.workspaces
-  FOR EACH ROW
-  EXECUTE FUNCTION public.update_updated_at_column();
+CREATE POLICY "Users can create approvals for new rules"
+  ON rule_approvals
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND rule_id IN (
+      SELECT id FROM extracted_rules
+      WHERE extracted_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "Workspace members can update approval status"
+  ON rule_approvals
+  FOR UPDATE
+  USING (
+    auth.uid() IS NOT NULL
+    AND rule_id IN (
+      SELECT r.id
+      FROM extracted_rules r
+      WHERE
+        r.workspace_id IN (
+          SELECT workspace_id
+          FROM workspace_members
+          WHERE user_id = auth.uid()
+        )
+        OR r.project_id IN (
+          SELECT id FROM projects WHERE user_id = auth.uid()
+        )
+        OR r.extracted_by = auth.uid()
+    )
+  );
+
+-- Rule Approval History Policies
+CREATE POLICY "Users can view approval history for accessible rules"
+  ON rule_approval_history
+  FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL
+    AND rule_id IN (
+      SELECT id FROM extracted_rules
+    )
+  );
+
+CREATE POLICY "System can insert approval history"
+  ON rule_approval_history
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND changed_by = auth.uid()
+  );
+
+-- Extraction Prompts Policies
+CREATE POLICY "Users can view global and workspace prompts"
+  ON extraction_prompts
+  FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IS NULL
+      OR workspace_id IN (
+        SELECT workspace_id
+        FROM workspace_members
+        WHERE user_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Workspace admins can create prompts"
+  ON extraction_prompts
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND (
+      (workspace_id IS NULL AND auth.uid() IN (
+        SELECT id FROM auth.users WHERE raw_user_meta_data->>'is_admin' = 'true'
+      ))
+      OR workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+    )
+  );
+
+CREATE POLICY "Workspace admins can update prompts"
+  ON extraction_prompts
+  FOR UPDATE
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      (workspace_id IS NULL AND auth.uid() IN (
+        SELECT id FROM auth.users WHERE raw_user_meta_data->>'is_admin' = 'true'
+      ))
+      OR workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+      OR created_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "Creators and admins can delete prompts"
+  ON extraction_prompts
+  FOR DELETE
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      created_by = auth.uid()
+      OR workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+    )
+  );
+
+-- Rule File Configs Policies
+CREATE POLICY "Users can view file configs for their workspaces"
+  ON rule_file_configs
+  FOR SELECT
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IN (
+        SELECT workspace_id
+        FROM workspace_members
+        WHERE user_id = auth.uid()
+      )
+      OR project_id IN (
+        SELECT id FROM projects WHERE user_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Workspace members can create file configs"
+  ON rule_file_configs
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IN (
+        SELECT workspace_id
+        FROM workspace_members
+        WHERE user_id = auth.uid()
+      )
+      OR project_id IN (
+        SELECT id FROM projects WHERE user_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Workspace admins can update file configs"
+  ON rule_file_configs
+  FOR UPDATE
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+      OR project_id IN (
+        SELECT id FROM projects WHERE user_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Workspace admins can delete file configs"
+  ON rule_file_configs
+  FOR DELETE
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      workspace_id IN (
+        SELECT wm.workspace_id
+        FROM workspace_members wm
+        INNER JOIN workspaces w ON w.id = wm.workspace_id
+        WHERE wm.user_id = auth.uid()
+          AND (w.created_by_user_id = auth.uid() OR wm.role = 'admin')
+      )
+      OR project_id IN (
+        SELECT id FROM projects WHERE user_id = auth.uid()
+      )
+    )
+  );
+
+-- ============================================================================
+-- GRANT PERMISSIONS
+-- ============================================================================
+GRANT EXECUTE ON FUNCTION get_approved_rules TO authenticated;
+GRANT EXECUTE ON FUNCTION approve_rule TO authenticated;
+GRANT EXECUTE ON FUNCTION reject_rule TO authenticated;
+
+-- ============================================================================
+-- REALTIME CONFIGURATION
+-- ============================================================================
+ALTER PUBLICATION supabase_realtime ADD TABLE chat_histories;
+ALTER PUBLICATION supabase_realtime ADD TABLE pinned_conversations;
+ALTER PUBLICATION supabase_realtime ADD TABLE session_shares;
+ALTER PUBLICATION supabase_realtime ADD TABLE session_workspace_shares;
+
+-- ============================================================================
+-- SEED DATA: Default Extraction Prompt
+-- ============================================================================
+INSERT INTO extraction_prompts (name, description, prompt_text, target_categories, is_active)
+VALUES (
+  'default',
+  'General-purpose prompt for extracting coding rules from conversations',
+  $$Analyze the following conversation between a developer and an AI coding assistant.
+
+Extract actionable coding rules that should be remembered for future sessions. Focus on:
+
+1. **Repeated Corrections:** Patterns where the developer corrects the AI multiple times (e.g., "use X instead of Y", "always do Z before W")
+2. **Workflow Preferences:** Steps the developer explicitly wants followed (e.g., "always create migration files first", "test locally before pushing")
+3. **Technical Constraints:** Architecture decisions, technology choices, or technical limitations (e.g., "never use 'use client' with async", "must use pnpm not npm")
+4. **Style Preferences:** Code formatting, naming conventions, file organization (e.g., "prefer functional components", "use kebab-case for file names")
+
+For each rule you extract, provide:
+- **rule_text**: Clear, actionable statement starting with a verb (e.g., "Use pnpm for all package management")
+- **category**: One of: git-workflow, code-style, architecture, best-practices, testing, documentation
+- **confidence**: Score from 0-1 based on:
+  - 0.9-1.0: Explicitly stated by user multiple times
+  - 0.7-0.9: Clearly implied or stated once emphatically
+  - 0.5-0.7: Inferred from context
+  - Below 0.5: Don't include
+- **evidence**: Brief quote from conversation showing where this rule came from
+
+Return JSON array format:
+[
+  {
+    "rule_text": "Always create migration files before applying database changes",
+    "category": "best-practices",
+    "confidence": 0.95,
+    "evidence": "User said: 'NEVER apply migrations directly without creating local migration files first'"
+  }
+]
+
+Conversation:
+{conversation_text}
+
+Context from similar sessions (via mem0):
+{mem0_context}
+
+Extract only high-quality, actionable rules. When in doubt, err on the side of caution.$$,
+  ARRAY['git-workflow', 'code-style', 'architecture', 'best-practices', 'testing', 'documentation'],
+  TRUE
+)
+ON CONFLICT DO NOTHING;
