@@ -906,12 +906,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'coding-agent:fork-session',
-    async (
-      _event,
-      agentType: CodingAgentType,
-      parentIdentifier: SessionIdentifier,
-      options?: ForkOptions
-    ) => {
+    async (_event, agentType: CodingAgentType, options: ForkOptions) => {
       try {
         const agentResult = await CodingAgentFactory.getAgent(agentType);
         if (agentResult.success === false) {
@@ -924,7 +919,7 @@ function registerIpcHandlers(): void {
           return { success: false, error: `${agentType} does not support session forking` };
         }
 
-        const result = await agent.forkSession(parentIdentifier, options);
+        const result = await agent.forkSession(options);
         if (result.success === false) {
           console.error('[Main] Error forking session', { agentType, error: result.error });
           return { success: false, error: result.error.message };

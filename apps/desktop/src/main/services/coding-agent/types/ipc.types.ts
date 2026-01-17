@@ -47,8 +47,7 @@ export interface CodingAgentAPI {
   /** Fork an existing session */
   forkSession: (
     agentType: CodingAgentType,
-    parentIdentifier: SessionIdentifier,
-    options?: ForkOptions
+    options: ForkOptions
   ) => Promise<Result<SessionInfo, AgentError>>;
 
   /** Get list of available agent types */

@@ -46,6 +46,12 @@ export interface ForkModalData {
   originalTargetMessageId?: string;
   /** Agent type for API calls */
   agentType?: string;
+  /**
+   * Whether to create a new git worktree for the fork.
+   * - true: Fork Handle Button behavior - creates isolated worktree
+   * - false: Text Selection Fork behavior - stays in same workspace
+   */
+  createWorktree: boolean;
 }
 
 /**
@@ -95,8 +101,9 @@ export interface UseForkModalReturn {
    * @param sourceNodeId - ID of the node to fork
    * @param position - Position for the new forked node
    * @param targetMessageId - Optional message ID for filtering fork context
+   * @param createWorktree - Whether to create a worktree (default: true)
    */
-  open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string) => Promise<void>;
+  open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree?: boolean) => Promise<void>;
   /**
    * Confirm the fork operation with a title
    * @param forkTitle - Title for the forked agent
@@ -170,7 +177,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
    * Open the fork modal for a source node
    */
   const open = useCallback(
-    async (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string) => {
+    async (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree: boolean = true) => {
       // Find the source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) {
@@ -237,6 +244,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         targetMessageId,
         originalTargetMessageId: targetMessageId,
         agentType: sourceData.agentType,
+        createWorktree,
       });
       // Initialize cutoff from targetMessageId (if provided from text selection)
       setCutoffMessageIdState(targetMessageId || null);
@@ -263,10 +271,10 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
       }
 
       const sourceData = sourceNode.data as unknown as AgentNodeData;
-      const parentSessionId = modalData.sessionId;
+      const sessionId = modalData.sessionId;
       const workspacePath = modalData.workspacePath;
 
-      if (!parentSessionId || !workspacePath) {
+      if (!sessionId || !workspacePath) {
         setError('Missing session or workspace');
         return { success: false, error: 'Missing session or workspace' };
       }
@@ -287,16 +295,18 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           targetMessageId: modalData.targetMessageId,
           effectiveCutoff,
           filterOptions,
+          createWorktree: modalData.createWorktree,
         });
 
-        // Call fork service to create worktree and fork session
+        // Call fork service to fork session (with or without worktree)
         const result = await forkService.forkAgent({
           sourceAgentId: sourceData.agentId,
-          parentSessionId,
+          sessionId,
           agentType: sourceData.agentType,
           forkTitle,
           repoPath: workspacePath,
           filterOptions,
+          createWorktree: modalData.createWorktree,
         });
 
         if (!result.success) {
@@ -309,6 +319,10 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         const newNodeId = `node-${Date.now()}`;
         const newAgentId = `agent-${crypto.randomUUID()}`;
         const newTerminalId = `terminal-${crypto.randomUUID()}`;
+
+        // Determine workspace path and worktree ID based on fork mode
+        const forkedWorkspacePath = result.data.worktreeInfo?.worktreePath ?? workspacePath;
+        const forkedWorktreeId = result.data.worktreeInfo?.id;
 
         // Create forked node data with explicit field mapping
         // This avoids accidentally copying fields that shouldn't be inherited
@@ -330,11 +344,11 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
 
           // Session/fork lineage
           sessionId: result.data.sessionInfo.id,
-          parentSessionId,
-          worktreeId: result.data.worktreeInfo.id,
+          parentSessionId: sessionId,
+          worktreeId: forkedWorktreeId,
 
           // Workspace configuration
-          workspacePath: result.data.worktreeInfo.worktreePath,
+          workspacePath: forkedWorkspacePath,
           gitInfo: sourceData.gitInfo, // Inherit from parent - worktree is on new branch in same repo
 
           // Keep non-workspace attachments (Linear issues, etc.)
@@ -364,7 +378,8 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         console.log('[useForkModal] Fork created successfully:', {
           newNodeId,
           sessionId: result.data.sessionInfo.id,
-          worktreePath: result.data.worktreeInfo.worktreePath,
+          workspacePath: forkedWorkspacePath,
+          hasWorktree: !!result.data.worktreeInfo,
         });
 
         // Close modal

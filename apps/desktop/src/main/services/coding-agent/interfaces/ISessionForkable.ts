@@ -1,7 +1,6 @@
 import type {
   Result,
   AgentError,
-  SessionIdentifier,
   SessionInfo,
   ForkOptions,
 } from '../types';
@@ -26,12 +25,8 @@ export interface ISessionForkable {
    *
    * For Claude Code: `claude --fork-session --session-id <parent>`
    *
-   * @param parentIdentifier - The session to fork from
-   * @param options - Fork options (new name, custom ID)
+   * @param options - Fork options including sessionId to fork from
    * @returns Metadata of the newly created session
    */
-  forkSession(
-    parentIdentifier: SessionIdentifier,
-    options?: ForkOptions
-  ): Promise<Result<SessionInfo, AgentError>>;
+  forkSession(options: ForkOptions): Promise<Result<SessionInfo, AgentError>>;
 }

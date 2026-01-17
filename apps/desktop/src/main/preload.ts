@@ -370,13 +370,9 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     }
   },
 
-  forkSession: (
-    agentType: CodingAgentType,
-    parentIdentifier: SessionIdentifier,
-    options?: ForkOptions
-  ) =>
+  forkSession: (agentType: CodingAgentType, options: ForkOptions) =>
     // Return Result type directly without unwrapping, allowing caller to handle errors explicitly
-    ipcRenderer.invoke('coding-agent:fork-session', agentType, parentIdentifier, options),
+    ipcRenderer.invoke('coding-agent:fork-session', agentType, options),
 
   getAvailableAgents: () =>
     unwrapResponse<CodingAgentType[]>(ipcRenderer.invoke('coding-agent:get-available')),

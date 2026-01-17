@@ -232,10 +232,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   // Optional Capabilities
   // ============================================
 
-  async forkSession(
-    parentId: SessionIdentifier,
-    options?: ForkOptions
-  ): Promise<Result<SessionInfo, AgentError>> {
+  async forkSession(options: ForkOptions): Promise<Result<SessionInfo, AgentError>> {
     const apiError = this.checkApiAvailable();
     if (apiError) {
       return err(apiError);
@@ -243,7 +240,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
 
     // The API now returns Result<SessionInfo, AgentError> directly
     // We need to map the main-side error to renderer-side AgentError
-    const result = await this.api!.forkSession(this.agentType, parentId, options);
+    const result = await this.api!.forkSession(this.agentType, options);
 
     if (!result.success) {
       // Convert main-side error to renderer-side AgentError

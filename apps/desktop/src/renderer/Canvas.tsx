@@ -353,7 +353,8 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       };
 
       // Open the fork modal with messageId for context filtering
-      forkModal.open(nodeId, forkPosition, messageId);
+      // Text selection fork does NOT create worktree (stays in same workspace)
+      forkModal.open(nodeId, forkPosition, messageId, false);
     };
 
     window.addEventListener('chat-message-fork', handleChatMessageFork);
@@ -513,7 +514,8 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         const clientY = 'clientY' in event ? event.clientY : event.touches?.[0]?.clientY ?? 0;
 
         const position = screenToFlowPosition({ x: clientX, y: clientY });
-        forkModal.open(state.sourceNodeId, position);
+        // Fork handle drag creates worktree
+        forkModal.open(state.sourceNodeId, position, undefined, true);
       }
 
       forkStore.cancelDrag();
@@ -564,7 +566,8 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       };
 
       console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
-      forkModal.open(selectedNode.id, forkPosition);
+      // Keyboard shortcut creates worktree
+      forkModal.open(selectedNode.id, forkPosition, undefined, true);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -725,7 +728,8 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       };
 
       console.log('[Canvas] Fork shortcut triggered for node:', selectedNode.id);
-      forkModal.open(selectedNode.id, forkPosition);
+      // Keyboard shortcut creates worktree
+      forkModal.open(selectedNode.id, forkPosition, undefined, true);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -750,7 +754,8 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       };
 
       console.log('[Canvas] Fork button clicked for node:', nodeId);
-      forkModal.open(nodeId, forkPosition);
+      // Fork button click creates worktree
+      forkModal.open(nodeId, forkPosition, undefined, true);
     };
 
     window.addEventListener('agent-node:fork-click', handleForkClick as EventListener);
@@ -1976,6 +1981,9 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
             cutoffMessageId={forkModal.cutoffMessageId}
             originalTargetMessageId={forkModal.modalData?.originalTargetMessageId}
             onCutoffChange={forkModal.setCutoffMessageId}
+            createWorktree={forkModal.modalData?.createWorktree}
+            workspacePath={forkModal.modalData?.workspacePath}
+            sessionId={forkModal.modalData?.sessionId}
           />
         )}
 

@@ -10,7 +10,7 @@
  * types used by the renderer layer.
  */
 
-import type { CodingAgentType, SessionInfo, SessionIdentifier, ForkOptions } from '../../main/services/coding-agent';
+import type { CodingAgentType, SessionInfo, ForkOptions } from '../../main/services/coding-agent';
 import type { WorktreeInfo } from '../../main/types/worktree';
 import type { AgentType, JsonlFilterOptions } from '@agent-orchestrator/shared';
 import { worktreeService } from './WorktreeService';
@@ -34,8 +34,8 @@ function isForkableAgentType(agentType: AgentType): agentType is CodingAgentType
 export interface ForkRequest {
   /** Source agent ID for tracking */
   sourceAgentId: string;
-  /** Parent session identifier */
-  parentSessionId: string;
+  /** Session ID to fork from */
+  sessionId: string;
   /** Type of agent (must be claude_code, cursor, or codex for fork support) */
   agentType: AgentType;
   /** User-provided title for the fork (used in branch name) */
@@ -44,14 +44,20 @@ export interface ForkRequest {
   repoPath: string;
   /** Optional filter to include only messages up to a specific point */
   filterOptions?: JsonlFilterOptions;
+  /**
+   * Whether to create a new git worktree for the fork.
+   * - true (default): Fork Handle Button behavior - creates isolated worktree
+   * - false: Text Selection Fork behavior - stays in same workspace
+   */
+  createWorktree?: boolean;
 }
 
 /**
  * Result of a successful fork operation
  */
 export interface ForkResult {
-  /** Worktree information */
-  worktreeInfo: WorktreeInfo;
+  /** Worktree information (only present if createWorktree=true) */
+  worktreeInfo?: WorktreeInfo;
   /** Forked session information */
   sessionInfo: SessionInfo;
 }
@@ -157,7 +163,11 @@ export class ForkService implements IForkService {
   }
 
   /**
-   * Fork an agent session with worktree isolation
+   * Fork an agent session
+   *
+   * Two modes based on createWorktree flag:
+   * - createWorktree=true (default): Creates worktree, then forks session to new path
+   * - createWorktree=false: Forks session in same workspace without worktree
    */
   async forkAgent(
     request: ForkRequest
@@ -176,24 +186,52 @@ export class ForkService implements IForkService {
     }
 
     // Check API availability
-    if (!window.codingAgentAPI || !window.worktreeAPI) {
+    if (!window.codingAgentAPI) {
       return {
         success: false,
         error: {
           type: 'API_NOT_AVAILABLE',
-          message: 'Coding agent or worktree API not available',
+          message: 'Coding agent API not available',
         },
       };
     }
 
     // Validate request
-    const validation = this.validateForkRequest(request.parentSessionId, request.repoPath);
+    const validation = this.validateForkRequest(request.sessionId, request.repoPath);
     if (!validation.valid) {
       return {
         success: false,
         error: {
           type: 'VALIDATION_FAILED',
           message: validation.error,
+        },
+      };
+    }
+
+    // Determine fork mode (default to creating worktree for backward compatibility)
+    const shouldCreateWorktree = request.createWorktree !== false;
+
+    if (shouldCreateWorktree) {
+      // WORKTREE PATH: Fork Handle Button behavior
+      return this.forkWithWorktree(request);
+    } else {
+      // NON-WORKTREE PATH: Text Selection Fork behavior
+      return this.forkWithoutWorktree(request);
+    }
+  }
+
+  /**
+   * Fork with worktree creation (Fork Handle Button behavior)
+   */
+  private async forkWithWorktree(
+    request: ForkRequest
+  ): Promise<{ success: true; data: ForkResult } | { success: false; error: ForkError }> {
+    if (!window.worktreeAPI) {
+      return {
+        success: false,
+        error: {
+          type: 'API_NOT_AVAILABLE',
+          message: 'Worktree API not available',
         },
       };
     }
@@ -216,38 +254,33 @@ export class ForkService implements IForkService {
       };
     }
 
-    // Step 2: Fork the session
-    console.log('[ForkService] Forking session:', request.parentSessionId);
-
-    // Get worktree info first to get the worktree path
+    // Step 2: Get worktree info
     const worktreeInfo = await window.worktreeAPI.get(worktreeResult.worktreeId);
     if (!worktreeInfo) {
-      throw new Error('Worktree info not found after creation');
+      return {
+        success: false,
+        error: {
+          type: 'WORKTREE_CREATION_FAILED',
+          message: 'Worktree info not found after creation',
+        },
+      };
     }
 
-    const parentIdentifier: SessionIdentifier = {
-      type: 'id',
-      value: request.parentSessionId,
-    };
+    // Step 3: Fork the session to the worktree path
+    console.log('[ForkService] Forking session to worktree:', request.sessionId);
 
-    // Pass worktree path as workingDirectory for cross-directory fork detection
-    // Include filterOptions if provided (for partial context fork)
     const forkOptions: ForkOptions = {
+      sessionId: request.sessionId,
       newSessionName: request.forkTitle,
-      workingDirectory: worktreeInfo.worktreePath,
+      workspacePath: worktreeInfo.worktreePath,
       filterOptions: request.filterOptions,
+      createWorktree: true,
     };
 
     console.log('[ForkService] Fork options:', forkOptions);
 
-    // Call the main process API which returns Result<SessionInfo, AgentError>
-    const result = await window.codingAgentAPI.forkSession(
-      request.agentType,
-      parentIdentifier,
-      forkOptions
-    );
+    const result = await window.codingAgentAPI!.forkSession(request.agentType, forkOptions);
 
-    // Handle Result type from main process
     if (!result.success) {
       // Rollback: release the worktree if session fork failed
       console.error('[ForkService] Session fork failed, rolling back worktree:', result.error);
@@ -268,14 +301,54 @@ export class ForkService implements IForkService {
       };
     }
 
-    const sessionInfo = result.data;
-    console.log('[ForkService] Session forked successfully:', sessionInfo);
+    console.log('[ForkService] Session forked successfully:', result.data);
 
     return {
       success: true,
       data: {
         worktreeInfo,
-        sessionInfo,
+        sessionInfo: result.data,
+      },
+    };
+  }
+
+  /**
+   * Fork without worktree creation (Text Selection Fork behavior)
+   */
+  private async forkWithoutWorktree(
+    request: ForkRequest
+  ): Promise<{ success: true; data: ForkResult } | { success: false; error: ForkError }> {
+    console.log('[ForkService] Forking session in same workspace:', request.sessionId);
+
+    const forkOptions: ForkOptions = {
+      sessionId: request.sessionId,
+      newSessionName: request.forkTitle,
+      workspacePath: request.repoPath, // Stay in same workspace
+      filterOptions: request.filterOptions,
+      createWorktree: false,
+    };
+
+    console.log('[ForkService] Fork options:', forkOptions);
+
+    const result = await window.codingAgentAPI!.forkSession(request.agentType, forkOptions);
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: {
+          type: 'SESSION_FORK_FAILED',
+          message: result.error.message,
+        },
+      };
+    }
+
+    console.log('[ForkService] Session forked successfully:', result.data);
+
+    return {
+      success: true,
+      data: {
+        sessionInfo: result.data,
+        // No worktreeInfo for non-worktree forks
       },
     };
   }

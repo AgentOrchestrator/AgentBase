@@ -200,3 +200,59 @@
   color: var(--color-text-secondary, #888);
   font-size: 13px;
 }
+
+/* Fork Configuration Section */
+.fork-modal-config-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fork-modal-config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fork-modal-config-label {
+  flex-shrink: 0;
+  width: 90px;
+  color: var(--color-text-secondary, #888);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fork-modal-config-input {
+  flex: 1;
+  background: var(--color-bg-secondary, #1a1a1a);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.fork-modal-config-input:focus {
+  border-color: var(--color-accent, #3b82f6);
+}
+
+.fork-modal-config-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fork-modal-readonly-input {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-secondary, #888);
+  cursor: default;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

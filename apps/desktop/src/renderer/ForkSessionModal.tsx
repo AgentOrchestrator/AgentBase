@@ -11,6 +11,19 @@ import { MessagePreviewPanel } from './components/MessagePreviewPanel';
 import type { MessagePreview } from './hooks/useForkModal';
 import './ForkSessionModal.css';
 
+/**
+ * Sanitize title into a valid branch name (same logic as ForkService)
+ */
+function sanitizeBranchName(title: string): string {
+  const sanitized = title
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  const timestamp = Date.now();
+  return `fork-${sanitized || 'unnamed'}-${timestamp}`;
+}
+
 interface ForkSessionModalProps {
   /** Called when user confirms the fork */
   onConfirm: (title: string, baseBranch?: string) => void;
@@ -32,16 +45,12 @@ interface ForkSessionModalProps {
   originalTargetMessageId?: string | null;
   /** Callback when cutoff changes */
   onCutoffChange?: (messageId: string) => void;
-  /** Available branches for selection */
-  branches?: string[];
-  /** Whether branches are loading */
-  isLoadingBranches?: boolean;
-  /** Currently selected base branch (defaults to parent's branch) */
-  selectedBranch?: string | null;
-  /** Parent's current branch (used as default) */
-  parentBranch?: string | null;
-  /** Callback when branch selection changes */
-  onBranchChange?: (branch: string) => void;
+  /** Whether to create a worktree (shows additional config when true) */
+  createWorktree?: boolean;
+  /** Target workspace path (for worktree forks) */
+  workspacePath?: string;
+  /** Session ID being forked (read-only display) */
+  sessionId?: string;
 }
 
 function ForkSessionModal({
@@ -55,11 +64,29 @@ function ForkSessionModal({
   cutoffMessageId = null,
   originalTargetMessageId = null,
   onCutoffChange,
+  createWorktree = true,
+  workspacePath,
+  sessionId,
 }: ForkSessionModalProps) {
   const [title, setTitle] = useState('');
+  const [branchName, setBranchName] = useState('');
+  const [isBranchManuallyEdited, setIsBranchManuallyEdited] = useState(false);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-update branch name from title (unless manually edited)
+  useEffect(() => {
+    if (!isBranchManuallyEdited && title.trim()) {
+      setBranchName(sanitizeBranchName(title));
+    }
+  }, [title, isBranchManuallyEdited]);
+
+  // Handle branch name change
+  const handleBranchChange = useCallback((value: string) => {
+    setBranchName(value);
+    setIsBranchManuallyEdited(true);
+  }, []);
 
   // Focus input when modal opens
   useEffect(() => {
@@ -156,6 +183,52 @@ function ForkSessionModal({
               }
             }}
           />
+
+          {/* Fork Configuration Section */}
+          <div className="fork-modal-config-section">
+            {/* Session ID (read-only) */}
+            <div className="fork-modal-config-row">
+              <label className="fork-modal-config-label">Session ID</label>
+              <input
+                type="text"
+                className="fork-modal-config-input fork-modal-readonly-input"
+                value={sessionId || 'auto-generated'}
+                readOnly
+                tabIndex={-1}
+              />
+            </div>
+
+            {/* Worktree-specific fields */}
+            {createWorktree && (
+              <>
+                {/* Workspace Path */}
+                <div className="fork-modal-config-row">
+                  <label className="fork-modal-config-label">Workspace</label>
+                  <input
+                    type="text"
+                    className="fork-modal-config-input fork-modal-readonly-input"
+                    value={workspacePath || ''}
+                    readOnly
+                    tabIndex={-1}
+                    title={workspacePath}
+                  />
+                </div>
+
+                {/* Git Branch (auto-generated from title, editable) */}
+                <div className="fork-modal-config-row">
+                  <label className="fork-modal-config-label">Git Branch</label>
+                  <input
+                    type="text"
+                    className="fork-modal-config-input"
+                    value={branchName}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    placeholder="fork-feature-name-timestamp"
+                    disabled={isLoading}
+                  />
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Context Preview Section */}
           {onLoadMessages && (

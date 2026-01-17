@@ -567,27 +567,16 @@ export class ClaudeCodeAgent
   // ISessionForkable Implementation
   // ============================================
 
-  async forkSession(
-    parentIdentifier: SessionIdentifier,
-    options?: ForkOptions
-  ): Promise<Result<SessionInfo, AgentError>> {
+  async forkSession(options: ForkOptions): Promise<Result<SessionInfo, AgentError>> {
     const initCheck = this.ensureInitialized();
     if (initCheck.success === false) {
       return { success: false, error: initCheck.error };
     }
 
-    // Resolve the parent session ID
-    const parentId = this.resolveSessionId(parentIdentifier);
-    if (!parentId) {
-      return err(
-        agentError(
-          AgentErrorCode.SESSION_INVALID,
-          'Cannot fork from "latest" session - please specify a session ID or name'
-        )
-      );
-    }
+    // Get session ID from options (required field)
+    const sessionId = options.sessionId;
 
-    const targetCwd = options?.workingDirectory ?? process.cwd();
+    const targetCwd = options.workspacePath ?? process.cwd();
     const sourceCwd = process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
 
@@ -603,10 +592,10 @@ export class ClaudeCodeAgent
 
     if (isCrossDirectory) {
       // For cross-directory forks, use extraArgs to create new session
-      sdkOptions.extraArgs = { 'session-id': parentId };
+      sdkOptions.extraArgs = { 'session-id': sessionId };
     } else {
       // For same-directory forks, use SDK's built-in fork mechanism
-      sdkOptions.resume = parentId;
+      sdkOptions.resume = sessionId;
       sdkOptions.forkSession = true;
     }
 
@@ -644,14 +633,14 @@ export class ClaudeCodeAgent
           // If resolution fails, use original path
         }
 
-        // IMPORTANT: Use the SAME session ID (parentId) for the forked session
+        // IMPORTANT: Use the SAME session ID for the forked session
         // This allows Claude Code SDK to find the copied JSONL file in the new directory
         const forkResult = await adapter.forkSessionFile(
-          parentId,
-          parentId, // Use same session ID - file will be in different project directory
+          sessionId,
+          sessionId, // Use same session ID - file will be in different project directory
           sourceCwd,
           resolvedTargetCwd,
-          options?.filterOptions // Pass filter options for partial context fork
+          options.filterOptions // Pass filter options for partial context fork
         );
 
         if (forkResult.success === false) {
@@ -669,25 +658,14 @@ export class ClaudeCodeAgent
     }
 
     return ok({
-      id: parentId,
-      name: options?.newSessionName,
+      id: sessionId,
+      name: options.newSessionName,
       agentType: 'claude_code',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       messageCount: 0,
-      parentSessionId: parentId,
+      parentSessionId: sessionId,
     });
-  }
-
-
-  private resolveSessionId(identifier: SessionIdentifier): string | null {
-    switch (identifier.type) {
-      case 'id':
-      case 'name':
-        return identifier.value;
-      case 'latest':
-        return null; // Cannot resolve latest without session context
-    }
   }
 
   // ============================================

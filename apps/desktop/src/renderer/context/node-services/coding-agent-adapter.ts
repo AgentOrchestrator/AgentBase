@@ -192,8 +192,16 @@ export interface ContinueOptions {
  * Options for forking a session
  */
 export interface ForkOptions {
+  /** Session ID to fork from (required) */
+  sessionId: string;
+  /** Human-readable name for the new session */
   newSessionName?: string;
-  workingDirectory?: string;
+  /** Workspace path for the new session */
+  workspacePath?: string;
+  /** Filter options for partial context fork */
+  filterOptions?: { targetMessageId?: string };
+  /** Whether to create a new git worktree */
+  createWorktree?: boolean;
 }
 
 // ============================================
@@ -371,10 +379,7 @@ export interface ICodingAgentAdapter {
   /**
    * Fork a session (creates a new session from an existing one)
    */
-  forkSession?(
-    parentId: SessionIdentifier,
-    options?: ForkOptions
-  ): Promise<Result<SessionInfo, AgentError>>;
+  forkSession?(options: ForkOptions): Promise<Result<SessionInfo, AgentError>>;
 
   /**
    * List session summaries

@@ -121,14 +121,20 @@ export interface ContinueOptions {
  * Options for forking a session
  */
 export interface ForkOptions {
+  /** Session ID to fork from (required) */
+  sessionId: string;
   /** Human-readable name for the new session */
   newSessionName?: string;
-  /** Custom session ID (auto-generated if not provided) */
-  customSessionId?: string;
-  /** Working directory for the new session (defaults to current if not provided) */
-  workingDirectory?: string;
+  /** Workspace path for the new session (defaults to current workspace) */
+  workspacePath?: string;
   /** Filter options for partial context fork (include messages up to a specific point) */
   filterOptions?: JsonlFilterOptions;
+  /**
+   * Whether to create a new git worktree for the fork.
+   * - true: Fork Handle Button behavior - creates isolated worktree
+   * - false: Text Selection Fork behavior - stays in same workspace
+   */
+  createWorktree?: boolean;
 }
 
 /**
