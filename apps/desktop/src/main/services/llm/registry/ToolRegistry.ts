@@ -43,8 +43,8 @@ export class ToolRegistry implements IToolRegistry {
 
   getDefinitionsByNames(names: string[]): ToolDefinition[] {
     return names
-      .filter((name) => this.tools.has(name))
-      .map((name) => this.tools.get(name)?.definition);
+      .map((name) => this.tools.get(name)?.definition)
+      .filter((def): def is ToolDefinition => def !== undefined);
   }
 
   async execute(name: string, args: Record<string, unknown>): Promise<Result<unknown, LLMError>> {
