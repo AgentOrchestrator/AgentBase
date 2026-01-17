@@ -70,6 +70,8 @@ They should only do one thing:
 
 connect a runtime object to a real imported type.
 
+Rule: Avoid using the spread operator; use explicit replacement instead as much as possible, because the spread operator hides what is being replaced.
+
 Correct pattern:
 
 // global.d.ts
