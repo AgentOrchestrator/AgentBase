@@ -11,7 +11,7 @@ import type { CodingAgentType, CodingAgentMessage } from '@agent-orchestrator/sh
 import type { CodingAgentStatusInfo } from '../../../types/coding-agent-status';
 import type { IAgentService } from '../context/node-services/types';
 import { useSessionFileWatcher } from './useSessionFileWatcher';
-import { createStatusService, type IStatusService } from '../services/status';
+import { createStatusService } from '../services/status';
 
 // =============================================================================
 // Types
@@ -136,11 +136,21 @@ export function useSessionOverview({
   const loadedSessionIdRef = useRef<string | null>(null);
   const summaryGeneratedForRef = useRef<string | null>(null);
 
+  // Create status service (memoized to avoid recreating on each render)
+  // Returns null if sessionId/workspacePath not available yet
+  const statusService = useMemo(() => {
+    if (!sessionId || !workspacePath) {
+      return null;
+    }
+    return createStatusService(agentService, sessionId, workspacePath);
+  }, [agentService, sessionId, workspacePath]);
+
   // Refs to keep latest values without causing re-renders
   const agentServiceRef = useRef(agentService);
   const sessionIdRef = useRef(sessionId);
   const workspacePathRef = useRef(workspacePath);
   const enabledRef = useRef(enabled);
+  const statusServiceRef = useRef(statusService);
 
   // Keep refs in sync
   useEffect(() => {
@@ -148,13 +158,8 @@ export function useSessionOverview({
     sessionIdRef.current = sessionId;
     workspacePathRef.current = workspacePath;
     enabledRef.current = enabled;
+    statusServiceRef.current = statusService;
   });
-
-  // Create status service (memoized to avoid recreating on each render)
-  const statusService: IStatusService = useMemo(
-    () => createStatusService(agentService),
-    [agentService]
-  );
 
   // =========================================================================
   // Load Session Data
@@ -193,6 +198,13 @@ export function useSessionOverview({
         // Extract most recent user message
         const recentMessage = extractMostRecentUserMessage(messages);
         setMostRecentUserMessage(recentMessage);
+
+        // Update last activity timestamp for idle detection
+        if (messages.length > 0) {
+          const latestMsg = messages[messages.length - 1];
+          const latestTimestamp = new Date(latestMsg.timestamp).getTime();
+          statusServiceRef.current?.setLastActivity(latestTimestamp);
+        }
 
         // Track loaded session
         loadedSessionIdRef.current = currentSessionId;
@@ -289,13 +301,16 @@ export function useSessionOverview({
   // =========================================================================
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !statusService) {
       return;
     }
 
     // Get initial status
     const initialStatus = statusService.getStatus(agentService.agentId);
     setStatus(initialStatus);
+
+    // Refresh last activity timestamp for time-based idle detection
+    void statusService.refreshLastActivity();
 
     // Subscribe to status changes
     const unsubscribe = statusService.onStatusChange(

@@ -3,4 +3,5 @@
  */
 
 export type { IStatusService } from './IStatusService';
-export { StatusServiceStub, createStatusService } from './StatusServiceStub';
+export { StatusService, createStatusService } from './StatusService';
+export type { StatusServiceConfig } from './StatusService';
