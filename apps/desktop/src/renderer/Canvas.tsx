@@ -14,7 +14,7 @@ import {
   OnConnectStartParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { MeshGradient } from '@paper-design/shaders-react';
+import { MeshGradient, Dithering } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
 import ForkSessionModal from './ForkSessionModal';
 import IssueDetailsModal from './IssueDetailsModal';
@@ -1154,6 +1154,299 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
+  // =============================================================================
+  // Gradient configurations based on first letter of username
+  // =============================================================================
+
+  type GradientConfig = 
+    | {
+        type: 'mesh';
+        speed: number;
+        distortion: number;
+        swirl: number;
+        frame: number;
+        grainMixer: number;
+        grainOverlay: number;
+        colors: string[];
+        rotate: string;
+        overlayColor: string;
+      }
+    | {
+        type: 'dithering';
+        speed: number;
+        shape: 'swirl' | 'warp' | 'simplex' | 'dots' | 'wave' | 'ripple' | 'sphere';
+        ditherType: '8x8' | 'random' | '2x2' | '4x4';
+        pxSize: number;
+        scale: number;
+        frame: number;
+        size: number;
+        colorFront: string;
+        overlayColor: string;
+        backgroundColor?: string;
+      };
+
+  const getGradientForLetter = useCallback((letter: string | null): GradientConfig => {
+    if (!letter) {
+      // Default to A, B gradient if no username
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 3547980.561001969,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#FFFFFF', '#0051FF'],
+        rotate: '0deg',
+        overlayColor: '#0051FF',
+      };
+    }
+
+    const upperLetter = letter.toUpperCase();
+    
+    // A, B
+    if (upperLetter === 'A' || upperLetter === 'B') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 3547980.561001969,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#FFFFFF', '#0051FF'],
+        rotate: '0deg',
+        overlayColor: '#0051FF',
+      };
+    }
+    
+    // C, D
+    if (upperLetter === 'C' || upperLetter === 'D') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 2555302.0330011887,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#FFE8AF', '#E54F0E'],
+        rotate: '0deg',
+        overlayColor: '#E54F0E',
+      };
+    }
+    
+    // E, F
+    if (upperLetter === 'E' || upperLetter === 'F') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 2449626.3160010916,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#FFFFFF', '#CD005F'],
+        rotate: '0deg',
+        overlayColor: '#CD005F',
+      };
+    }
+    
+    // G, H
+    if (upperLetter === 'G' || upperLetter === 'H') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 5438369.934008135,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#000000', '#008A6D'],
+        rotate: '0deg',
+        overlayColor: '#008A6D',
+      };
+    }
+    
+    // I, J
+    if (upperLetter === 'I' || upperLetter === 'J') {
+      return {
+        type: 'dithering' as const,
+        speed: 0.9,
+        shape: 'warp' as const,
+        ditherType: '8x8' as const,
+        pxSize: 1.8,
+        scale: 0.51,
+        frame: 246417.07600003193,
+        size: 2.7,
+        colorFront: '#8DB735',
+        overlayColor: '#8DB735',
+      };
+    }
+    
+    // K, L
+    if (upperLetter === 'K' || upperLetter === 'L') {
+      return {
+        type: 'dithering' as const,
+        speed: 1.22,
+        shape: 'warp' as const,
+        ditherType: 'random' as const,
+        pxSize: 1.8,
+        scale: 0.66,
+        frame: 442221.90600008366,
+        size: 2.6,
+        colorFront: '#FFFFFF',
+        overlayColor: '#FFFFFF',
+      };
+    }
+    
+    // M, N
+    if (upperLetter === 'M' || upperLetter === 'N') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 3475477.906001939,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#C5D2F8', '#4F0C28'],
+        rotate: '0deg',
+        overlayColor: '#4F0C28',
+      };
+    }
+    
+    // O, P
+    if (upperLetter === 'O' || upperLetter === 'P') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 5438369.934008135,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#282828', '#A8051A'],
+        rotate: '0deg',
+        overlayColor: '#A8051A',
+      };
+    }
+    
+    // Q, R
+    if (upperLetter === 'Q' || upperLetter === 'R') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 5219391.935008144,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#004D00', '#53F398'],
+        rotate: '0deg',
+        overlayColor: '#53F398',
+      };
+    }
+    
+    // S, T
+    if (upperLetter === 'S' || upperLetter === 'T') {
+      return {
+        type: 'dithering' as const,
+        speed: 1,
+        shape: 'dots' as const,
+        ditherType: 'random' as const,
+        pxSize: 1.8,
+        scale: 1.24,
+        frame: 648655.0500000913,
+        size: 11.6,
+        colorFront: '#485ACD',
+        overlayColor: '#485ACD',
+        backgroundColor: '#000000',
+      };
+    }
+    
+    // U, V, W
+    if (upperLetter === 'U' || upperLetter === 'V' || upperLetter === 'W') {
+      return {
+        type: 'mesh',
+        speed: 1.49,
+        distortion: 0.58,
+        swirl: 0.55,
+        frame: 4558265.078004454,
+        grainMixer: 1,
+        grainOverlay: 1,
+        colors: ['#DADABC', '#BCA145'],
+        rotate: '0deg',
+        overlayColor: '#BCA145',
+      };
+    }
+    
+    // X, Y, Z
+    if (upperLetter === 'X' || upperLetter === 'Y' || upperLetter === 'Z') {
+      return {
+        type: 'dithering' as const,
+        speed: 0.9,
+        shape: 'warp' as const,
+        ditherType: '8x8' as const,
+        pxSize: 1.8,
+        scale: 0.51,
+        frame: 396886.546000077,
+        size: 2.7,
+        colorFront: '#FF00EA',
+        overlayColor: '#FF00EA',
+      };
+    }
+    
+    // Default fallback
+    return {
+      type: 'mesh',
+      speed: 1.49,
+      distortion: 0.58,
+      swirl: 0.55,
+      frame: 3547980.561001969,
+      grainMixer: 1,
+      grainOverlay: 1,
+      colors: ['#FFFFFF', '#0051FF'],
+      rotate: '0deg',
+      overlayColor: '#0051FF',
+    };
+  }, []);
+
+  const selectedGradient = useMemo(() => {
+    if (!githubUsername) {
+      return getGradientForLetter(null);
+    }
+    
+    const firstChar = githubUsername.charAt(0);
+    // If it's a number (0-9), map to first 10 letter pairs (A-T)
+    if (/[0-9]/.test(firstChar)) {
+      const num = parseInt(firstChar, 10);
+      // Map: 0→A, 1→C, 2→E, 3→G, 4→I, 5→K, 6→M, 7→O, 8→Q, 9→S
+      const letterPairs = ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O', 'Q', 'S'];
+      return getGradientForLetter(letterPairs[num]);
+    }
+    
+    // Otherwise, use the first letter as-is
+    return getGradientForLetter(firstChar);
+  }, [githubUsername, getGradientForLetter]);
+
+  // Helper to determine if overlay color is light (for text color adjustment)
+  const isLightColor = useCallback((color: string): boolean => {
+    // Remove # if present
+    const hex = color.replace('#', '');
+    // Convert to RGB
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5;
+  }, []);
+
+  const overlayTextColor = useMemo(() => {
+    return isLightColor(selectedGradient.overlayColor) ? '#000000' : '#FFFFFF';
+  }, [selectedGradient.overlayColor, isLightColor]);
+
   // Show loading state while canvas is being restored
   if (isCanvasLoading) {
     return (
@@ -1663,9 +1956,9 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         >
           <Background
             variant={BackgroundVariant.Lines}
-            gap={12}
-            size={1}
-            color={theme === 'light-web' ? '#F5F6F8' : '#3a3a3a'}
+            gap={24}
+            size={2}
+            color={theme === 'light-web' ? '#F5F6F8' : theme === 'dark' ? '#171717' : '#3a3a3a'}
           />
           <ForkGhostNode />
         </ReactFlow>
@@ -1784,29 +2077,66 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
               <div className="settings-modal-content">
                 <div className="settings-section">
                   <div className="settings-mesh-container">
-                    <div className="settings-mesh-preview">
-                      <MeshGradient 
-                        speed={1.49} 
-                        distortion={0.58} 
-                        swirl={0.55} 
-                        frame={2418207.4310010453} 
-                        grainMixer={1} 
-                        grainOverlay={1} 
-                        colors={['#FFFFFF', '#0051FF']} 
-                        style={{ 
-                          width: '256px', 
-                          height: '360px', 
-                          opacity: 1, 
-                          borderRadius: 0,
-                          transformOrigin: 'center center',
-                          rotate: '0deg'
-                        }} 
-                      />
-                      <div className="settings-mesh-overlay">
+                    <div 
+                      className="settings-mesh-preview"
+                      style={{ borderColor: selectedGradient.overlayColor }}
+                    >
+                      {selectedGradient.type === 'mesh' ? (
+                        <MeshGradient 
+                          speed={selectedGradient.speed} 
+                          distortion={selectedGradient.distortion} 
+                          swirl={selectedGradient.swirl} 
+                          frame={selectedGradient.frame} 
+                          grainMixer={selectedGradient.grainMixer} 
+                          grainOverlay={selectedGradient.grainOverlay} 
+                          colors={selectedGradient.colors} 
+                          style={{ 
+                            width: '256px', 
+                            height: '360px', 
+                            opacity: 1, 
+                            borderRadius: 0,
+                            transformOrigin: 'center center',
+                            rotate: selectedGradient.rotate
+                          }} 
+                        />
+                      ) : (
+                        <Dithering
+                          speed={selectedGradient.speed}
+                          shape={selectedGradient.shape}
+                          type={selectedGradient.ditherType}
+                          pxSize={selectedGradient.pxSize}
+                          scale={selectedGradient.scale}
+                          frame={selectedGradient.frame}
+                          size={selectedGradient.size}
+                          colorFront={selectedGradient.colorFront}
+                          style={{
+                            width: '256px',
+                            height: '360px',
+                            borderRadius: 0,
+                            transformOrigin: 'center center',
+                            rotate: '0deg',
+                            backgroundColor: selectedGradient.backgroundColor || undefined
+                          }}
+                        />
+                      )}
+                      <div 
+                        className="settings-mesh-overlay"
+                        style={{ backgroundColor: selectedGradient.overlayColor }}
+                      >
                         {githubUsername && (
                           <>
-                            <div className="settings-mesh-username">@{githubUsername}</div>
-                            <div className="settings-mesh-subtitle">Agent Whisperer</div>
+                            <div 
+                              className="settings-mesh-username"
+                              style={{ color: overlayTextColor }}
+                            >
+                              @{githubUsername}
+                            </div>
+                            <div 
+                              className="settings-mesh-subtitle"
+                              style={{ color: overlayTextColor }}
+                            >
+                              Agent Whisperer
+                            </div>
                           </>
                         )}
                       </div>

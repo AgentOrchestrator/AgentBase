@@ -872,7 +872,8 @@
   padding: 0;
   background: white;
   border-radius: 6px;
-  border: 1px solid #0051FF;
+  /* border color is set dynamically via inline style */
+  border: 1px solid;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
@@ -942,7 +943,7 @@
   left: 0;
   width: 100%;
   height: 120px;
-  background: #0051FF;
+  /* background color is set dynamically via inline style */
   z-index: 1;
   display: flex;
   flex-direction: column;
