@@ -45,7 +45,7 @@ import { useTheme } from './context';
 import { createLinearIssueAttachment } from './types/attachments';
 import { forkService } from './services';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
-import type { AgentNodeData } from './types/agent-node';
+import type { AgentNodeData } from '@agent-orchestrator/shared';
 import { updateEdgesWithOptimalHandles, getOptimalHandles } from './utils/edgeHandles';
 
 // Use node types from the registry (single source of truth)
@@ -391,8 +391,6 @@ function CanvasFlow() {
         return;
       }
 
-      const sourceData = sourceNode.data as unknown as { workspacePath?: string; gitInfo?: { branch?: string } };
-
       // Calculate position to the RIGHT of source node
       const nodeWidth = (sourceNode.width as number) || (sourceNode.style?.width as number) || 600;
       const horizontalSpacing = 100;
@@ -483,6 +481,7 @@ function CanvasFlow() {
             gitInfo: sourceNodeData.gitInfo,
             attachments: sourceNodeData.attachments || [],
             forking: false,
+            initialInputText: selectedText,
           };
 
           // Create the new forked node
@@ -526,7 +525,7 @@ function CanvasFlow() {
       } else {
         // Auto-fork is on: show modal as before
         // Text selection fork does NOT create worktree (stays in same workspace)
-        forkModal.open(nodeId, forkPosition, messageId, false);
+        forkModal.open(nodeId, forkPosition, messageId, false, selectedText);
       }
     };
 

@@ -390,6 +390,30 @@
   pointer-events: none;
 }
 
+/* Attached text display box - shows selected text from parent conversation */
+.agent-chat-view-attached-text {
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--color-bg-primary);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 11;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.agent-chat-view-attached-text-content {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+  user-select: text;
+  cursor: text;
+}
+
 .agent-chat-view-input-container {
   display: flex;
   align-items: center;

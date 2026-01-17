@@ -29,6 +29,8 @@ interface AgentChatViewProps {
   /** Workspace path (required for chat operations) */
   workspacePath: string;
   initialPrompt?: string;
+  /** Initial text to populate in the input field (not auto-sent) */
+  initialInputText?: string;
   onSessionCreated?: (sessionId: string) => void;
   isSessionReady?: boolean;
   selected?: boolean;
@@ -47,6 +49,7 @@ export default function AgentChatView({
   agentType,
   workspacePath,
   initialPrompt,
+  initialInputText,
   onSessionCreated,
   isSessionReady = true,
   selected = false,
@@ -54,6 +57,9 @@ export default function AgentChatView({
 }: AgentChatViewProps) {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Track the initial input text for display (cleared after first message)
+  const [attachedText, setAttachedText] = useState<string | undefined>(initialInputText);
+  const hasSentFirstMessage = useRef(false);
   const [textSelection, setTextSelection] = useState<{
     text: string;
     /** Y position in content coordinates (accounts for scroll) */
@@ -90,6 +96,13 @@ export default function AgentChatView({
     onError: setError,
     onSessionCreated,
   });
+
+  // Set attached text from initialInputText prop (only if we haven't sent a message yet)
+  useEffect(() => {
+    if (initialInputText && !hasSentFirstMessage.current) {
+      setAttachedText(initialInputText);
+    }
+  }, [initialInputText]);
 
   // Auto-send initial prompt only once when session is brand new (no existing messages)
   useEffect(() => {
@@ -373,11 +386,20 @@ export default function AgentChatView({
   const handleSend = async () => {
     if (!isSessionReady || !inputValue.trim() || isStreaming) return;
 
-    const userMessage = inputValue.trim();
+    const userInput = inputValue.trim();
+    let messageToSend = userInput;
+    
+    // If this is the first message and we have attached text, prepend it
+    if (!hasSentFirstMessage.current && attachedText) {
+      messageToSend = `${attachedText}\n\n${userInput}`;
+      setAttachedText(undefined); // Clear box immediately
+      hasSentFirstMessage.current = true;
+    }
+    
     setInputValue('');
     setError(null);
 
-    await sendMessage(userMessage);
+    await sendMessage(messageToSend);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -609,6 +631,14 @@ export default function AgentChatView({
       <div className="agent-chat-view-input-area" ref={inputAreaRef}>
         {/* Chin - covers everything from 50% of input bar downwards */}
         <div className="agent-chat-view-chin" />
+        
+        {/* Attached text display box - shows selected text from parent conversation */}
+        {attachedText && (
+          <div className="agent-chat-view-attached-text">
+            <div className="agent-chat-view-attached-text-content">{attachedText}</div>
+          </div>
+        )}
+        
         <div className="agent-chat-view-input-container">
           <textarea
             ref={inputRef}
