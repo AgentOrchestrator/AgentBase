@@ -172,6 +172,9 @@ export interface AgentNodeData {
   /** Initial prompt to send to the agent when it starts */
   initialPrompt?: string;
 
+  /** Initial text to populate in the chat input field (not auto-sent) */
+  initialInputText?: string;
+
   /** Whether the JSONL file exists (for forking capability) */
   forking?: boolean;
 }

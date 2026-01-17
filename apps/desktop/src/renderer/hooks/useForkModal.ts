@@ -55,6 +55,8 @@ export interface ForkModalData {
   createWorktree: boolean;
   /** Parent's current git branch (for default branch value) */
   parentBranch?: string;
+  /** Selected text from the source node (to populate in new node's input) */
+  selectedText?: string;
 }
 
 /**
@@ -105,8 +107,9 @@ export interface UseForkModalReturn {
    * @param position - Position for the new forked node
    * @param targetMessageId - Optional message ID for filtering fork context
    * @param createWorktree - Whether to create a worktree (default: true)
+   * @param selectedText - Optional selected text to populate in new node's input
    */
-  open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree?: boolean) => Promise<void>;
+  open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree?: boolean, selectedText?: string) => Promise<void>;
   /**
    * Confirm the fork operation with data from NewAgentModal
    * @param data - Fork confirmation data from the modal
@@ -188,7 +191,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
    * Open the fork modal for a source node
    */
   const open = useCallback(
-    async (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree: boolean = true) => {
+    async (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree: boolean = true, selectedText?: string) => {
       // Find the source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) {
@@ -260,6 +263,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         agentType: sourceData.agentType,
         createWorktree,
         parentBranch,
+        selectedText,
       });
       // Initialize cutoff from targetMessageId (if provided from text selection)
       setCutoffMessageIdState(targetMessageId || null);
@@ -390,6 +394,9 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
 
           // Forking state
           forking: false,
+
+          // Initial input text from text selection
+          initialInputText: modalData.selectedText,
         };
 
         // Create the new forked node

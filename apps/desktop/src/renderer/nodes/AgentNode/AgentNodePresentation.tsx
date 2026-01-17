@@ -681,6 +681,7 @@ export function AgentNodePresentation({
             workspacePath={data.workspacePath}
             agentType={data.agentType}
             initialPrompt={data.initialPrompt}
+            initialInputText={data.initialInputText}
             onSessionCreated={(newSessionId) => onDataChange({ sessionId: newSessionId })}
             isSessionReady={isSessionReady}
             selected={selected}
