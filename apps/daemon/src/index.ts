@@ -9,14 +9,24 @@ import { AuthManager } from './auth-manager.js';
 import { mergeProjects } from './project-aggregator.js';
 import { getDatabase } from './database.js';
 import { createSupabaseAuthProvider, createSupabaseRepositoryFactory } from './infrastructure/supabase/index.js';
-import { createSQLiteAuthStateStore } from './infrastructure/sqlite/index.js';
+import { createSQLiteAuthStateStore, createSQLiteRepositoryFactory, createLocalAuthProvider } from './infrastructure/sqlite/index.js';
 import { createServiceContainer, type ServiceContainer } from './service-container.js';
+
+// Determine storage backend from environment variable
+// Default to local SQLite storage, use USE_SUPABASE=true for cloud sync
+const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 // Create infrastructure instances
 const db = getDatabase();
-const authProvider = createSupabaseAuthProvider();
+
+// Select backend based on environment
+const authProvider = USE_SUPABASE
+  ? createSupabaseAuthProvider()
+  : createLocalAuthProvider(db);
 const authStateStore = createSQLiteAuthStateStore(db);
-const repositoryFactory = createSupabaseRepositoryFactory();
+const repositoryFactory = USE_SUPABASE
+  ? createSupabaseRepositoryFactory()
+  : createSQLiteRepositoryFactory(db);
 
 // Create the global service container
 const serviceContainer: ServiceContainer = createServiceContainer(repositoryFactory);
@@ -157,6 +167,7 @@ async function processHistories() {
 
 async function main() {
   console.log('Agent Orchestrator Daemon Starting...');
+  console.log(`Storage backend: ${USE_SUPABASE ? 'Supabase (cloud)' : 'SQLite (local)'}`);
   console.log('Running in background watch mode...');
 
   // Check authentication status on startup
@@ -165,16 +176,18 @@ async function main() {
     console.log('✓ Using existing authentication session');
   }
 
-  // Set up periodic token refresh (every 30 minutes)
-  // This ensures the session stays alive even during long-running daemon processes
-  setInterval(async () => {
-    const stillAuthenticated = await authManager.isAuthenticated();
-    if (stillAuthenticated) {
-      console.log('[Auth] Token refreshed successfully');
-    } else {
-      console.log('[Auth] Token refresh failed - authentication required');
-    }
-  }, 30 * 60 * 1000); // 30 minutes
+  // Set up periodic token refresh only for Supabase mode (every 30 minutes)
+  // Local mode doesn't need token refresh
+  if (USE_SUPABASE) {
+    setInterval(async () => {
+      const stillAuthenticated = await authManager.isAuthenticated();
+      if (stillAuthenticated) {
+        console.log('[Auth] Token refreshed successfully');
+      } else {
+        console.log('[Auth] Token refresh failed - authentication required');
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  }
 
   // Process immediately on startup
   await processHistories();

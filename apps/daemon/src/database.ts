@@ -145,6 +145,162 @@ export class AppDatabase {
     if (syncStateCount.count === 0) {
       this.db.prepare('INSERT INTO sync_state DEFAULT VALUES').run();
     }
+
+    // Create users table for local storage
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL DEFAULT 'local@localhost',
+        display_name TEXT,
+        avatar_url TEXT,
+        github_username TEXT,
+        github_avatar_url TEXT,
+        is_admin INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create projects table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        project_path TEXT,
+        description TEXT,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        workspace_metadata TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, name)
+      );
+    `);
+
+    // Create chat_histories table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_histories (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        project_id TEXT,
+        agent_type TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        messages TEXT NOT NULL,
+        metadata TEXT,
+        latest_message_timestamp TEXT,
+        ai_summary TEXT,
+        ai_summary_generated_at TEXT,
+        ai_summary_message_count INTEGER,
+        ai_title TEXT,
+        ai_title_generated_at TEXT,
+        ai_keywords_type TEXT,
+        ai_keywords_topic TEXT,
+        ai_keywords_generated_at TEXT,
+        ai_keywords_message_count INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create llm_api_keys table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS llm_api_keys (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        api_key TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(account_id, provider)
+      );
+    `);
+
+    // Create user_preferences table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id TEXT PRIMARY KEY,
+        ai_summary_enabled INTEGER NOT NULL DEFAULT 1,
+        ai_title_enabled INTEGER NOT NULL DEFAULT 1,
+        ai_model_provider TEXT DEFAULT 'openai',
+        ai_model_name TEXT DEFAULT 'gpt-4o-mini',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create active_sessions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS active_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        project_id TEXT,
+        editor_type TEXT NOT NULL,
+        workspace_path TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        last_activity_at TEXT NOT NULL,
+        recent_files TEXT,
+        session_metadata TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create user_canvas_layouts table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_canvas_layouts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        position_x REAL NOT NULL,
+        position_y REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, node_id)
+      );
+    `);
+
+    // Create pinned_conversations table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS pinned_conversations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        pinned_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, conversation_id)
+      );
+    `);
+
+    // Create session_summaries table for caching AI-generated summaries
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_summaries (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        workspace_path TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(session_id, workspace_path)
+      );
+    `);
+
+    // Create indexes for new tables
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+      CREATE INDEX IF NOT EXISTS idx_projects_is_default ON projects(user_id, is_default);
+      CREATE INDEX IF NOT EXISTS idx_chat_histories_account_id ON chat_histories(account_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_histories_project_id ON chat_histories(project_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_histories_timestamp ON chat_histories(latest_message_timestamp);
+      CREATE INDEX IF NOT EXISTS idx_active_sessions_user_id ON active_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_active_sessions_active ON active_sessions(user_id, is_active);
+      CREATE INDEX IF NOT EXISTS idx_canvas_layouts_user_id ON user_canvas_layouts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_pinned_conversations_user_id ON pinned_conversations(user_id);
+      CREATE INDEX IF NOT EXISTS idx_session_summaries_session_id ON session_summaries(session_id);
+    `);
   }
 
   /**
@@ -427,6 +583,13 @@ export class AppDatabase {
    */
   getDbPath(): string {
     return this.dbPath;
+  }
+
+  /**
+   * Get the raw database instance for direct access (used by repositories)
+   */
+  getRawDb(): Database.Database {
+    return this.db;
   }
 }
 

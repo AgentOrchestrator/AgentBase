@@ -721,6 +721,53 @@ export interface IPinnedConversationRepository {
   isConversationPinned(userId: string, conversationId: string): Promise<boolean>;
 }
 
+/**
+ * Session summary cache record
+ */
+export interface SessionSummary {
+  id: string;
+  sessionId: string;
+  workspacePath: string;
+  summary: string;
+  messageCount: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * Session summary repository interface
+ */
+export interface ISessionSummaryRepository {
+  /**
+   * Get a cached summary for a session
+   */
+  getSummary(sessionId: string, workspacePath: string): Promise<SessionSummary | null>;
+
+  /**
+   * Save or update a summary for a session
+   */
+  saveSummary(
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ): Promise<SessionSummary | null>;
+
+  /**
+   * Check if a cached summary is stale (message count changed)
+   */
+  isSummaryStale(
+    sessionId: string,
+    workspacePath: string,
+    currentMessageCount: number
+  ): Promise<boolean>;
+
+  /**
+   * Delete a cached summary
+   */
+  deleteSummary(sessionId: string, workspacePath: string): Promise<boolean>;
+}
+
 // ============================================================================
 // Repository Factory
 // ============================================================================

@@ -167,6 +167,16 @@ export class AuthManager {
   // ===========================================================================
 
   async waitForAuth(timeoutMs: number = 300000): Promise<boolean> {
+    // Check if provider supports device auth
+    const providerInfo = this.authProvider.getProviderInfo();
+
+    if (!providerInfo.capabilities.supportsDeviceAuth) {
+      // Auto-authenticate for local/offline providers
+      console.log('[Auth] Using auto-authentication (local mode)');
+      return await this.checkAuthCompletion();
+    }
+
+    // Browser-based auth flow for providers that support device auth
     const startTime = Date.now();
     const pollInterval = 2000; // Poll every 2 seconds
     const authUrl = this.getAuthUrl();
