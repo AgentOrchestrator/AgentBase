@@ -221,7 +221,7 @@ export function useSessionOverview({
   }, []); // No dependencies - uses refs
 
   // =========================================================================
-  // Generate Summary
+  // Generate Summary (with caching)
   // =========================================================================
 
   const generateSummary = useCallback(async () => {
@@ -247,7 +247,7 @@ export function useSessionOverview({
     isSummaryGeneratingRef.current = true;
 
     try {
-      // Fetch session to get user messages
+      // Fetch session to get user messages and message count
       const session = await currentAgentService.getSession(currentSessionId, currentWorkspacePath, {
         roles: ['user'],
       });
@@ -257,38 +257,81 @@ export function useSessionOverview({
       }
 
       const userMessages = session.messages as CodingAgentMessage[];
+      const messageCount = userMessages.length;
 
       // Need at least 1 user message for summary
-      if (userMessages.length === 0) {
+      if (messageCount === 0) {
         return;
       }
 
-      // Build prompt from first 2 user messages
-      const prompt = buildSummaryPrompt(userMessages);
+      // Check cache first
+      const cacheAPI = window.sessionSummaryCacheAPI;
+      if (cacheAPI) {
+        try {
+          const cached = await cacheAPI.getSummary(currentSessionId, currentWorkspacePath);
+          if (cached && cached.messageCount === messageCount) {
+            // Cache hit and still valid
+            setSummary(cached.summary);
+            summaryGeneratedForRef.current = currentSessionId;
+            console.log('[useSessionOverview] Summary loaded from cache:', cached.summary);
+            return;
+          }
+        } catch (cacheError) {
+          console.warn('[useSessionOverview] Cache read failed, generating new summary:', cacheError);
+        }
+      }
 
-      // Generate summary using a separate session ID to avoid polluting chat history
-      const summarySessionId = crypto.randomUUID();
+      // =======================================================================
+      // TEMPORARY MOCK: Replace with real AI call once caching is verified
+      // =======================================================================
+      const USE_MOCK_SUMMARY = false; // Set to false to use real AI generation
 
-      console.log('[useSessionOverview] Generating summary for session:', currentSessionId);
+      let cleanSummary: string;
 
-      const response = await currentAgentService.sendMessage(
-        prompt,
-        currentWorkspacePath,
-        summarySessionId
-      );
+      if (USE_MOCK_SUMMARY) {
+        // Mock summary for testing cache behavior
+        cleanSummary = `[MOCK] Session summary for testing (msgs: ${messageCount})`;
+        console.log('[useSessionOverview] MOCK: Generated fake summary for session:', currentSessionId);
+      } else {
+        // Build prompt from first 2 user messages
+        const prompt = buildSummaryPrompt(userMessages);
 
-      if (response?.content) {
+        // Generate summary using a separate session ID to avoid polluting chat history
+        const summarySessionId = crypto.randomUUID();
+
+        console.log('[useSessionOverview] Generating summary for session:', currentSessionId);
+
+        const response = await currentAgentService.sendMessage(
+          prompt,
+          currentWorkspacePath,
+          summarySessionId
+        );
+
+        if (!response?.content) {
+          return;
+        }
+
         // Clean up the summary - take first line, trim whitespace
-        const cleanSummary = response.content
+        cleanSummary = response.content
           .split('\n')[0]
           .trim()
           .slice(0, 100); // Safety limit
-
-        setSummary(cleanSummary);
-        summaryGeneratedForRef.current = currentSessionId;
-
-        console.log('[useSessionOverview] Summary generated:', cleanSummary);
       }
+
+      setSummary(cleanSummary);
+      summaryGeneratedForRef.current = currentSessionId;
+
+      // Save to cache
+      if (cacheAPI) {
+        try {
+          await cacheAPI.saveSummary(currentSessionId, currentWorkspacePath, cleanSummary, messageCount);
+          console.log('[useSessionOverview] Summary cached:', cleanSummary);
+        } catch (cacheError) {
+          console.warn('[useSessionOverview] Failed to cache summary:', cacheError);
+        }
+      }
+
+      console.log('[useSessionOverview] Summary generated:', cleanSummary);
     } catch (error) {
       console.error('[useSessionOverview] Failed to generate summary:', error);
     } finally {

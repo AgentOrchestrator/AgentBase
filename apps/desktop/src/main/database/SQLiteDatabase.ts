@@ -100,6 +100,25 @@ export class SQLiteDatabase implements IDatabase {
     await this.run(
       'CREATE INDEX IF NOT EXISTS idx_recent_workspaces_last_opened ON recent_workspaces(last_opened_at DESC)'
     );
+
+    // Create session_summaries table for caching AI-generated summaries
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS session_summaries (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        workspace_path TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(session_id, workspace_path)
+      )
+    `);
+
+    // Create index for session lookup
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_session_summaries_session_id ON session_summaries(session_id)'
+    );
   }
 
   async saveCanvas(canvasId: string, state: CanvasState): Promise<void> {
@@ -496,6 +515,71 @@ export class SQLiteDatabase implements IDatabase {
       lastOpenedAt: row.last_opened_at,
       createdAt: row.created_at,
     };
+  }
+
+  // ===========================================================================
+  // Session Summary Cache Methods
+  // ===========================================================================
+
+  async getSessionSummary(
+    sessionId: string,
+    workspacePath: string
+  ): Promise<{ summary: string; messageCount: number } | null> {
+    const row = await this.get<{
+      summary: string;
+      message_count: number;
+    }>(
+      'SELECT summary, message_count FROM session_summaries WHERE session_id = ? AND workspace_path = ?',
+      [sessionId, workspacePath]
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      summary: row.summary,
+      messageCount: row.message_count,
+    };
+  }
+
+  async saveSessionSummary(
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ): Promise<void> {
+    const now = Date.now();
+    const id = `${sessionId}-${workspacePath}`;
+
+    await this.run(
+      `INSERT OR REPLACE INTO session_summaries
+        (id, session_id, workspace_path, summary, message_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, sessionId, workspacePath, summary, messageCount, now, now]
+    );
+  }
+
+  async isSessionSummaryStale(
+    sessionId: string,
+    workspacePath: string,
+    currentMessageCount: number
+  ): Promise<boolean> {
+    const cached = await this.getSessionSummary(sessionId, workspacePath);
+
+    if (!cached) {
+      return true; // No cache exists, needs generation
+    }
+
+    // Stale if message count has changed
+    return cached.messageCount !== currentMessageCount;
+  }
+
+  async deleteSessionSummary(sessionId: string, workspacePath: string): Promise<void> {
+    await this.run(
+      'DELETE FROM session_summaries WHERE session_id = ? AND workspace_path = ?',
+      [sessionId, workspacePath]
+    );
   }
 
   // Helper methods to promisify sqlite3 callbacks

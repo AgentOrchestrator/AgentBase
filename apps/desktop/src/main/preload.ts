@@ -674,6 +674,55 @@ contextBridge.exposeInMainWorld('sessionWatcherAPI', {
   },
 } as SessionWatcherAPI);
 
+// Type definitions for the session summary cache API
+export interface SessionSummaryCacheAPI {
+  /** Get a cached summary for a session */
+  getSummary: (
+    sessionId: string,
+    workspacePath: string
+  ) => Promise<{ summary: string; messageCount: number } | null>;
+  /** Save a summary for a session */
+  saveSummary: (
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ) => Promise<void>;
+  /** Check if a cached summary is stale */
+  isStale: (
+    sessionId: string,
+    workspacePath: string,
+    currentMessageCount: number
+  ) => Promise<boolean>;
+  /** Delete a cached summary */
+  deleteSummary: (sessionId: string, workspacePath: string) => Promise<void>;
+}
+
+// Expose session summary cache API for persisting AI-generated summaries
+contextBridge.exposeInMainWorld('sessionSummaryCacheAPI', {
+  getSummary: (sessionId: string, workspacePath: string) =>
+    unwrapResponse<{ summary: string; messageCount: number } | null>(
+      ipcRenderer.invoke('session-summary:get', sessionId, workspacePath)
+    ),
+  saveSummary: async (
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ) => {
+    await unwrapResponse(
+      ipcRenderer.invoke('session-summary:save', sessionId, workspacePath, summary, messageCount)
+    );
+  },
+  isStale: (sessionId: string, workspacePath: string, currentMessageCount: number) =>
+    unwrapResponse<boolean>(
+      ipcRenderer.invoke('session-summary:is-stale', sessionId, workspacePath, currentMessageCount)
+    ),
+  deleteSummary: async (sessionId: string, workspacePath: string) => {
+    await unwrapResponse(ipcRenderer.invoke('session-summary:delete', sessionId, workspacePath));
+  },
+} as SessionSummaryCacheAPI);
+
 // Expose recent workspaces API for tracking recently opened workspace paths
 contextBridge.exposeInMainWorld('recentWorkspacesAPI', {
   addWorkspace: async (workspacePath: string, options?: AddWorkspaceOptions) => {

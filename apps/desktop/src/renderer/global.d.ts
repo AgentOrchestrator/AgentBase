@@ -4,7 +4,16 @@
  * Extends Window interface with Electron IPC APIs.
  */
 
-import type { ElectronAPI, WorktreeAPI, AgentStatusAPI, LLMAPI, RepresentationAPI, GitAPI, ShellAPI } from '../main/preload';
+import type {
+  ElectronAPI,
+  WorktreeAPI,
+  AgentStatusAPI,
+  LLMAPI,
+  RepresentationAPI,
+  GitAPI,
+  ShellAPI,
+  SessionSummaryCacheAPI,
+} from '../main/preload';
 import type { TerminalSessionAPI, SessionWatcherAPI, RecentWorkspacesAPI } from '@agent-orchestrator/shared';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
 
@@ -24,6 +33,7 @@ declare global {
     terminalSessionAPI?: TerminalSessionAPI;
     sessionWatcherAPI?: SessionWatcherAPI;
     recentWorkspacesAPI?: RecentWorkspacesAPI;
+    sessionSummaryCacheAPI?: SessionSummaryCacheAPI;
   }
 }
 

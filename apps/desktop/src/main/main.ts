@@ -737,6 +737,78 @@ function registerIpcHandlers(): void {
   });
 
   // ============================================
+  // Session Summary Cache IPC Handlers
+  // ============================================
+
+  ipcMain.handle(
+    'session-summary:get',
+    async (_event, sessionId: string, workspacePath: string) => {
+      try {
+        const cached = await database.getSessionSummary(sessionId, workspacePath);
+        return { success: true, data: cached };
+      } catch (error) {
+        console.error('[Main] Error getting session summary', { sessionId, workspacePath, error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'session-summary:save',
+    async (
+      _event,
+      sessionId: string,
+      workspacePath: string,
+      summary: string,
+      messageCount: number
+    ) => {
+      try {
+        await database.saveSessionSummary(sessionId, workspacePath, summary, messageCount);
+        console.log('[Main] Session summary saved', { sessionId, messageCount });
+        return { success: true };
+      } catch (error) {
+        console.error('[Main] Error saving session summary', { sessionId, workspacePath, error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'session-summary:is-stale',
+    async (_event, sessionId: string, workspacePath: string, currentMessageCount: number) => {
+      try {
+        const isStale = await database.isSessionSummaryStale(
+          sessionId,
+          workspacePath,
+          currentMessageCount
+        );
+        return { success: true, data: isStale };
+      } catch (error) {
+        console.error('[Main] Error checking session summary staleness', {
+          sessionId,
+          workspacePath,
+          error,
+        });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'session-summary:delete',
+    async (_event, sessionId: string, workspacePath: string) => {
+      try {
+        await database.deleteSessionSummary(sessionId, workspacePath);
+        console.log('[Main] Session summary deleted', { sessionId });
+        return { success: true };
+      } catch (error) {
+        console.error('[Main] Error deleting session summary', { sessionId, workspacePath, error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  // ============================================
   // Coding Agent IPC Handlers
   // ============================================
 
@@ -1447,122 +1519,122 @@ function registerIpcHandlers(): void {
     return gitBranchService.getGitInfo(workspacePath);
   });
 
-  console.log('[Main] IPC handlers registered successfully');
-}
-
-ipcMain.handle('git:create-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
-  try {
-    // Verify path exists and is a git repo
-    if (!fs.existsSync(workspacePath)) {
-      return { success: false, error: `Path does not exist: ${workspacePath}` };
-    }
-
-    // Validate branch name
-    if (!branchName || !branchName.trim()) {
-      return { success: false, error: 'Branch name is required' };
-    }
-
-    // Sanitize branch name (remove invalid characters)
-    const sanitizedBranchName = branchName.trim().replace(/[^a-zA-Z0-9._/-]/g, '-');
-    if (!sanitizedBranchName) {
-      return { success: false, error: 'Invalid branch name' };
-    }
-
+  ipcMain.handle('git:create-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Create and checkout the new branch
-      await runGitCommand(workspacePath, ['checkout', '-b', sanitizedBranchName]);
-      console.log('[Main] Branch created and checked out', { workspacePath, branchName: sanitizedBranchName });
-      return { success: true };
-    } catch (error) {
-      const errorMessage = (error as Error).message;
-      // Check if branch already exists
-      if (errorMessage.includes('already exists')) {
-        // Try to checkout the existing branch instead
-        try {
-          await runGitCommand(workspacePath, ['checkout', sanitizedBranchName]);
-          console.log('[Main] Branch already exists, checked out existing branch', { workspacePath, branchName: sanitizedBranchName });
-          return { success: true };
-        } catch (checkoutError) {
-          return { success: false, error: (checkoutError as Error).message };
-        }
+      // Verify path exists and is a git repo
+      if (!fs.existsSync(workspacePath)) {
+        return { success: false, error: `Path does not exist: ${workspacePath}` };
       }
-      return { success: false, error: errorMessage };
-    }
-  } catch (error) {
-    console.error('[Main] Error creating branch', { workspacePath, branchName, error });
-    return { success: false, error: (error as Error).message };
-  }
-});
 
-ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
-  try {
-    // Verify path exists and is a git repo
-    if (!fs.existsSync(workspacePath)) {
-      return { success: false, error: `Path does not exist: ${workspacePath}` };
-    }
+      // Validate branch name
+      if (!branchName || !branchName.trim()) {
+        return { success: false, error: 'Branch name is required' };
+      }
 
-    // Validate branch name
-    if (!branchName || !branchName.trim()) {
-      return { success: false, error: 'Branch name is required' };
-    }
+      // Sanitize branch name (remove invalid characters)
+      const sanitizedBranchName = branchName.trim().replace(/[^a-zA-Z0-9._/-]/g, '-');
+      if (!sanitizedBranchName) {
+        return { success: false, error: 'Invalid branch name' };
+      }
 
-    try {
-      // Checkout the branch
-      await runGitCommand(workspacePath, ['checkout', branchName.trim()]);
-      console.log('[Main] Branch checked out', { workspacePath, branchName });
-      return { success: true };
+      try {
+        // Create and checkout the new branch
+        await runGitCommand(workspacePath, ['checkout', '-b', sanitizedBranchName]);
+        console.log('[Main] Branch created and checked out', { workspacePath, branchName: sanitizedBranchName });
+        return { success: true };
+      } catch (error) {
+        const errorMessage = (error as Error).message;
+        // Check if branch already exists
+        if (errorMessage.includes('already exists')) {
+          // Try to checkout the existing branch instead
+          try {
+            await runGitCommand(workspacePath, ['checkout', sanitizedBranchName]);
+            console.log('[Main] Branch already exists, checked out existing branch', { workspacePath, branchName: sanitizedBranchName });
+            return { success: true };
+          } catch (checkoutError) {
+            return { success: false, error: (checkoutError as Error).message };
+          }
+        }
+        return { success: false, error: errorMessage };
+      }
     } catch (error) {
+      console.error('[Main] Error creating branch', { workspacePath, branchName, error });
       return { success: false, error: (error as Error).message };
     }
-  } catch (error) {
-    console.error('[Main] Error checking out branch', { workspacePath, branchName, error });
-    return { success: false, error: (error as Error).message };
-  }
-});
+  });
 
-ipcMain.handle('git:get-github-username', async (): Promise<{ success: boolean; data?: { username: string }; error?: string }> => {
-  try {
-    const gh = spawn('gh', ['api', 'user', '--jq', '.login'], { shell: true });
-    let stdout = '';
-    let stderr = '';
+  ipcMain.handle('git:checkout-branch', async (_event, workspacePath: string, branchName: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // Verify path exists and is a git repo
+      if (!fs.existsSync(workspacePath)) {
+        return { success: false, error: `Path does not exist: ${workspacePath}` };
+      }
 
-    gh.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
+      // Validate branch name
+      if (!branchName || !branchName.trim()) {
+        return { success: false, error: 'Branch name is required' };
+      }
 
-    gh.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    const username = await new Promise<string>((resolve, reject) => {
-      gh.on('close', (code) => {
-        if (code === 0) {
-          const trimmed = stdout.trim();
-          if (trimmed) {
-            resolve(trimmed);
-          } else {
-            reject(new Error('GitHub CLI returned empty username'));
-          }
-        } else {
-          reject(new Error(stderr.trim() || `GitHub CLI failed with code ${code}`));
-        }
-      });
-      gh.on('error', (err) => {
-        reject(new Error(`Failed to execute GitHub CLI: ${err.message}`));
-      });
-    });
-
-    if (username) {
-      console.log('[Main] GitHub username retrieved:', username);
-      return { success: true, data: { username } };
+      try {
+        // Checkout the branch
+        await runGitCommand(workspacePath, ['checkout', branchName.trim()]);
+        console.log('[Main] Branch checked out', { workspacePath, branchName });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    } catch (error) {
+      console.error('[Main] Error checking out branch', { workspacePath, branchName, error });
+      return { success: false, error: (error as Error).message };
     }
+  });
 
-    return { success: false, error: 'Could not determine GitHub username' };
-  } catch (error) {
-    console.error('[Main] Error getting GitHub username', { error });
-    return { success: false, error: (error as Error).message };
-  }
-});
+  ipcMain.handle('git:get-github-username', async (): Promise<{ success: boolean; data?: { username: string }; error?: string }> => {
+    try {
+      const gh = spawn('gh', ['api', 'user', '--jq', '.login'], { shell: true });
+      let stdout = '';
+      let stderr = '';
+
+      gh.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      gh.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      const username = await new Promise<string>((resolve, reject) => {
+        gh.on('close', (code) => {
+          if (code === 0) {
+            const trimmed = stdout.trim();
+            if (trimmed) {
+              resolve(trimmed);
+            } else {
+              reject(new Error('GitHub CLI returned empty username'));
+            }
+          } else {
+            reject(new Error(stderr.trim() || `GitHub CLI failed with code ${code}`));
+          }
+        });
+        gh.on('error', (err) => {
+          reject(new Error(`Failed to execute GitHub CLI: ${err.message}`));
+        });
+      });
+
+      if (username) {
+        console.log('[Main] GitHub username retrieved:', username);
+        return { success: true, data: { username } };
+      }
+
+      return { success: false, error: 'Could not determine GitHub username' };
+    } catch (error) {
+      console.error('[Main] Error getting GitHub username', { error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  console.log('[Main] IPC handlers registered successfully');
+}
 
 app.whenReady().then(async () => {
   console.log('[Main] App ready');

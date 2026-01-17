@@ -118,4 +118,53 @@ export interface IDatabase {
    * @param path - Workspace path to find
    */
   getRecentWorkspaceByPath(path: string): Promise<RecentWorkspace | null>;
+
+  // ==========================================================================
+  // Session Summary Cache Methods
+  // ==========================================================================
+
+  /**
+   * Get a cached summary for a session
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   * @returns The cached summary record, or null if not found
+   */
+  getSessionSummary(
+    sessionId: string,
+    workspacePath: string
+  ): Promise<{ summary: string; messageCount: number } | null>;
+
+  /**
+   * Save or update a summary for a session
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   * @param summary - The AI-generated summary
+   * @param messageCount - Message count at time of generation (for staleness check)
+   */
+  saveSessionSummary(
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ): Promise<void>;
+
+  /**
+   * Check if a cached summary exists and is still valid
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   * @param currentMessageCount - Current message count to compare against
+   * @returns true if summary is stale or doesn't exist
+   */
+  isSessionSummaryStale(
+    sessionId: string,
+    workspacePath: string,
+    currentMessageCount: number
+  ): Promise<boolean>;
+
+  /**
+   * Delete a cached summary
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   */
+  deleteSessionSummary(sessionId: string, workspacePath: string): Promise<void>;
 }

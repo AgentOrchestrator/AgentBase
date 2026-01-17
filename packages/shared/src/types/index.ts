@@ -28,3 +28,6 @@ export * from './conversation.js';
 
 // Workspace types (recent workspaces)
 export * from './workspace.js';
+
+// Repository types (domain entities and interfaces)
+export * from './repository.js';
