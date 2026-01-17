@@ -54,6 +54,42 @@ export function parseJsonlLineString(line: string): ClaudeCodeJsonlLine | null {
 // =============================================================================
 
 /**
+ * Check if a user message is actually a tool result (not a true user message)
+ * Tool results have type "user" but contain tool_result content blocks
+ */
+function isToolResult(data: ClaudeCodeJsonlLine): boolean {
+  if (data.type !== 'user') return false;
+  if (!data.message?.content) return false;
+
+  const content = data.message.content;
+  
+  // Check if content is an array with tool_result blocks
+  if (Array.isArray(content)) {
+    return content.some(
+      (part) =>
+        part &&
+        typeof part === 'object' &&
+        'type' in part &&
+        part.type === 'tool_result'
+    );
+  }
+
+  // Check if content is a single tool_result object
+  if (content && typeof content === 'object' && 'type' in content) {
+    return content.type === 'tool_result';
+  }
+
+  return false;
+}
+
+/**
+ * Check if a line is a queue operation (should be skipped)
+ */
+function isQueueOperation(data: ClaudeCodeJsonlLine): boolean {
+  return data.type === 'queue-operation';
+}
+
+/**
  * Parse a JSONL line to rich CodingAgentMessage format
  *
  * Used by desktop app for full-featured message display with content blocks.
@@ -69,6 +105,16 @@ export function parseJsonlToRichMessages(
   const generateId = options?.generateId ?? defaultGenerateId;
   const messages: CodingAgentMessage[] = [];
   const timestamp = normalizeTimestamp(data.timestamp);
+
+  // Skip queue operations
+  if (isQueueOperation(data)) {
+    return { messages, sessionId: data.sessionId, uuid: data.uuid };
+  }
+
+  // Skip tool results (user messages that are actually tool results)
+  if (isToolResult(data)) {
+    return { messages, sessionId: data.sessionId, uuid: data.uuid };
+  }
 
   // Handle summary lines
   if (data.type === 'summary' && data.summary) {
@@ -133,6 +179,16 @@ export function parseJsonlToChatMessages(
   const generateId = options?.generateId ?? defaultGenerateId;
   const messages: ChatMessage[] = [];
   const timestamp = normalizeTimestamp(data.timestamp);
+
+  // Skip queue operations
+  if (isQueueOperation(data)) {
+    return { messages, sessionId: data.sessionId };
+  }
+
+  // Skip tool results (user messages that are actually tool results)
+  if (isToolResult(data)) {
+    return { messages, sessionId: data.sessionId };
+  }
 
   // Handle summary lines
   if (data.type === 'summary' && data.summary) {

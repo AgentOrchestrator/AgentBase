@@ -62,7 +62,6 @@ export default function AgentChatView({
     messageId?: string;
   } | null>(null);
   const [isCommandPressed, setIsCommandPressed] = useState(false);
-  const [stickyUserMessageId, setStickyUserMessageId] = useState<string | null>(null);
   const hasSentInitialPrompt = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -284,53 +283,6 @@ export default function AgentChatView({
     };
   }, [handleSelectionChange]);
 
-  // Track which user message is currently sticky using scroll position
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    const updateStickyMessage = () => {
-      const userMessages = Array.from(container.querySelectorAll('.conversation-user-message')) as HTMLElement[];
-      if (userMessages.length === 0) {
-        setStickyUserMessageId(null);
-        return;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      const stickyThreshold = containerRect.top + 50; // Account for padding
-
-      // Find the user message that is currently at the sticky position
-      // Check from bottom to top to get the most recent one that's sticky
-      let currentStickyId: string | null = null;
-
-      for (let i = userMessages.length - 1; i >= 0; i--) {
-        const userMsg = userMessages[i];
-        const rect = userMsg.getBoundingClientRect();
-        const messageId = userMsg.getAttribute('data-message-id');
-
-        // Check if this message is in the sticky zone (at or near the top)
-        if (rect.top <= stickyThreshold && rect.bottom > stickyThreshold) {
-          currentStickyId = messageId;
-          break;
-        }
-      }
-
-      setStickyUserMessageId(currentStickyId);
-    };
-
-    // Initial check
-    updateStickyMessage();
-
-    // Update on scroll
-    container.addEventListener('scroll', updateStickyMessage);
-    // Also update when messages change
-    const timeoutId = setTimeout(updateStickyMessage, 100);
-
-    return () => {
-      container.removeEventListener('scroll', updateStickyMessage);
-      clearTimeout(timeoutId);
-    };
-  }, [messages]);
 
   const handleSend = async () => {
     if (!isSessionReady || !inputValue.trim() || isStreaming) return;
@@ -358,7 +310,7 @@ export default function AgentChatView({
     return null; // Skip TodoWrite and other tools
   };
 
-  // Process content blocks into display items (matches ConversationNode logic)
+  // Process content blocks into display items (matches ConversationNode logic exactly)
   const processContentBlocks = (contentBlocks: AgentContentBlock[]): DisplayItem[] => {
     const items: DisplayItem[] = [];
     let currentToolType: 'read' | 'edit' | 'grep' | 'glob' | null = null;
@@ -387,10 +339,7 @@ export default function AgentChatView({
       } else if (block.type === 'thinking') {
         flushToolGroup();
         items.push({ type: 'thinking', content: { thinking: block.thinking }, key: `thinking-${itemIndex++}` });
-      } else if (block.type === 'redacted_thinking') {
-        flushToolGroup();
-        items.push({ type: 'thinking', content: { thinking: 'Thinking redacted' }, key: `thinking-${itemIndex++}` });
-      } else if (block.type === 'tool_use' || block.type === 'server_tool_use') {
+      } else if (block.type === 'tool_use') {
         const toolType = getToolType(block.name);
         if (toolType) {
           if (currentToolType === toolType) {
@@ -401,8 +350,9 @@ export default function AgentChatView({
             currentToolCount = 1;
           }
         }
-        // Skip web_search_tool_result and other tools
+        // Skip all other tool types (server_tool_use, web_search_tool_result, etc.)
       }
+      // Skip all other content types (redacted_thinking, server_tool_use, web_search_tool_result, etc.)
     }
 
     flushToolGroup();
@@ -460,20 +410,10 @@ export default function AgentChatView({
   };
 
   const renderUserMessage = (msg: AgentChatMessage, msgIndex: number) => {
-    const isSticky = stickyUserMessageId === msg.id;
-    
-    // Find the index of the sticky message
-    const stickyIndex = stickyUserMessageId 
-      ? messages.findIndex(m => m.id === stickyUserMessageId)
-      : -1;
-    
-    // Only fade out messages that come BEFORE (are older than) the sticky one
-    const shouldFade = stickyIndex !== -1 && msgIndex < stickyIndex;
-    
     return (
       <div 
         key={msg.id} 
-        className={`conversation-user-message ${isSticky ? 'sticky-active' : ''} ${shouldFade ? 'sticky-fade' : ''}`}
+        className="conversation-user-message"
         data-message-id={msg.id}
       >
         <div className="conversation-user-content">
@@ -533,9 +473,9 @@ export default function AgentChatView({
               : 'Waiting for session to be ready...'}
           </div>
         )}
-        {messages.map((msg, index) => {
+        {messages.map((msg) => {
           if (msg.role === 'user') {
-            return renderUserMessage(msg, index);
+            return renderUserMessage(msg, 0);
           } else {
             return renderAssistantMessage(msg);
           }

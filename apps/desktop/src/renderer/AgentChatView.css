@@ -83,21 +83,6 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  /* Add subtle shadow when sticky to indicate it's floating */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  /* Smooth transition for transform changes */
-  transition: transform 0.3s ease;
-}
-
-/* When a user message is currently sticky, keep it in place */
-.conversation-user-message.sticky-active {
-  transform: translateY(0);
-}
-
-/* When another user message is sticky, push this one up and out of view */
-.conversation-user-message.sticky-fade {
-  transform: translateY(-2000%);
-  pointer-events: none;
 }
 
 .conversation-user-content {

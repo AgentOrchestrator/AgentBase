@@ -67,6 +67,8 @@ export function useChatMessages({
   const loadedSessionIdRef = useRef<string | null>(null);
   const messagesRef = useRef<CodingAgentMessage[]>([]);
   const isLoadingRef = useRef(false);
+  const streamingEndTimeRef = useRef<number | null>(null);
+  const STREAMING_COOLDOWN_MS = 2000; // Prevent file watcher reloads for 2s after streaming ends
 
   // Keep messagesRef in sync with state
   useEffect(() => {
@@ -142,11 +144,19 @@ export function useChatMessages({
     onSessionChange: useCallback(
       (event) => {
         // Only reload on updates (not creates/deletes), and not while streaming
-        if (event.type === 'updated' && !isStreaming) {
+        // Also prevent reloads immediately after streaming ends (cooldown period)
+        const timeSinceStreamingEnd = streamingEndTimeRef.current
+          ? Date.now() - streamingEndTimeRef.current
+          : Infinity;
+        const isInCooldown = timeSinceStreamingEnd < STREAMING_COOLDOWN_MS;
+
+        if (event.type === 'updated' && !isStreaming && !isInCooldown) {
           console.log('[useChatMessages] Session file updated externally, reloading');
           loadedSessionIdRef.current = null;
           setIsLoaded(false);
           void loadMessages();
+        } else if (isInCooldown) {
+          console.log('[useChatMessages] Skipping reload - still in streaming cooldown period');
         }
       },
       [loadMessages, isStreaming]
@@ -207,13 +217,40 @@ export function useChatMessages({
       // Notify caller of session (useful for first message)
       onSessionCreated?.(sessionId);
 
-      // Final update with complete content
-      const finalMessages = [
-        ...messagesRef.current.slice(0, -1),
-        { ...assistantMessage, content: result?.content || assistantContent },
-      ];
-      messagesRef.current = finalMessages;
-      setMessages(finalMessages);
+      // After streaming completes, reload messages from file to get full contentBlocks
+      // This ensures we have thinking blocks, tool_use blocks, etc. that weren't available during streaming
+      // Wait a bit for the file to be fully written
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      try {
+        const session = await agentService.getSession(sessionId, workspacePath, {
+          roles: ['user', 'assistant'],
+        });
+
+        if (session?.messages) {
+          const loadedMessages = session.messages as CodingAgentMessage[];
+          messagesRef.current = loadedMessages;
+          setMessages(loadedMessages);
+          loadedSessionIdRef.current = sessionId;
+        } else {
+          // Fallback: use the streamed content if reload fails
+          const finalMessages = [
+            ...messagesRef.current.slice(0, -1),
+            { ...assistantMessage, content: result?.content || assistantContent },
+          ];
+          messagesRef.current = finalMessages;
+          setMessages(finalMessages);
+        }
+      } catch (reloadErr) {
+        console.warn('[useChatMessages] Failed to reload messages after streaming, using streamed content:', reloadErr);
+        // Fallback: use the streamed content if reload fails
+        const finalMessages = [
+          ...messagesRef.current.slice(0, -1),
+          { ...assistantMessage, content: result?.content || assistantContent },
+        ];
+        messagesRef.current = finalMessages;
+        setMessages(finalMessages);
+      }
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Failed to send message');
       // Remove incomplete assistant message on error
@@ -222,6 +259,7 @@ export function useChatMessages({
       setMessages(rollbackMessages);
     } finally {
       setIsStreaming(false);
+      streamingEndTimeRef.current = Date.now();
     }
   }, [agentService, sessionId, workspacePath, onSessionCreated, onError]);
 

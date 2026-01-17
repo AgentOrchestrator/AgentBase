@@ -61,6 +61,46 @@ const defaultGenerateId = (): string => {
 };
 
 // =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Check if a user message is actually a tool result (not a true user message)
+ * Tool results have type "user" but contain tool_result content blocks
+ */
+function isToolResult(data: ClaudeCodeJsonlLine): boolean {
+  if (data.type !== 'user') return false;
+  if (!data.message?.content) return false;
+
+  const content = data.message.content;
+  
+  // Check if content is an array with tool_result blocks
+  if (Array.isArray(content)) {
+    return content.some(
+      (part) =>
+        part &&
+        typeof part === 'object' &&
+        'type' in part &&
+        part.type === 'tool_result'
+    );
+  }
+
+  // Check if content is a single tool_result object
+  if (content && typeof content === 'object' && 'type' in content) {
+    return content.type === 'tool_result';
+  }
+
+  return false;
+}
+
+/**
+ * Check if a line is a queue operation (should be skipped)
+ */
+function isQueueOperation(data: ClaudeCodeJsonlLine): boolean {
+  return data.type === 'queue-operation';
+}
+
+// =============================================================================
 // Claude Code JSONL Parser Class
 // =============================================================================
 
@@ -272,6 +312,12 @@ export class ClaudeCodeJsonlParser {
   private parseJsonlLineToMessages(data: ClaudeCodeJsonlLine): CodingAgentMessage[] {
     const messages: CodingAgentMessage[] = [];
 
+    // Skip queue operations
+    if (isQueueOperation(data)) return messages;
+
+    // Skip tool results (user messages that are actually tool results)
+    if (isToolResult(data)) return messages;
+
     if (!data.message?.content) return messages;
     if (data.type !== 'user' && data.type !== 'assistant') return messages;
 
@@ -281,10 +327,20 @@ export class ClaudeCodeJsonlParser {
 
     if (!displayText && blocks.length === 0) return messages;
 
+    // For user messages, only include text from 'text' type blocks, not from tool_result
+    // This prevents file content from tool_result blocks from appearing in user messages
+    let filteredDisplayText = displayText;
+    if (data.type === 'user') {
+      const textBlocks = blocks.filter(block => block.type === 'text');
+      filteredDisplayText = textBlocks
+        .map(block => (block as { type: 'text'; text: string }).text)
+        .join('\n');
+    }
+
     messages.push({
       id: data.uuid || this.generateId(),
       role: data.type,
-      content: displayText,
+      content: filteredDisplayText,
       contentBlocks: blocks.length > 0 ? blocks : undefined,
       timestamp: normalizeTimestamp(data.timestamp),
       messageType: data.type,

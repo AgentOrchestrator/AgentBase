@@ -66,6 +66,27 @@ function parseSessionFile(filePath: string, projectPath: string): ChatHistory | 
       try {
         const data: JsonlLine = JSON.parse(line);
 
+        // Skip queue operations
+        if (data.type === 'queue-operation') {
+          continue;
+        }
+
+        // Skip tool results (user messages that are actually tool results)
+        if (data.type === 'user' && data.message?.content) {
+          const content = data.message.content;
+          const contentParts = Array.isArray(content) ? content : [content];
+          const isToolResult = contentParts.some(
+            (part) =>
+              part &&
+              typeof part === 'object' &&
+              'type' in part &&
+              part.type === 'tool_result'
+          );
+          if (isToolResult) {
+            continue;
+          }
+        }
+
         if (data.type === 'summary' && data.summary) {
           summary = data.summary;
         }
