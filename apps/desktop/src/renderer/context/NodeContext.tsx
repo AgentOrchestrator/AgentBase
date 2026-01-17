@@ -7,7 +7,7 @@
  */
 
 import type React from 'react';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentType } from '../../../types/coding-agent-status';
 import type { NodeServiceConfig } from './NodeServicesRegistry';
 import { useNodeServicesRegistry } from './NodeServicesRegistry';
@@ -104,14 +104,19 @@ export function NodeContextProvider({
   const servicesRef = useRef<NodeServices | null>(null);
   const isDisposingRef = useRef(false);
 
-  // Build service config
-  const config: NodeServiceConfig = {
-    terminalId: terminalId || `terminal-${nodeId}`,
-    agentId: agentId || `agent-${nodeId}`,
-    agentType: (agentType as AgentType) || 'claude_code',
-    sessionId,
-    workspacePath,
-  };
+  // Memoize service config to prevent infinite re-renders
+  // Without useMemo, config object is recreated on every render with a new reference,
+  // causing the useEffect below to re-run infinitely
+  const config = useMemo<NodeServiceConfig>(
+    () => ({
+      terminalId: terminalId || `terminal-${nodeId}`,
+      agentId: agentId || `agent-${nodeId}`,
+      agentType: (agentType as AgentType) || 'claude_code',
+      sessionId,
+      workspacePath,
+    }),
+    [terminalId, nodeId, agentId, agentType, sessionId, workspacePath]
+  );
 
   // Track the previous workspace path to detect changes
   const prevWorkspacePathRef = useRef<string | undefined>(undefined);
