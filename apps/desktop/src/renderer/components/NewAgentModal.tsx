@@ -924,44 +924,33 @@ export function NewAgentModal({
 
         {/* Main Content */}
         <div className="new-agent-modal-content">
-          {/* Fork mode: Fork name input with inline worktree checkbox */}
+          {/* Fork mode: Fork name input */}
           {isForkMode && (
-            <div className="new-agent-modal-fork-input-row">
-              <textarea
-                ref={descriptionInputRef}
-                className="new-agent-modal-description-input new-agent-modal-fork-input"
-                placeholder="Fork name..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onKeyDown={(e) => {
-                  if (keyboardFocus === 'input') {
-                    if (e.key === 'Enter' && e.shiftKey) {
-                      return;
-                    }
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleCreate();
-                      return;
-                    }
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      handleCreate();
-                      return;
-                    }
+            <textarea
+              ref={descriptionInputRef}
+              className="new-agent-modal-description-input new-agent-modal-fork-input"
+              placeholder="Fork name..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => {
+                if (keyboardFocus === 'input') {
+                  if (e.key === 'Enter' && e.shiftKey) {
+                    return;
                   }
-                }}
-                rows={1}
-              />
-              <label className="new-agent-modal-checkbox-label new-agent-modal-fork-worktree-checkbox">
-                <input
-                  type="checkbox"
-                  className="new-agent-modal-checkbox"
-                  checked={shouldCreateWorktreeForFork}
-                  onChange={(e) => setShouldCreateWorktreeForFork(e.target.checked)}
-                />
-                <span className="new-agent-modal-checkbox-text">Worktree</span>
-              </label>
-            </div>
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleCreate();
+                    return;
+                  }
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleCreate();
+                    return;
+                  }
+                }
+              }}
+              rows={1}
+            />
           )}
           {/* Regular mode: standard textarea */}
           {!isForkMode && (
@@ -991,27 +980,11 @@ export function NewAgentModal({
               rows={6}
             />
           )}
-          {/* Fork mode: Show full worktree path when worktree checkbox is checked */}
-          {isForkMode && shouldCreateWorktreeForFork && workspacePath && (
-            <div className="new-agent-modal-fork-worktree-path">
-              <span className="new-agent-modal-fork-worktree-label">Create Agent in:</span>
-              <span className="new-agent-modal-fork-worktree-value">
-                {(() => {
-                  // Compute sibling path: parent directory of workspace + directory name
-                  const parentDir = workspacePath.split('/').slice(0, -1).join('/');
-                  const dirName = description.trim()
-                    ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
-                    : 'agent-fork';
-                  return `${parentDir}/${dirName}`;
-                })()}
-              </span>
-            </div>
-          )}
 
           {/* Fork mode: Message preview section */}
           {isForkMode && onLoadMessages && (
             <div className="new-agent-modal-preview-section">
-              <button
+              {/* <button
                 type="button"
                 className="new-agent-modal-preview-toggle"
                 onClick={() => {
@@ -1022,7 +995,7 @@ export function NewAgentModal({
                 }}
               >
                 {isPreviewExpanded ? '▼' : '▶'} Preview Context
-              </button>
+              </button> */}
 
               {isPreviewExpanded && (
                 <div className="new-agent-modal-preview-content">
@@ -1045,13 +1018,16 @@ export function NewAgentModal({
 
         {/* Bottom Bar */}
         <div className={`new-agent-modal-footer ${isForkMode ? 'fork-mode-footer' : ''}`}>
-          {/* Fork mode: Show parent session info on the left */}
-          {isForkMode && forkData && (
-            <div className="new-agent-modal-session-info">
-              <span className="new-agent-modal-session-id">
-                from: {forkData.parentSessionId}
-              </span>
-            </div>
+          {isForkMode && (
+            <label className="new-agent-modal-checkbox-label new-agent-modal-fork-worktree-checkbox">
+              <input
+                type="checkbox"
+                className="new-agent-modal-checkbox"
+                checked={shouldCreateWorktreeForFork}
+                onChange={(e) => setShouldCreateWorktreeForFork(e.target.checked)}
+              />
+              <span className="new-agent-modal-checkbox-text">Worktree</span>
+            </label>
           )}
           <button
             className="new-agent-modal-create-btn"
@@ -1074,6 +1050,23 @@ export function NewAgentModal({
              'Start agent'}
           </button>
         </div>
+
+        {/* Chin area for worktree path info */}
+        {isForkMode && shouldCreateWorktreeForFork && workspacePath && (
+          <div className="new-agent-modal-chin new-agent-modal-fork-worktree-path">
+            <span className="new-agent-modal-fork-worktree-label">Create Agent in:</span>
+            <span className="new-agent-modal-fork-worktree-value">
+              {(() => {
+                // Compute sibling path: parent directory of workspace + directory name
+                const parentDir = workspacePath.split('/').slice(0, -1).join('/');
+                const dirName = description.trim()
+                  ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+                  : 'agent-fork';
+                return `${parentDir}/${dirName}`;
+              })()}
+            </span>
+          </div>
+        )}
       </div>
       <BranchSwitchWarningDialog
         isOpen={showBranchSwitchWarning}

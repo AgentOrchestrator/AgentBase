@@ -1030,12 +1030,14 @@
 
 .settings-item {
   display: flex;
+  flex-direction: column;
   justify-content: flex-start;
-  align-items: center;
+  align-items: flex-start;
   padding: 12px 0;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-primary);
   font-size: 14px;
+  gap: 8px;
 }
 
 .settings-item:last-child {
@@ -1069,6 +1071,63 @@
 .theme-select option {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
+}
+
+/* Settings Toggle */
+.settings-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-toggle {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-primary);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.settings-toggle:checked {
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
+}
+
+.settings-toggle:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.settings-toggle-text {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.settings-toggle-description {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  margin-left: 26px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.settings-toggle-description[style*="margin-left: 0"] {
+  margin-left: 0;
 }
 
 .settings-shortcut {

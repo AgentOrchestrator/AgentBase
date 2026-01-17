@@ -450,7 +450,6 @@
 /* Message preview section */
 .new-agent-modal-preview-section {
   margin-top: 16px;
-  border-top: 1px solid var(--color-border);
   padding-top: 12px;
 }
 
@@ -504,4 +503,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Chin area for worktree path info */
+.new-agent-modal-chin {
+  padding: 6px 16px;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border);
 }
