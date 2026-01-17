@@ -586,7 +586,7 @@ export class ClaudeCodeAgent
     // Determine target session ID:
     // - Cross-directory (worktree) forks: use same session ID (file is in different project directory)
     // - Same-directory forks without worktree: generate new session ID
-    const targetSessionId = isCrossDirectory || createWorktree
+    const targetSessionId = createWorktree
       ? sourceSessionId
       : crypto.randomUUID();
 
