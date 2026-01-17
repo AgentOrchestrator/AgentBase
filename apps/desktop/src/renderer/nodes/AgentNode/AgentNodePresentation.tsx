@@ -122,38 +122,8 @@ export function AgentNodePresentation({
     [onDataChange]
   );
 
-  // Auto-update title from first user message
-  useEffect(() => {
-    // Only auto-update if title is not manually set
-    if (data.title.isManuallySet) {
-      return;
-    }
-
-    const messages = data.chatMessages || [];
-    const firstUserMessage = messages.find((msg) => msg.role === 'user');
-
-    if (firstUserMessage && firstUserMessage.content) {
-      const content = firstUserMessage.content.trim();
-      if (content && content !== data.title.value) {
-        // Truncate to reasonable length for title (will be further limited by CSS)
-        const maxLength = 100;
-        let titleText = content;
-        if (titleText.length > maxLength) {
-          titleText = titleText.slice(0, maxLength).trim();
-          // Try to cut at word boundary
-          const lastSpace = titleText.lastIndexOf(' ');
-          if (lastSpace > maxLength * 0.7) {
-            titleText = titleText.slice(0, lastSpace);
-          }
-          titleText += '...';
-        }
-
-        onDataChange({
-          title: { value: titleText, isManuallySet: false },
-        });
-      }
-    }
-  }, [data.chatMessages, data.title.isManuallySet, data.title.value, onDataChange]);
+  // NOTE: Auto-title updates are handled by useChatSession when messages are loaded from the session
+  // This ensures titles sync with actual session content, not stale node state
 
   // Handle attachment details click
   const handleAttachmentClick = useCallback((attachment: TerminalAttachment) => {
@@ -587,9 +557,7 @@ export function AgentNodePresentation({
               sessionId={data.sessionId}
               workspacePath={data.workspacePath}
               agentType={data.agentType}
-              initialMessages={data.chatMessages}
               initialPrompt={data.initialPrompt}
-              onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
               onSessionCreated={(newSessionId) => onDataChange({ sessionId: newSessionId })}
               isSessionReady={isSessionReady}
               selected={selected}
@@ -606,7 +574,6 @@ export function AgentNodePresentation({
           sessionId={data.sessionId}
           agentType={data.agentType}
           workspacePath={data.workspacePath}
-          chatMessages={data.chatMessages || []}
           title={data.title.value}
         />
         <AgentNodeForkHandle nodeId={nodeId} />

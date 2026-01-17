@@ -576,10 +576,9 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         sessionId?: string;
         agentType: string;
         workspacePath?: string;
-        chatMessages?: unknown[];
         title?: string;
       }>;
-      const { nodeId, agentId, sessionId, agentType, workspacePath, chatMessages, title } = customEvent.detail;
+      const { nodeId, agentId, sessionId, agentType, workspacePath, title } = customEvent.detail;
 
       // Check if a chat node already exists for this agent node
       const existingChatNode = nodes.find(
@@ -617,6 +616,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
       };
 
       // Create new chat node
+      // Note: Messages are loaded via agentService.getSession(), not stored in node data
       const chatNodeId = `chat-node-${Date.now()}`;
       const chatNode: Node = {
         id: chatNodeId,
@@ -627,7 +627,6 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
           agentType,
           workspacePath,
           title: title || 'Chat',
-          messages: chatMessages || [],
           isDraft: !sessionId,
           isExpanded: true,
           agentId, // Pass agentId so it can use the same agent service

@@ -604,7 +604,7 @@ export class AgentServiceImpl implements IAgentService {
     console.log('[AgentServiceImpl] getSession called', {
       sessionId,
       workspacePath,
-      filterWorkspacePath: filter?.workspacePath,
+      filter
     });
 
     const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);

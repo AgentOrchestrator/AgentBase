@@ -4,7 +4,6 @@ export interface AgentNodeChatHandleProps {
   sessionId?: string;
   agentType: string;
   workspacePath?: string;
-  chatMessages: unknown[];
   title: string;
 }
 
@@ -14,7 +13,6 @@ export function AgentNodeChatHandle({
   sessionId,
   agentType,
   workspacePath,
-  chatMessages,
   title,
 }: AgentNodeChatHandleProps) {
   return (
@@ -31,7 +29,6 @@ export function AgentNodeChatHandle({
               sessionId,
               agentType,
               workspacePath,
-              chatMessages,
               title,
             },
             bubbles: true,

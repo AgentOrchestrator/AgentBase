@@ -107,8 +107,6 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
           sessionId={sessionId}
           workspacePath={agent.workspace.path}
           agentType={agent.config.agentType}
-          initialMessages={agent.nodeData.chatMessages || []}
-          onMessagesChange={(messages) => handleDataChange({ chatMessages: messages })}
           onSessionCreated={(newSessionId) => handleDataChange({ sessionId: newSessionId })}
           isSessionReady={agent.session.readiness === 'ready'}
           selected={selected}

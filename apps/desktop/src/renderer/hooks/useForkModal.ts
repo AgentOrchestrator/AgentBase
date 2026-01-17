@@ -310,20 +310,38 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         const newAgentId = `agent-${crypto.randomUUID()}`;
         const newTerminalId = `terminal-${crypto.randomUUID()}`;
 
-        // Create forked node data with new session and worktree info
-        // gitInfo is inherited from parent - worktree is in the same git repo
+        // Create forked node data with explicit field mapping
+        // This avoids accidentally copying fields that shouldn't be inherited
         const forkedData: AgentNodeData = {
-          ...sourceData,
+          // New identifiers for the forked agent
           agentId: newAgentId,
           terminalId: newTerminalId,
+
+          // Inherited from source (agent configuration)
+          agentType: sourceData.agentType,
+
+          // Fresh state for the forked agent
+          status: 'idle',
+          statusInfo: undefined,
           title: createDefaultAgentTitle(forkTitle),
+          summary: null,
+          progress: null,
+          activeView: sourceData.activeView,
+
+          // Session/fork lineage
           sessionId: result.data.sessionInfo.id,
           parentSessionId,
           worktreeId: result.data.worktreeInfo.id,
+
+          // Workspace configuration
           workspacePath: result.data.worktreeInfo.worktreePath,
           gitInfo: sourceData.gitInfo, // Inherit from parent - worktree is on new branch in same repo
+
           // Keep non-workspace attachments (Linear issues, etc.)
           attachments: sourceData.attachments || [],
+
+          // Forking state
+          forking: false,
         };
 
         // Create the new forked node

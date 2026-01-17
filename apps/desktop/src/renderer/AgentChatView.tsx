@@ -28,9 +28,7 @@ interface AgentChatViewProps {
   agentType: string;
   /** Workspace path (required for chat operations) */
   workspacePath: string;
-  initialMessages?: AgentChatMessage[];
   initialPrompt?: string;
-  onMessagesChange: (messages: AgentChatMessage[]) => void;
   onSessionCreated?: (sessionId: string) => void;
   isSessionReady?: boolean;
   selected?: boolean;
@@ -48,15 +46,13 @@ export default function AgentChatView({
   sessionId,
   agentType,
   workspacePath,
-  initialMessages = [],
   initialPrompt,
-  onMessagesChange,
   onSessionCreated,
   isSessionReady = true,
   selected = false,
   nodeId,
 }: AgentChatViewProps) {
-  const [messages, setMessages] = useState<AgentChatMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<AgentChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [textSelection, setTextSelection] = useState<{
@@ -87,8 +83,7 @@ export default function AgentChatView({
     currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: AgentChatMessage[]) => {
       setMessages(newMessages);
-      onMessagesChange(newMessages);
-    }, [onMessagesChange]),
+    }, []),
     onSessionCreated: useCallback((newSessionId: string) => {
       onSessionCreated?.(newSessionId);
     }, [onSessionCreated]),
@@ -96,17 +91,10 @@ export default function AgentChatView({
     agentService,
   });
 
-  // Sync messages from props
-  useEffect(() => {
-    if (initialMessages.length > 0 && messages.length === 0) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages, messages.length]);
-
   // Auto-send initial prompt when session is ready and no messages exist
   useEffect(() => {
-    // Don't send if there are already messages (from initialMessages or previous conversation)
-    const hasExistingMessages = messages.length > 0 || initialMessages.length > 0;
+    // Don't send if there are already messages (loaded from session)
+    const hasExistingMessages = messages.length > 0;
     
     if (
       isSessionReady &&
@@ -122,7 +110,7 @@ export default function AgentChatView({
         hasSentInitialPrompt.current = false; // Allow retry on error
       });
     }
-  }, [isSessionReady, initialPrompt, messages.length, initialMessages.length, isStreaming, sendMessage]);
+  }, [isSessionReady, initialPrompt, messages.length, isStreaming, sendMessage]);
 
   // Reset hasSentInitialPrompt if initialPrompt changes (shouldn't happen, but safety check)
   useEffect(() => {

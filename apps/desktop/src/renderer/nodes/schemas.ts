@@ -112,7 +112,6 @@ export const AgentNodeDataSchema = z.object({
   conversationId: z.string().optional(),
   initialPrompt: z.string().optional(),
   sessionId: z.string().optional(),
-  chatMessages: z.array(ChatMessageSchema).optional(),
   forking: z.boolean().optional(),
   // Workspace - single source of truth
   workspacePath: z.string().optional(),
@@ -146,6 +145,7 @@ export const ConversationNodeDataSchema = z.object({
 
 /**
  * Schema for AgentChatNode data
+ * Note: Messages are retrieved via agentService.getSession(), not persisted in node state
  */
 export const AgentChatNodeDataSchema = z.object({
   sessionId: z.string().optional(),
@@ -153,7 +153,6 @@ export const AgentChatNodeDataSchema = z.object({
   workspacePath: z.string().optional(),
   title: z.string().optional(),
   isExpanded: z.boolean().optional(),
-  messages: z.array(ChatMessageSchema),
   isDraft: z.boolean(),
 });
 

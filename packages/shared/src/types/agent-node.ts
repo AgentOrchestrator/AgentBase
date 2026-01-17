@@ -172,9 +172,6 @@ export interface AgentNodeData {
   /** Initial prompt to send to the agent when it starts */
   initialPrompt?: string;
 
-  /** Chat messages for SDK-based chat view */
-  chatMessages?: AgentChatMessage[];
-
   /** Whether the JSONL file exists (for forking capability) */
   forking?: boolean;
 }
