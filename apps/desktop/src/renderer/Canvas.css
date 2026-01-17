@@ -753,6 +753,39 @@
   color: #888;
 }
 
+/* Zoom Controls */
+.zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zoom-fab {
+  padding: 8px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.zoom-fab:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.zoom-fab svg {
+  width: 16px;
+  height: 16px;
+  color: #888;
+}
+
 /* Settings Modal */
 .settings-modal-overlay {
   position: fixed;

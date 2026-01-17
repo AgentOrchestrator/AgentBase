@@ -249,7 +249,7 @@ function CanvasFlow() {
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-const { screenToFlowPosition, getNodes } = useReactFlow();
+const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [_isShiftPressed, setIsShiftPressed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -2082,6 +2082,30 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
             </defs>
           </svg>
         </button>
+
+        {/* Zoom Controls */}
+        <div className="zoom-controls">
+          <button
+            className="zoom-fab"
+            onClick={() => zoomIn()}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button
+            className="zoom-fab"
+            onClick={() => zoomOut()}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
 
         {/* Settings Modal */}
         {isSettingsOpen && (

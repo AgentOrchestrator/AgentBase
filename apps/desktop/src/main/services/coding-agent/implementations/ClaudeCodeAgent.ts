@@ -301,6 +301,7 @@ export class ClaudeCodeAgent
       this.activeQueries.set(queryId, handle);
 
       console.log(`[ClaudeCodeAgent] Starting query ${queryId}`);
+      console.log(`[ClaudeCodeAgent] Query Result:`, queryResult);
 
       const messages: SDKMessage[] = [];
       for await (const message of queryResult) {
