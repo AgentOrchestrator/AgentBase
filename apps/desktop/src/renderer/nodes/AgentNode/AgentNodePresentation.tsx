@@ -22,7 +22,7 @@ import {
   useAgentService,
   useTerminalService,
 } from '../../context';
-import { useAgentViewMode, usePreloadedChatMessages } from '../../hooks';
+import { useAgentViewMode, usePreloadedChatMessages, useAutoTitleFromSession } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import type { CodingAgentStatus } from '../../../../types/coding-agent-status';
@@ -135,8 +135,14 @@ export function AgentNodePresentation({
     [onDataChange]
   );
 
-  // NOTE: Auto-title updates are handled by useChatSession when messages are loaded from the session
-  // This ensures titles sync with actual session content, not stale node state
+  // Auto-title updates from session file changes
+  useAutoTitleFromSession({
+    sessionId: data.sessionId,
+    workspacePath: data.workspacePath,
+    agentService: agent,
+    agentType: data.agentType,
+    onTitleChange: handleTitleChange,
+  });
 
   // Handle attachment details click
   const handleAttachmentClick = useCallback((attachment: TerminalAttachment) => {

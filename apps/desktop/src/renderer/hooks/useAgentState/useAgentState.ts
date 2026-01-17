@@ -79,7 +79,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // ---------------------------------------------------------------------------
   // Core State
   // ---------------------------------------------------------------------------
-  const [nodeData] = useState<AgentNodeData>(initialNodeData);
+  const [nodeData, setNodeData] = useState<AgentNodeData>(initialNodeData);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Track if we've logged initialization (only log once per mount)
@@ -91,21 +91,23 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
     }
   }, []);
 
-  // COMMENTED OUT FOR DEBUGGING - Sync external node updates
-  // useEffect(() => {
-  //   setNodeData((prev) => ({
-  //     ...prev,
-  //     ...initialNodeData,
-  //     sessionId: initialNodeData.sessionId ?? prev.sessionId,
-  //     parentSessionId: initialNodeData.parentSessionId ?? prev.parentSessionId,
-  //     worktreeId: initialNodeData.worktreeId ?? prev.worktreeId,
-  //     workingDirectory: initialNodeData.workingDirectory ?? prev.workingDirectory,
-  //     chatMessages: initialNodeData.chatMessages ?? prev.chatMessages,
-  //     attachments: initialNodeData.attachments ?? prev.attachments,
-  //     createdAt: initialNodeData.createdAt ?? prev.createdAt,
-  //     initialPrompt: initialNodeData.initialPrompt ?? prev.initialPrompt,
-  //   }));
-  // }, [initialNodeData]);
+  // Sync external node updates (e.g., from Canvas update-node events)
+  useEffect(() => {
+    setNodeData((prev) => ({
+      ...prev,
+      ...initialNodeData,
+      // Preserve session-related fields if they exist in prev but not in initialNodeData
+      sessionId: initialNodeData.sessionId ?? prev.sessionId,
+      parentSessionId: initialNodeData.parentSessionId ?? prev.parentSessionId,
+      worktreeId: initialNodeData.worktreeId ?? prev.worktreeId,
+      // Preserve workspace path if it exists
+      workspacePath: initialNodeData.workspacePath ?? prev.workspacePath,
+      // Preserve other optional fields
+      attachments: initialNodeData.attachments ?? prev.attachments,
+      createdAt: initialNodeData.createdAt ?? prev.createdAt,
+      initialPrompt: initialNodeData.initialPrompt ?? prev.initialPrompt,
+    }));
+  }, [initialNodeData]);
 
   // ---------------------------------------------------------------------------
   // Workspace State

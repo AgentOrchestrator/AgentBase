@@ -44,6 +44,9 @@ import { NewAgentModal } from './components/NewAgentModal';
 import { ActionPill } from './components/ActionPill';
 import { useTheme } from './context';
 import { createLinearIssueAttachment } from './types/attachments';
+import type { AgentNodeData } from './types/agent-node';
+import { createServiceFactories } from './services/factories/ServiceFactories';
+import { TerminalServiceImpl } from './services/impl/TerminalServiceImpl';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -2492,6 +2495,130 @@ function CanvasFlow() {
         )}
 
         <ActionPill />
+
+        {/* Debug Button - Update All Agent Titles */}
+        <button
+          className="debug-update-titles-button"
+          onClick={async () => {
+            const MAX_TITLE_LENGTH = 50;
+            const serviceFactories = createServiceFactories();
+            let updatedCount = 0;
+            let errorCount = 0;
+            let skippedCount = 0;
+
+            // Get all agent nodes
+            const agentNodes = nodes.filter((node) => node.type === 'agent');
+            
+            console.log('[Canvas] Debug: Updating titles for', agentNodes.length, 'agent nodes');
+
+            for (const node of agentNodes) {
+              const nodeData = node.data as unknown as AgentNodeData;
+              
+              console.log('[Canvas] Debug: Processing node', node.id, {
+                sessionId: nodeData.sessionId,
+                workspacePath: nodeData.workspacePath,
+                currentTitle: nodeData.title?.value,
+              });
+              
+              if (!nodeData.sessionId || !nodeData.workspacePath) {
+                skippedCount++;
+                console.log('[Canvas] Debug: Skipping node', node.id, '- missing sessionId or workspacePath');
+                continue;
+              }
+
+              try {
+                // Create temporary services for this node
+                const terminalService = new TerminalServiceImpl(node.id, nodeData.terminalId);
+                const agentService = serviceFactories.createAgentService(
+                  node.id,
+                  nodeData.agentId,
+                  nodeData.agentType,
+                  terminalService
+                );
+
+                console.log('[Canvas] Debug: Loading session for node', node.id);
+
+                // Load session
+                const session = await agentService.getSession(
+                  nodeData.sessionId,
+                  nodeData.workspacePath,
+                  { roles: ['user'] }
+                );
+
+                console.log('[Canvas] Debug: Session loaded for node', node.id, {
+                  hasSession: !!session,
+                  messageCount: session?.messages?.length || 0,
+                });
+
+                if (session?.messages && session.messages.length > 0) {
+                  // Get last user message
+                  const userMessages = session.messages.filter((m) => m.role === 'user');
+                  const lastUserMessage = userMessages[userMessages.length - 1];
+
+                  console.log('[Canvas] Debug: User messages found for node', node.id, {
+                    userMessageCount: userMessages.length,
+                    lastMessageContent: lastUserMessage?.content?.substring(0, 50),
+                  });
+
+                  if (lastUserMessage?.content) {
+                    const content = lastUserMessage.content.trim();
+                    const newTitle =
+                      content.length > MAX_TITLE_LENGTH
+                        ? content.slice(0, MAX_TITLE_LENGTH) + '...'
+                        : content;
+
+                    console.log('[Canvas] Debug: Updating node', node.id, 'title from', nodeData.title?.value, 'to', newTitle);
+
+                    // Update node via event
+                    window.dispatchEvent(
+                      new CustomEvent('update-node', {
+                        detail: {
+                          nodeId: node.id,
+                          data: {
+                            ...nodeData,
+                            title: { value: newTitle, isManuallySet: true },
+                          },
+                        },
+                      })
+                    );
+
+                    updatedCount++;
+                    console.log('[Canvas] Debug: Successfully updated title for node', node.id);
+                  } else {
+                    skippedCount++;
+                    console.log('[Canvas] Debug: No content in last user message for node', node.id);
+                  }
+                } else {
+                  skippedCount++;
+                  console.log('[Canvas] Debug: No messages in session for node', node.id);
+                }
+              } catch (error) {
+                errorCount++;
+                console.error('[Canvas] Debug: Error updating title for node', node.id, ':', error);
+              }
+            }
+
+            const message = `Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`;
+            console.log('[Canvas] Debug: Title update complete.', message);
+            alert(message);
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            padding: '8px 16px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            zIndex: 1000,
+          }}
+          title="Debug: Update all agent node titles from last user message"
+        >
+          🔄 Update Titles
+        </button>
 
         {/* Linear Issue Details Modal */}
         {selectedIssueId && (

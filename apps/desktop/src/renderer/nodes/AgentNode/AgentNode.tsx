@@ -29,12 +29,23 @@ function AgentNode({ data, id, selected }: NodeProps) {
   }
   const initialNodeData = initialDataRef.current;
 
+  // Sync with React Flow node data updates (e.g., from Canvas update-node events)
+  // This ensures useAgentState receives the latest data when Canvas updates the node
+  const currentData = data as unknown as AgentNodeData;
+  const [syncedData, setSyncedData] = useState<AgentNodeData>(initialNodeData);
+
+  useEffect(() => {
+    // Update synced data when React Flow node data changes
+    // This happens when Canvas dispatches update-node events
+    setSyncedData(currentData);
+  }, [currentData]);
+
   // ---------------------------------------------------------------------------
   // Single Source of Truth: useAgentState()
   // ---------------------------------------------------------------------------
   const agent = useAgentState({
     nodeId: id,
-    initialNodeData,
+    initialNodeData: syncedData,
   });
 
   // ---------------------------------------------------------------------------
