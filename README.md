@@ -5,9 +5,9 @@
 </picture>
 </div>
 
-**Stay in sync with your team's coding sessions — see what they're building in real-time**
+**Orchestrate multiple AI agents on a visual canvas — explore ideas in parallel, stay in control**
 
-When you're deep in flow working with AI agents, explaining what you're working on is the last thing you want to do. But your teammates need context. Agent Base gives your team transparency into everyone's AI conversations — what they're building, where they're stuck, and when they need help — without interrupting the flow.
+When working with AI coding agents, you often want to explore multiple approaches simultaneously. Agent Base gives you a visual canvas to launch and manage multiple agents working in parallel, each with shared context but isolated edits, so they don't step on each other's toes.
 
 <div align="center">
 <img src="./assets/agent_base_1.png" alt="Agent Base" width="618"/>
@@ -17,9 +17,20 @@ When you're deep in flow working with AI agents, explaining what you're working 
   <img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/>
 </p>
 <div align="left">
-We built Agent Base to provide a quick overview of what all your and your teammates' agents are working on. You get real-time visibility, summaries that let you instantly understand the context of each conversation, and shared context that lets you jump into conversations with full context when pair programming or code reviews.
 
-You can run Agent Base locally on your machine for personal development and testing, or connect to a shared Supabase instance for real-time team collaboration. The local setup keeps everything on your device, while the remote option lets your entire team see each other's agent conversations in real-time.
+### What Agent Base Does
+
+- **Visual Canvas** — Get a bird's-eye view of all your running agents. Zoom in on specific agents or zoom out to see the big picture of your parallel explorations.
+
+- **Parallel Agent Execution** — Launch multiple agents that share the same context. Explore different tasks, features, or approaches simultaneously without waiting for one to finish.
+
+- **Isolated Edits** — Choose whether agent edits are isolated from each other. Parallel agents can work on the same codebase without overwriting each other's changes.
+
+- **Progress Tracking** — Each agent's state is summarized with todo list progress and a summary of your initial request, so you can quickly understand what each agent is doing without diving into conversation logs.
+
+- **Command Center** — When multiple agents need your approval, open the command center to see all pending user requests in one place. No more switching between terminals.
+
+Agent Base is local-first — everything runs on your machine.
 </div>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-555555.svg?labelColor=333333&color=666666)](LICENSE)
@@ -39,167 +50,100 @@ You can run Agent Base locally on your machine for personal development and test
 ## 🚀 Installation
 
 **Platform Compatibility:**
-- ✅ **macOS** - Fully tested and supported
+- ✅ **macOS** - Supported
 - 🚧 **Windows** - Coming soon
 - 🚧 **Linux** - Coming soon
 
-**Requirements**
-- Supabase credentials (local or remote setup possible)
-
-**Get your supabase credentials ready:**
-
-For local Supabase:
-```bash
-# Install and start Supabase CLI first
-brew install supabase/tap/supabase  # macOS
-supabase start
-supabase status -o env
-```
-
-For remote Supabase:
-- Create project at [supabase.com](https://supabase.com)
-- Get credentials from Project Settings → API
-
 Choose your preferred installation method:
 
-### 🐳 Docker based setup
-
-**Prerequisites:** Docker and Docker Compose
+### 📦 npm Installation
 
 ```bash
 git clone https://github.com/AgentOrchestrator/agentbase.git
 cd agentbase
-
-# 1. Copy environment file
-cp .env.example .env
-# Edit .env:
-#   - Linux users: uncomment Linux paths, comment out macOS paths
-#   - Optional: add Supabase credentials (defaults work for local)
-
-# 2. Start all services
-docker compose up -d
-```
-
-**Docker includes:**
-- ✅ Daemon service
-- ✅ Local Supabase database (port 54322)
-- ✅ Supabase Studio (port 54323)
-
-### 📦 npm/pnpm Installation (If you don't like to use docker)
-
-```bash
-git clone https://github.com/AgentOrchestrator/agentbase.git
-cd agentbase
-
-# Using pnpm (recommended - faster and more efficient)
-pnpm install
-cp .env.example .env  # Configure your environment
-pnpm run dev
-
-# OR using npm
 npm install
 cp .env.example .env  # Configure your environment
 npm run dev
 ```
 
 
-### Access points:
-- **Supabase Studio** (local only): http://localhost:54323
+### Access:
 - **Desktop App**: Launch the Electron desktop application
-
-> **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
 
 ---
 
 ## 📋 Available Commands
 
-### Docker Commands
-
 | Command | Description |
 |---------|-------------|
-| `docker compose up -d` | Start all services in background (detached mode) |
-| `docker compose up` | Start all services with logs visible |
-| `docker compose down` | Stop and remove all containers |
-| `docker compose logs -f` | View logs from all services |
-| `docker compose restart` | Restart all services |
-| `docker compose down -v` | Stop services and remove volumes (fresh start) |
-| `docker compose build` | Rebuild all Docker images |
-
-### npm/pnpm Commands (Non-Docker)
-
-All commands work with both **pnpm** (recommended) and **npm**. For npm, use `npm run <command>` instead of `pnpm <command>`.
-
-| pnpm command | npm equivalent | Description |
-|--------------|----------------|-------------|
-| `pnpm install` | `npm install` | Install all dependencies for the monorepo |
-| `pnpm dev` | `npm run dev` | Start all services in development mode (daemon + desktop with hot reload) |
-| `pnpm dev:daemon` | `npm run dev:daemon` | Start only the daemon service in development mode |
-| `pnpm dev:desktop` | `npm run dev:desktop` | Start only the desktop app in development mode |
-| `pnpm build` | `npm run build` | Build all apps for production |
-| `pnpm start` | `npm run start` | Start all services in production mode (requires build first) |
+| `npm install` | Install all dependencies for the monorepo |
+| `npm run dev` | Start all services in development mode (daemon + desktop with hot reload) |
+| `npm run dev:daemon` | Start only the daemon service in development mode |
+| `npm run dev:desktop` | Start only the desktop app in development mode |
+| `npm run build` | Build all apps for production |
+| `npm run start` | Start all services in production mode (requires build first) |
 
 ---
 
 ## 💡 Why We Built This
 
-**The Problem:** Max and I were hacking on a project together, jumping between features, debugging issues, and exploring new ideas with our AI coding assistants. The hardest part wasn't the code — it was staying aligned on what the other person was currently working on.
+**The Problem:** When working with AI coding agents, we kept running into the same friction: you want to explore multiple ideas at once, but managing multiple terminal sessions is chaotic. You lose track of what each agent is doing. When several agents need your input, you're alt-tabbing between windows. And if two agents are editing the same files, they conflict.
 
-When you're in the zone with Claude Code or Cursor, articulating your current task in Slack feels like context-switching hell. "What are you working on?" becomes a difficult question to answer when you're mid-conversation with an AI, exploring multiple approaches, hitting roadblocks, and iterating rapidly.
+**The Solution:** We built Agent Base as a visual control center for parallel agent work:
 
-**The Solution:** We built Agent Base to create transparency without the overhead. Instead of asking teammates to explain what they're doing, we can simply check the canvas:
+- **Canvas overview** — See all your agents at a glance, zoom in on details or out for the big picture
+- **Parallel exploration** — Launch multiple agents with shared context to explore different approaches simultaneously
+- **Isolated workspaces** — Keep agent edits separate so parallel work doesn't conflict
+- **Progress at a glance** — Todo list progress and request summaries let you track each agent without reading logs
+- **Centralized approvals** — The command center collects all pending requests so you can handle them efficiently
 
-- **Real-time visibility** - See who's working on what, right now
-- **AI-powered summaries** - Instantly understand the context of each conversation without reading entire chat logs
-- **Async collaboration** - Help teammates when they're stuck without interrupting their flow
-- **Shared context** - Jump into conversations with full context when pair programming or code reviews
-
-This is the tool we wished we had: a way to stay connected with our team's work without breaking the flow state that makes AI-assisted coding so productive.
+This is the tool we wished we had: a way to orchestrate multiple AI agents visually, explore ideas in parallel, and stay in control of the chaos.
 
 ---
 
 
 ## ✨ Features
 
-- **👥 Team Collaboration** - See what your teammates are working on in real-time with shared Supabase backend
-- **🤖 Multi-Agent Support** - Works with Claude Code, Cursor (Windsurf & Codex coming soon)
-- **🧠 AI Summaries** - GPT-4o-mini analyzes conversations and identifies key insights
-- **📁 Project Organization** - Chat histories grouped by project for easy navigation
-- **⚡ Real-time Updates** - Live dashboard updates as teammates code with AI assistants
-- **🔒 Secure by Design** - Read-only web UI, all secrets in backend daemon
-- **🏠 Flexible Deployment** - Run locally for solo work or use hosted Supabase for team collaboration
+- **🎨 Visual Canvas** — Infinite canvas to arrange, organize, and monitor all your running agents
+- **⚡ Parallel Agents** — Launch multiple agents with shared context to explore different tasks simultaneously
+- **🔀 Isolated Edits** — Toggle edit isolation so parallel agents don't overwrite each other's changes
+- **📊 Progress Tracking** — See todo list progress and request summaries for each agent at a glance
+- **🎛️ Command Center** — Handle all pending approval requests from multiple agents in one place
+- **🤖 Multi-Agent Support** — Works with Claude Code, Cursor, Codex, and more
+- **🏠 Local-First** — Everything runs on your machine
 
 ---
 
 ## 🔌 Integrations
 
-Agent Base connects with your favorite AI coding assistants to provide real-time visibility into your team's development workflow.
+The visual canvas currently supports **Claude Code** with full orchestration capabilities. We welcome contributions to integrate additional AI coding assistants.
 
-### Supported AI Coding Assistants:
+### Canvas Support:
 
-| Integration | Status | Description |
-| ----------- | ------ | ----------- |
-| [Claude Code](https://claude.ai/claude-code) | ✅ Supported | Anthropic's AI coding assistant - full integration with chat history tracking and real-time updates |
-| [Cursor](https://cursor.sh) | ✅ Supported | AI-first code editor - tracks conversations and project context |
-| [Codex](https://openai.com/blog/openai-codex) | ✅ Supported | OpenAI's code generation model - tracks chat history and project context |
-| [FactoryDroid](https://www.factory.ai/) | ✅ Supported | Factory AI's coding agent - full integration with chat history tracking |
-| [Windsurf](https://codeium.com/windsurf) | 🚧 Coming Soon | Codeium's AI coding assistant - integration in development |
+| Integration | Canvas Support | Description |
+| ----------- | -------------- | ----------- |
+| [Claude Code](https://claude.ai/claude-code) | ✅ Full Support | Launch, monitor, and orchestrate multiple Claude Code agents on the canvas |
+| [Cursor](https://cursor.sh) | 🤝 Contributions Welcome | AI-first code editor |
+| [Codex](https://openai.com/blog/openai-codex) | 🤝 Contributions Welcome | OpenAI's code generation model |
+| [FactoryDroid](https://www.factory.ai/) | 🤝 Contributions Welcome | Factory AI's coding agent |
+| [Windsurf](https://codeium.com/windsurf) | 🤝 Contributions Welcome | Codeium's AI coding assistant |
 
-### Integration Features:
+### Feature Support (Claude Code):
 
-| Feature | Claude Code | Cursor | Codex | Droid | Windsurf |
-| ------- | ----------- | ------ | ----- | ------------ | -------- |
-| Chat History Sync | ✅ | ✅ | ✅ | ✅ | 🚧 |
-| Real-time Updates | ✅ | ✅ | ✅ | ✅ | 🚧 |
-| AI Summaries      | ✅ | ✅ | ✅ | ✅ | 🚧 |
-| Project Detection | ✅ | ✅ | ✅ | ✅ | 🚧 |
-| File Change Tracking | 🚧  | 🚧 | 🚧 | 🚧 | 🚧 |
+| Feature | Status |
+| ------- | ------ |
+| Visual Canvas | ✅ |
+| Parallel Agent Execution | ✅ |
+| Isolated Edits | ✅ |
+| Progress Tracking (Todo Lists) | ✅ |
+| Command Center (Approval Requests) | ✅ |
+| Shared Context | ✅ |
 
 **Legend:**
 - ✅ Fully supported
-- 🚧 Coming soon
-- ⏸️ Planned
+- 🤝 Contributions welcome
 
-Want to see your favorite AI assistant integrated? [Open an issue](https://github.com/AgentOrchestrator/agent-orchestrator/issues) or contribute via PR!
+Want to help integrate your favorite AI assistant? [Open an issue](https://github.com/AgentOrchestrator/agent-orchestrator/issues) or contribute via PR!
 
 ---
 

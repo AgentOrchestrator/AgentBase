@@ -29,13 +29,6 @@
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
     "dev:daemon": "npm run dev --workspace=agent-orchestrator-daemon",
     "dev:desktop": "npm run build --workspace=@agent-orchestrator/shared && npm run dev --workspace=desktop",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up -d",
-    "docker:dev": "docker compose up",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f",
-    "docker:restart": "docker compose restart",
-    "docker:clean": "docker compose down -v",
     "prepare": "husky"
   },
   "devDependencies": {
