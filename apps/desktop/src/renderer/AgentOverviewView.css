@@ -133,10 +133,10 @@
 
 /* Most Recent User Message */
 .overview-recent-message {
-  padding: 12px;
-  background: rgba(136, 136, 136, 0.08);
-  border-radius: 8px;
-  border-left: 3px solid #888;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border-left: none;
 }
 
 .overview-recent-message-label {
@@ -151,7 +151,7 @@
 
 .overview-recent-message-text {
   margin: 0;
-  color: #b0b0b0;
+  color: var(--color-text-primary);
   font-size: 13px;
   line-height: 1.5;
   overflow: hidden;
@@ -247,34 +247,44 @@
   align-items: flex-start;
   gap: 8px;
   padding: 6px 10px;
-  background: #1e1e1e;
+  background: transparent;
   border-radius: 6px;
   transition: background 0.2s ease;
 }
 
 .todolist-item.completed {
-  background: rgba(136, 136, 136, 0.1);
+  background: transparent;
 }
 
 .todo-checkbox {
-  font-size: 14px;
-  color: #888;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
   flex-shrink: 0;
-  line-height: 1.4;
+  cursor: default;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 2px solid var(--color-text-primary);
+  border-radius: 50%;
+  background: transparent;
+  position: relative;
 }
 
-.todolist-item.completed .todo-checkbox {
-  color: #d4d4d4;
+.todo-checkbox:checked {
+  background: var(--color-text-secondary);
+  border-color: var(--color-text-secondary);
 }
 
 .todo-content {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 13px;
   line-height: 1.4;
 }
 
 .todolist-item.completed .todo-content {
-  color: #888;
+  color: var(--color-text-secondary);
   text-decoration: line-through;
 }
 

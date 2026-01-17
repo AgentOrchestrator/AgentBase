@@ -114,7 +114,12 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
               key={item.id}
               className={`todolist-item ${item.completed ? 'completed' : ''}`}
             >
-              <span className="todo-checkbox">{item.completed ? '☑' : '☐'}</span>
+              <input
+                type="checkbox"
+                className="todo-checkbox"
+                checked={item.completed}
+                readOnly
+              />
               <span className="todo-content">{item.content}</span>
             </div>
           ))}
