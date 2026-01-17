@@ -305,6 +305,7 @@ export class ClaudeCodeAgent
 
       const messages: SDKMessage[] = [];
       for await (const message of queryResult) {
+        console.log(`[ClaudeCodeAgent] Query ${queryId} received message:`, message);
         messages.push(message);
 
         if (onChunk && message.type === 'stream_event') {

@@ -76,8 +76,6 @@ export interface NodeContextProviderProps {
   sessionId?: string;
   /** Workspace path */
   workspacePath?: string;
-  /** Auto-start CLI on mount (agent nodes only) */
-  autoStartCli?: boolean;
   /** Initial prompt to send to the agent when it starts */
   initialPrompt?: string;
   /** Child components */
@@ -102,7 +100,6 @@ export function NodeContextProvider({
   agentType,
   sessionId,
   workspacePath,
-  autoStartCli = false,
   initialPrompt,
   children,
 }: NodeContextProviderProps) {
@@ -119,7 +116,6 @@ export function NodeContextProvider({
     agentType: (agentType as AgentType) || 'claude_code',
     sessionId,
     workspacePath,
-    autoStartCli,
   };
 
   // Track the previous workspace path to detect changes
@@ -196,14 +192,7 @@ export function NodeContextProvider({
     }
 
     console.log(`[NodeContext] Workspace path changed: ${previousPath} -> ${workspacePath}`);
-
-    const services = servicesRef.current;
-
-    // Start CLI if requested - now passing workspacePath directly
-    if (hasAgentService(services) && autoStartCli && workspacePath) {
-      services.agent.start(workspacePath, sessionId, initialPrompt);
-    }
-  }, [isInitialized, workspacePath, autoStartCli, initialPrompt, sessionId]);
+  }, [isInitialized, workspacePath]);
 
   // Build context value
   const contextValue: NodeContextValue | null = servicesRef.current

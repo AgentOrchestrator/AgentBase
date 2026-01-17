@@ -1,8 +1,7 @@
 /**
  * Service Factories
  *
- * Factory functions for creating real service implementations.
- * Use these in production, swap with MockServiceFactories for testing.
+ * Factory functions for creating service implementations.
  */
 
 import type { AgentType } from '../../../../types/coding-agent-status';

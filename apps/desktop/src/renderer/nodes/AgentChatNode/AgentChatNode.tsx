@@ -91,7 +91,6 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
       sessionId={sessionId}
       agentType={agent.config.agentType}
       workspacePath={agent.workspace.path}
-      autoStartCli={!!agent.workspace.path}
     >
       <div className={`agent-node ${selected ? 'selected' : ''}`}>
         <NodeResizer

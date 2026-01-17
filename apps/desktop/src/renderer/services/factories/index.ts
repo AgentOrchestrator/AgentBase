@@ -5,4 +5,3 @@
  */
 
 export { createServiceFactories } from './ServiceFactories';
-export { createMockServiceFactories } from './MockServiceFactories';

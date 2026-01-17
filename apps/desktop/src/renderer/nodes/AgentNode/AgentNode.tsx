@@ -89,7 +89,6 @@ function AgentNode({ data, id, selected }: NodeProps) {
       sessionId={agent.session.id ?? undefined}
       agentType={agent.config.agentType}
       workspacePath={agent.workspace.path ?? undefined}
-      autoStartCli={!!agent.workspace.path}
       initialPrompt={agent.config.initialPrompt}
     >
       <AgentNodePresentation

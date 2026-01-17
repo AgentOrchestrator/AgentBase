@@ -181,15 +181,6 @@ export interface IAgentService extends INodeService {
   onStatusChange(listener: StatusChangeListener): () => void;
 
   // =========================================================================
-  // Configuration
-  // =========================================================================
-
-  /** Check if auto-start is enabled */
-  isAutoStartEnabled(): boolean;
-  /** Enable/disable auto-start */
-  setAutoStart(enabled: boolean): void;
-
-  // =========================================================================
   // Generation (Adapter-driven, stateless)
   // =========================================================================
 

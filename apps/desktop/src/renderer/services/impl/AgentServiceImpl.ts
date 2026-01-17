@@ -41,7 +41,6 @@ export class AgentServiceImpl implements IAgentService {
   private terminalService: ITerminalService;
   private statusListeners: Set<StatusChangeListener> = new Set();
   private currentStatus: CodingAgentStatusInfo | null = null;
-  private autoStartEnabled = false;
   private isRunning = false;
 
   constructor(
@@ -525,24 +524,6 @@ export class AgentServiceImpl implements IAgentService {
     return () => {
       this.statusListeners.delete(listener);
     };
-  }
-
-  // =============================================================================
-  // Configuration
-  // =============================================================================
-
-  /**
-   * Check if auto-start is enabled
-   */
-  isAutoStartEnabled(): boolean {
-    return this.autoStartEnabled;
-  }
-
-  /**
-   * Enable/disable auto-start
-   */
-  setAutoStart(enabled: boolean): void {
-    this.autoStartEnabled = enabled;
   }
 
   // =============================================================================

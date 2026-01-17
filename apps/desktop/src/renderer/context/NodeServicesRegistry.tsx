@@ -55,7 +55,6 @@ export interface NodeServiceConfig {
   agentId?: string;
   agentType?: AgentType;
   workspacePath?: string;
-  autoStartCli?: boolean;
   /** Session ID for conversation nodes */
   sessionId?: string;
 }
@@ -148,11 +147,6 @@ export function NodeServicesRegistryProvider({
           const terminal = factories.createTerminalService(nodeId, terminalId);
           const workspace = factories.createWorkspaceService(nodeId, config.workspacePath);
           const agent = factories.createAgentService(nodeId, agentId, agentType, terminal);
-
-          // Configure auto-start if specified
-          if (config.autoStartCli !== undefined) {
-            agent.setAutoStart(config.autoStartCli);
-          }
 
           services = {
             type: 'agent',
