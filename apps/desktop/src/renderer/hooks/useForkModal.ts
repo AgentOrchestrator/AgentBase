@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { forkService } from '../services';
 import { createDefaultAgentTitle, type AgentNodeData } from '../types/agent-node';
+import { getOptimalHandles } from '../utils/edgeHandles';
 
 // =============================================================================
 // Types
@@ -402,14 +403,15 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
 
         // Create edge from source to forked node (agent to agent)
         // Use solid style to differentiate from chat edges (agent to chat view)
-        // Use fork-source handle on the source node and fork-target handle on the target node
+        // Calculate optimal handles based on relative node positions for shortest path
+        const optimalHandles = getOptimalHandles(sourceNode, forkedNode);
         const newEdgeId = `edge-${Date.now()}`;
         const newEdge: Edge = {
           id: newEdgeId,
           source: modalData.sourceNodeId,
           target: newNodeId,
-          sourceHandle: 'fork-source',
-          targetHandle: 'fork-target',
+          sourceHandle: optimalHandles.sourceHandle,
+          targetHandle: optimalHandles.targetHandle,
           type: 'default',
           animated: false,
           style: { 

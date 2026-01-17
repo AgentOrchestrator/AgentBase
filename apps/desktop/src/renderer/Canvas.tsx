@@ -46,6 +46,7 @@ import { createLinearIssueAttachment } from './types/attachments';
 import { forkService } from './services';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from './types/agent-node';
+import { updateEdgesWithOptimalHandles, getOptimalHandles } from './utils/edgeHandles';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -494,13 +495,15 @@ function CanvasFlow() {
           };
 
           // Create edge from source to forked node
+          // Calculate optimal handles based on relative node positions for shortest path
+          const optimalHandles = getOptimalHandles(sourceNode, forkedNode);
           const newEdgeId = `edge-${Date.now()}`;
           const newEdge: Edge = {
             id: newEdgeId,
             source: nodeId,
             target: newNodeId,
-            sourceHandle: 'fork-source',
-            targetHandle: 'fork-target',
+            sourceHandle: optimalHandles.sourceHandle,
+            targetHandle: optimalHandles.targetHandle,
             type: 'default',
             animated: false,
             style: { 
@@ -820,13 +823,14 @@ function CanvasFlow() {
 
       // Create edge connecting the nodes (agent to chat view)
       // Use dashed style to differentiate from fork edges (agent to agent)
-      // Don't specify handle IDs - let React Flow use default connection points
-      // This avoids timing issues where edges are created before handles are registered
-      // Explicitly omit handle properties to avoid any "null" string issues
+      // Chat nodes are always positioned below their parent agent node,
+      // and AgentChatNode only has handles at top/bottom, so we use explicit handles
       const edge: Edge = {
         id: `edge-${nodeId}-${chatNodeId}`,
         source: nodeId,
         target: chatNodeId,
+        sourceHandle: 'source-bottom',
+        targetHandle: 'chat-target', // AgentChatNode uses 'chat-target' for its top handle
         type: 'default',
         animated: false,
         style: { 
@@ -834,8 +838,6 @@ function CanvasFlow() {
           strokeWidth: 2,
           strokeDasharray: '5, 5', // Dashed line pattern
         },
-        // Explicitly do NOT include sourceHandle or targetHandle
-        // React Flow will use default connection points
       };
 
       // Add the new node first
@@ -1295,6 +1297,7 @@ function CanvasFlow() {
   );
 
   // Wrap onNodesChange to intercept position changes and apply snapping
+  // Also updates edge handles to maintain optimal connections when nodes move
   const handleNodesChange = useCallback(
     (changes: unknown[]) => {
       // If snapping is disabled or we're already snapping, just pass through
@@ -1345,8 +1348,34 @@ function CanvasFlow() {
         // No snapping needed, pass through original changes
         onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
       }
+
+      // Check if any position changes occurred (drag in progress or completed)
+      const hasPositionChanges = changes.some((change) => {
+        const posChange = change as { type?: string };
+        return posChange.type === 'position';
+      });
+
+      // Update edge handles when nodes are moved to maintain optimal connections
+      if (hasPositionChanges) {
+        // Get the updated nodes after applying changes
+        // We need to construct the updated nodes array based on the changes
+        const updatedNodes = allNodes.map((node) => {
+          const change = modifiedChanges.find((c) => {
+            const posChange = c as { id?: string; position?: { x: number; y: number } };
+            return posChange.id === node.id && posChange.position;
+          }) as { id?: string; position?: { x: number; y: number } } | undefined;
+          
+          if (change?.position) {
+            return { ...node, position: change.position };
+          }
+          return node;
+        });
+
+        // Update edges with optimal handles based on new node positions
+        setEdges((currentEdges) => updateEdgesWithOptimalHandles(currentEdges, updatedNodes));
+      }
     },
-    [onNodesChange, isNodeDragEnabled, getNodes, applySnapping]
+    [onNodesChange, isNodeDragEnabled, getNodes, applySnapping, setEdges]
   );
 
   // =============================================================================

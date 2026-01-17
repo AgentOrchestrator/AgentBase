@@ -480,13 +480,16 @@ export function AgentNodePresentation({
           handleClassName="agent-node-resize-handle"
         />
 
-        {/* Target handle for incoming fork edges */}
-        <Handle
-          type="target"
-          position={Position.Top}
-          id="fork-target"
-          className="agent-node-fork-target-handle"
-        />
+        {/* Target handles - all sides for flexible edge connections */}
+        <Handle type="target" position={Position.Top} id="target-top" className="agent-node-side-handle" />
+        <Handle type="target" position={Position.Right} id="target-right" className="agent-node-side-handle" />
+        <Handle type="target" position={Position.Bottom} id="target-bottom" className="agent-node-side-handle" />
+        <Handle type="target" position={Position.Left} id="target-left" className="agent-node-side-handle" />
+
+        {/* Source handles - all sides for flexible edge connections */}
+        <Handle type="source" position={Position.Top} id="source-top" className="agent-node-side-handle" />
+        <Handle type="source" position={Position.Right} id="source-right" className="agent-node-side-handle" />
+        <Handle type="source" position={Position.Left} id="source-left" className="agent-node-side-handle" />
 
       {/* Status Indicator - Top Left */}
       <div className="agent-node-status-indicator">
@@ -674,15 +677,6 @@ export function AgentNodePresentation({
       <div className="agent-node-bottom-buttons">
         <AgentNodeForkHandle nodeId={nodeId} />
       </div>
-
-      {/* Source handle for chat node connections */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="chat-source"
-        className="agent-node-chat-source-handle"
-        style={{ bottom: -8 }}
-      />
 
       {/* Issue Details Modal */}
       {showIssueModal && selectedIssueId && (
