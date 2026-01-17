@@ -20,13 +20,20 @@ module.exports = {
       filter: ['**/*']
     },
     'package.json',
-    'node_modules/**/*',
-    '!**/.turbo/**/*',
-    '!**/node_modules/.cache/**/*',
-    '!**/node_modules/*/{test,tests,__tests__}/**/*',
-    '!**/node_modules/*/*.md',
-    '!**/node_modules/*/LICENSE*',
-    '!**/node_modules/*/.git/**/*'
+    // Explicitly include node_modules with from/to to bypass workspace detection issues
+    {
+      from: 'node_modules',
+      to: 'node_modules',
+      filter: [
+        '**/*',
+        '!**/.turbo/**',
+        '!**/.cache/**',
+        '!**/{test,tests,__tests__}/**',
+        '!**/*.md',
+        '!**/LICENSE*',
+        '!**/.git/**'
+      ]
+    }
   ],
 
   extraMetadata: {

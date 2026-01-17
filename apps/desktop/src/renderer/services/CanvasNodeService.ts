@@ -229,6 +229,27 @@ export class CanvasNodeService {
   }
 
   /**
+   * Create a browser node
+   */
+  createBrowserNode(options: CreateNodeOptions): Node {
+    const nodePosition = this.resolvePosition(options);
+    const browserId = `browser-${crypto.randomUUID()}`;
+
+    return {
+      id: `node-${Date.now()}`,
+      type: 'browser',
+      position: nodePosition,
+      data: {
+        browserId,
+      },
+      style: {
+        width: 800,
+        height: 600,
+      },
+    };
+  }
+
+  /**
    * Create an agent node from a starter node submission
    */
   createAgentNodeFromStarter(

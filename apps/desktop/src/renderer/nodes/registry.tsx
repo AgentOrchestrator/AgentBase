@@ -18,6 +18,7 @@ import StarterNode from './StarterNode';
 import { AgentNode } from './AgentNode';
 import ConversationNode from './ConversationNode';
 import AgentChatNode from './AgentChatNode';
+import BrowserNode from './BrowserNode';
 
 // Import schemas
 import {
@@ -26,6 +27,7 @@ import {
   AgentNodeDataSchema,
   ConversationNodeDataSchema,
   AgentChatNodeDataSchema,
+  BrowserNodeDataSchema,
 } from './schemas';
 
 // =============================================================================
@@ -134,6 +136,14 @@ const NODE_CONFIGS: NodeTypeConfig[] = [
     persistence: {
       enabled: false,
       reason: 'Starter nodes are transient input fields, not meant to be persisted',
+    },
+  },
+  {
+    type: 'browser',
+    component: BrowserNode as ComponentType<NodeProps>,
+    persistence: {
+      enabled: true,
+      dataSchema: BrowserNodeDataSchema,
     },
   },
 ];
