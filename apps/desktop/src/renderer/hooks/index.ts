@@ -86,10 +86,10 @@ export { useAgentViewMode } from './useAgentViewMode';
 export type { UseAgentViewModeInput, UseAgentViewModeReturn } from './useAgentViewMode';
 
 // =============================================================================
-// Preloaded Chat Messages Hook - Background message loading for fast view switch
+// Chat Messages Hook - Unified message loading, file watching, and sending
 // =============================================================================
-export { usePreloadedChatMessages } from './usePreloadedChatMessages';
+export { useChatMessages } from './useChatMessages';
 export type {
-  UsePreloadedChatMessagesOptions,
-  UsePreloadedChatMessagesReturn,
-} from './usePreloadedChatMessages';
+  UseChatMessagesOptions,
+  UseChatMessagesReturn,
+} from './useChatMessages';

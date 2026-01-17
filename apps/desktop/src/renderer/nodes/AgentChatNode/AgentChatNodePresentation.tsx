@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { useChatSession } from './hooks/useChatSession';
+import { useChatMessages } from '../../hooks/useChatMessages';
 import { useAgentService } from '../../context';
 import './AgentChatNode.css';
 import type { CodingAgentMessage } from '@agent-orchestrator/shared';
@@ -43,7 +43,6 @@ export function AgentChatNodePresentation({
 }: AgentChatNodePresentationProps) {
   const agentService = useAgentService();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const [messages, setMessages] = useState<CodingAgentMessage[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -51,28 +50,22 @@ export function AgentChatNodePresentation({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const {
-    sendMessage,
+    messages,
     isStreaming,
-  } = useChatSession({
-    agentType,
+    sendMessage,
+  } = useChatMessages({
     sessionId,
     workspacePath,
-    currentMessages: messages,
-    onMessagesUpdate: useCallback((newMessages: CodingAgentMessage[]) => {
-      setMessages(newMessages);
-      onMessagesChange(newMessages);
-    }, [onMessagesChange]),
-    onSessionCreated,
-    onError: setError,
     agentService,
+    agentType,
+    onError: setError,
+    onSessionCreated,
   });
 
-  // Sync messages from props
+  // Notify parent when messages change
   useEffect(() => {
-    if (initialMessages.length > 0 && messages.length === 0) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages, messages.length]);
+    onMessagesChange(messages);
+  }, [messages, onMessagesChange]);
 
   // Auto-scroll to bottom
   useEffect(() => {

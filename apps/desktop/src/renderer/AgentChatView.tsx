@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import { useReactFlow } from '@xyflow/react';
-import { useChatSession } from './nodes/AgentChatNode/hooks/useChatSession';
+import { useChatMessages } from './hooks/useChatMessages';
 import { useAgentService } from './context';
 import { TextSelectionButton } from './components/TextSelectionButton';
 import type { AgentChatMessage } from './types/agent-node';
@@ -34,14 +34,6 @@ interface AgentChatViewProps {
   selected?: boolean;
   /** Node ID for fork events */
   nodeId: string;
-  /** Preloaded messages from parent (avoids IPC call on mount) */
-  preloadedMessages?: AgentChatMessage[];
-  /** Whether preloaded messages have been loaded */
-  messagesLoaded?: boolean;
-  /** Callback to sync messages back to parent */
-  onMessagesChange?: (messages: AgentChatMessage[]) => void;
-  /** Callback to reload messages from session file */
-  onReloadMessages?: () => Promise<void>;
 }
 
 // Represents a displayable item for assistant messages (matches ConversationNode)
@@ -59,29 +51,7 @@ export default function AgentChatView({
   isSessionReady = true,
   selected = false,
   nodeId,
-  preloadedMessages,
-  messagesLoaded = false,
-  onMessagesChange,
-  onReloadMessages: _onReloadMessages,
 }: AgentChatViewProps) {
-  // Note: _onReloadMessages is available for future use (e.g., manual refresh button)
-  // Use preloaded messages if available, otherwise start with empty array
-  const [messages, setMessagesInternal] = useState<AgentChatMessage[]>(
-    preloadedMessages ?? []
-  );
-
-  // Wrapper to sync messages to parent when they change
-  const setMessages = useCallback((newMessages: AgentChatMessage[]) => {
-    setMessagesInternal(newMessages);
-    onMessagesChange?.(newMessages);
-  }, [onMessagesChange]);
-
-  // Sync preloaded messages when they arrive
-  useEffect(() => {
-    if (preloadedMessages && preloadedMessages.length > 0 && messages.length === 0) {
-      setMessagesInternal(preloadedMessages);
-    }
-  }, [preloadedMessages, messages.length]);
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [textSelection, setTextSelection] = useState<{
@@ -94,8 +64,6 @@ export default function AgentChatView({
   const [isCommandPressed, setIsCommandPressed] = useState(false);
   const [stickyUserMessageId, setStickyUserMessageId] = useState<string | null>(null);
   const hasSentInitialPrompt = useRef(false);
-  // If messages are preloaded from parent, consider history already checked
-  const [historyChecked, setHistoryChecked] = useState(messagesLoaded);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -105,29 +73,23 @@ export default function AgentChatView({
   // Get agentService from context
   const agentService = useAgentService();
 
+  // Use unified chat messages hook - handles loading, file watching, and sending
   const {
-    sendMessage,
+    messages,
+    isLoaded,
     isStreaming,
-  } = useChatSession({
-    agentType,
+    sendMessage,
+  } = useChatMessages({
     sessionId,
     workspacePath,
-    currentMessages: messages,
-    // Disable auto-loading if parent already preloaded messages
-    autoLoadHistory: !messagesLoaded,
-    onMessagesUpdate: useCallback((newMessages: AgentChatMessage[]) => {
-      setMessages(newMessages);
-    }, [setMessages]),
-    onSessionCreated: useCallback((newSessionId: string) => {
-      onSessionCreated?.(newSessionId);
-    }, [onSessionCreated]),
-    onError: setError,
     agentService,
+    agentType,
+    enabled: isSessionReady,
+    onError: setError,
+    onSessionCreated,
   });
 
   // Auto-send initial prompt only once when session is brand new (no existing messages)
-  // Relies on useChatSession's autoLoadHistory to populate messages first (avoids duplicate IPC)
-  // Uses mounted flag to handle React Strict Mode double-mounting
   useEffect(() => {
     // Skip if already sent, no prompt, or currently streaming
     if (hasSentInitialPrompt.current || !initialPrompt?.trim() || isStreaming || !isSessionReady) {
@@ -136,40 +98,21 @@ export default function AgentChatView({
 
     // Skip if we already have messages loaded (session has history)
     if (messages.length > 0) {
-      if (!historyChecked) setHistoryChecked(true);
       return;
     }
 
-    // Once historyChecked is true and messages.length is still 0, send initial prompt
-    // historyChecked gets set to true after useChatSession finishes loading (or on second render)
-    if (historyChecked) {
-      hasSentInitialPrompt.current = true;
-      sendMessage(initialPrompt.trim()).catch((err) => {
-        console.error('[AgentChatView] Failed to send initial prompt:', err);
-        hasSentInitialPrompt.current = false;
-      });
-    }
-  }, [isSessionReady, initialPrompt, messages.length, isStreaming, sendMessage, historyChecked]);
-
-  // Mark history as checked - either immediately if preloaded, or after delay for useChatSession
-  useEffect(() => {
-    if (historyChecked) return;
-
-    // If parent already loaded messages, mark as checked immediately
-    if (messagesLoaded) {
-      setHistoryChecked(true);
+    // Wait for initial load to complete before deciding to send
+    if (!isLoaded) {
       return;
     }
 
-    // Otherwise wait for useChatSession's loadSessionHistory
-    if (!isSessionReady) return;
-
-    const timeoutId = setTimeout(() => {
-      setHistoryChecked(true);
-    }, 150);
-
-    return () => clearTimeout(timeoutId);
-  }, [historyChecked, isSessionReady, messagesLoaded]);
+    // isLoaded is true and messages.length is 0, so this is a new session - send initial prompt
+    hasSentInitialPrompt.current = true;
+    sendMessage(initialPrompt.trim()).catch((err: unknown) => {
+      console.error('[AgentChatView] Failed to send initial prompt:', err);
+      hasSentInitialPrompt.current = false;
+    });
+  }, [isSessionReady, initialPrompt, messages.length, isStreaming, sendMessage, isLoaded]);
 
   // Auto-scroll to bottom
   useEffect(() => {

@@ -22,7 +22,7 @@ import {
   useAgentService,
   useTerminalService,
 } from '../../context';
-import { useAgentViewMode, usePreloadedChatMessages, useAutoTitleFromSession } from '../../hooks';
+import { useAgentViewMode, useAutoTitleFromSession } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import type { CodingAgentStatus } from '../../../../types/coding-agent-status';
@@ -59,19 +59,6 @@ export function AgentNodePresentation({
   const agent = useAgentService();
   const terminalService = useTerminalService();
   const isSessionReady = sessionReadiness === 'ready';
-
-  // Preload chat messages in background so they're ready when switching to chat view
-  const {
-    messages: preloadedMessages,
-    isLoaded: messagesLoaded,
-    setMessages: setPreloadedMessages,
-    reload: reloadMessages,
-  } = usePreloadedChatMessages({
-    sessionId: data.sessionId,
-    workspacePath: data.workspacePath,
-    agentService: agent,
-    enabled: !!data.sessionId && !!data.workspacePath,
-  });
 
   // Use centralized view mode management with terminal lifecycle coordination
   // This ensures REPL is exited and terminal PTY is destroyed when switching to chat view
@@ -648,10 +635,6 @@ export function AgentNodePresentation({
             onSessionCreated={(newSessionId) => onDataChange({ sessionId: newSessionId })}
             isSessionReady={isSessionReady}
             selected={selected}
-            preloadedMessages={preloadedMessages}
-            messagesLoaded={messagesLoaded}
-            onMessagesChange={setPreloadedMessages}
-            onReloadMessages={reloadMessages}
           />
         )}
       </div>
