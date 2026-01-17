@@ -11,13 +11,21 @@
   --color-bg-primary: #1e1e1e;
   --color-bg-primary-alt: #131313;
   --color-bg-secondary: #2d2d2d;
-  --color-text-primary: #d4d4d4;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #888888;
   --color-border: #232323;
   --color-bg-tertiary: #2a2c36;
-  --color-bg-hover: #3a3c46;
+  --color-bg-hover: #2d2d2d;
   --color-bg-hover-light: #4a4c56;
   --color-bg-card: #252527;
   --color-bg-canvas: #0A0A0A;
+  
+  /* Status colors - global, theme-independent */
+  --yellow: #F5C348;
+  --green: #0ECF85;
+  --error: #AF201D;
+  --error-bg: #5c2020;
+  --error-text: #f88;
 }
 
 [data-theme="light"] {
@@ -26,9 +34,10 @@
   --color-bg-primary-alt: #f4f3f0;
   --color-bg-secondary: #e5e4de;
   --color-text-primary: #302e26;
+  --color-text-secondary: #888888;
   --color-border: #dfdeda;
   --color-bg-tertiary: #e5e4de;
-  --color-bg-hover: #dfdeda;
+  --color-bg-hover: #e5e4de;
   --color-bg-hover-light: #d4d4d4;
   --color-bg-card: #dfdeda;
   --color-bg-canvas: #f4f3f0;
@@ -38,14 +47,32 @@
   /* Light theme (web app colors) */
   --color-bg-primary: #ffffff;
   --color-bg-primary-alt: #ffffff;
-  --color-bg-secondary: #ffffff;
-  --color-text-primary: #000000;
+  --color-bg-secondary: #F9FBFC;
+  --color-text-primary: #0A0A0A;
+  --color-text-secondary: #888888;
   --color-border: #d1d5db;
   --color-bg-tertiary: #ffffff;
-  --color-bg-hover: #f9fafb;
+  --color-bg-hover: #F9FBFC;
   --color-bg-hover-light: #f3f4f6;
   --color-bg-card: #ffffff;
   --color-bg-canvas: #F9FBFC;
+}
+
+/* Text secondary becomes primary on hover */
+* {
+  color: inherit;
+}
+
+/* Global rule: when hovering over an interactive element, 
+   any child with text-secondary should become text-primary */
+*:hover * {
+  --hover-text-color: var(--color-text-primary);
+}
+
+/* Specific rule: elements with text-secondary color should transition smoothly */
+[class*="text-secondary"],
+[style*="--color-text-secondary"] {
+  transition: color 0.2s ease;
 }
 
 html,

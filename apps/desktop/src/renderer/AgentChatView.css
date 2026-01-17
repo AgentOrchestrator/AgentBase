@@ -65,7 +65,7 @@
 
 .agent-chat-view-empty {
   text-align: center;
-  color: #888;
+  color: var(--color-text-secondary);
   padding: 40px 20px;
   font-size: 13px;
 }
@@ -269,7 +269,7 @@
 
 /* Tool Summary - compact gray text (matches ConversationNode) */
 .conversation-tool-summary {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   margin: 0;
   padding: 0;

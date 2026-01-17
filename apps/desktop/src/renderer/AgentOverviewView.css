@@ -41,7 +41,7 @@
 
 .overview-title {
   margin: 0;
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 24px;
   font-weight: 700;
   cursor: pointer;
@@ -68,11 +68,11 @@
 
 .overview-title-input {
   flex: 1;
-  background: #1e1e1e;
-  border: 1px solid #888;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 6px 10px;
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 24px;
   font-weight: 700;
   outline: none;
@@ -113,7 +113,7 @@
 }
 
 .status-label {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 500;
 }

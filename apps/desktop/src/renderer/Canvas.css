@@ -83,7 +83,7 @@
 .sidebar-expand-button svg {
   width: 16px;
   height: 16px;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .sidebar-header {
@@ -114,7 +114,7 @@
 
 .sidebar-username {
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   margin-top: 4px;
   font-weight: 400;
   font-family: 'Averia Serif Libre', serif;
@@ -140,7 +140,7 @@
 .sidebar-toggle {
   background: none;
   border: none;
-  color: #888;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -152,7 +152,7 @@
 }
 
 .sidebar-toggle:hover {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
@@ -190,7 +190,7 @@
 .sidebar-section-title {
   margin: 0 0 8px 0;
   padding: 0 8px;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.4px;
@@ -230,17 +230,25 @@
 }
 
 .sidebar-item:hover {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
+}
+
+.sidebar-item:hover .sidebar-shortcut {
+  color: var(--color-text-primary);
 }
 
 .sidebar-item.active {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.sidebar-item.active .sidebar-shortcut {
   color: var(--color-text-primary);
 }
 
 .sidebar-shortcut {
   font-size: 11px;
-  color: #888;
+  color: var(--color-text-secondary);
   font-family: 'Menlo', 'Monaco', monospace;
   background: var(--color-bg-primary);
   padding: 2px 6px;
@@ -260,7 +268,7 @@
 }
 
 .sidebar-content::-webkit-scrollbar-thumb {
-  background: #888;
+  background: var(--color-text-secondary);
   border-radius: 3px;
 }
 
@@ -335,13 +343,21 @@
 }
 
 .sidebar-folder-header:hover {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
+}
+
+.sidebar-folder-header:hover .sidebar-folder-name,
+.sidebar-folder-header:hover .sidebar-folder-icon,
+.sidebar-folder-header:hover .sidebar-folder-icon svg,
+.sidebar-folder-header:hover .sidebar-folder-svg,
+.sidebar-folder-header:hover .sidebar-branch-svg {
+  color: var(--color-text-primary);
 }
 
 .sidebar-folder-lock {
   background: none;
   border: none;
-  color: #888;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -362,7 +378,7 @@
 }
 
 .sidebar-folder-lock:hover {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
@@ -377,7 +393,7 @@
 
 .sidebar-folder-icon {
   font-size: 10px;
-  color: #888;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   width: 12px;
   display: flex;
@@ -389,7 +405,7 @@
 .sidebar-folder-icon svg {
   width: 12px;
   height: 12px;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .sidebar-folder-icon.collapsed {
@@ -404,7 +420,7 @@
 .sidebar-branch-svg,
 .sidebar-linear-svg {
   flex-shrink: 0;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .sidebar-folder-name {
@@ -413,6 +429,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  color: var(--color-text-secondary);
+  transition: color 0.2s ease;
 }
 
 .sidebar-folder-content {
@@ -427,7 +445,7 @@
 .sidebar-folder .sidebar-item {
   padding: 6px 8px 6px 24px;
   font-size: 12px;
-  color: #b4b4b4;
+  color: var(--color-text-secondary);
 }
 
 /* Canvas Content */
@@ -655,7 +673,7 @@
 
 .context-menu-shortcut {
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-secondary);
   background: var(--color-bg-secondary);
   padding: 4px 8px;
   border-radius: 4px;
@@ -663,10 +681,11 @@
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
+.context-menu-item:hover .context-menu-shortcut,
 .context-menu-item.selected .context-menu-shortcut,
 .context-menu-item.highlight .context-menu-shortcut {
-  color: #5a9cf5;
-  border-color: #5a9cf5;
+  color: var(--color-text-primary);
+  border-color: var(--color-text-primary);
 }
 
 /* Custom controls styling */
@@ -682,7 +701,7 @@
 }
 
 .react-flow__controls button:hover {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
 }
 
 /* Custom background */
@@ -719,7 +738,7 @@
 .highlight-all-fab svg {
   width: 16px;
   height: 16px;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .highlight-all-fab[aria-label*="Unhighlight"] svg {
@@ -750,7 +769,7 @@
 .settings-fab svg {
   width: 16px;
   height: 16px;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 /* Settings Modal */
@@ -818,7 +837,7 @@
 .settings-close-button {
   background: none;
   border: none;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -832,7 +851,7 @@
 }
 
 .settings-close-button:hover {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
@@ -1016,7 +1035,7 @@
 
 .settings-shortcut {
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-secondary);
   font-family: 'Menlo', 'Monaco', monospace;
   background: var(--color-bg-primary);
   padding: 4px 8px;
@@ -1058,7 +1077,7 @@
 }
 
 .integration-status.disconnected {
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .integration-content {
@@ -1091,7 +1110,7 @@
 }
 
 .integration-input::placeholder {
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .integration-button {
@@ -1108,7 +1127,7 @@
 }
 
 .integration-button:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-hover);
 }
 
 .integration-button:active:not(:disabled) {
@@ -1127,7 +1146,7 @@
 
 .integration-button.connect:hover:not(:disabled) {
   background: #4a9eff;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .integration-button.disconnect {
@@ -1137,11 +1156,11 @@
 
 .integration-button.disconnect:hover:not(:disabled) {
   background: #ef4444;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .integration-help {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -1284,7 +1303,7 @@
 
 .issues-workspace-label {
   font-size: 11px;
-  color: #9a9aa2;
+  color: var(--color-text-secondary);
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -1310,7 +1329,7 @@
 
 .issues-filter label {
   font-size: 11px;
-  color: #9a9aa2;
+  color: var(--color-text-secondary);
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -1363,7 +1382,7 @@
   justify-content: center;
   padding: 24px 0;
   min-height: 120px;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -1404,7 +1423,7 @@
 }
 
 .issue-identifier {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-family: 'Menlo', 'Monaco', monospace;
   font-weight: 600;
@@ -1414,7 +1433,7 @@
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 4px;
-  color: #fff;
+  color: var(--color-text-primary);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1434,13 +1453,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #9a9aa2;
+  color: var(--color-text-secondary);
   font-size: 12px;
   margin-bottom: 8px;
 }
 
 .issue-meta-sep {
-  color: #5a5c66;
+  color: var(--color-text-secondary);
 }
 
 /* Issue assignee */
@@ -1459,13 +1478,13 @@
 }
 
 .assignee-name {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 
 /* Issue priority */
 .issue-priority {
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1496,7 +1515,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #888;
+  color: var(--color-text-secondary);
   transition: transform 0.2s ease;
 }
 
@@ -1526,7 +1545,7 @@
 }
 
 .sidebar-linear-issues-workspace {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 500;
   overflow: hidden;
@@ -1554,7 +1573,7 @@
 }
 
 .sidebar-linear-issues-filter label {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
@@ -1628,7 +1647,7 @@
 .sidebar-linear-issues-empty {
   padding: 16px;
   text-align: center;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 
@@ -1667,7 +1686,7 @@
 }
 
 .sidebar-issue-identifier {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-family: 'Menlo', 'Monaco', monospace;
   font-weight: 600;
@@ -1677,7 +1696,7 @@
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 3px;
-  color: #fff;
+  color: var(--color-text-primary);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1698,13 +1717,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #9a9aa2;
+  color: var(--color-text-secondary);
   font-size: 11px;
   margin-bottom: 8px;
 }
 
 .sidebar-issue-meta-sep {
-  color: #5a5c66;
+  color: var(--color-text-secondary);
 }
 
 .sidebar-issue-assignee {
@@ -1722,7 +1741,7 @@
 }
 
 .sidebar-assignee-name {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1732,7 +1751,7 @@
 }
 
 .sidebar-issue-priority {
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1753,7 +1772,7 @@
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -1826,12 +1845,12 @@
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  color: #fff;
+  color: var(--color-text-primary);
   flex-shrink: 0;
 }
 
 .fork-error-message {
-  color: #fff;
+  color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 500;
   flex: 1;
@@ -1856,5 +1875,5 @@
 
 .fork-error-dismiss:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: var(--color-text-primary);
 }

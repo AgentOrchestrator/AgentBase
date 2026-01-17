@@ -41,7 +41,7 @@
 }
 
 .command-palette-input::placeholder {
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .command-palette-list {
@@ -57,13 +57,19 @@
   padding: 12px 16px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
   color: var(--color-text-primary);
 }
 
 .command-palette-item:hover,
 .command-palette-item.selected {
   background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.command-palette-item:hover .command-palette-label,
+.command-palette-item.selected .command-palette-label {
+  color: var(--color-text-primary);
 }
 
 .command-palette-label {
@@ -73,23 +79,25 @@
 
 .command-palette-shortcut {
   font-size: 12px;
-  color: #888;
+  color: var(--color-text-secondary);
   background: var(--color-bg-secondary);
   padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid var(--color-border);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  transition: color 0.2s ease, border-color 0.2s ease;
 }
 
+.command-palette-item:hover .command-palette-shortcut,
 .command-palette-item.selected .command-palette-shortcut {
-  color: #5a9cf5;
-  border-color: #5a9cf5;
+  color: var(--color-text-primary);
+  border-color: var(--color-text-primary);
 }
 
 .command-palette-empty {
   padding: 24px;
   text-align: center;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
