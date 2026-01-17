@@ -227,9 +227,9 @@ export function useSessionOverview({
             const extracted = extractLatestTodoList(lines);
             if (extracted && extracted.items.length > 0) {
               setProgress(toTodoListProgress(extracted));
-            } else {
-              setProgress(null);
             }
+            // Note: Don't clear progress if no todos found - preserve completed todo lists
+            // The todo list should persist until the session changes or a new non-empty TodoWrite is sent
           }
         }
       } catch (progressError) {
@@ -407,6 +407,7 @@ export function useSessionOverview({
     // Reset state if session changes
     if (loadedSessionIdRef.current !== sessionId) {
       setIsLoaded(false);
+      setProgress(null); // Clear progress when switching sessions
       loadedSessionIdRef.current = null;
     }
 
