@@ -31,15 +31,13 @@ export function createServiceFactories(): ServiceFactories {
       nodeId: string,
       agentId: string,
       agentType: AgentType,
-      terminalService: ITerminalService,
-      workspacePath?: string
+      terminalService: ITerminalService
     ) => {
       // Create adapter internally based on agent type
       // The adapter factory may return null for unsupported types or if API is unavailable
       let adapter = null;
       try {
         adapter = createCodingAgentAdapter(agentType, {
-          workingDirectory: workspacePath,
           agentId,
         });
       } catch (error) {
@@ -47,7 +45,7 @@ export function createServiceFactories(): ServiceFactories {
         // AgentServiceImpl handles null adapter gracefully
         console.warn('[ServiceFactories] Failed to create adapter:', error);
       }
-      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, adapter, workspacePath);
+      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, adapter);
     },
 
     createConversationService: (

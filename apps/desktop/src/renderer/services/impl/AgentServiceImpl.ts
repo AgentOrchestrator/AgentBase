@@ -43,23 +43,19 @@ export class AgentServiceImpl implements IAgentService {
   private currentStatus: CodingAgentStatusInfo | null = null;
   private autoStartEnabled = false;
   private isRunning = false;
-  private currentSessionId: string | null = null;
-  private workspacePathValue: string | null = null;
 
   constructor(
     nodeId: string,
     agentId: string,
     agentType: AgentType,
     terminalService: ITerminalService,
-    adapter: ICodingAgentAdapter | null,
-    workspacePath?: string
+    adapter: ICodingAgentAdapter | null
   ) {
     this.nodeId = nodeId;
     this.agentId = agentId;
     this.agentType = agentType;
     this.terminalService = terminalService;
     this.adapter = adapter;
-    this.workspacePathValue = workspacePath || null;
 
     // Initialize status
     this.currentStatus = {
@@ -71,16 +67,6 @@ export class AgentServiceImpl implements IAgentService {
   // =============================================================================
   // Helper Methods
   // =============================================================================
-
-  /**
-   * Require workspace to be set, throw if not
-   */
-  private requireWorkspace(): string {
-    if (!this.workspacePathValue) {
-      throw new Error('Workspace path not set. Call setWorkspace() first.');
-    }
-    return this.workspacePathValue;
-  }
 
   /**
    * Require adapter to be set, throw if not
@@ -103,15 +89,6 @@ export class AgentServiceImpl implements IAgentService {
       throw error;
     }
     return result.data;
-  }
-
-  // =============================================================================
-  // Getters
-  // =============================================================================
-
-  /** Get the current workspace path */
-  get workspacePath(): string | null {
-    return this.workspacePathValue;
   }
 
   // =============================================================================
@@ -212,7 +189,6 @@ export class AgentServiceImpl implements IAgentService {
           terminalId: this.terminalService.terminalId,
         });
         this.isRunning = true;
-        this.currentSessionId = state.sessionId || null;
         this.updateStatus('running');
       } else {
         console.log('[AgentService] No active agent session to restore', {
@@ -336,15 +312,16 @@ export class AgentServiceImpl implements IAgentService {
 
   /**
    * Start the coding agent CLI REPL in the terminal.
-   * Call setWorkspace() first to set the working directory.
-   * @param sessionId - UUID for the session (required for new sessions, used for resume check)
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Optional session ID for resume
    * @param initialPrompt - Optional initial prompt (currently unused - user types in terminal)
    */
-  async start(sessionId?: string, _initialPrompt?: string): Promise<void> {
+  async start(workspacePath: string, sessionId?: string, _initialPrompt?: string): Promise<void> {
     console.log('[AgentService] start() called', {
       agentId: this.agentId,
       terminalId: this.terminalService.terminalId,
       isRunning: this.isRunning,
+      workspacePath,
       sessionId,
     });
 
@@ -355,8 +332,6 @@ export class AgentServiceImpl implements IAgentService {
       return;
     }
 
-    // Require workspace and session ID
-    const workspacePath = this.requireWorkspace();
     if (!sessionId) {
       console.error('[AgentService] start() requires sessionId');
       this.updateStatus('error', {
@@ -374,7 +349,7 @@ export class AgentServiceImpl implements IAgentService {
     await this.waitForTerminalReady();
 
     // Check if this is a resume (session file exists)
-    const isResume = await this.isSessionActive(sessionId);
+    const isResume = await this.isSessionActive(sessionId, workspacePath);
 
     // Build and send CLI command to terminal
     if (this.adapter) {
@@ -420,7 +395,6 @@ export class AgentServiceImpl implements IAgentService {
     }
 
     this.isRunning = true;
-    this.currentSessionId = sessionId;
     this.updateStatus('running');
 
     // Persist session state to main process (survives renderer refresh)
@@ -443,37 +417,11 @@ export class AgentServiceImpl implements IAgentService {
     // Update status
     this.updateStatus('idle');
     this.isRunning = false;
-    this.currentSessionId = null;
 
     // NOTE: We intentionally do NOT clear session state here.
     // The session state is cleared in onExit when the terminal process actually exits.
     // This prevents race conditions during browser refresh where stop() is called
     // but the pty process is still running in the main process.
-  }
-
-  // =============================================================================
-  // Workspace
-  // =============================================================================
-
-  /**
-   * Set workspace path.
-   * Does NOT start generation - use sendMessage/resumeSession for that.
-   */
-  async setWorkspace(path: string): Promise<void> {
-    console.log('[AgentService] setWorkspace() called', {
-      agentId: this.agentId,
-      terminalId: this.terminalService.terminalId,
-      path,
-      isRunning: this.isRunning,
-    });
-
-    this.workspacePathValue = path;
-
-    // Ensure terminal is ready for display
-    if (!this.terminalService.isRunning()) {
-      await this.terminalService.create();
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    }
   }
 
   // =============================================================================
@@ -544,16 +492,18 @@ export class AgentServiceImpl implements IAgentService {
   }
 
   // =============================================================================
-  // Generation (Adapter-driven)
+  // Generation (Adapter-driven, stateless)
   // =============================================================================
 
   /**
    * Send a message and get response (non-streaming).
-   * Creates a new session if no active session exists.
-   * @throws Error if workspace not set or adapter fails
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required)
+   * @throws Error if adapter fails
    */
-  async sendMessage(prompt: string): Promise<GenerateResponse> {
-    const workspacePath = this.requireWorkspace();
+  async sendMessage(prompt: string, workspacePath: string, sessionId: string): Promise<GenerateResponse> {
     const adapter = this.requireAdapter();
 
     this.updateStatus('running');
@@ -562,17 +512,13 @@ export class AgentServiceImpl implements IAgentService {
       const result = await adapter.generate({
         prompt,
         workingDirectory: workspacePath,
-        sessionId: this.currentSessionId || undefined,
+        sessionId,
         agentId: this.agentId,
       });
 
       const response = this.unwrapResult(result);
 
-      // Update session ID if returned
-      if (response.sessionId) {
-        this.currentSessionId = response.sessionId;
-        await this.persistSessionStateToMainProcess(response.sessionId);
-      }
+      await this.persistSessionStateToMainProcess(sessionId);
 
       this.updateStatus('idle');
       return response;
@@ -586,11 +532,19 @@ export class AgentServiceImpl implements IAgentService {
 
   /**
    * Send a message with streaming (chunks emitted via callback).
-   * Returns the final complete response.
-   * @throws Error if workspace not set or adapter fails
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required)
+   * @param onChunk - Callback for streaming chunks
+   * @throws Error if adapter fails
    */
-  async sendMessageStreaming(prompt: string, onChunk: StreamCallback): Promise<GenerateResponse> {
-    const workspacePath = this.requireWorkspace();
+  async sendMessageStreaming(
+    prompt: string,
+    workspacePath: string,
+    sessionId: string,
+    onChunk: StreamCallback
+  ): Promise<GenerateResponse> {
     const adapter = this.requireAdapter();
 
     this.updateStatus('running');
@@ -600,7 +554,7 @@ export class AgentServiceImpl implements IAgentService {
         {
           prompt,
           workingDirectory: workspacePath,
-          sessionId: this.currentSessionId || undefined,
+          sessionId,
           agentId: this.agentId,
         },
         onChunk
@@ -608,11 +562,7 @@ export class AgentServiceImpl implements IAgentService {
 
       const response = this.unwrapResult(result);
 
-      // Update session ID if returned
-      if (response.sessionId) {
-        this.currentSessionId = response.sessionId;
-        await this.persistSessionStateToMainProcess(response.sessionId);
-      }
+      await this.persistSessionStateToMainProcess(sessionId);
 
       this.updateStatus('idle');
       return response;
@@ -624,89 +574,20 @@ export class AgentServiceImpl implements IAgentService {
     }
   }
 
-  /**
-   * Resume an existing session with a new message (non-streaming).
-   * @throws Error if workspace not set, session not found, or adapter fails
-   */
-  async resumeSession(sessionId: string, prompt: string): Promise<GenerateResponse> {
-    const workspacePath = this.requireWorkspace();
-    const adapter = this.requireAdapter();
-
-    this.updateStatus('running');
-
-    try {
-      const result = await adapter.continueSession(
-        { type: 'id', value: sessionId },
-        prompt,
-        { workingDirectory: workspacePath, agentId: this.agentId }
-      );
-
-      const response = this.unwrapResult(result);
-
-      // Update current session
-      this.currentSessionId = sessionId;
-      await this.persistSessionStateToMainProcess(sessionId);
-
-      this.updateStatus('idle');
-      return response;
-    } catch (error) {
-      this.updateStatus('error', {
-        errorMessage: error instanceof Error ? error.message : 'Resume session failed',
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Resume an existing session with streaming.
-   * Returns the final complete response.
-   * @throws Error if workspace not set, session not found, or adapter fails
-   */
-  async resumeSessionStreaming(
-    sessionId: string,
-    prompt: string,
-    onChunk: StreamCallback
-  ): Promise<GenerateResponse> {
-    const workspacePath = this.requireWorkspace();
-    const adapter = this.requireAdapter();
-
-    this.updateStatus('running');
-
-    try {
-      const result = await adapter.continueSessionStreaming(
-        { type: 'id', value: sessionId },
-        prompt,
-        onChunk,
-        { workingDirectory: workspacePath, agentId: this.agentId }
-      );
-
-      const response = this.unwrapResult(result);
-
-      // Update current session
-      this.currentSessionId = sessionId;
-      await this.persistSessionStateToMainProcess(sessionId);
-
-      this.updateStatus('idle');
-      return response;
-    } catch (error) {
-      this.updateStatus('error', {
-        errorMessage: error instanceof Error ? error.message : 'Resume session failed',
-      });
-      throw error;
-    }
-  }
-
   // =============================================================================
-  // Session Queries
+  // Session Queries (stateless)
   // =============================================================================
 
   /**
    * Get session content with optional message filtering.
-   * Automatically includes workspacePath to scope session lookup for forked sessions.
+   * @param sessionId - Session ID to retrieve
+   * @param workspacePath - Working directory to scope session lookup
+   * @param filter - Optional message filter options
    * @throws Error if adapter fails
    */
   async getSession(
     sessionId: string,
+    workspacePath: string,
     filter?: MessageFilterOptions
   ): Promise<CodingAgentSessionContent | null> {
     const adapter = this.requireAdapter();
@@ -716,15 +597,14 @@ export class AgentServiceImpl implements IAgentService {
     // but exist in different project directories (parent vs worktree)
     const filterWithWorkspace: MessageFilterOptions = {
       ...filter,
-      workspacePath: this.workspacePathValue ?? filter?.workspacePath,
+      workspacePath,
     };
 
     // Debug logging to trace workspace path being used
     console.log('[AgentServiceImpl] getSession called', {
       sessionId,
-      workspacePathValue: this.workspacePathValue,
+      workspacePath,
       filterWorkspacePath: filter?.workspacePath,
-      finalWorkspacePath: filterWithWorkspace.workspacePath,
     });
 
     const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);
@@ -733,22 +613,20 @@ export class AgentServiceImpl implements IAgentService {
 
   /**
    * Check if a session is active (file exists).
-   * @throws Error if workspace not set
+   * @param sessionId - Session ID to check
+   * @param workspacePath - Working directory to scope session lookup
    */
-  async isSessionActive(sessionId: string): Promise<boolean> {
-    const workspacePath = this.requireWorkspace();
+  async isSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
     const adapter = this.requireAdapter();
-
     return adapter.checkSessionActive(sessionId, workspacePath);
   }
 
   /**
-   * Get the latest session for the current workspace.
+   * Get the latest session for a workspace.
    * Returns null if no sessions exist or capability not supported.
-   * @throws Error if workspace not set
+   * @param workspacePath - Working directory to scope session lookup
    */
-  async getLatestSession(): Promise<SessionInfo | null> {
-    const workspacePath = this.requireWorkspace();
+  async getLatestSession(workspacePath: string): Promise<SessionInfo | null> {
     const adapter = this.requireAdapter();
 
     // Check if adapter supports this capability

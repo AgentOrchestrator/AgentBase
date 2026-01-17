@@ -23,8 +23,11 @@ marked.setOptions({
 });
 
 interface AgentChatViewProps {
-  sessionId?: string;
+  /** Session ID (required for chat operations) */
+  sessionId: string;
   agentType: string;
+  /** Workspace path (required for chat operations) */
+  workspacePath: string;
   initialMessages?: AgentChatMessage[];
   initialPrompt?: string;
   onMessagesChange: (messages: AgentChatMessage[]) => void;
@@ -44,6 +47,7 @@ type DisplayItem =
 export default function AgentChatView({
   sessionId,
   agentType,
+  workspacePath,
   initialMessages = [],
   initialPrompt,
   onMessagesChange,
@@ -79,6 +83,7 @@ export default function AgentChatView({
   } = useChatSession({
     agentType,
     sessionId,
+    workspacePath,
     currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: AgentChatMessage[]) => {
       setMessages(newMessages);

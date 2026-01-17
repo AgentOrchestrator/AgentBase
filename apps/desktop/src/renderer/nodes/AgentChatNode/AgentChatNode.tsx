@@ -29,6 +29,12 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
   }
   const initialNodeData = initialDataRef.current;
 
+  // Generate a stable sessionId if none exists (required for stateless API)
+  const generatedSessionIdRef = useRef<string | null>(null);
+  if (!generatedSessionIdRef.current && !initialNodeData.sessionId) {
+    generatedSessionIdRef.current = crypto.randomUUID();
+  }
+
   // ---------------------------------------------------------------------------
   // Single Source of Truth: useAgentState()
   // ---------------------------------------------------------------------------
@@ -36,6 +42,9 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
     nodeId: id,
     initialNodeData,
   });
+
+  // Resolve sessionId: use from state if exists, otherwise use generated one
+  const sessionId = agent.session.id ?? generatedSessionIdRef.current ?? '';
 
   // ---------------------------------------------------------------------------
   // Event Handlers
@@ -79,7 +88,7 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
       nodeType="agent"
       terminalId={agent.config.terminalId}
       agentId={agent.config.agentId}
-      sessionId={agent.session.id ?? undefined}
+      sessionId={sessionId}
       agentType={agent.config.agentType}
       workspacePath={agent.workspace.path}
       autoStartCli={!!agent.workspace.path}
@@ -95,11 +104,12 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
         />
         <AgentChatView
           nodeId={id}
-          sessionId={agent.session.id ?? undefined}
+          sessionId={sessionId}
+          workspacePath={agent.workspace.path}
           agentType={agent.config.agentType}
           initialMessages={agent.nodeData.chatMessages || []}
           onMessagesChange={(messages) => handleDataChange({ chatMessages: messages })}
-          onSessionCreated={(sessionId) => handleDataChange({ sessionId })}
+          onSessionCreated={(newSessionId) => handleDataChange({ sessionId: newSessionId })}
           isSessionReady={agent.session.readiness === 'ready'}
           selected={selected}
         />

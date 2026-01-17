@@ -14,9 +14,11 @@ import type { CodingAgentMessage } from '@agent-orchestrator/shared';
 
 interface AgentChatNodePresentationProps {
   selected?: boolean;
-  sessionId?: string;
+  /** Session ID (required for chat operations) */
+  sessionId: string;
   agentType: string;
-  workspacePath?: string;
+  /** Workspace path (required for chat operations) */
+  workspacePath: string;
   title?: string;
   initialMessages: CodingAgentMessage[];
   isDraft: boolean;
@@ -30,7 +32,7 @@ export function AgentChatNodePresentation({
   selected,
   sessionId,
   agentType,
-  workspacePath: _workspacePath,
+  workspacePath,
   title,
   initialMessages,
   isDraft,
@@ -54,6 +56,7 @@ export function AgentChatNodePresentation({
   } = useChatSession({
     agentType,
     sessionId,
+    workspacePath,
     currentMessages: messages,
     onMessagesUpdate: useCallback((newMessages: CodingAgentMessage[]) => {
       setMessages(newMessages);

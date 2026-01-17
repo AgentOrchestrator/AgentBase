@@ -146,8 +146,13 @@ export interface IAgentService extends INodeService {
   // Lifecycle
   // =========================================================================
 
-  /** Start the coding agent (initializes adapter) */
-  start(sessionId?: string, initialPrompt?: string): Promise<void>;
+  /**
+   * Start the coding agent CLI REPL in the terminal.
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Optional session ID for resume
+   * @param initialPrompt - Optional initial prompt
+   */
+  start(workspacePath: string, sessionId?: string, initialPrompt?: string): Promise<void>;
   /** Stop the coding agent (cancels operations) */
   stop(): Promise<void>;
 
@@ -175,78 +180,65 @@ export interface IAgentService extends INodeService {
   setAutoStart(enabled: boolean): void;
 
   // =========================================================================
-  // Workspace
-  // =========================================================================
-
-  /** Current workspace path (null if not set) */
-  get workspacePath(): string | null;
-
-  /**
-   * Set workspace path.
-   * Does NOT start generation - use sendMessage/resumeSession for that.
-   */
-  setWorkspace(path: string): Promise<void>;
-
-  // =========================================================================
-  // Generation (Adapter-driven)
+  // Generation (Adapter-driven, stateless)
   // =========================================================================
 
   /**
    * Send a message and get response (non-streaming).
-   * Creates a new session if no active session exists.
-   * @throws Error if workspace not set or adapter fails
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required - caller must provide)
+   * @throws Error if adapter fails
    */
-  sendMessage(prompt: string): Promise<GenerateResponse>;
+  sendMessage(prompt: string, workspacePath: string, sessionId: string): Promise<GenerateResponse>;
 
   /**
    * Send a message with streaming (chunks emitted via callback).
-   * Returns the final complete response.
-   * @throws Error if workspace not set or adapter fails
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required - caller must provide)
+   * @param onChunk - Callback for streaming chunks
+   * @throws Error if adapter fails
    */
-  sendMessageStreaming(prompt: string, onChunk: StreamCallback): Promise<GenerateResponse>;
-
-  /**
-   * Resume an existing session with a new message (non-streaming).
-   * @throws Error if workspace not set, session not found, or adapter fails
-   */
-  resumeSession(sessionId: string, prompt: string): Promise<GenerateResponse>;
-
-  /**
-   * Resume an existing session with streaming.
-   * Returns the final complete response.
-   * @throws Error if workspace not set, session not found, or adapter fails
-   */
-  resumeSessionStreaming(
-    sessionId: string,
+  sendMessageStreaming(
     prompt: string,
+    workspacePath: string,
+    sessionId: string,
     onChunk: StreamCallback
   ): Promise<GenerateResponse>;
 
   // =========================================================================
-  // Session Queries
+  // Session Queries (stateless)
   // =========================================================================
 
   /**
    * Get session content with optional message filtering.
+   * @param sessionId - Session ID to retrieve
+   * @param workspacePath - Working directory to scope session lookup
+   * @param filter - Optional message filter options
    * @throws Error if adapter fails
    */
   getSession(
     sessionId: string,
+    workspacePath: string,
     filter?: MessageFilterOptions
   ): Promise<CodingAgentSessionContent | null>;
 
   /**
    * Check if a session is active (file exists).
-   * @throws Error if workspace not set
+   * @param sessionId - Session ID to check
+   * @param workspacePath - Working directory to scope session lookup
    */
-  isSessionActive(sessionId: string): Promise<boolean>;
+  isSessionActive(sessionId: string, workspacePath: string): Promise<boolean>;
 
   /**
-   * Get the latest session for the current workspace.
+   * Get the latest session for a workspace.
    * Returns null if no sessions exist or capability not supported.
-   * @throws Error if workspace not set
+   * @param workspacePath - Working directory to scope session lookup
    */
-  getLatestSession(): Promise<SessionInfo | null>;
+  getLatestSession(workspacePath: string): Promise<SessionInfo | null>;
 
   // =========================================================================
   // Events

@@ -13,7 +13,10 @@ import type { IAgentService } from '../../../context/node-services';
 
 interface UseChatSessionOptions {
   agentType: string;
-  sessionId?: string;
+  /** Session ID (required - caller must provide) */
+  sessionId: string;
+  /** Workspace path (required - caller must provide) */
+  workspacePath: string;
   currentMessages?: CodingAgentMessage[];
   autoLoadHistory?: boolean;
   onMessagesUpdate: (messages: CodingAgentMessage[]) => void;
@@ -26,6 +29,7 @@ interface UseChatSessionOptions {
 export function useChatSession({
   agentType,
   sessionId,
+  workspacePath,
   currentMessages,
   autoLoadHistory = true,
   onMessagesUpdate,
@@ -60,7 +64,7 @@ export function useChatSession({
   );
 
   const loadSessionHistory = useCallback(async () => {
-    if (!sessionId) {
+    if (!sessionId || !workspacePath) {
       return;
     }
 
@@ -73,12 +77,12 @@ export function useChatSession({
     // Debug logging to trace workspace path used for session lookup
     console.log('[useChatSession] loadSessionHistory called', {
       sessionId,
-      agentServiceWorkspacePath: agentService.workspacePath,
+      workspacePath,
       agentType,
     });
 
     try {
-      const session = await agentService.getSession(sessionId, { roles: ['user', 'assistant'] });
+      const session = await agentService.getSession(sessionId, workspacePath, { roles: ['user', 'assistant'] });
 
       if (session?.messages) {
         // Cast messages to shared type (adapter type is compatible but uses string for messageType)
@@ -90,7 +94,7 @@ export function useChatSession({
     } finally {
       isLoadingHistoryRef.current = false;
     }
-  }, [agentService, sessionId, onError, publishMessages]);
+  }, [agentService, sessionId, workspacePath, onError, publishMessages]);
 
   useEffect(() => {
     if (!autoLoadHistory || !sessionId) {
@@ -128,6 +132,11 @@ export function useChatSession({
   });
 
   const sendMessage = useCallback(async (prompt: string) => {
+    if (!sessionId || !workspacePath) {
+      onError('Session ID and workspace path are required');
+      return;
+    }
+
     setIsStreaming(true);
 
     // Add user message
@@ -154,8 +163,6 @@ export function useChatSession({
     publishMessages([...messagesRef.current]);
 
     try {
-      let result;
-
       const handleChunk = (chunk: string) => {
         assistantContent += chunk;
         // Update last message with new content
@@ -166,22 +173,11 @@ export function useChatSession({
         publishMessages(updatedMessages);
       };
 
-      // Check if session is active and resume or start new
-      const isActive = sessionId ? await agentService.isSessionActive(sessionId) : false;
+      // Stateless API - adapter handles create vs continue based on session file existence
+      const result = await agentService.sendMessageStreaming(prompt, workspacePath, sessionId, handleChunk);
 
-      if (isActive && sessionId) {
-        // Resume existing session
-        result = await agentService.resumeSessionStreaming(sessionId, prompt, handleChunk);
-      } else {
-        // Start new session
-        result = await agentService.sendMessageStreaming(prompt, handleChunk);
-
-        // Capture session ID from response
-        if (result.sessionId) {
-          loadedSessionIdRef.current = result.sessionId;
-          onSessionCreated(result.sessionId);
-        }
-      }
+      // Notify caller of session (useful for first message)
+      onSessionCreated(sessionId);
 
       // Final update with complete content
       const finalMessages = [
@@ -197,7 +193,7 @@ export function useChatSession({
     } finally {
       setIsStreaming(false);
     }
-  }, [agentService, sessionId, publishMessages, onSessionCreated, onError]);
+  }, [agentService, sessionId, workspacePath, publishMessages, onSessionCreated, onError]);
 
   return {
     sendMessage,

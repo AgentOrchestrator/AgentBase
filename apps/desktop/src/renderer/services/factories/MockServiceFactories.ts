@@ -118,11 +118,9 @@ function createMockAgentService(
   nodeId: string,
   agentId: string,
   agentType: AgentType,
-  _terminalService: ITerminalService,
-  _workspacePath?: string
+  _terminalService: ITerminalService
 ): IAgentService {
   let autoStart = false;
-  let workspacePath: string | null = _workspacePath || null;
   let currentStatus: CodingAgentStatusInfo = {
     status: 'idle',
     startedAt: Date.now(),
@@ -140,15 +138,12 @@ function createMockAgentService(
     nodeId,
     agentId,
     agentType,
-    get workspacePath() {
-      return workspacePath;
-    },
     initialize: async () => {},
     dispose: async () => {
       statusListeners.clear();
       eventListeners.clear();
     },
-    start: async (_sessionId?: string, _initialPrompt?: string) => {
+    start: async (_workspacePath: string, _sessionId?: string, _initialPrompt?: string) => {
       currentStatus = { status: 'running', startedAt: Date.now() };
     },
     stop: async () => {
@@ -170,35 +165,25 @@ function createMockAgentService(
     setAutoStart: (enabled) => {
       autoStart = enabled;
     },
-    setWorkspace: async (path: string) => {
-      workspacePath = path;
-    },
-    // Generation methods
-    sendMessage: async (_prompt: string): Promise<GenerateResponse> => {
+    // Generation methods (stateless - all params explicit)
+    sendMessage: async (_prompt: string, _workspacePath: string, _sessionId: string): Promise<GenerateResponse> => {
       return mockResponse;
     },
-    sendMessageStreaming: async (_prompt: string, onChunk: StreamCallback): Promise<GenerateResponse> => {
+    sendMessageStreaming: async (
+      _prompt: string,
+      _workspacePath: string,
+      _sessionId: string,
+      onChunk: StreamCallback
+    ): Promise<GenerateResponse> => {
       onChunk('Mock ');
       onChunk('streaming ');
       onChunk('response');
       return mockResponse;
     },
-    resumeSession: async (_sessionId: string, _prompt: string): Promise<GenerateResponse> => {
-      return mockResponse;
-    },
-    resumeSessionStreaming: async (
-      _sessionId: string,
-      _prompt: string,
-      onChunk: StreamCallback
-    ): Promise<GenerateResponse> => {
-      onChunk('Mock ');
-      onChunk('resumed ');
-      onChunk('response');
-      return mockResponse;
-    },
-    // Session queries
+    // Session queries (stateless - all params explicit)
     getSession: async (
       _sessionId: string,
+      _workspacePath: string,
       _filter?: MessageFilterOptions
     ): Promise<CodingAgentSessionContent | null> => {
       return {
@@ -223,10 +208,10 @@ function createMockAgentService(
         ],
       };
     },
-    isSessionActive: async (_sessionId: string): Promise<boolean> => {
+    isSessionActive: async (_sessionId: string, _workspacePath: string): Promise<boolean> => {
       return true;
     },
-    getLatestSession: async (): Promise<SessionInfo | null> => {
+    getLatestSession: async (_workspacePath: string): Promise<SessionInfo | null> => {
       return {
         id: 'mock-session-id',
         agentType,

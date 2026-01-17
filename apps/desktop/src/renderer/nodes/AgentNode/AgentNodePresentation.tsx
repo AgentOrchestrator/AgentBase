@@ -74,8 +74,8 @@ export function AgentNodePresentation({
   // Auto-start CLI when initialized (if enabled and has initial prompt)
   // If no initial prompt, agent remains idle
   useEffect(() => {
-    if (isInitialized && agent.isAutoStartEnabled() && isSessionReady) {
-      agent.start(data.sessionId, data.initialPrompt).catch((err) => {
+    if (isInitialized && agent.isAutoStartEnabled() && isSessionReady && data.workspacePath && data.sessionId) {
+      agent.start(data.workspacePath, data.sessionId, data.initialPrompt).catch((err) => {
         console.error('[AgentNode] Failed to auto-start agent:', err);
       });
     }
@@ -88,7 +88,7 @@ export function AgentNodePresentation({
         console.error('[AgentNode] Failed to stop agent:', err);
       });
     };
-  }, [isInitialized, agent, isSessionReady, data.sessionId, data.initialPrompt]);
+  }, [isInitialized, agent, isSessionReady, data.sessionId, data.initialPrompt, data.workspacePath]);
 
   // Subscribe to status changes
   useEffect(() => {
@@ -581,17 +581,20 @@ export function AgentNodePresentation({
           <AgentTerminalView terminalId={data.terminalId} selected={selected} />
         </div>
         <div style={{ display: activeView === 'chat' ? 'contents' : 'none' }}>
-          <AgentChatView
-            nodeId={nodeId || ''}
-            sessionId={data.sessionId}
-            agentType={data.agentType}
-            initialMessages={data.chatMessages}
-            initialPrompt={data.initialPrompt}
-            onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
-            onSessionCreated={(sessionId) => onDataChange({ sessionId })}
-            isSessionReady={isSessionReady}
-            selected={selected}
-          />
+          {data.sessionId && data.workspacePath && (
+            <AgentChatView
+              nodeId={nodeId || ''}
+              sessionId={data.sessionId}
+              workspacePath={data.workspacePath}
+              agentType={data.agentType}
+              initialMessages={data.chatMessages}
+              initialPrompt={data.initialPrompt}
+              onMessagesChange={(messages) => onDataChange({ chatMessages: messages })}
+              onSessionCreated={(newSessionId) => onDataChange({ sessionId: newSessionId })}
+              isSessionReady={isSessionReady}
+              selected={selected}
+            />
+          )}
         </div>
       </div>
 
