@@ -30,10 +30,18 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "docker:restart": "docker compose restart",
-    "docker:clean": "docker compose down -v"
+    "docker:clean": "docker compose down -v",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.6",
     "@types/node": "^22.0.0",
+    "husky": "^9.1.7",
+    "semantic-release": "^24.2.9",
     "turbo": "^2.3.0",
     "typescript": "^5.9.3"
   }
