@@ -1657,7 +1657,7 @@
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 8px;
-  cursor: grab;
+  cursor: pointer;
   transition: all 0.2s ease;
   box-sizing: border-box;
 }

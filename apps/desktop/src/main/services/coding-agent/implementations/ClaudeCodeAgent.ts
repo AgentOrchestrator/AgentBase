@@ -270,21 +270,27 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // ICodingAgentProvider Implementation
+  // Central Query Execution
   // ============================================
 
-  async generate(request: GenerateRequest): Promise<Result<GenerateResponse, AgentError>> {
-    const initCheck = this.ensureInitialized();
-    if (initCheck.success === false) {
-      return { success: false, error: initCheck.error };
-    }
-
+  /**
+   * Execute a single query attempt and collect messages.
+   *
+   * @param prompt - The prompt to send
+   * @param options - SDK query options (must include abortController)
+   * @param onChunk - Optional streaming callback
+   * @returns Result with GenerateResponse or AgentError
+   */
+  private async executeQuery(
+    prompt: string,
+    options: Partial<Options>,
+    onChunk?: StreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
     const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
+    const abortController = options.abortController!;
 
     try {
-      const options = this.buildQueryOptions(request, abortController);
-      const queryResult = query({ prompt: request.prompt, options });
+      const queryResult = query({ prompt, options });
 
       const handle: QueryHandle = {
         id: queryId,
@@ -292,31 +298,28 @@ export class ClaudeCodeAgent
         abortController,
         startTime: Date.now(),
       };
-
-      if (request.sessionId) {
-        options.resume = request.sessionId;
-      }
-
       this.activeQueries.set(queryId, handle);
 
-      console.log(`[ClaudeCodeAgent] Starting generate query ${queryId} with options:`, options);
+      console.log(`[ClaudeCodeAgent] Starting query ${queryId}`);
 
-      // Collect all messages
       const messages: SDKMessage[] = [];
       for await (const message of queryResult) {
         messages.push(message);
+
+        if (onChunk && message.type === 'stream_event') {
+          const chunk = extractStreamingChunk(message);
+          if (chunk) {
+            onChunk(chunk);
+          }
+        }
       }
 
-      console.log(`[ClaudeCodeAgent] Completed generate query ${queryId} with ${messages.length} messages.`);
-      console.debug(`[ClaudeCodeAgent] Messages:`, messages);
-
+      console.log(`[ClaudeCodeAgent] Completed query ${queryId} with ${messages.length} messages`);
       this.activeQueries.delete(queryId);
 
-      // Find result message and check for errors
       const resultMessage = findResultMessage(messages);
-      
       if (!resultMessage) {
-        console.error(`[ClaudeCodeAgent] No result message found for query ${queryId}.`);
+        console.error(`[ClaudeCodeAgent] No result message found for query ${queryId}`);
         return err(noResultError());
       }
 
@@ -327,8 +330,89 @@ export class ClaudeCodeAgent
       return ok(mapSdkMessagesToResponse(messages, resultMessage));
     } catch (error) {
       this.activeQueries.delete(queryId);
+      throw error; // Re-throw for runQuery to handle fallback
+    }
+  }
+
+  /**
+   * Central method for executing SDK queries with resume fallback logic.
+   *
+   * When a sessionId is provided, this method:
+   * 1. First tries to resume the session using `options.resume`
+   * 2. If resume fails (session doesn't exist), falls back to creating a new session
+   *    with `extraArgs['session-id']`
+   *
+   * @param prompt - The prompt to send to Claude
+   * @param options - SDK query options
+   * @param onChunk - Optional streaming callback for partial messages
+   * @returns Result with GenerateResponse or AgentError
+   */
+  private async runQuery(
+    prompt: string,
+    options: Partial<Options>,
+    onChunk?: StreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
+    const abortController = options.abortController ?? new AbortController();
+    const baseOptions: Partial<Options> = {
+      ...options,
+      abortController,
+    };
+
+    // Extract sessionId from extraArgs if present (for fallback scenario)
+    const sessionId = baseOptions.extraArgs?.['session-id'] as string | undefined;
+
+    // If we have a sessionId, try resume first
+    if (sessionId) {
+      const resumeOptions: Partial<Options> = {
+        ...baseOptions,
+        resume: sessionId,
+        extraArgs: undefined, // Remove extraArgs when using resume
+      };
+
+      console.log(`[ClaudeCodeAgent] Attempting to resume session: ${sessionId}`);
+
+      try {
+        return await this.executeQuery(prompt, resumeOptions, onChunk);
+      } catch (error) {
+        console.log(`[ClaudeCodeAgent] Resume failed, falling back to new session with session-id: ${sessionId}`, error);
+
+        // Create a new AbortController for the retry
+        const retryAbortController = new AbortController();
+        const fallbackOptions: Partial<Options> = {
+          ...baseOptions,
+          abortController: retryAbortController,
+          resume: undefined, // Clear resume
+          extraArgs: { 'session-id': sessionId },
+        };
+
+        try {
+          return await this.executeQuery(prompt, fallbackOptions, onChunk);
+        } catch (fallbackError) {
+          return err(mapSdkError(fallbackError));
+        }
+      }
+    }
+
+    // No sessionId, just execute directly
+    try {
+      return await this.executeQuery(prompt, baseOptions, onChunk);
+    } catch (error) {
       return err(mapSdkError(error));
     }
+  }
+
+  // ============================================
+  // ICodingAgentProvider Implementation
+  // ============================================
+
+  async generate(request: GenerateRequest): Promise<Result<GenerateResponse, AgentError>> {
+    const initCheck = this.ensureInitialized();
+    if (initCheck.success === false) {
+      return { success: false, error: initCheck.error };
+    }
+
+    const options = this.buildQueryOptions(request, new AbortController(), false);
+    return this.runQuery(request.prompt, options);
   }
 
   async generateStreaming(
@@ -340,61 +424,19 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const options = this.buildQueryOptions(request, abortController, true);
-      const queryResult = query({ prompt: request.prompt, options });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-
-      if (request.sessionId) {
-        options.resume = request.sessionId;
-      }
-
-      this.activeQueries.set(queryId, handle);
-
-      // Collect messages and stream chunks
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        messages.push(message);
-
-        // Stream partial messages
-        if (message.type === 'stream_event') {
-          const chunk = extractStreamingChunk(message);
-          if (chunk) {
-            onChunk(chunk);
-          }
-        }
-      }
-
-      this.activeQueries.delete(queryId);
-
-      // Find result message and check for errors
-      const resultMessage = findResultMessage(messages);
-      if (!resultMessage) {
-        return err(noResultError());
-      }
-
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
-      }
-
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    const options = this.buildQueryOptions(request, new AbortController(), true);
+    return this.runQuery(request.prompt, options, onChunk);
   }
 
   /**
-   * Build SDK query options from a generate request
+   * Build SDK query options from a generate request.
+   *
+   * Note: Session handling (resume vs new session) is handled by runQuery(),
+   * which tries resume first and falls back to extraArgs['session-id'].
+   *
+   * @param request - The generate request
+   * @param abortController - Controller for aborting the query
+   * @param streaming - Whether to enable streaming partial messages
    */
   private buildQueryOptions(
     request: GenerateRequest,
@@ -402,7 +444,7 @@ export class ClaudeCodeAgent
     streaming = false
   ): Partial<Options> {
     const options: Partial<Options> = {
-      cwd: request.workingDirectory ?? this.config.workingDirectory,
+      cwd: request.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
       canUseTool: this.canUseTool,
@@ -421,8 +463,9 @@ export class ClaudeCodeAgent
       options.systemPrompt = { type: 'preset', preset: 'claude_code' };
     }
 
+    // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
     if (request.sessionId) {
-      options.resume = request.sessionId;
+      options.extraArgs = { 'session-id': request.sessionId };
     }
 
     this.queryContexts.set(abortController.signal, {
@@ -453,43 +496,8 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const sdkOptions = this.buildContinueOptions(identifier, abortController, options);
-      const queryResult = query({ prompt, options: sdkOptions });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect all messages
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        messages.push(message);
-      }
-
-      this.activeQueries.delete(queryId);
-
-      const resultMessage = findResultMessage(messages);
-      if (!resultMessage) {
-        return err(noResultError());
-      }
-
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
-      }
-
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    const sdkOptions = this.buildContinueOptions(identifier, new AbortController(), options);
+    return this.runQuery(prompt, sdkOptions);
   }
 
   async continueSessionStreaming(
@@ -503,54 +511,15 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const sdkOptions = this.buildContinueOptions(identifier, abortController, options, true);
-      const queryResult = query({ prompt, options: sdkOptions });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect messages and stream chunks
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        messages.push(message);
-
-        if (message.type === 'stream_event') {
-          const chunk = extractStreamingChunk(message);
-          if (chunk) {
-            onChunk(chunk);
-          }
-        }
-      }
-
-      this.activeQueries.delete(queryId);
-
-      const resultMessage = findResultMessage(messages);
-      if (!resultMessage) {
-        return err(noResultError());
-      }
-
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
-      }
-
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    const sdkOptions = this.buildContinueOptions(identifier, new AbortController(), options, true);
+    return this.runQuery(prompt, sdkOptions, onChunk);
   }
 
   /**
-   * Build SDK options for session continuation
+   * Build SDK options for session continuation.
+   *
+   * Note: For 'id' and 'name' identifiers, we use extraArgs['session-id']
+   * and let runQuery() handle the resume fallback logic.
    */
   private buildContinueOptions(
     identifier: SessionIdentifier,
@@ -559,7 +528,7 @@ export class ClaudeCodeAgent
     streaming = false
   ): Partial<Options> {
     const options: Partial<Options> = {
-      cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
+      cwd: continueOptions?.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
       canUseTool: this.canUseTool,
@@ -571,11 +540,13 @@ export class ClaudeCodeAgent
     // Map SessionIdentifier to SDK options
     switch (identifier.type) {
       case 'latest':
+        // 'latest' uses continue: true (no session ID)
         options.continue = true;
         break;
       case 'id':
       case 'name':
-        options.resume = identifier.value;
+        // Use extraArgs - runQuery() handles resume fallback
+        options.extraArgs = { 'session-id': identifier.value };
         break;
     }
 
@@ -616,54 +587,32 @@ export class ClaudeCodeAgent
       );
     }
 
-    // Handle same-directory fork (original SDK fork behavior)
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-  
-    const targetCwd = options?.workingDirectory ?? this.config.workingDirectory ?? process.cwd();
-    const sourceCwd = this.config.workingDirectory ?? process.cwd();
+    const targetCwd = options?.workingDirectory ?? process.cwd();
+    const sourceCwd = process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
 
+    // Build fork options
+    const abortController = new AbortController();
+    const sdkOptions: Partial<Options> = {
+      abortController,
+      hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
+      tools: { type: 'preset', preset: 'claude_code' },
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+    };
+
+    if (isCrossDirectory) {
+      // For cross-directory forks, use extraArgs to create new session
+      sdkOptions.extraArgs = { 'session-id': parentId };
+    } else {
+      // For same-directory forks, use SDK's built-in fork mechanism
+      sdkOptions.resume = parentId;
+      sdkOptions.forkSession = true;
+    }
+
+    // Trigger fork via empty prompt query (fire-and-forget style)
     try {
-
-      var sdkOptions: Partial<Options>;
-
-      if (isCrossDirectory) {
-        sdkOptions = {
-          abortController,
-          tools: { type: 'preset', preset: 'claude_code' },
-          systemPrompt: { type: 'preset', preset: 'claude_code' },
-          extraArgs: { session_id: parentId }
-        };
-
-      } else {
-        sdkOptions = {
-          abortController,
-          resume: parentId,
-          forkSession: true,
-          tools: { type: 'preset', preset: 'claude_code' },
-          systemPrompt: { type: 'preset', preset: 'claude_code' },
-        };
-      }
-
-      // Use empty prompt to trigger the fork
-      const queryResult = query({ prompt: '', options: sdkOptions });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // for await (const message of queryResult) {
-      //   // Extract session_id from any message
-      //   if ('session_id' in message && message.session_id) {
-      //     parentId != message.session_id;
-      //     throw new Error('Forked session created with different ID than parent');
-      //   }
-      // }
+      await this.executeQuery('', sdkOptions);
     } catch (error) {
       console.error('[ClaudeCodeAgent] Failed to create new session', { error });
     }
@@ -705,7 +654,7 @@ export class ClaudeCodeAgent
           options?.filterOptions // Pass filter options for partial context fork
         );
 
-        if (!forkResult.success) {
+        if (forkResult.success === false) {
           console.error('[ClaudeCodeAgent] Fork adapter failed to fork session', { error: forkResult.error });
           throw forkResult.error;
         }
@@ -777,7 +726,10 @@ export class ClaudeCodeAgent
   async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
     const encodedPath = this.encodeWorkspacePath(workspacePath);
     const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
-    return fs.existsSync(sessionFilePath);
+    const res = fs.existsSync(sessionFilePath);
+
+    console.log('[ClaudeCodeAgent] Checking session active', { sessionId, workspacePath, sessionFilePath, res });
+    return res
   }
 
   async getSessionModificationTimes(

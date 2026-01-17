@@ -73,9 +73,9 @@ export function agentError(code: AgentErrorCode, message: string, cause?: unknow
  */
 export interface GenerateRequest {
   prompt: string;
-  workingDirectory?: string;
+  workingDirectory: string;
+  sessionId: string;
   systemPrompt?: string;
-  sessionId?: string;
   agentId?: string;
 }
 
@@ -84,7 +84,7 @@ export interface GenerateRequest {
  */
 export interface GenerateResponse {
   content: string;
-  sessionId?: string;
+  sessionId: string;
   tokenUsage?: {
     inputTokens: number;
     outputTokens: number;
@@ -411,6 +411,13 @@ export interface ICodingAgentAdapter {
    * @returns Shell command string including newline
    */
   buildResumeSessionCommand?(workspacePath: string, sessionId: string): string;
+
+  /**
+   * Get the command to gracefully exit the CLI REPL.
+   * This is vendor-specific (e.g., "/exit" for Claude Code, "exit" for others).
+   * @returns Exit command string including newline
+   */
+  getExitCommand(): string;
 
   // ============================================
   // Events

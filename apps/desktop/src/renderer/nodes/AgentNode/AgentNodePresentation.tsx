@@ -20,8 +20,9 @@ import {
 import type { AgentNodeData, AgentNodeView } from '../../types/agent-node';
 import {
   useAgentService,
-  useNodeInitialized,
+  useTerminalService,
 } from '../../context';
+import { useAgentViewMode, usePreloadedChatMessages } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import type { CodingAgentStatus } from '../../../../types/coding-agent-status';
@@ -56,12 +57,32 @@ export function AgentNodePresentation({
   nodeId,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
-  const isInitialized = useNodeInitialized();
+  const terminalService = useTerminalService();
   const isSessionReady = sessionReadiness === 'ready';
 
-  const [activeView, setActiveView] = useState<AgentNodeView>(
-    data.activeView || 'overview'
-  );
+  // Preload chat messages in background so they're ready when switching to chat view
+  const {
+    messages: preloadedMessages,
+    isLoaded: messagesLoaded,
+    setMessages: setPreloadedMessages,
+    reload: reloadMessages,
+  } = usePreloadedChatMessages({
+    sessionId: data.sessionId,
+    workspacePath: data.workspacePath,
+    agentService: agent,
+    enabled: !!data.sessionId && !!data.workspacePath,
+  });
+
+  // Use centralized view mode management with terminal lifecycle coordination
+  // This ensures REPL is exited and terminal PTY is destroyed when switching to chat view
+  // to avoid Claude Code session conflicts (same session can't be used simultaneously)
+  const { activeView, setActiveView } = useAgentViewMode({
+    terminalService,
+    agentService: agent,
+    initialView: data.activeView || 'overview',
+    onViewChange: (view) => onDataChange({ activeView: view }),
+  });
+
   const [isDragOver, setIsDragOver] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -71,24 +92,15 @@ export function AgentNodePresentation({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCheckingRef = useRef(false);
 
-  // Auto-start CLI when initialized (if enabled and has initial prompt)
-  // If no initial prompt, agent remains idle
+  // Stop agent when node unmounts
+  // Agent start is handled by AgentTerminalView when it mounts
   useEffect(() => {
-    if (isInitialized && agent.isAutoStartEnabled() && isSessionReady && data.workspacePath && data.sessionId) {
-      agent.start(data.workspacePath, data.sessionId, data.initialPrompt).catch((err) => {
-        console.error('[AgentNode] Failed to auto-start agent:', err);
-      });
-    }
-
-    console.log('[AgentNodePresentation] isInitialized:', isInitialized, 'isSessionReady:', isSessionReady, data);
-
     return () => {
-      // Stop agent on unmount
       agent.stop().catch((err) => {
         console.error('[AgentNode] Failed to stop agent:', err);
       });
     };
-  }, [isInitialized, agent, isSessionReady, data.sessionId, data.initialPrompt, data.workspacePath]);
+  }, [agent]);
 
   // Subscribe to status changes
   useEffect(() => {
@@ -103,13 +115,14 @@ export function AgentNodePresentation({
     return unsubscribe;
   }, [agent, onDataChange]);
 
-  // Handle view change
+  // Handle view change - delegates to useAgentViewMode hook which manages
+  // terminal lifecycle and persists view state via onViewChange callback
   const handleViewChange = useCallback(
     (view: AgentNodeView) => {
-      setActiveView(view);
-      onDataChange({ activeView: view });
+      // setActiveView is async and handles terminal destroy when switching to chat
+      void setActiveView(view);
     },
-    [onDataChange]
+    [setActiveView]
   );
 
   // Handle title change
@@ -586,10 +599,10 @@ export function AgentNodePresentation({
           />
         ))}
 
-      {/* Content Area - Both views are always mounted, visibility controlled via CSS */}
-      {/* This preserves terminal session state when switching between tabs */}
+      {/* Content Area - Conditional rendering to avoid Claude Code session conflicts */}
+      {/* Terminal and Chat cannot be mounted simultaneously as they both use the same session */}
       <div className="agent-node-content">
-        <div style={{ display: activeView === 'overview' ? 'contents' : 'none' }}>
+        {activeView === 'overview' && (
           <AgentOverviewView
             agentId={data.agentId}
             title={data.title}
@@ -602,24 +615,31 @@ export function AgentNodePresentation({
             onTitleChange={handleTitleChange}
             hideStatusIndicator={true}
           />
-        </div>
-        <div style={{ display: activeView === 'terminal' ? 'contents' : 'none' }}>
-          <AgentTerminalView terminalId={data.terminalId} selected={selected} />
-        </div>
-        <div style={{ display: activeView === 'chat' ? 'contents' : 'none' }}>
-          {data.sessionId && data.workspacePath && (
-            <AgentChatView
-              nodeId={nodeId || ''}
-              sessionId={data.sessionId}
-              workspacePath={data.workspacePath}
-              agentType={data.agentType}
-              initialPrompt={data.initialPrompt}
-              onSessionCreated={(newSessionId) => onDataChange({ sessionId: newSessionId })}
-              isSessionReady={isSessionReady}
-              selected={selected}
-            />
-          )}
-        </div>
+        )}
+        {activeView === 'terminal' && data.sessionId && data.workspacePath && (
+          <AgentTerminalView
+            workspacePath={data.workspacePath}
+            sessionId={data.sessionId}
+            initialPrompt={data.initialPrompt}
+            selected={selected}
+          />
+        )}
+        {activeView === 'chat' && data.sessionId && data.workspacePath && (
+          <AgentChatView
+            nodeId={nodeId || ''}
+            sessionId={data.sessionId}
+            workspacePath={data.workspacePath}
+            agentType={data.agentType}
+            initialPrompt={data.initialPrompt}
+            onSessionCreated={(newSessionId) => onDataChange({ sessionId: newSessionId })}
+            isSessionReady={isSessionReady}
+            selected={selected}
+            preloadedMessages={preloadedMessages}
+            messagesLoaded={messagesLoaded}
+            onMessagesChange={setPreloadedMessages}
+            onReloadMessages={reloadMessages}
+          />
+        )}
       </div>
 
       {/* Bottom buttons - fork */}
