@@ -3,7 +3,7 @@
  *
  * Simple modal that appears when user drags to fork an AgentNode.
  * Collects fork title which is used to name the git branch.
- * Includes optional context preview to let users select cutoff point.
+ * Includes branch selection (defaults to parent's branch) and optional context preview.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -13,7 +13,7 @@ import './ForkSessionModal.css';
 
 interface ForkSessionModalProps {
   /** Called when user confirms the fork */
-  onConfirm: (title: string) => void;
+  onConfirm: (title: string, baseBranch?: string) => void;
   /** Called when user cancels */
   onCancel: () => void;
   /** Whether the fork operation is in progress */
@@ -32,6 +32,16 @@ interface ForkSessionModalProps {
   originalTargetMessageId?: string | null;
   /** Callback when cutoff changes */
   onCutoffChange?: (messageId: string) => void;
+  /** Available branches for selection */
+  branches?: string[];
+  /** Whether branches are loading */
+  isLoadingBranches?: boolean;
+  /** Currently selected base branch (defaults to parent's branch) */
+  selectedBranch?: string | null;
+  /** Parent's current branch (used as default) */
+  parentBranch?: string | null;
+  /** Callback when branch selection changes */
+  onBranchChange?: (branch: string) => void;
 }
 
 function ForkSessionModal({

@@ -73,9 +73,9 @@ export function agentError(code: AgentErrorCode, message: string, cause?: unknow
  */
 export interface GenerateRequest {
   prompt: string;
-  workingDirectory?: string;
+  workingDirectory: string;
+  sessionId: string;
   systemPrompt?: string;
-  sessionId?: string;
   agentId?: string;
 }
 
@@ -84,7 +84,7 @@ export interface GenerateRequest {
  */
 export interface GenerateResponse {
   content: string;
-  sessionId?: string;
+  sessionId: string;
   tokenUsage?: {
     inputTokens: number;
     outputTokens: number;

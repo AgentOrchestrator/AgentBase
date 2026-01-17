@@ -1,15 +1,15 @@
 /**
  * Claude Code Adapter
  *
- * Renderer-side adapter for Claude Code that proxies calls to the main process
+ * Stateless renderer-side adapter for Claude Code that proxies calls to the main process
  * via window.codingAgentAPI. Implements ICodingAgentAdapter interface with
  * Result-based error handling.
  *
  * This adapter:
  * - Wraps IPC calls to maintain consistent Result types
  * - Delegates event subscription to SharedEventDispatcher (no per-adapter IPC listeners)
- * - Provides helper methods for configuration
  * - Does NOT unwrap results - that's the service layer's responsibility
+ * - Is stateless - all parameters must be provided per-request
  */
 
 import type {
@@ -37,7 +37,6 @@ import {
   agentError,
 } from '../../context/node-services/coding-agent-adapter';
 import type { AgentType } from '../../../../types/coding-agent-status';
-import type { AdapterConfig } from './types';
 import { sharedEventDispatcher } from '../SharedEventDispatcher';
 
 /**
@@ -48,44 +47,6 @@ import { sharedEventDispatcher } from '../SharedEventDispatcher';
  */
 export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   public readonly agentType: AgentType = 'claude_code';
-
-  private _config: AdapterConfig;
-
-  constructor(config: AdapterConfig = {}) {
-    this._config = { ...config };
-  }
-
-  // ============================================
-  // Configuration Helpers
-  // ============================================
-
-  /**
-   * Create a new adapter instance with updated config
-   */
-  withConfig(config: Partial<AdapterConfig>): ClaudeCodeAdapter {
-    return new ClaudeCodeAdapter({
-      ...this._config,
-      ...config,
-    });
-  }
-
-  /**
-   * Create a new adapter instance configured for continuing a session
-   */
-  withContinueConfig(options: ContinueOptions): ClaudeCodeAdapter {
-    return new ClaudeCodeAdapter({
-      ...this._config,
-      workingDirectory: options.workingDirectory ?? this._config.workingDirectory,
-      agentId: options.agentId ?? this._config.agentId,
-    });
-  }
-
-  /**
-   * Get current configuration
-   */
-  getConfig(): Readonly<AdapterConfig> {
-    return { ...this._config };
-  }
 
   // ============================================
   // Private Helpers
@@ -130,7 +91,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
       return false;
     }
     try {
-      return await this.api.isAgentAvailable('claude_code');
+      return await this.api.isAgentAvailable(this.agentType);
     } catch {
       return false;
     }
@@ -156,14 +117,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      // Merge config into request
-      const mergedRequest: GenerateRequest = {
-        ...request,
-        workingDirectory: request.workingDirectory ?? this._config.workingDirectory,
-        agentId: request.agentId ?? this._config.agentId,
-      };
-
-      const response = await this.api!.generate('claude_code', mergedRequest);
+      const response = await this.api!.generate(this.agentType, request);
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));
@@ -180,14 +134,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      // Merge config into request
-      const mergedRequest: GenerateRequest = {
-        ...request,
-        workingDirectory: request.workingDirectory ?? this._config.workingDirectory,
-        agentId: request.agentId ?? this._config.agentId,
-      };
-
-      const response = await this.api!.generateStreaming('claude_code', mergedRequest, onChunk);
+      const response = await this.api!.generateStreaming(this.agentType, request, onChunk);
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));
@@ -209,17 +156,11 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      // Merge config with options
-      const mergedOptions: ContinueOptions = {
-        workingDirectory: options?.workingDirectory ?? this._config.workingDirectory,
-        agentId: options?.agentId ?? this._config.agentId,
-      };
-
       const response = await this.api!.continueSession(
-        'claude_code',
+        this.agentType,
         identifier,
         prompt,
-        mergedOptions
+        options
       );
       return ok(response);
     } catch (error) {
@@ -239,18 +180,12 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      // Merge config with options
-      const mergedOptions: ContinueOptions = {
-        workingDirectory: options?.workingDirectory ?? this._config.workingDirectory,
-        agentId: options?.agentId ?? this._config.agentId,
-      };
-
       const response = await this.api!.continueSessionStreaming(
-        'claude_code',
+        this.agentType,
         identifier,
         prompt,
         onChunk,
-        mergedOptions
+        options
       );
       return ok(response);
     } catch (error) {
@@ -274,7 +209,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     try {
       // Note: The IPC API uses slightly different types, cast as needed
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const session = await this.api!.getSession('claude_code', sessionId, filter as any);
+      const session = await this.api!.getSession(this.agentType, sessionId, filter as any);
       return ok(session as CodingAgentSessionContent | null);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.SESSION_NOT_FOUND));
@@ -287,7 +222,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      return await this.api.checkSessionActive('claude_code', sessionId, workspacePath);
+      return await this.api.checkSessionActive(this.agentType, sessionId, workspacePath);
     } catch {
       return false;
     }
@@ -306,15 +241,9 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
       return err(apiError);
     }
 
-    // Merge config with options
-    const mergedOptions: ForkOptions = {
-      ...options,
-      workingDirectory: options?.workingDirectory ?? this._config.workingDirectory,
-    };
-
     // The API now returns Result<SessionInfo, AgentError> directly
     // We need to map the main-side error to renderer-side AgentError
-    const result = await this.api!.forkSession('claude_code', parentId, mergedOptions);
+    const result = await this.api!.forkSession(this.agentType, parentId, options);
 
     if (!result.success) {
       // Convert main-side error to renderer-side AgentError
@@ -337,7 +266,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const summaries = await this.api!.listSessionSummaries('claude_code', filter);
+      const summaries = await this.api!.listSessionSummaries(this.agentType, filter);
       return ok(summaries);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.UNKNOWN_ERROR));
@@ -353,14 +282,14 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
-      const session = await this.api!.getLatestSession('claude_code', workspacePath);
+      const session = await this.api!.getLatestSession(this.agentType, workspacePath);
       if (!session) {
         return ok(null);
       }
       // Convert the minimal response to SessionInfo
       const sessionInfo: SessionInfo = {
         id: session.id,
-        agentType: 'claude_code',
+        agentType: this.agentType,
         createdAt: session.updatedAt, // Use updatedAt as fallback
         updatedAt: session.updatedAt,
       };

@@ -1,13 +1,12 @@
 /**
  * Coding Agent Adapter Factory
  *
- * Factory function for creating coding agent adapters.
+ * Factory function for creating stateless coding agent adapters.
  * Currently only supports Claude Code, but designed for extensibility.
  */
 
 import type { ICodingAgentAdapter } from '../../context/node-services/coding-agent-adapter';
 import type { AgentType } from '../../../../types/coding-agent-status';
-import type { AdapterConfig } from './types';
 import { ClaudeCodeAdapter } from './ClaudeCodeAdapter';
 
 /**
@@ -32,28 +31,26 @@ function isCodingAgentAPIAvailable(): boolean {
 }
 
 /**
- * Create a coding agent adapter for the specified agent type.
+ * Create a stateless coding agent adapter for the specified agent type.
  *
  * @param agentType - The type of coding agent to create an adapter for
- * @param config - Optional configuration for the adapter
  * @returns An adapter instance implementing ICodingAgentAdapter
  * @throws AdapterFactoryError if the agent type is not supported or API is unavailable
  *
  * @example
  * ```typescript
- * const adapter = createCodingAgentAdapter('claude_code', {
- *   workingDirectory: '/path/to/project',
- *   agentId: 'agent-123'
- * });
+ * const adapter = createCodingAgentAdapter('claude_code');
  *
  * await adapter.initialize();
- * const result = await adapter.generate({ prompt: 'Hello' });
+ * const result = await adapter.generate({
+ *   prompt: 'Hello',
+ *   workingDirectory: '/path/to/project',
+ *   sessionId: 'session-123',
+ *   agentId: 'agent-123'
+ * });
  * ```
  */
-export function createCodingAgentAdapter(
-  agentType: AgentType,
-  config: AdapterConfig = {}
-): ICodingAgentAdapter {
+export function createCodingAgentAdapter(agentType: AgentType): ICodingAgentAdapter {
   // Guard: Check API availability
   if (!isCodingAgentAPIAvailable()) {
     throw new AdapterFactoryError(
@@ -65,7 +62,7 @@ export function createCodingAgentAdapter(
   // Factory logic for different agent types
   switch (agentType) {
     case 'claude_code':
-      return new ClaudeCodeAdapter(config);
+      return new ClaudeCodeAdapter();
 
     default:
       throw new AdapterFactoryError(

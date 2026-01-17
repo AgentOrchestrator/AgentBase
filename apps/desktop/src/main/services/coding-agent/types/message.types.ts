@@ -51,7 +51,7 @@ export interface GenerateResponse {
   /** The generated content */
   content: string;
   /** Session ID (for stateful agents) */
-  sessionId?: string;
+  sessionId: string;
   /** Unique message ID */
   messageId: string;
   /** When the response was generated */

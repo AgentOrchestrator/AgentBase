@@ -33,13 +33,11 @@ export function createServiceFactories(): ServiceFactories {
       agentType: AgentType,
       terminalService: ITerminalService
     ) => {
-      // Create adapter internally based on agent type
+      // Create stateless adapter based on agent type
       // The adapter factory may return null for unsupported types or if API is unavailable
       let adapter = null;
       try {
-        adapter = createCodingAgentAdapter(agentType, {
-          agentId,
-        });
+        adapter = createCodingAgentAdapter(agentType);
       } catch (error) {
         // Adapter creation failed (unsupported type or API unavailable)
         // AgentServiceImpl handles null adapter gracefully

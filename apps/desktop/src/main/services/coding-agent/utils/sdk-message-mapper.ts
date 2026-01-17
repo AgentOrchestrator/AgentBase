@@ -49,6 +49,11 @@ export function mapSdkMessagesToResponse(
     ? (result.usage.input_tokens ?? 0) + (result.usage.output_tokens ?? 0)
     : undefined;
 
+  if (!result) {
+    console.warn('[SDKMessageMapper] No result message found in SDK messages');
+    throw new Error('No result message found');
+  }
+
   return {
     content: content.trim(),
     sessionId: result?.session_id,
