@@ -20,6 +20,8 @@ interface AgentOverviewViewProps {
   sessionId?: string;
   onTitleChange?: (newTitle: string) => void;
   hideStatusIndicator?: boolean;
+  /** Most recent user message from the session */
+  mostRecentUserMessage?: string | null;
 }
 
 // Editor display names - commented out, will be used when editor menu feature is re-enabled
@@ -136,7 +138,7 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
  */
 export default function AgentOverviewView({
   title,
-  summary: _summary,
+  summary,
   status,
   statusInfo,
   progress,
@@ -144,6 +146,7 @@ export default function AgentOverviewView({
   sessionId: _sessionId,
   onTitleChange,
   hideStatusIndicator = false,
+  mostRecentUserMessage,
 }: AgentOverviewViewProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title.value);
@@ -247,12 +250,20 @@ export default function AgentOverviewView({
       {/* Status Indicator - Hidden if moved to node header */}
       {!hideStatusIndicator && <StatusIndicator status={status} statusInfo={statusInfo} />}
 
-      {/* Summary - Hidden */}
-      {/* {summary && (
+      {/* Summary */}
+      {summary && (
         <div className="overview-summary">
-          <p>{summary}</p>
+          <p className="overview-summary-text">{summary}</p>
         </div>
-      )} */}
+      )}
+
+      {/* Most Recent User Message */}
+      {mostRecentUserMessage && (
+        <div className="overview-recent-message">
+          <span className="overview-recent-message-label">Latest:</span>
+          <p className="overview-recent-message-text">{mostRecentUserMessage}</p>
+        </div>
+      )}
 
       {/* Progress */}
       {progress && (

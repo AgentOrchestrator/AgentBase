@@ -93,3 +93,13 @@ export type {
   UseChatMessagesOptions,
   UseChatMessagesReturn,
 } from './useChatMessages';
+
+// =============================================================================
+// Session Overview Hook - Unified session data management
+// =============================================================================
+export { useSessionOverview } from './useSessionOverview';
+export type {
+  UseSessionOverviewOptions,
+  SessionOverviewState,
+  UseSessionOverviewReturn,
+} from './useSessionOverview';

@@ -120,16 +120,44 @@
 
 /* Summary */
 .overview-summary {
+  padding: 8px 0;
+}
+
+.overview-summary-text {
+  margin: 0;
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Most Recent User Message */
+.overview-recent-message {
+  padding: 12px;
+  background: rgba(136, 136, 136, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #888;
+}
+
+.overview-recent-message-label {
+  display: block;
+  color: #666;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.overview-recent-message-text {
+  margin: 0;
   color: #b0b0b0;
   font-size: 13px;
   line-height: 1.5;
-  padding: 12px;
-  background: #1e1e1e;
-  border-radius: 8px;
-}
-
-.overview-summary p {
-  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 /* Progress Section */

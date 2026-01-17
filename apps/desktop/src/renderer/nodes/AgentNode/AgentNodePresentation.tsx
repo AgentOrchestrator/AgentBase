@@ -22,7 +22,7 @@ import {
   useAgentService,
   useTerminalService,
 } from '../../context';
-import { useAgentViewMode, useAutoTitleFromSession } from '../../hooks';
+import { useAgentViewMode, useSessionOverview } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import type { CodingAgentStatus } from '../../../../types/coding-agent-status';
@@ -92,18 +92,53 @@ export function AgentNodePresentation({
     };
   }, [agent]);
 
-  // Subscribe to status changes
-  useEffect(() => {
-    const unsubscribe = agent.onStatusChange((_agentId, _oldStatus, newStatus) => {
-      // Update node data with new status
-      onDataChange({
-        status: newStatus.status,
-        statusInfo: newStatus,
-      });
-    });
+  // Unified session overview - manages title, status, summary, and most recent message
+  const sessionOverview = useSessionOverview({
+    sessionId: data.sessionId,
+    workspacePath: data.workspacePath,
+    agentService: agent,
+    agentType: data.agentType,
+    enabled: !!data.sessionId && !!data.workspacePath,
+  });
 
-    return unsubscribe;
-  }, [agent, onDataChange]);
+  // Refs to track previous values and prevent infinite re-renders
+  const prevStatusRef = useRef<string | null>(null);
+  const prevTitleRef = useRef<string | null>(null);
+  const prevSummaryRef = useRef<string | null>(null);
+
+  // Sync status changes from overview to node data
+  useEffect(() => {
+    const currentStatus = sessionOverview.status?.status ?? null;
+    if (currentStatus && currentStatus !== prevStatusRef.current) {
+      prevStatusRef.current = currentStatus;
+      onDataChange({
+        status: sessionOverview.status!.status,
+        statusInfo: sessionOverview.status!,
+      });
+    }
+  }, [sessionOverview.status, onDataChange]);
+
+  // Sync title changes from overview to node data (only if not manually set)
+  useEffect(() => {
+    if (
+      sessionOverview.title &&
+      !data.title.isManuallySet &&
+      sessionOverview.title !== prevTitleRef.current
+    ) {
+      prevTitleRef.current = sessionOverview.title;
+      onDataChange({
+        title: { value: sessionOverview.title, isManuallySet: false },
+      });
+    }
+  }, [sessionOverview.title, data.title.isManuallySet, onDataChange]);
+
+  // Sync summary changes from overview to node data
+  useEffect(() => {
+    if (sessionOverview.summary && sessionOverview.summary !== prevSummaryRef.current) {
+      prevSummaryRef.current = sessionOverview.summary;
+      onDataChange({ summary: sessionOverview.summary });
+    }
+  }, [sessionOverview.summary, onDataChange]);
 
   // Handle view change - delegates to useAgentViewMode hook which manages
   // terminal lifecycle and persists view state via onViewChange callback
@@ -115,7 +150,7 @@ export function AgentNodePresentation({
     [setActiveView]
   );
 
-  // Handle title change
+  // Handle title change (manual edit from user)
   const handleTitleChange = useCallback(
     (newTitle: string) => {
       onDataChange({
@@ -124,15 +159,6 @@ export function AgentNodePresentation({
     },
     [onDataChange]
   );
-
-  // Auto-title updates from session file changes
-  useAutoTitleFromSession({
-    sessionId: data.sessionId,
-    workspacePath: data.workspacePath,
-    agentService: agent,
-    agentType: data.agentType,
-    onTitleChange: handleTitleChange,
-  });
 
   // Handle attachment details click
   const handleAttachmentClick = useCallback((attachment: TerminalAttachment) => {
@@ -619,6 +645,7 @@ export function AgentNodePresentation({
             sessionId={data.sessionId}
             onTitleChange={handleTitleChange}
             hideStatusIndicator={true}
+            mostRecentUserMessage={sessionOverview.mostRecentUserMessage}
           />
         )}
         {activeView === 'terminal' && data.sessionId && data.workspacePath && (
