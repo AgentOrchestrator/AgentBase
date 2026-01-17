@@ -43,6 +43,9 @@ import { NewAgentModal } from './components/NewAgentModal';
 import { ActionPill } from './components/ActionPill';
 import { useTheme } from './context';
 import { createLinearIssueAttachment } from './types/attachments';
+import { forkService } from './services';
+import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
+import type { AgentNodeData } from './types/agent-node';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -288,6 +291,17 @@ function CanvasFlow() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
   const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
+  
+  // Auto-fork setting (default: true, persisted in localStorage)
+  const [autoFork, setAutoFork] = useState<boolean>(() => {
+    const stored = localStorage.getItem('auto-fork');
+    return stored !== null ? stored === 'true' : true;
+  });
+  
+  // Persist auto-fork setting
+  useEffect(() => {
+    localStorage.setItem('auto-fork', String(autoFork));
+  }, [autoFork]);
   const [pendingAgentPosition, setPendingAgentPosition] = useState<{ x: number; y: number } | undefined>(undefined);
   const [pendingLinearIssue, setPendingLinearIssue] = useState<LinearIssue | undefined>(undefined);
   const [isLinearCollapsed, setIsLinearCollapsed] = useState(false);
@@ -358,7 +372,7 @@ function CanvasFlow() {
 
   // Chat message fork - listen for text selection fork events
   useEffect(() => {
-    const handleChatMessageFork = (event: Event) => {
+    const handleChatMessageFork = async (event: Event) => {
       const customEvent = event as CustomEvent<{ nodeId: string; selectedText: string; messageId?: string }>;
       const { nodeId, selectedText, messageId } = customEvent.detail;
 
@@ -366,6 +380,7 @@ function CanvasFlow() {
         nodeId,
         selectedText: selectedText.slice(0, 50) + (selectedText.length > 50 ? '...' : ''),
         messageId,
+        autoFork,
       });
 
       // Find the source node
@@ -375,6 +390,8 @@ function CanvasFlow() {
         return;
       }
 
+      const sourceData = sourceNode.data as unknown as { workspacePath?: string; gitInfo?: { branch?: string } };
+
       // Calculate position to the RIGHT of source node
       const nodeWidth = (sourceNode.width as number) || (sourceNode.style?.width as number) || 600;
       const horizontalSpacing = 100;
@@ -383,14 +400,136 @@ function CanvasFlow() {
         y: sourceNode.position.y,
       };
 
-      // Open the fork modal with messageId for context filtering
-      // Text selection fork does NOT create worktree (stays in same workspace)
-      forkModal.open(nodeId, forkPosition, messageId, false);
+      // If auto-fork is off, automatically create fork with random name (bypass modal)
+      if (!autoFork) {
+        // Generate random 5-digit fork name
+        const randomDigits = Math.floor(10000 + Math.random() * 90000); // 10000-99999
+        const forkName = `fork-${randomDigits}`;
+
+        const sourceNodeData = sourceNode.data as unknown as AgentNodeData;
+        const workspacePath = sourceNodeData.workspacePath;
+        
+        if (!workspacePath) {
+          console.error('[Canvas] Auto-fork failed: no workspace path');
+          return;
+        }
+
+        // Auto-detect session if not set
+        let sessionId = sourceNodeData.sessionId;
+        if (!sessionId && workspacePath) {
+          console.log('[Canvas] Auto-fork: Session not set, auto-detecting from workspace...');
+          const latestSession = await forkService.getLatestSessionForWorkspace(
+            sourceNodeData.agentType,
+            workspacePath
+          );
+          if (latestSession) {
+            sessionId = latestSession.id;
+            console.log('[Canvas] Auto-fork: Auto-detected session:', sessionId);
+          }
+        }
+
+        if (!sessionId) {
+          console.error('[Canvas] Auto-fork failed: no session ID');
+          return;
+        }
+
+        // Validate fork request
+        const validation = forkService.validateForkRequest(sessionId, workspacePath);
+        if (!validation.valid) {
+          console.error('[Canvas] Auto-fork validation failed:', validation.error);
+          return;
+        }
+
+        try {
+          // Build filterOptions using messageId if provided
+          const filterOptions = messageId ? { targetMessageId: messageId } : undefined;
+
+          // Call fork service directly (no worktree)
+          const result = await forkService.forkAgent({
+            sourceAgentId: sourceNodeData.agentId,
+            sessionId,
+            agentType: sourceNodeData.agentType,
+            forkTitle: forkName,
+            repoPath: workspacePath,
+            filterOptions,
+            createWorktree: false,
+          });
+
+          if (!result.success) {
+            console.error('[Canvas] Auto-fork failed:', result.error.message);
+            return;
+          }
+
+          // Generate new IDs for the forked node
+          const newNodeId = `node-${Date.now()}`;
+          const newAgentId = `agent-${crypto.randomUUID()}`;
+          const newTerminalId = `terminal-${crypto.randomUUID()}`;
+
+          // Create forked node data
+          const forkedData: AgentNodeData = {
+            agentId: newAgentId,
+            terminalId: newTerminalId,
+            agentType: sourceNodeData.agentType,
+            status: 'idle',
+            statusInfo: undefined,
+            title: createDefaultAgentTitle(forkName),
+            summary: null,
+            progress: null,
+            activeView: sourceNodeData.activeView,
+            sessionId: result.data.sessionInfo.id,
+            parentSessionId: sessionId,
+            workspacePath: workspacePath,
+            gitInfo: sourceNodeData.gitInfo,
+            attachments: sourceNodeData.attachments || [],
+            forking: false,
+          };
+
+          // Create the new forked node
+          const forkedNode: Node = {
+            id: newNodeId,
+            type: sourceNode.type,
+            position: forkPosition,
+            data: forkedData as unknown as Record<string, unknown>,
+            style: sourceNode.style,
+          };
+
+          // Create edge from source to forked node
+          const newEdgeId = `edge-${Date.now()}`;
+          const newEdge: Edge = {
+            id: newEdgeId,
+            source: nodeId,
+            target: newNodeId,
+            sourceHandle: 'fork-source',
+            targetHandle: 'fork-target',
+            type: 'default',
+            animated: false,
+            style: { 
+              stroke: '#4a5568', 
+              strokeWidth: 2,
+            },
+          };
+
+          // Add the new node and edge
+          setNodes((nds) => [...nds, forkedNode]);
+          setEdges((eds) => [...eds, newEdge]);
+
+          console.log('[Canvas] Auto-fork created successfully:', {
+            newNodeId,
+            sessionId: result.data.sessionInfo.id,
+          });
+        } catch (err) {
+          console.error('[Canvas] Auto-fork error:', err);
+        }
+      } else {
+        // Auto-fork is on: show modal as before
+        // Text selection fork does NOT create worktree (stays in same workspace)
+        forkModal.open(nodeId, forkPosition, messageId, false);
+      }
     };
 
     window.addEventListener('chat-message-fork', handleChatMessageFork);
     return () => window.removeEventListener('chat-message-fork', handleChatMessageFork);
-  }, [nodes, forkModal]);
+  }, [nodes, forkModal, autoFork, setNodes, setEdges]);
 
   // Check if there are any agents
   const hasAgents = useMemo(() => {
@@ -2312,8 +2451,12 @@ function CanvasFlow() {
                 </div>
 
                 <div className="settings-section">
-                  <h3>Appearance</h3>
-                  <div className="settings-item">
+                  <div className="integration-header">
+                    <div className="integration-info">
+                      <span className="integration-name">Appearance</span>
+                    </div>
+                  </div>
+                  <div className="settings-item" style={{ padding: '12px 0', borderBottom: 'none' }}>
                     <select
                       className="theme-select"
                       value={theme}
@@ -2368,6 +2511,28 @@ function CanvasFlow() {
                     >
                       Linear Settings → API
                     </a>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="integration-header">
+                    <div className="integration-info">
+                      <span className="integration-name">Text Level Fork</span>
+                    </div>
+                  </div>
+                  <div className="settings-item" style={{ padding: '12px 0', borderBottom: 'none' }}>
+                    <label className="settings-toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={autoFork}
+                        onChange={(e) => setAutoFork(e.target.checked)}
+                        className="settings-toggle"
+                      />
+                      <span className="settings-toggle-text">Text Level Fork</span>
+                    </label>
+                    <div className="settings-toggle-description" style={{ marginLeft: '0' }}>
+                      When enabled, highlighting text and clicking the plus button opens the fork dialog. When disabled, automatically creates a fork with a random name.
+                    </div>
                   </div>
                 </div>
               </div>
