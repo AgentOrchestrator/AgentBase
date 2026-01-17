@@ -64,7 +64,7 @@ export function conversationToNodesAndEdges(
         id: `edge-${previousGroup.uuid}-${group.uuid}`,
         source: previousGroup.uuid,
         target: group.uuid,
-        type: 'smooth',
+        type: 'default',
         animated: false,
         style: { stroke: borderColor, strokeWidth: 2 },
       });

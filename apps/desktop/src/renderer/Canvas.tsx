@@ -688,7 +688,8 @@ function CanvasFlow() {
         .getPropertyValue('--color-border')
         .trim() || '#232323'; // Fallback to dark theme default
 
-      // Create edge connecting the nodes
+      // Create edge connecting the nodes (agent to chat view)
+      // Use dashed style to differentiate from fork edges (agent to agent)
       // Don't specify handle IDs - let React Flow use default connection points
       // This avoids timing issues where edges are created before handles are registered
       // Explicitly omit handle properties to avoid any "null" string issues
@@ -696,9 +697,13 @@ function CanvasFlow() {
         id: `edge-${nodeId}-${chatNodeId}`,
         source: nodeId,
         target: chatNodeId,
-        type: 'smooth',
+        type: 'default',
         animated: false,
-        style: { stroke: borderColor, strokeWidth: 2 },
+        style: { 
+          stroke: borderColor, 
+          strokeWidth: 2,
+          strokeDasharray: '5, 5', // Dashed line pattern
+        },
         // Explicitly do NOT include sourceHandle or targetHandle
         // React Flow will use default connection points
       };
@@ -758,11 +763,30 @@ function CanvasFlow() {
     async (forkTitle: string) => {
       const result = await forkModal.confirm(forkTitle);
       if (result.success) {
+        // Add the forked node first
         setNodes((nds) => [...nds, result.forkedNode]);
-        setEdges((eds) => [...eds, result.newEdge]);
+        
+        // Defer edge addition until after the node is rendered and handles are measured
+        // This ensures React Flow can properly calculate edge positions
+        requestAnimationFrame(() => {
+          // Update node internals to ensure handles are measured
+          updateNodeInternals(result.forkedNode.id);
+          updateNodeInternals(result.newEdge.source);
+          
+          // Add edge after a short delay to ensure node internals are updated
+          requestAnimationFrame(() => {
+            setEdges((eds) => {
+              // Get current nodes to include the newly added forked node
+              const currentNodes = getNodes();
+              // Sanitize the new edge before adding it
+              const sanitizedEdges = sanitizeEdges([...eds, result.newEdge], currentNodes);
+              return sanitizedEdges;
+            });
+          });
+        });
       }
     },
-    [forkModal, setNodes, setEdges]
+    [forkModal, setNodes, setEdges, updateNodeInternals, getNodes]
   );
 
   // =============================================================================

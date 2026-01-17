@@ -457,6 +457,14 @@ export function AgentNodePresentation({
           handleClassName="agent-node-resize-handle"
         />
 
+        {/* Target handle for incoming fork edges */}
+        <Handle
+          type="target"
+          position={Position.Top}
+          id="fork-target"
+          className="agent-node-fork-target-handle"
+        />
+
       {/* Status Indicator - Top Left */}
       <div className="agent-node-status-indicator">
         <div
