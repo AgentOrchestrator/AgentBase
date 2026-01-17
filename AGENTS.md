@@ -24,15 +24,22 @@ supabase/
 
 ```bash
 npm install                 # Install all dependencies
-cp .env.example .env        # Copy and configure environment variables
+```
+
+**Choose your storage backend:**
+
+```bash
+# Option 1: Local SQLite (simple, no external services)
+cp .env.local.example .env
+
+# Option 2: Remote Supabase (team collaboration, cloud sync)
+cp .env.remote.example .env
 ```
 
 For git worktrees, copy `.env` from the main worktree instead:
 ```bash
 cp /path/to/main-worktree/.env .env
 ```
-
-See `.env.example` for Supabase configuration options (local vs remote).
 
 ## Commands
 
@@ -51,7 +58,7 @@ IDE files (~/.claude/, Cursor storage, etc.)
     ↓
 Daemon (reads, normalizes to ChatHistory, syncs every 10 min)
     ↓
-Supabase (with RLS)
+Storage (SQLite local OR Supabase remote)
     ↓
 Desktop App
 ```
