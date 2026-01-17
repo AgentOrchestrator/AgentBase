@@ -1409,8 +1409,21 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   }, []);
 
   const selectedGradient = useMemo(() => {
-    const firstLetter = githubUsername ? githubUsername.charAt(0) : null;
-    return getGradientForLetter(firstLetter);
+    if (!githubUsername) {
+      return getGradientForLetter(null);
+    }
+    
+    const firstChar = githubUsername.charAt(0);
+    // If it's a number (0-9), map to first 10 letter pairs (A-T)
+    if (/[0-9]/.test(firstChar)) {
+      const num = parseInt(firstChar, 10);
+      // Map: 0→A, 1→C, 2→E, 3→G, 4→I, 5→K, 6→M, 7→O, 8→Q, 9→S
+      const letterPairs = ['A', 'C', 'E', 'G', 'I', 'K', 'M', 'O', 'Q', 'S'];
+      return getGradientForLetter(letterPairs[num]);
+    }
+    
+    // Otherwise, use the first letter as-is
+    return getGradientForLetter(firstChar);
   }, [githubUsername, getGradientForLetter]);
 
   // Helper to determine if overlay color is light (for text color adjustment)
