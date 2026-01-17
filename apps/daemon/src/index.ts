@@ -3,17 +3,20 @@ import { readCursorHistories, convertCursorToStandardFormat, extractProjectsFrom
 import { readVSCodeHistories, convertVSCodeToStandardFormat, extractProjectsFromConversations as extractVSCodeProjects } from './vscode-reader.js';
 import { readFactoryHistories, extractProjectsFromFactoryHistories } from './factory-reader.js';
 import { readCodexHistories, extractProjectsFromCodexHistories } from './codex-reader.js';
-import { uploadAllHistoriesWithTokens, syncProjectsWithTokens } from './uploader.js';
-import { runPeriodicSummaryUpdate, runPeriodicKeywordUpdate, runPeriodicTitleUpdate } from './summarizer.js';
+import { uploadAllHistories, syncProjects } from './uploader.js';
+import { runSummaryUpdateWithContainer, runKeywordUpdateWithContainer, runTitleUpdateWithContainer } from './summarizer.js';
 import { AuthManager } from './auth-manager.js';
 import { mergeProjects } from './project-aggregator.js';
 import { getDatabase } from './database.js';
 import { createSupabaseAuthProvider, createSupabaseRepositoryFactory } from './infrastructure/supabase/index.js';
-import type { IRepositoryFactory } from './interfaces/repositories.js';
+import { createServiceContainer, getServiceContainer, type ServiceContainer } from './service-container.js';
 
 // Create infrastructure instances
 const authProvider = createSupabaseAuthProvider();
-const repositoryFactory: IRepositoryFactory = createSupabaseRepositoryFactory();
+const repositoryFactory = createSupabaseRepositoryFactory();
+
+// Create the global service container
+const serviceContainer: ServiceContainer = createServiceContainer(repositoryFactory);
 
 let authManager: AuthManager;
 
@@ -49,16 +52,26 @@ async function processHistories() {
       }
     }
 
-    const accountId = authManager.getUserId();
     const accessToken = authManager.getAccessToken();
     const refreshToken = authManager.getRefreshToken();
-    console.log(`✓ Authenticated as user: ${accountId}`);
 
     if (!accessToken || !refreshToken) {
       console.log('⚠️  No access token or refresh token available. Skipping upload.');
       db.completeSyncError('No access token or refresh token');
       return;
     }
+
+    // Initialize or reinitialize the service container with current tokens
+    if (!serviceContainer.isInitialized()) {
+      await serviceContainer.initialize(accessToken, refreshToken);
+    } else {
+      // Reinitialize to ensure we have fresh repositories with current tokens
+      await serviceContainer.reinitialize(accessToken, refreshToken);
+    }
+
+    const userId = serviceContainer.getUserId();
+    const { projects: projectRepo, chatHistories: chatHistoryRepo } = serviceContainer.getRepositories();
+    console.log(`✓ Authenticated as user: ${userId}`);
 
     // Get session lookback period from environment (default: 7 days)
     const lookbackDays = parseInt(process.env.SESSION_LOOKBACK_DAYS || '7', 10);
@@ -79,7 +92,7 @@ async function processHistories() {
     console.log(`Found ${claudeHistories.length} Claude Code chat histories.`);
 
     // Read Cursor histories (with timestamp filtering and authenticated session for heuristic timestamps)
-    const cursorConversations = await readCursorHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined, repositoryFactory);
+    const cursorConversations = await readCursorHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined, serviceContainer);
     const cursorHistories = convertCursorToStandardFormat(cursorConversations);
     console.log(`Found ${cursorHistories.length} Cursor chat histories.`);
 
@@ -111,7 +124,7 @@ async function processHistories() {
     const allProjects = mergeProjects(cursorProjects, claudeCodeProjects, vscodeProjects, factoryProjects, codexProjects);
 
     if (allProjects.length > 0) {
-      await syncProjectsWithTokens(allProjects, accountId, accessToken, refreshToken, repositoryFactory);
+      await syncProjects(allProjects, userId, projectRepo);
     }
 
     // Combine all histories
@@ -124,7 +137,7 @@ async function processHistories() {
     }
 
     console.log(`Total: ${allHistories.length} chat histories to sync.`);
-    const uploadResult = await uploadAllHistoriesWithTokens(allHistories, accountId, accessToken, refreshToken, repositoryFactory, failedSyncs);
+    const uploadResult = await uploadAllHistories(allHistories, userId, projectRepo, chatHistoryRepo, failedSyncs);
     console.log('Upload complete.');
 
     // Mark sync as completed successfully
@@ -189,17 +202,20 @@ async function main() {
       return;
     }
 
-    const accessToken = authManager.getAccessToken();
-    const refreshToken = authManager.getRefreshToken();
-
-    if (!accessToken || !refreshToken) {
-      console.log('[AI Updaters] No tokens available, skipping update');
-      return;
+    // Ensure service container is initialized
+    if (!serviceContainer.isInitialized()) {
+      const accessToken = authManager.getAccessToken();
+      const refreshToken = authManager.getRefreshToken();
+      if (!accessToken || !refreshToken) {
+        console.log('[AI Updaters] No tokens available, skipping update');
+        return;
+      }
+      await serviceContainer.initialize(accessToken, refreshToken);
     }
 
-    await runPeriodicSummaryUpdate(accessToken, refreshToken, repositoryFactory);
-    await runPeriodicKeywordUpdate(accessToken, refreshToken, repositoryFactory);
-    await runPeriodicTitleUpdate(accessToken, refreshToken, repositoryFactory);
+    await runSummaryUpdateWithContainer(serviceContainer);
+    await runKeywordUpdateWithContainer(serviceContainer);
+    await runTitleUpdateWithContainer(serviceContainer);
   };
 
   // Run immediately on startup

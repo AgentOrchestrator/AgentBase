@@ -7,6 +7,7 @@ import type {
   IRepositoryFactory,
   ChatHistoryRecord,
 } from './interfaces/repositories.js';
+import type { ServiceContainer } from './service-container.js';
 
 // Check if we're in development mode
 const isDevelopment = process.env.DEVELOPMENT === 'true';
@@ -843,6 +844,119 @@ export async function runPeriodicTitleUpdate(
 
     const ctx: SummarizerContext = { userId, chatHistories, userPreferences, apiKeys };
 
+    const sessions = await getSessionsNeedingTitleUpdate(ctx);
+
+    if (sessions.length === 0) {
+      console.log('[Title Updater] No sessions need updating');
+      return;
+    }
+
+    console.log(`[Title Updater] Found ${sessions.length} sessions needing title updates`);
+
+    const sessionIds = sessions.map((s) => s.id);
+    const result = await batchUpdateSessionTitles(ctx, sessionIds);
+
+    console.log('[Title Updater] Update complete:', {
+      total: sessionIds.length,
+      updated: result.updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('[Title Updater] Error during periodic update:', error);
+  }
+}
+
+// ============================================================================
+// ServiceContainer-based entry points (recommended for new code)
+// ============================================================================
+
+/**
+ * Helper to create SummarizerContext from ServiceContainer
+ */
+function createContextFromContainer(container: ServiceContainer): SummarizerContext {
+  const { chatHistories, userPreferences, apiKeys } = container.getRepositories();
+  return {
+    userId: container.getUserId(),
+    chatHistories,
+    userPreferences,
+    apiKeys,
+  };
+}
+
+/**
+ * Run summary update using ServiceContainer
+ */
+export async function runSummaryUpdateWithContainer(
+  container: ServiceContainer
+): Promise<void> {
+  console.log('[Summary Updater] Starting periodic summary update...');
+
+  try {
+    const ctx = createContextFromContainer(container);
+    const sessions = await getSessionsNeedingSummaryUpdate(ctx);
+
+    if (sessions.length === 0) {
+      console.log('[Summary Updater] No sessions need updating');
+      return;
+    }
+
+    console.log(`[Summary Updater] Found ${sessions.length} sessions needing summary updates`);
+
+    const sessionIds = sessions.map((s) => s.id);
+    const result = await batchUpdateSessionSummaries(ctx, sessionIds);
+
+    console.log('[Summary Updater] Update complete:', {
+      total: sessionIds.length,
+      updated: result.updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('[Summary Updater] Error during periodic update:', error);
+  }
+}
+
+/**
+ * Run keyword update using ServiceContainer
+ */
+export async function runKeywordUpdateWithContainer(
+  container: ServiceContainer
+): Promise<void> {
+  console.log('[Keyword Updater] Starting periodic keyword update...');
+
+  try {
+    const ctx = createContextFromContainer(container);
+    const sessions = await getSessionsNeedingKeywordUpdate(ctx);
+
+    if (sessions.length === 0) {
+      console.log('[Keyword Updater] No sessions need updating');
+      return;
+    }
+
+    console.log(`[Keyword Updater] Found ${sessions.length} sessions needing keyword updates`);
+
+    const sessionIds = sessions.map((s) => s.id);
+    const result = await batchUpdateSessionKeywords(ctx, sessionIds);
+
+    console.log('[Keyword Updater] Update complete:', {
+      total: sessionIds.length,
+      updated: result.updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('[Keyword Updater] Error during periodic update:', error);
+  }
+}
+
+/**
+ * Run title update using ServiceContainer
+ */
+export async function runTitleUpdateWithContainer(
+  container: ServiceContainer
+): Promise<void> {
+  console.log('[Title Updater] Starting periodic title update...');
+
+  try {
+    const ctx = createContextFromContainer(container);
     const sessions = await getSessionsNeedingTitleUpdate(ctx);
 
     if (sessions.length === 0) {

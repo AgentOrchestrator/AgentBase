@@ -16,6 +16,7 @@ import {
   getHomeDir,
 } from '@agent-orchestrator/shared';
 import type { IChatHistoryRepository, IRepositoryFactory } from './interfaces/repositories.js';
+import type { ServiceContainer } from './service-container.js';
 
 // Re-export types for backward compatibility
 export type { ChatHistory, SessionMetadata } from '@agent-orchestrator/shared';
@@ -105,10 +106,10 @@ let chatHistoryRepo: IChatHistoryRepository | null = null;
 let authenticatedUserId: string | null = null;
 
 /**
- * Initialize repositories for database lookups
- * Must be called before fetching sessions from database
+ * Initialize repositories for database lookups using a factory
+ * @deprecated Use initializeFromContainer instead
  */
-async function initializeRepositories(
+async function initializeRepositoriesFromFactory(
   accessToken: string,
   refreshToken: string,
   repositoryFactory: IRepositoryFactory
@@ -119,6 +120,20 @@ async function initializeRepositories(
     authenticatedUserId = repos.userId;
   } catch (error) {
     console.warn('[Cursor Reader] Could not initialize repositories:', error);
+    chatHistoryRepo = null;
+    authenticatedUserId = null;
+  }
+}
+
+/**
+ * Initialize repositories from a ServiceContainer
+ */
+function initializeFromContainer(container: ServiceContainer): void {
+  try {
+    chatHistoryRepo = container.getRepository('chatHistories');
+    authenticatedUserId = container.getUserId();
+  } catch (error) {
+    console.warn('[Cursor Reader] Could not initialize from container:', error);
     chatHistoryRepo = null;
     authenticatedUserId = null;
   }
@@ -779,23 +794,38 @@ function buildWorkspaceMap(): Map<string, WorkspaceInfo> {
  * @param accessToken - Optional access token for authenticated database lookups (enables heuristic timestamps)
  * @param refreshToken - Optional refresh token for authenticated database lookups
  * @param sinceTimestamp - Optional timestamp to filter sessions updated after this time (for incremental sync)
- * @param repositoryFactory - Optional repository factory for database lookups (enables heuristic timestamps)
+ * @param containerOrFactory - Optional ServiceContainer or repository factory for database lookups (enables heuristic timestamps)
  */
 export async function readCursorHistories(
   lookbackDays?: number,
   accessToken?: string,
   refreshToken?: string,
   sinceTimestamp?: number,
-  repositoryFactory?: IRepositoryFactory
+  containerOrFactory?: ServiceContainer | IRepositoryFactory
 ): Promise<CursorConversation[]> {
   const conversations: CursorConversation[] = [];
 
-  // Initialize repositories if tokens and factory provided
-  if (accessToken && refreshToken && repositoryFactory) {
-    await initializeRepositories(accessToken, refreshToken, repositoryFactory);
-    console.log('[Cursor Reader] Repositories initialized for heuristic timestamps');
+  // Initialize repositories based on what was provided
+  if (containerOrFactory) {
+    // Check if it's a ServiceContainer (has isInitialized method)
+    if ('isInitialized' in containerOrFactory && typeof containerOrFactory.isInitialized === 'function') {
+      // It's a ServiceContainer
+      const container = containerOrFactory as ServiceContainer;
+      if (container.isInitialized()) {
+        initializeFromContainer(container);
+        console.log('[Cursor Reader] Repositories initialized from ServiceContainer for heuristic timestamps');
+      } else {
+        console.log('[Cursor Reader] ServiceContainer not initialized - heuristic timestamps disabled');
+      }
+    } else if (accessToken && refreshToken) {
+      // It's a factory, use the old method
+      await initializeRepositoriesFromFactory(accessToken, refreshToken, containerOrFactory as IRepositoryFactory);
+      console.log('[Cursor Reader] Repositories initialized from factory for heuristic timestamps');
+    } else {
+      console.log('[Cursor Reader] Factory provided but no tokens - heuristic timestamps disabled');
+    }
   } else {
-    console.log('[Cursor Reader] No auth tokens or repository factory provided - heuristic timestamps disabled');
+    console.log('[Cursor Reader] No container or factory provided - heuristic timestamps disabled');
   }
 
   // Calculate cutoff date - use sinceTimestamp if provided, otherwise fall back to lookbackDays
@@ -1138,17 +1168,19 @@ export class CursorLoader implements IDatabaseLoader {
   readonly name = 'Cursor';
   readonly databasePath: string;
 
-  private repositoryFactory?: IRepositoryFactory | undefined;
+  private containerOrFactory?: ServiceContainer | IRepositoryFactory | undefined;
   private accessToken?: string | undefined;
   private refreshToken?: string | undefined;
 
   constructor(options?: {
+    serviceContainer?: ServiceContainer;
     repositoryFactory?: IRepositoryFactory;
     accessToken?: string;
     refreshToken?: string;
   }) {
     this.databasePath = getCursorStatePath();
-    this.repositoryFactory = options?.repositoryFactory;
+    // Prefer ServiceContainer over factory
+    this.containerOrFactory = options?.serviceContainer ?? options?.repositoryFactory;
     this.accessToken = options?.accessToken;
     this.refreshToken = options?.refreshToken;
   }
@@ -1159,7 +1191,7 @@ export class CursorLoader implements IDatabaseLoader {
       this.accessToken,
       this.refreshToken,
       options?.sinceTimestamp,
-      this.repositoryFactory
+      this.containerOrFactory
     );
     return convertCursorToStandardFormat(conversations);
   }
