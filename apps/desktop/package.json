@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "AgentBase Desktop App",
   "license": "MIT",
   "author": "Hai Dang",
@@ -16,10 +16,13 @@
     "electron": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "pack": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --dir --config electron-builder.config.js",
+    "dist": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --config electron-builder.config.js"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
+    "electron-builder": "^26.4.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",

@@ -93,34 +93,15 @@ cd agentbase
 
 # Using pnpm (recommended - faster and more efficient)
 pnpm install
-pnpm run setup
+cp .env.example .env  # Configure your environment
 pnpm run dev
 
 # OR using npm
 npm install
-npm run setup
+cp .env.example .env  # Configure your environment
 npm run dev
 ```
 
-
-### Non-Interactive Setup (for coding assistants or CI/CD)
-
-```bash
-# Using environment variables (recommended)
-export SUPABASE_URL=http://127.0.0.1:54321  # or your remote URL
-export SUPABASE_ANON_KEY=eyJh...
-export OPENAI_API_KEY=sk-xxx  # optional
-pnpm run setup --non-interactive
-
-# Using env file (recommended for CI/CD)
-pnpm run setup --non-interactive -e .env.production
-
-# Using CLI args (less secure - visible in process list)
-pnpm run setup --non-interactive \
-  --supabase-url https://xxx.supabase.co \
-  --supabase-anon-key eyJh... \
-  --openai-key sk-xxx
-```
 
 ### Access points:
 - **Supabase Studio** (local only): http://localhost:54323
@@ -151,24 +132,11 @@ All commands work with both **pnpm** (recommended) and **npm**. For npm, use `np
 | pnpm command | npm equivalent | Description |
 |--------------|----------------|-------------|
 | `pnpm install` | `npm install` | Install all dependencies for the monorepo |
-| `pnpm run setup` | `npm run setup` | Interactive setup wizard - configures environment and Supabase |
 | `pnpm dev` | `npm run dev` | Start all services in development mode (daemon + desktop with hot reload) |
 | `pnpm dev:daemon` | `npm run dev:daemon` | Start only the daemon service in development mode |
 | `pnpm dev:desktop` | `npm run dev:desktop` | Start only the desktop app in development mode |
 | `pnpm build` | `npm run build` | Build all apps for production |
 | `pnpm start` | `npm run start` | Start all services in production mode (requires build first) |
-
-### Setup Flags
-
-| Flag | Description |
-|------|-------------|
-| `--non-interactive` | Run setup without prompts (for CI/CD or coding assistants) |
-| `--supabase-url <url>` | Supabase URL (required for non-interactive) |
-| `--supabase-anon-key <key>` | Supabase anon key (required for non-interactive) |
-| `-e, --env-file <path>` | Load environment variables from a file |
-| `--openai-key <key>` | OpenAI API key (optional) |
-| `--skip-openai` | Skip OpenAI API key setup (development mode) |
-| `--help` | Show detailed help for the setup command |
 
 ---
 
@@ -246,7 +214,6 @@ Want to see your favorite AI assistant integrated? [Open an issue](https://githu
 Contributions welcome! This is a monorepo, so all code lives in one place:
 - **Backend (daemon)**: `apps/daemon/`
 - **Desktop App**: `apps/desktop/`
-- **CLI**: `apps/cli/`
 - **Shared code**: `packages/shared/`
 
 Please open an issue or PR in this repository!

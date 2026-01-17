@@ -12,7 +12,6 @@ Monorepo using **npm workspaces** and **Turborepo**.
 
 ```
 apps/
-  cli/              # Setup CLI (Ink - React for terminal)
   daemon/           # Background sync service (Node.js + SQLite)
   desktop/          # Electron app (Vite + React + xterm.js)
 packages/

@@ -22,7 +22,6 @@
     "test": "turbo run test",
     "type-check": "turbo run type-check",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
-    "setup": "node scripts/setup.js",
     "dev:daemon": "npm run dev --workspace=agent-orchestrator-daemon",
     "dev:desktop": "npm run build --workspace=@agent-orchestrator/shared && npm run dev --workspace=desktop",
     "docker:build": "docker compose build",

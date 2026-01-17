@@ -46,3 +46,6 @@ bun.lockb
 .next/
 .turbo/
 
+# Electron-builder output
+apps/desktop/release/
+
