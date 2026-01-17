@@ -1,6 +1,14 @@
+/**
+ * AuthManager - Orchestrates authentication flow
+ *
+ * Uses dependency injection for:
+ * - IAuthProvider: vendor-agnostic auth operations (Supabase, Firebase, etc.)
+ * - IAuthStateStore: vendor-agnostic local persistence (SQLite, file, etc.)
+ */
+
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from './database.js';
 import type { IAuthProvider } from './interfaces/auth.js';
+import type { IAuthStateStore } from './interfaces/auth-state-store.js';
 
 interface AuthState {
   accessToken: string;
@@ -12,34 +20,45 @@ interface AuthState {
 export class AuthManager {
   private authState: AuthState | null = null;
   private deviceId: string;
-  private db = getDatabase();
 
-  constructor(private authProvider: IAuthProvider) {
+  constructor(
+    private authProvider: IAuthProvider,
+    private stateStore: IAuthStateStore
+  ) {
     this.deviceId = this.getOrCreateDeviceId();
     this.loadAuthState();
   }
 
-  private getOrCreateDeviceId(): string {
-    let deviceId = this.db.getDeviceId();
+  // ===========================================================================
+  // Device Identity
+  // ===========================================================================
 
-    if (!deviceId) {
-      deviceId = uuidv4();
-      this.db.setDeviceId(deviceId);
-      console.log('[Auth] Created new device ID:', deviceId);
+  private getOrCreateDeviceId(): string {
+    const identity = this.stateStore.getDeviceIdentity();
+
+    if (identity) {
+      return identity.deviceId;
     }
 
+    const deviceId = uuidv4();
+    this.stateStore.setDeviceIdentity({ deviceId, createdAt: Date.now() });
+    console.log('[Auth] Created new device ID:', deviceId);
     return deviceId;
   }
 
+  // ===========================================================================
+  // Auth State Persistence
+  // ===========================================================================
+
   private loadAuthState(): void {
     try {
-      const auth = this.db.getAuth();
-      if (auth) {
+      const persisted = this.stateStore.getAuthState();
+      if (persisted) {
         this.authState = {
-          accessToken: auth.access_token,
-          refreshToken: auth.refresh_token,
-          userId: auth.user_id,
-          expiresAt: auth.expires_at,
+          accessToken: persisted.accessToken,
+          refreshToken: persisted.refreshToken,
+          userId: persisted.userId,
+          expiresAt: persisted.expiresAt,
         };
       }
     } catch (error) {
@@ -51,19 +70,23 @@ export class AuthManager {
   private saveAuthState(): void {
     try {
       if (this.authState) {
-        this.db.saveAuth({
-          access_token: this.authState.accessToken,
-          refresh_token: this.authState.refreshToken,
-          user_id: this.authState.userId,
-          expires_at: this.authState.expiresAt,
+        this.stateStore.saveAuthState({
+          accessToken: this.authState.accessToken,
+          refreshToken: this.authState.refreshToken,
+          userId: this.authState.userId,
+          expiresAt: this.authState.expiresAt,
         });
       } else {
-        this.db.clearAuth();
+        this.stateStore.clearAuthState();
       }
     } catch (error) {
       console.error('Error saving auth state:', error);
     }
   }
+
+  // ===========================================================================
+  // Authentication Status
+  // ===========================================================================
 
   async isAuthenticated(): Promise<boolean> {
     if (!this.authState) {
@@ -114,6 +137,10 @@ export class AuthManager {
     }
   }
 
+  // ===========================================================================
+  // Getters
+  // ===========================================================================
+
   getUserId(): string | null {
     return this.authState?.userId || null;
   }
@@ -131,9 +158,13 @@ export class AuthManager {
   }
 
   getAuthUrl(): string {
-    // Auth is now handled through the desktop app
-    return `agent-base://auth?device_id=${this.deviceId}`;
+    // Delegate to auth provider for vendor-specific URL
+    return this.authProvider.getAuthUrl(this.deviceId);
   }
+
+  // ===========================================================================
+  // Device Auth Flow
+  // ===========================================================================
 
   async waitForAuth(timeoutMs: number = 300000): Promise<boolean> {
     const startTime = Date.now();

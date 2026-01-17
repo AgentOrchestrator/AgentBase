@@ -89,6 +89,7 @@ export function createSupabaseRepositoryFactory(): IRepositoryFactory {
 
 // Re-export for convenience
 export { SupabaseAuthProvider } from './auth-provider.js';
+export { SupabaseClientFactory, createSupabaseClientFactory } from './supabase-client-factory.js';
 export { SupabaseUserRepository } from './user-repository.js';
 export { SupabaseProjectRepository } from './project-repository.js';
 export { SupabaseChatHistoryRepository } from './chat-history-repository.js';

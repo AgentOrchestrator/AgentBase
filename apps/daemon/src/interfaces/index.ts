@@ -8,10 +8,26 @@ export type {
   AuthTokens,
   AuthSession,
   DeviceAuthSession,
+  AuthProviderCapabilities,
+  AuthProviderInfo,
+  TokenValidationResult,
   IAuthProvider,
   AuthContext,
   CreateAuthContext,
 } from './auth.js';
+
+// Auth state store interfaces (local persistence)
+export type {
+  PersistedAuthState,
+  DeviceIdentity,
+  IAuthStateStore,
+} from './auth-state-store.js';
+
+// Authenticated client factory interfaces
+export type {
+  AuthenticatedClientResult,
+  IAuthenticatedClientFactory,
+} from './authenticated-client-factory.js';
 
 // Repository interfaces and domain types
 export type {

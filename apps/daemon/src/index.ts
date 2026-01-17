@@ -9,21 +9,24 @@ import { AuthManager } from './auth-manager.js';
 import { mergeProjects } from './project-aggregator.js';
 import { getDatabase } from './database.js';
 import { createSupabaseAuthProvider, createSupabaseRepositoryFactory } from './infrastructure/supabase/index.js';
-import { createServiceContainer, getServiceContainer, type ServiceContainer } from './service-container.js';
+import { createSQLiteAuthStateStore } from './infrastructure/sqlite/index.js';
+import { createServiceContainer, type ServiceContainer } from './service-container.js';
 
 // Create infrastructure instances
+const db = getDatabase();
 const authProvider = createSupabaseAuthProvider();
+const authStateStore = createSQLiteAuthStateStore(db);
 const repositoryFactory = createSupabaseRepositoryFactory();
 
 // Create the global service container
 const serviceContainer: ServiceContainer = createServiceContainer(repositoryFactory);
 
-let authManager: AuthManager;
+// Create auth manager with injected dependencies
+const authManager = new AuthManager(authProvider, authStateStore);
 
 async function processHistories() {
   console.log('Processing chat histories...');
 
-  const db = getDatabase();
   const syncState = db.getSyncState();
 
   // Mark sync as started
@@ -155,9 +158,6 @@ async function processHistories() {
 async function main() {
   console.log('Agent Orchestrator Daemon Starting...');
   console.log('Running in background watch mode...');
-
-  // Initialize auth manager with the auth provider
-  authManager = new AuthManager(authProvider);
 
   // Check authentication status on startup
   const alreadyAuthenticated = await authManager.isAuthenticated();
