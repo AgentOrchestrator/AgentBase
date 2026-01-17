@@ -152,10 +152,10 @@
 
 /* Terminal handle styles */
 .terminal-node .react-flow__handle {
-  background: #4a9eff;
+  background: var(--handle-color, transparent);
   width: 10px;
   height: 10px;
-  border: 2px solid var(--color-bg-tertiary);
+  border: none;
 }
 
 .terminal-node .react-flow__handle-top {

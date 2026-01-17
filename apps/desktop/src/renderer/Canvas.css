@@ -598,10 +598,15 @@
 
 /* Custom handle styles */
 .custom-node .react-flow__handle {
-  background: #4a9eff;
+  background: var(--handle-color, transparent);
   width: 10px;
   height: 10px;
-  border: 2px solid var(--color-bg-tertiary);
+  border: none;
+}
+
+/* Global handle styles - remove all borders from React Flow handles */
+.react-flow__handle {
+  border: none !important;
 }
 
 .custom-node .react-flow__handle-top {

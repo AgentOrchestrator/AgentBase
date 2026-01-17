@@ -22,9 +22,10 @@
 
 /* Handle */
 .agent-chat-handle {
-  background: var(--handle-bg, #555);
+  background: var(--handle-color, transparent);
   width: 8px;
   height: 8px;
+  border: none;
 }
 
 /* Header */

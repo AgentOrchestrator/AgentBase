@@ -52,13 +52,21 @@ export function conversationToNodesAndEdges(
     // This ensures all messages in the conversation are connected in order
     if (i > 0) {
       const previousGroup = groups[i - 1];
+      // Get the border color from CSS variable to match node borders
+      // Use fallback if DOM is not available (e.g., in tests)
+      const borderColor = typeof document !== 'undefined'
+        ? (getComputedStyle(document.documentElement)
+            .getPropertyValue('--color-border')
+            .trim() || '#232323')
+        : '#232323';
+      
       edges.push({
         id: `edge-${previousGroup.uuid}-${group.uuid}`,
         source: previousGroup.uuid,
         target: group.uuid,
         type: 'smooth',
         animated: false,
-        style: { stroke: '#4a5568', strokeWidth: 2 },
+        style: { stroke: borderColor, strokeWidth: 2 },
       });
     }
 

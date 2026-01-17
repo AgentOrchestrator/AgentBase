@@ -12,6 +12,7 @@ import {
   Node,
   useReactFlow,
   OnConnectStartParams,
+  useUpdateNodeInternals,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { MeshGradient, Dithering } from '@paper-design/shaders-react';
@@ -63,16 +64,41 @@ type ContextMenu = {
 
 const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
   const nodeIds = new Set(nodes.map((node) => node.id));
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  
   return edges
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
     .map((edge) => {
-      const nextEdge: Edge = { ...edge };
-      if (nextEdge.sourceHandle == null || nextEdge.sourceHandle === 'null') {
-        delete nextEdge.sourceHandle;
+      // Create a clean edge object, explicitly omitting null/undefined handles
+      const nextEdge: Edge = {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        animated: edge.animated,
+        style: edge.style,
+        data: edge.data,
+        // Only include handles if they are valid non-null strings
+        ...(edge.sourceHandle && edge.sourceHandle !== 'null' && edge.sourceHandle !== '' 
+          ? { sourceHandle: edge.sourceHandle } 
+          : {}),
+        ...(edge.targetHandle && edge.targetHandle !== 'null' && edge.targetHandle !== '' 
+          ? { targetHandle: edge.targetHandle } 
+          : {}),
+      };
+      
+      // If no handles specified, try to infer them for agent -> chat connections
+      if (!nextEdge.sourceHandle && !nextEdge.targetHandle) {
+        const sourceNode = nodeMap.get(edge.source);
+        const targetNode = nodeMap.get(edge.target);
+        
+        // If connecting agent node to chat node, use the correct handles
+        if (sourceNode?.type === 'agent' && targetNode?.type === 'agent-chat') {
+          nextEdge.sourceHandle = 'chat-source';
+          nextEdge.targetHandle = 'chat-target';
+        }
       }
-      if (nextEdge.targetHandle == null || nextEdge.targetHandle === 'null') {
-        delete nextEdge.targetHandle;
-      }
+      
       return nextEdge;
     });
 };
@@ -170,6 +196,22 @@ function CanvasFlow() {
     }
   }, [nodes, isCanvasLoading, persistNodes]);
 
+  // Sanitize edges whenever they change to remove any "null" string handles
+  useEffect(() => {
+    if (!isCanvasLoading && edges.length > 0) {
+      const sanitized = sanitizeEdges(edges, nodes);
+      // Only update if sanitization changed anything
+      const hasChanges = sanitized.some((edge, index) => {
+        const original = edges[index];
+        return edge.sourceHandle !== original.sourceHandle || 
+               edge.targetHandle !== original.targetHandle;
+      });
+      if (hasChanges) {
+        setEdges(sanitized);
+      }
+    }
+  }, [edges, nodes, isCanvasLoading, setEdges]);
+
   // Persist edges when they change
   const prevEdgesRef = useRef<Edge[]>(edges);
   useEffect(() => {
@@ -250,7 +292,8 @@ function CanvasFlow() {
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-const { screenToFlowPosition, getNodes } = useReactFlow();
+  const { screenToFlowPosition, getNodes } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [_isShiftPressed, setIsShiftPressed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -467,23 +510,22 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   // =============================================================================
 
   const onConnect = useCallback(
-    (params: Connection) =>
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            sourceHandle:
-              params.sourceHandle == null || params.sourceHandle === 'null'
-                ? null
-                : params.sourceHandle,
-            targetHandle:
-              params.targetHandle == null || params.targetHandle === 'null'
-                ? null
-                : params.targetHandle,
-          },
-          eds
-        )
-      ),
+    (params: Connection) => {
+      // Clean up the connection params - remove null/undefined handles
+      // Use null (not undefined) to match Connection type, but filter out string "null"
+      const cleanParams: Connection = {
+        source: params.source,
+        target: params.target,
+        sourceHandle: params.sourceHandle && params.sourceHandle !== 'null' && params.sourceHandle !== '' 
+          ? params.sourceHandle 
+          : null,
+        targetHandle: params.targetHandle && params.targetHandle !== 'null' && params.targetHandle !== '' 
+          ? params.targetHandle 
+          : null,
+      };
+      
+      setEdges((eds) => addEdge(cleanParams, eds));
+    },
     [setEdges]
   );
 
@@ -641,19 +683,47 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
         },
       };
 
+      // Get the border color from CSS variable to match node borders
+      const borderColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-border')
+        .trim() || '#232323'; // Fallback to dark theme default
+
       // Create edge connecting the nodes
+      // Don't specify handle IDs - let React Flow use default connection points
+      // This avoids timing issues where edges are created before handles are registered
+      // Explicitly omit handle properties to avoid any "null" string issues
       const edge: Edge = {
         id: `edge-${nodeId}-${chatNodeId}`,
         source: nodeId,
         target: chatNodeId,
         type: 'smooth',
         animated: false,
-        style: { stroke: '#4a5568', strokeWidth: 2 },
+        style: { stroke: borderColor, strokeWidth: 2 },
+        // Explicitly do NOT include sourceHandle or targetHandle
+        // React Flow will use default connection points
       };
 
-      // Add the new node and edge
+      // Add the new node first
       setNodes((nds) => [...nds, chatNode]);
-      setEdges((eds) => [...eds, edge]);
+      
+      // Defer edge addition until after the node is rendered and handles are measured
+      // This ensures React Flow can properly calculate edge positions
+      requestAnimationFrame(() => {
+        // Update node internals to ensure handles are measured
+        updateNodeInternals(chatNodeId);
+        updateNodeInternals(nodeId);
+        
+        // Add edge after a short delay to ensure node internals are updated
+        requestAnimationFrame(() => {
+          setEdges((eds) => {
+            // Get current nodes to include the newly added chatNode
+            const currentNodes = getNodes();
+            // Sanitize the new edge before adding it
+            const sanitizedEdges = sanitizeEdges([...eds, edge], currentNodes);
+            return sanitizedEdges;
+          });
+        });
+      });
 
       console.log('[Canvas] Created chat node from agent node:', {
         sourceNodeId: nodeId,
@@ -666,7 +736,7 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
     return () => {
       window.removeEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
     };
-  }, [nodes, edges, setNodes, setEdges]);
+  }, [nodes, edges, setNodes, setEdges, updateNodeInternals, getNodes]);
 
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();

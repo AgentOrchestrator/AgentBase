@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizer, Handle, Position } from '@xyflow/react';
 import AgentOverviewView from '../../AgentOverviewView';
 import AgentTerminalView from '../../AgentTerminalView';
 import AgentChatView from '../../AgentChatView';
@@ -646,6 +646,15 @@ export function AgentNodePresentation({
       <div className="agent-node-bottom-buttons">
         <AgentNodeForkHandle nodeId={nodeId} />
       </div>
+
+      {/* Source handle for chat node connections */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="chat-source"
+        className="agent-node-chat-source-handle"
+        style={{ bottom: -8 }}
+      />
 
       {/* Issue Details Modal */}
       {showIssueModal && selectedIssueId && (

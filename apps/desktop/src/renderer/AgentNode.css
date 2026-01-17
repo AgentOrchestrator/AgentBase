@@ -214,10 +214,10 @@
 
 /* Handle styles */
 .agent-node .react-flow__handle {
-  background: #888;
+  background: var(--handle-color, transparent);
   width: 10px;
   height: 10px;
-  border: 2px solid var(--color-bg-primary);
+  border: none;
 }
 
 /* Resize handles - increase size and hit area (but not corner handles) - invisible but functional */

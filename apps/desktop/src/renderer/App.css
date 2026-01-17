@@ -19,6 +19,7 @@
   --color-bg-hover-light: #4a4c56;
   --color-bg-card: #252527;
   --color-bg-canvas: #0A0A0A;
+  --handle-color: transparent;
   
   /* Status colors - global, theme-independent */
   --yellow: #F5C348;
@@ -41,6 +42,7 @@
   --color-bg-hover-light: #d4d4d4;
   --color-bg-card: #dfdeda;
   --color-bg-canvas: #f4f3f0;
+  --handle-color: transparent;
 }
 
 [data-theme="light-web"] {
@@ -56,6 +58,7 @@
   --color-bg-hover-light: #f3f4f6;
   --color-bg-card: #ffffff;
   --color-bg-canvas: #F9FBFC;
+  --handle-color: transparent;
 }
 
 /* Text secondary becomes primary on hover */
