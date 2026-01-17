@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React from 'react';
 import './AgentOverviewView.css';
 import type { CodingAgentStatus, CodingAgentStatusInfo } from '../../types/coding-agent-status';
 import type { AgentTitle, AgentProgress } from './types/agent-node';
@@ -13,12 +13,12 @@ interface AgentOverviewViewProps {
   agentId: string;
   title: AgentTitle;
   summary: string | null;
+  lastUserMessage: string | null;
   status: CodingAgentStatus;
   statusInfo?: CodingAgentStatusInfo;
   progress: AgentProgress | null;
   workspacePath?: string;
   sessionId?: string;
-  onTitleChange?: (newTitle: string) => void;
   hideStatusIndicator?: boolean;
 }
 
@@ -136,76 +136,15 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
  */
 export default function AgentOverviewView({
   title,
-  summary: _summary,
+  summary,
+  lastUserMessage,
   status,
   statusInfo,
   progress,
   workspacePath: _workspacePath,
   sessionId: _sessionId,
-  onTitleChange,
   hideStatusIndicator = false,
 }: AgentOverviewViewProps) {
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(title.value);
-  const [showEditorMenu, setShowEditorMenu] = useState(false);
-  const [availableEditors, setAvailableEditors] = useState<EditorApp[]>([]);
-  const [isLoadingEditors, setIsLoadingEditors] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Load available editors when menu opens
-  useEffect(() => {
-    if (showEditorMenu && availableEditors.length === 0 && !isLoadingEditors) {
-      setIsLoadingEditors(true);
-      window.shellAPI?.getAvailableEditors()
-        .then((editors) => {
-          setAvailableEditors(editors);
-        })
-        .catch((error) => {
-          console.error('Failed to get available editors:', error);
-        })
-        .finally(() => {
-          setIsLoadingEditors(false);
-        });
-    }
-  }, [showEditorMenu, availableEditors.length, isLoadingEditors]);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowEditorMenu(false);
-      }
-    };
-
-    if (showEditorMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showEditorMenu]);
-
-  const handleTitleDoubleClick = useCallback(() => {
-    setIsEditingTitle(true);
-    setEditedTitle(title.value);
-  }, [title.value]);
-
-  const handleTitleBlur = useCallback(() => {
-    setIsEditingTitle(false);
-    if (editedTitle.trim() && editedTitle !== title.value) {
-      onTitleChange?.(editedTitle.trim());
-    }
-  }, [editedTitle, title.value, onTitleChange]);
-
-  const handleTitleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        handleTitleBlur();
-      } else if (e.key === 'Escape') {
-        setEditedTitle(title.value);
-        setIsEditingTitle(false);
-      }
-    },
-    [handleTitleBlur, title.value]
-  );
 
   // handleOpenWithEditor - commented out, will be used when editor menu feature is re-enabled
   // const handleOpenWithEditor = useCallback(async (editor: EditorApp) => {
@@ -222,37 +161,27 @@ export default function AgentOverviewView({
     <div className="agent-overview">
       {/* Title Section */}
       <div className="overview-title-section">
-        {isEditingTitle ? (
-          <input
-            type="text"
-            className="overview-title-input"
-            value={editedTitle}
-            onChange={(e) => setEditedTitle(e.target.value)}
-            onBlur={handleTitleBlur}
-            onKeyDown={handleTitleKeyDown}
-            placeholder="Add Title"
-            autoFocus
-          />
-        ) : (
-          <h2
-            className={`overview-title ${!title.value || title.value.trim() === '' ? 'overview-title-placeholder' : ''}`}
-            onDoubleClick={handleTitleDoubleClick}
-            title="Double-click to edit"
-          >
-            {title.value && title.value.trim() !== '' ? title.value : 'Add Title'}
-          </h2>
-        )}
+        <h2 className="overview-title">
+          {title.value || 'Untitled Agent'}
+        </h2>
       </div>
 
       {/* Status Indicator - Hidden if moved to node header */}
       {!hideStatusIndicator && <StatusIndicator status={status} statusInfo={statusInfo} />}
 
-      {/* Summary - Hidden */}
-      {/* {summary && (
+      {/* Summary - Last assistant message */}
+      {summary && (
         <div className="overview-summary">
-          <p>{summary}</p>
+          <p className="overview-summary-text">{summary}</p>
         </div>
-      )} */}
+      )}
+
+      {/* Last User Message */}
+      {lastUserMessage && (
+        <div className="overview-summary">
+          <p className="overview-summary-text">{lastUserMessage}</p>
+        </div>
+      )}
 
       {/* Progress */}
       {progress && (

@@ -1,6 +1,8 @@
 export { useCanvasPersistence } from './useCanvasPersistence';
 export { useSessionFileWatcher } from './useSessionFileWatcher';
 export { useAutoTitleFromSession } from './useAutoTitleFromSession';
+export { useAutoSummaryFromSession } from './useAutoSummaryFromSession';
+export { useAutoLastUserMessageFromSession } from './useAutoLastUserMessageFromSession';
 export * from './canvasConverters';
 export {
   useAgentHierarchy,

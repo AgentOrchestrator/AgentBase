@@ -123,7 +123,7 @@ export class CanvasNodeService {
 
     // Use title from modal if provided, otherwise use default
     const nodeTitle: AgentTitle = modalData?.title
-      ? { value: modalData.title, isManuallySet: true }
+      ? { value: modalData.title }
       : createDefaultAgentTitle();
 
     // Determine workspace path: modal > explicit > locked folder
@@ -140,6 +140,7 @@ export class CanvasNodeService {
       status: 'idle',
       title: nodeTitle,
       summary: description || null,
+      lastUserMessage: null,
       progress: null,
       attachments: initialAttachments || [],
       activeView: 'overview',
@@ -257,9 +258,9 @@ export class CanvasNodeService {
       status: 'idle',
       title: {
         value: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
-        isManuallySet: false,
       },
       summary: null,
+      lastUserMessage: null,
       progress: null,
       initialPrompt: message,
       workspacePath: workingDirectory,

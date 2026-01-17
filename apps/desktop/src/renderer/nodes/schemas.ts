@@ -103,9 +103,9 @@ export const AgentNodeDataSchema = z.object({
   statusInfo: z.record(z.string(), z.unknown()).optional(),
   title: z.object({
     value: z.string(),
-    isManuallySet: z.boolean(),
   }),
   summary: z.string().nullable(),
+  lastUserMessage: z.string().nullable().optional(),
   progress: z.record(z.string(), z.unknown()).nullable(),
   attachments: z.array(TerminalAttachmentSchema).optional(),
   activeView: z.enum(['overview', 'terminal', 'chat']).optional(),

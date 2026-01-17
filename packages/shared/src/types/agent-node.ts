@@ -89,13 +89,11 @@ export function isTodoListProgress(
 // =============================================================================
 
 /**
- * Title configuration with manual/computed tracking
+ * Title configuration
  */
 export interface AgentTitle {
   /** The display title */
   value: string;
-  /** Whether manually edited by user */
-  isManuallySet: boolean;
 }
 
 // =============================================================================
@@ -142,6 +140,9 @@ export interface AgentNodeData {
   /** Short summary of current task */
   summary: string | null;
 
+  /** Last user message in the session */
+  lastUserMessage: string | null;
+
   /** Progress tracking (percentage or todo list) */
   progress: AgentProgress | null;
 
@@ -186,7 +187,6 @@ export interface AgentNodeData {
 export function createDefaultAgentTitle(value = 'Untitled Agent'): AgentTitle {
   return {
     value,
-    isManuallySet: false,
   };
 }
 

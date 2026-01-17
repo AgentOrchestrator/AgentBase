@@ -76,16 +76,27 @@ function AgentNode({ data, id, selected }: NodeProps) {
     agent.actions.deleteNode();
   }, [agent.actions]);
 
+  // Use a ref to access current nodeData without causing callback recreation
+  const nodeDataRef = useRef(agent.nodeData);
+  nodeDataRef.current = agent.nodeData;
+
   const handleDataChange = useCallback(
     (updates: Partial<AgentNodeData>) => {
       // Dispatch update directly to Canvas for node data changes
+      // Use ref to get current nodeData to avoid callback recreation on every nodeData change
+      console.log('[AgentNode] handleDataChange called:', {
+        nodeId: id,
+        updateKeys: Object.keys(updates),
+        summary: 'summary' in updates ? (updates.summary as string)?.substring(0, 50) : 'NOT_IN_UPDATE',
+        lastUserMessage: 'lastUserMessage' in updates ? (updates.lastUserMessage as string)?.substring(0, 50) : 'NOT_IN_UPDATE',
+      });
       window.dispatchEvent(
         new CustomEvent('update-node', {
-          detail: { nodeId: id, data: { ...agent.nodeData, ...updates } },
+          detail: { nodeId: id, data: { ...nodeDataRef.current, ...updates } },
         })
       );
     },
-    [id, agent.nodeData]
+    [id]
   );
 
   // ---------------------------------------------------------------------------

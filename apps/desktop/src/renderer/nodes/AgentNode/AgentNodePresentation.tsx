@@ -22,7 +22,7 @@ import {
   useAgentService,
   useTerminalService,
 } from '../../context';
-import { useAgentViewMode, usePreloadedChatMessages, useAutoTitleFromSession } from '../../hooks';
+import { useAgentViewMode, usePreloadedChatMessages, useAutoSummaryFromSession, useAutoLastUserMessageFromSession } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import type { CodingAgentStatus } from '../../../../types/coding-agent-status';
@@ -125,23 +125,80 @@ export function AgentNodePresentation({
     [setActiveView]
   );
 
-  // Handle title change
-  const handleTitleChange = useCallback(
-    (newTitle: string) => {
+  // Handle summary change
+  const handleSummaryChange = useCallback(
+    (newSummary: string) => {
+      console.log('[AgentNodePresentation] handleSummaryChange called:', {
+        newSummary: newSummary.substring(0, 50),
+        currentSummary: data.summary?.substring(0, 50),
+      });
       onDataChange({
-        title: { value: newTitle, isManuallySet: true },
+        summary: newSummary,
       });
     },
-    [onDataChange]
+    [onDataChange, data.summary]
   );
 
-  // Auto-title updates from session file changes
-  useAutoTitleFromSession({
+  // Handle lastUserMessage change
+  const handleLastUserMessageChange = useCallback(
+    (newLastUserMessage: string) => {
+      console.log('[AgentNodePresentation] handleLastUserMessageChange called:', {
+        newLastUserMessage: newLastUserMessage.substring(0, 50),
+        currentLastUserMessage: data.lastUserMessage?.substring(0, 50),
+      });
+      onDataChange({
+        lastUserMessage: newLastUserMessage,
+      });
+    },
+    [onDataChange, data.lastUserMessage]
+  );
+
+  // Aggressively sync title from lastUserMessage
+  // Title always reflects lastUserMessage, or "New Node" if empty
+  useEffect(() => {
+    const MAX_TITLE_LENGTH = 50;
+    const lastUserMessage = data.lastUserMessage;
+    
+    let newTitle: string;
+    if (!lastUserMessage || lastUserMessage.trim() === '') {
+      newTitle = 'New Node';
+    } else {
+      const content = lastUserMessage.trim();
+      newTitle = content.length > MAX_TITLE_LENGTH
+        ? content.slice(0, MAX_TITLE_LENGTH) + '...'
+        : content;
+    }
+
+    // Always update title to match lastUserMessage
+    // This aggressively takes over the title regardless of manual changes
+    if (data.title?.value !== newTitle) {
+      console.log('[AgentNodePresentation] Syncing title from lastUserMessage:', {
+        lastUserMessage: lastUserMessage?.substring(0, 50),
+        newTitle,
+        oldTitle: data.title?.value,
+      });
+      onDataChange({
+        title: { value: newTitle },
+      });
+    }
+  }, [data.lastUserMessage, data.title?.value, onDataChange]);
+
+  // Auto-summary updates from session file changes (last assistant message)
+  useAutoSummaryFromSession({
     sessionId: data.sessionId,
     workspacePath: data.workspacePath,
     agentService: agent,
     agentType: data.agentType,
-    onTitleChange: handleTitleChange,
+    onSummaryChange: handleSummaryChange,
+  });
+
+  // Auto-lastUserMessage updates from session file changes (last user message)
+  useAutoLastUserMessageFromSession({
+    sessionId: data.sessionId,
+    workspacePath: data.workspacePath,
+    agentService: agent,
+    agentType: data.agentType,
+    onLastUserMessageChange: handleLastUserMessageChange,
   });
 
   // Handle attachment details click
@@ -621,12 +678,12 @@ export function AgentNodePresentation({
             agentId={data.agentId}
             title={data.title}
             summary={data.summary}
+            lastUserMessage={data.lastUserMessage}
             status={data.status}
             statusInfo={data.statusInfo}
             progress={data.progress}
             workspacePath={workspacePath ?? undefined}
             sessionId={data.sessionId}
-            onTitleChange={handleTitleChange}
             hideStatusIndicator={true}
           />
         )}

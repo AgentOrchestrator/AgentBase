@@ -432,7 +432,7 @@ function CanvasFlow() {
       const { nodeId, data } = event.detail;
       nodeStore.updateNode(nodeId, data as Record<string, unknown>);
       setNodes((nds) =>
-        nds.map((node) => (node.id === nodeId ? { ...node, data: { ...data } } : node))
+        nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node))
       );
     };
 
@@ -488,8 +488,9 @@ function CanvasFlow() {
           terminalId,
           agentType: 'claude_code',
           status: 'idle',
-          title: { value: message.slice(0, 50) + (message.length > 50 ? '...' : ''), isManuallySet: false },
+          title: { value: message.slice(0, 50) + (message.length > 50 ? '...' : '') },
           summary: null,
+          lastUserMessage: null,
           progress: null,
           initialPrompt: message,
           workingDirectory,
@@ -2232,7 +2233,7 @@ function CanvasFlow() {
                               className="settings-mesh-subtitle"
                               style={{ color: overlayTextColor }}
                             >
-                              Agent Whisperer
+                              Vibe Coder
                             </div>
                           </>
                         )}
@@ -2538,11 +2539,11 @@ function CanvasFlow() {
 
                 console.log('[Canvas] Debug: Loading session for node', node.id);
 
-                // Load session
+                // Load session (get both user and assistant messages)
                 const session = await agentService.getSession(
                   nodeData.sessionId,
                   nodeData.workspacePath,
-                  { roles: ['user'] }
+                  { roles: ['user', 'assistant'] }
                 );
 
                 console.log('[Canvas] Debug: Session loaded for node', node.id, {
@@ -2551,15 +2552,24 @@ function CanvasFlow() {
                 });
 
                 if (session?.messages && session.messages.length > 0) {
-                  // Get last user message
+                  // Get last user message for title
                   const userMessages = session.messages.filter((m) => m.role === 'user');
                   const lastUserMessage = userMessages[userMessages.length - 1];
 
-                  console.log('[Canvas] Debug: User messages found for node', node.id, {
+                  // Get last assistant message for summary
+                  const assistantMessages = session.messages.filter((m) => m.role === 'assistant');
+                  const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+
+                  console.log('[Canvas] Debug: Messages found for node', node.id, {
                     userMessageCount: userMessages.length,
-                    lastMessageContent: lastUserMessage?.content?.substring(0, 50),
+                    assistantMessageCount: assistantMessages.length,
+                    lastUserMessageContent: lastUserMessage?.content?.substring(0, 50),
+                    lastAssistantMessageContent: lastAssistantMessage?.content?.substring(0, 50),
                   });
 
+                  const updates: Partial<AgentNodeData> = {};
+
+                  // Update title from last user message
                   if (lastUserMessage?.content) {
                     const content = lastUserMessage.content.trim();
                     const newTitle =
@@ -2568,7 +2578,23 @@ function CanvasFlow() {
                         : content;
 
                     console.log('[Canvas] Debug: Updating node', node.id, 'title from', nodeData.title?.value, 'to', newTitle);
+                    updates.title = { value: newTitle };
+                  }
 
+                  // Update summary from last assistant message
+                  if (lastAssistantMessage?.content) {
+                    const content = lastAssistantMessage.content.trim();
+                    const MAX_SUMMARY_LENGTH = 200;
+                    const newSummary =
+                      content.length > MAX_SUMMARY_LENGTH
+                        ? content.slice(0, MAX_SUMMARY_LENGTH) + '...'
+                        : content;
+
+                    console.log('[Canvas] Debug: Updating node', node.id, 'summary to', newSummary.substring(0, 50) + '...');
+                    updates.summary = newSummary;
+                  }
+
+                  if (Object.keys(updates).length > 0) {
                     // Update node via event
                     window.dispatchEvent(
                       new CustomEvent('update-node', {
@@ -2576,17 +2602,17 @@ function CanvasFlow() {
                           nodeId: node.id,
                           data: {
                             ...nodeData,
-                            title: { value: newTitle, isManuallySet: true },
+                            ...updates,
                           },
                         },
                       })
                     );
 
                     updatedCount++;
-                    console.log('[Canvas] Debug: Successfully updated title for node', node.id);
+                    console.log('[Canvas] Debug: Successfully updated node', node.id);
                   } else {
                     skippedCount++;
-                    console.log('[Canvas] Debug: No content in last user message for node', node.id);
+                    console.log('[Canvas] Debug: No content in messages for node', node.id);
                   }
                 } else {
                   skippedCount++;

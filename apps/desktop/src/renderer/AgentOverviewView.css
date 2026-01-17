@@ -44,11 +44,6 @@
   color: var(--color-text-primary);
   font-size: 24px;
   font-weight: 700;
-  cursor: pointer;
-  padding: 4px 8px;
-  margin: -4px -8px;
-  border-radius: 4px;
-  transition: background 0.2s ease;
   flex: 1;
   overflow: hidden;
   display: -webkit-box;
@@ -56,34 +51,6 @@
   -webkit-box-orient: vertical;
   line-height: 1.2;
   word-break: break-word;
-}
-
-.overview-title:hover {
-  background: rgba(136, 136, 136, 0.15);
-}
-
-.overview-title-placeholder {
-  color: #666;
-}
-
-.overview-title-input {
-  flex: 1;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: var(--color-text-primary);
-  font-size: 24px;
-  font-weight: 700;
-  outline: none;
-}
-
-.overview-title-input:focus {
-  box-shadow: 0 0 0 2px rgba(136, 136, 136, 0.3);
-}
-
-.overview-title-input::placeholder {
-  color: #666;
 }
 
 .title-auto-badge {
@@ -120,16 +87,16 @@
 
 /* Summary */
 .overview-summary {
-  color: #b0b0b0;
-  font-size: 13px;
-  line-height: 1.5;
-  padding: 12px;
-  background: #1e1e1e;
-  border-radius: 8px;
+  margin-top: 8px;
 }
 
-.overview-summary p {
+.overview-summary-text {
   margin: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  word-wrap: break-word;
 }
 
 /* Progress Section */

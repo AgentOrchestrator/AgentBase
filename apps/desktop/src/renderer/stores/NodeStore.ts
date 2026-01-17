@@ -42,7 +42,7 @@ export class NodeStore implements INodeStore {
 
     const updatedNode: Node = {
       ...existing,
-      data: { ...data },
+      data: { ...existing.data, ...data },
     };
 
     this.nodes.set(nodeId, updatedNode);
