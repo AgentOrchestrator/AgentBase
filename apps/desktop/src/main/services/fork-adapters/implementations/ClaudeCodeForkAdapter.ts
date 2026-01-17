@@ -5,23 +5,8 @@ import type { IForkAdapter } from '../interfaces/IForkAdapter';
 import type { Result, AgentError } from '../../coding-agent/types';
 import { ok, err, agentError, AgentErrorCode } from '../../coding-agent/types';
 import type { JsonlFilterOptions } from '@agent-orchestrator/shared';
+import { JSONLFile } from '@agent-orchestrator/shared';
 import { filterJsonl } from '../filter';
-
-/**
- * JSONL line structure from Claude Code session files
- */
-interface JsonlLine {
-  type?: string;
-  message?: {
-    role: string;
-    content: unknown;
-  };
-  timestamp?: string | number;
-  sessionId?: string;
-  summary?: string;
-  cwd?: string;
-  [key: string]: unknown;
-}
 
 /**
  * Fork adapter for Claude Code sessions
@@ -111,94 +96,6 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
     return targetProjectDir;
   }
 
-  /**
-   * Transform paths in JSONL content from source worktree to target worktree
-   */
-  private transformPaths(
-    line: string,
-    sourceWorkingDir: string,
-    targetWorkingDir: string
-  ): string {
-    try {
-      const data: JsonlLine = JSON.parse(line);
-
-      // Transform cwd field if present
-      if (data.cwd && typeof data.cwd === 'string') {
-        data.cwd = data.cwd.replace(sourceWorkingDir, targetWorkingDir);
-      }
-
-      // Transform paths in message content
-      if (data.message?.content) {
-        data.message.content = this.transformContentPaths(
-          data.message.content,
-          sourceWorkingDir,
-          targetWorkingDir
-        );
-      }
-
-      // Transform any other string fields that might contain paths
-      for (const key in data) {
-        if (typeof data[key] === 'string') {
-          data[key] = (data[key] as string).replace(
-            new RegExp(this.escapeRegex(sourceWorkingDir), 'g'),
-            targetWorkingDir
-          );
-        }
-      }
-
-      return JSON.stringify(data);
-    } catch (error) {
-      // If parsing fails, do simple string replacement
-      return line.replace(
-        new RegExp(this.escapeRegex(sourceWorkingDir), 'g'),
-        targetWorkingDir
-      );
-    }
-  }
-
-  /**
-   * Transform paths in message content (can be string, array, or object)
-   */
-  private transformContentPaths(
-    content: unknown,
-    sourceWorkingDir: string,
-    targetWorkingDir: string
-  ): unknown {
-    if (typeof content === 'string') {
-      return content.replace(
-        new RegExp(this.escapeRegex(sourceWorkingDir), 'g'),
-        targetWorkingDir
-      );
-    }
-
-    if (Array.isArray(content)) {
-      return content.map(item =>
-        this.transformContentPaths(item, sourceWorkingDir, targetWorkingDir)
-      );
-    }
-
-    if (typeof content === 'object' && content !== null) {
-      const transformed: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(content)) {
-        transformed[key] = this.transformContentPaths(
-          value,
-          sourceWorkingDir,
-          targetWorkingDir
-        );
-      }
-      return transformed;
-    }
-
-    return content;
-  }
-
-  /**
-   * Escape special regex characters in a string
-   */
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
   supportsAgentType(agentType: string): boolean {
     return agentType === 'claude_code';
   }
@@ -256,16 +153,16 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
         });
       }
 
-      const lines = contentToTransform.split('\n');
-
-      // Transform paths in each line, using resolved target path
-      const transformedLines = lines.map(line => {
-        if (!line.trim()) return line;
-        return this.transformPaths(line, sourceWorkingDir, resolvedTargetDir);
+      // Use JSONLFile to transform paths and optionally replace sessionId
+      const jsonlFile = new JSONLFile(contentToTransform);
+      const needsSessionIdReplacement = sourceSessionId !== targetSessionId;
+      const transformed = jsonlFile.replaceFields({
+        cwd: { from: sourceWorkingDir, to: resolvedTargetDir },
+        sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
       });
 
       // Write to target file
-      fs.writeFileSync(targetFilePath, transformedLines.join('\n'), 'utf-8');
+      fs.writeFileSync(targetFilePath, transformed.toString(), 'utf-8');
 
       console.log('[ClaudeCodeForkAdapter] Session file forked:', {
         source: sourceFilePath,

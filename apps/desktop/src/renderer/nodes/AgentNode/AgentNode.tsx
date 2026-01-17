@@ -108,6 +108,7 @@ function AgentNode({ data, id, selected }: NodeProps) {
         selected={selected}
         sessionReadiness={agent.session.readiness}
         nodeId={id}
+        sessionCreatedAgo={agent.session.createdAgo}
       />
       {/* Modal overlay - UI state managed locally */}
       <WorkspaceSelectionModal

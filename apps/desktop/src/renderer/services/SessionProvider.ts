@@ -2,13 +2,7 @@
  * Session Provider
  *
  * Abstraction for retrieving active coding agent sessions.
- * This interface allows swapping implementations:
- * - FileBasedSessionProvider: Current implementation using file system lookups
- * - HooksSessionProvider: Future implementation using the hooks/event system
- *
- * When the hooks system (packages/shared/src/hooks) is implemented,
- * the HooksSessionProvider will subscribe to 'session:start' events
- * and maintain an in-memory cache of active sessions.
+ * Uses file system lookups via the main process to find session files.
  */
 
 import type { CodingAgentType } from '../../main/services/coding-agent';
@@ -48,10 +42,6 @@ export type SessionStartCallback = (
 
 /**
  * Interface for session providers
- *
- * Implementations:
- * - FileBasedSessionProvider: Looks up sessions from ~/.claude/projects/
- * - HooksSessionProvider (future): Uses EventRegistry to track session:start events
  */
 export interface ISessionProvider {
   /**
@@ -80,9 +70,6 @@ export interface ISessionProvider {
  * Retrieves session information by scanning the agent's session
  * history files on disk. For Claude Code, this reads from
  * ~/.claude/projects/<encoded-path>/<session-id>.jsonl
- *
- * This is the current/temporary implementation until the hooks
- * system is fully implemented.
  */
 export class FileBasedSessionProvider implements ISessionProvider {
   /**
@@ -123,7 +110,6 @@ export class FileBasedSessionProvider implements ISessionProvider {
 }
 
 /**
- * Singleton instance using file-based implementation
- * Replace with HooksSessionProvider when hooks system is ready
+ * Singleton instance
  */
 export const sessionProvider: ISessionProvider = new FileBasedSessionProvider();

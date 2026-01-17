@@ -21,6 +21,7 @@ import { useReactFlow } from '@xyflow/react';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { AgentNodeData } from '../../types/agent-node';
 import { agentActionStore } from '../../stores';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type {
   AgentState,
   UseAgentStateInput,
@@ -120,12 +121,15 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // Session State
   // ---------------------------------------------------------------------------
   const [sessionId, setSessionId] = useState<string | null>(nodeData.sessionId || null);
+  const [sessionCreatedAt, setSessionCreatedAt] = useState<string | null>(null);
   const sessionReadiness: SessionReadiness = sessionId ? 'ready' : 'idle';
 
   useEffect(() => {
     const nextSessionId = nodeData.sessionId ?? null;
     if (nextSessionId !== sessionId) {
       setSessionId(nextSessionId);
+      // Reset creation time when session changes
+      setSessionCreatedAt(null);
     }
   }, [nodeData.sessionId, sessionId]);
 
@@ -172,6 +176,50 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
     workspacePath = manualWorkspacePath;
     workspaceSource = 'manual';
   }
+
+  // ---------------------------------------------------------------------------
+  // Session Creation Time Fetching
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    // Skip if we don't have both sessionId and workspacePath
+    if (!sessionId || !workspacePath) {
+      return;
+    }
+
+    // Avoid re-fetching if we already have the creation time
+    if (sessionCreatedAt) {
+      return;
+    }
+
+    const fetchSessionCreatedAt = async () => {
+      try {
+        const codingAgentAPI = window.codingAgentAPI;
+        if (!codingAgentAPI) {
+          return;
+        }
+
+        const session = await codingAgentAPI.getSession(
+          nodeData.agentType,
+          sessionId,
+          { workspacePath }
+        );
+
+        if (session?.createdAt) {
+          setSessionCreatedAt(session.createdAt);
+        }
+      } catch (error) {
+        console.error('[useAgentState] Failed to fetch session creation time:', error);
+      }
+    };
+
+    fetchSessionCreatedAt();
+  }, [sessionId, workspacePath, nodeData.agentType, sessionCreatedAt]);
+
+  // Compute the "time ago" string - recalculated on each render for accuracy
+  const sessionCreatedAgo = useMemo(() => {
+    if (!sessionCreatedAt) return null;
+    return formatRelativeTime(sessionCreatedAt);
+  }, [sessionCreatedAt]);
 
   // ---------------------------------------------------------------------------
   // Store Subscription
@@ -317,6 +365,8 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
     session: {
       id: sessionId,
       readiness: sessionReadiness,
+      createdAt: sessionCreatedAt,
+      createdAgo: sessionCreatedAgo,
     },
     nodeData,
     actions: {

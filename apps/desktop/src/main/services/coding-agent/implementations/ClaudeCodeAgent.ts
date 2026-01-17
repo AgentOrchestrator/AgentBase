@@ -576,11 +576,28 @@ export class ClaudeCodeAgent
     }
 
     // Get session ID from options (required field)
-    const sessionId = options.sessionId;
+    const sourceSessionId = options.sessionId;
 
     const targetCwd = options.workspacePath ?? process.cwd();
     const sourceCwd = process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
+    const createWorktree = options.createWorktree !== false; // Default to true for backward compatibility
+
+    // Determine target session ID:
+    // - Cross-directory (worktree) forks: use same session ID (file is in different project directory)
+    // - Same-directory forks without worktree: generate new session ID
+    const targetSessionId = isCrossDirectory || createWorktree
+      ? sourceSessionId
+      : crypto.randomUUID();
+
+    console.log('[ClaudeCodeAgent] Fork operation:', {
+      sourceSessionId,
+      targetSessionId,
+      isCrossDirectory,
+      createWorktree,
+      sourceCwd,
+      targetCwd,
+    });
 
     // Build fork options
     const abortController = new AbortController();
@@ -594,10 +611,13 @@ export class ClaudeCodeAgent
 
     if (isCrossDirectory) {
       // For cross-directory forks, use extraArgs to create new session
-      sdkOptions.extraArgs = { 'session-id': sessionId };
+      sdkOptions.extraArgs = { 'session-id': sourceSessionId };
+    } else if (!createWorktree) {
+      // For same-directory forks without worktree, use extraArgs with new session ID
+      sdkOptions.extraArgs = { 'session-id': targetSessionId };
     } else {
-      // For same-directory forks, use SDK's built-in fork mechanism
-      sdkOptions.resume = sessionId;
+      // For same-directory forks with worktree (shouldn't happen normally), use SDK's built-in fork
+      sdkOptions.resume = sourceSessionId;
       sdkOptions.forkSession = true;
     }
 
@@ -608,9 +628,16 @@ export class ClaudeCodeAgent
       console.error('[ClaudeCodeAgent] Failed to create new session', { error });
     }
 
-    // Handle cross-directory fork (worktree scenario)
-    if (isCrossDirectory) {
-      console.log('[ClaudeCodeAgent] Cross-directory fork detected', { sourceCwd, targetCwd });
+    // Handle forks that need JSONL file copying
+    // - Cross-directory forks: copy to new project directory
+    // - Same-directory forks without worktree: copy with new session ID
+    if (isCrossDirectory || !createWorktree) {
+      console.log('[ClaudeCodeAgent] Fork requires JSONL file copy', {
+        isCrossDirectory,
+        createWorktree,
+        sourceCwd,
+        targetCwd,
+      });
 
       // Get fork adapter for Claude Code
       const adapter = ForkAdapterFactory.getAdapter('claude_code');
@@ -618,7 +645,7 @@ export class ClaudeCodeAgent
         return err(
           agentError(
             AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
-            'Cross-directory fork adapter not available'
+            'Fork adapter not available'
           )
         );
       }
@@ -635,13 +662,13 @@ export class ClaudeCodeAgent
           // If resolution fails, use original path
         }
 
-        // IMPORTANT: Use the SAME session ID for the forked session
-        // This allows Claude Code SDK to find the copied JSONL file in the new directory
+        // For same-directory forks, source and target cwd are the same
+        // but we use different session IDs
         const forkResult = await adapter.forkSessionFile(
-          sessionId,
-          sessionId, // Use same session ID - file will be in different project directory
+          sourceSessionId,
+          targetSessionId,
           sourceCwd,
-          resolvedTargetCwd,
+          isCrossDirectory ? resolvedTargetCwd : sourceCwd, // Same cwd for non-worktree forks
           options.filterOptions // Pass filter options for partial context fork
         );
 
@@ -660,13 +687,13 @@ export class ClaudeCodeAgent
     }
 
     return ok({
-      id: sessionId,
+      id: targetSessionId,
       name: options.newSessionName,
       agentType: 'claude_code',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       messageCount: 0,
-      parentSessionId: sessionId,
+      parentSessionId: sourceSessionId,
     });
   }
 

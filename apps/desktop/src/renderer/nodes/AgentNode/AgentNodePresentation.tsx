@@ -41,6 +41,8 @@ export interface AgentNodePresentationProps {
   sessionReadiness?: SessionReadiness;
   /** React Flow node ID */
   nodeId?: string;
+  /** Human-readable "time ago" string for session creation (e.g., "5m ago") */
+  sessionCreatedAgo?: string | null;
 }
 
 /**
@@ -55,6 +57,7 @@ export function AgentNodePresentation({
   selected,
   sessionReadiness = 'idle',
   nodeId,
+  sessionCreatedAgo,
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const terminalService = useTerminalService();
@@ -413,6 +416,7 @@ export function AgentNodePresentation({
       {data.sessionId && (
         <div className="agent-node-session-label">
           Session: {data.sessionId.slice(0, 8)}...
+          {sessionCreatedAgo && <span className="session-created-ago"> · {sessionCreatedAgo}</span>}
         </div>
       )}
 

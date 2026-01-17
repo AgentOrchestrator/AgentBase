@@ -37,6 +37,10 @@ export interface SessionState {
   id: string | null;
   /** Whether a session is ready to use */
   readiness: SessionReadiness;
+  /** When the session was created (ISO string from JSONL file) */
+  createdAt: string | null;
+  /** Human-readable "time ago" string (e.g., "5 minutes ago", "2 hours ago") */
+  createdAgo: string | null;
 }
 
 // =============================================================================

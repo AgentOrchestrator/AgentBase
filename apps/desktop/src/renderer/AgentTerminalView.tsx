@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import './AgentTerminalView.css';
-import { useTerminalService, useAgentService } from './context';
+import { useTerminalService, useAgentService, useNodeInitialized } from './context';
 
 interface AgentTerminalViewProps {
   /** Workspace path for agent REPL */
@@ -57,13 +57,17 @@ export default function AgentTerminalView({
 }: AgentTerminalViewProps) {
   const terminalService = useTerminalService();
   const agentService = useAgentService();
+  const isServicesInitialized = useNodeInitialized();
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    // Wait for services to be fully initialized before setting up terminal
+    // This ensures agentService.initialize() has completed, which restores
+    // session state from main process and sets isRunning if CLI is already active
+    if (!isServicesInitialized || !terminalRef.current) return;
 
     // Guard against double initialization (React StrictMode)
     const existingXterm = terminalRef.current.querySelector('.xterm');
@@ -219,7 +223,7 @@ export default function AgentTerminalView({
 
       isInitializedRef.current = false;
     };
-  }, [terminalService, agentService, workspacePath, sessionId, initialPrompt]);
+  }, [terminalService, agentService, workspacePath, sessionId, initialPrompt, isServicesInitialized]);
 
   // Handle scroll events when node is selected
   // Only prevent canvas scrolling when node is selected (clicked)

@@ -9,7 +9,6 @@
  * - PermissionPolicy for per-project permission configuration
  * - Handlers for permission requests and other events
  * - Adapters to translate vendor events (Claude Code, Codex) to unified format
- * - Providers for session tracking (used by ForkService)
  *
  * @example
  * ```typescript
@@ -18,7 +17,6 @@
  *   createPermissionHandler,
  *   PERMISSION_PRESETS,
  *   ClaudeCodeAdapter,
- *   createSessionProvider,
  * } from '@agent-orchestrator/shared';
  *
  * // Create event registry
@@ -31,9 +29,6 @@
  *     return await showPermissionDialog(payload);
  *   },
  * }));
- *
- * // Create session provider for ForkService
- * const sessionProvider = createSessionProvider(registry);
  *
  * // Parse terminal output and emit events
  * const adapter = new ClaudeCodeAdapter();
@@ -58,6 +53,3 @@ export * from './handlers/index.js';
 
 // Agent adapters
 export * from './adapters/index.js';
-
-// Providers (session tracking)
-export * from './providers/index.js';
