@@ -89,6 +89,10 @@ export interface ITerminalService extends INodeService {
   // State
   /** Check if terminal process is running */
   isRunning(): boolean;
+
+  // Buffer
+  /** Get terminal buffer for restoration after view switch */
+  getBuffer(): Promise<string | null>;
 }
 
 // =============================================================================
@@ -155,6 +159,12 @@ export interface IAgentService extends INodeService {
   start(workspacePath: string, sessionId?: string, initialPrompt?: string): Promise<void>;
   /** Stop the coding agent (cancels operations) */
   stop(): Promise<void>;
+  /**
+   * Gracefully exit the CLI REPL and wait for process to terminate.
+   * Sends vendor-specific exit command via adapter and waits for terminal exit.
+   * @param timeoutMs - Max time to wait for graceful exit before forcing destroy
+   */
+  exitRepl(timeoutMs?: number): Promise<void>;
 
   // =========================================================================
   // Status

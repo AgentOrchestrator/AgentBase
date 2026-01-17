@@ -68,6 +68,7 @@ function createMockTerminalService(
       return () => exitListeners.delete(callback);
     },
     isRunning: () => isCreated,
+    getBuffer: async () => null,
   };
 }
 

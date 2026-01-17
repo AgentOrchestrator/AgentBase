@@ -4,9 +4,16 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import './AgentTerminalView.css';
+import { useTerminalService, useAgentService } from './context';
 
 interface AgentTerminalViewProps {
-  terminalId: string;
+  /** Workspace path for agent REPL */
+  workspacePath: string;
+  /** Session ID for agent REPL */
+  sessionId: string;
+  /** Optional initial prompt to send on start */
+  initialPrompt?: string;
+  /** Whether the node is selected (for scroll handling) */
   selected?: boolean;
 }
 
@@ -38,15 +45,22 @@ const TERMINAL_THEME = {
 /**
  * Agent Terminal View
  *
- * Simplified terminal component for embedding within AgentNode.
- * Handles terminal lifecycle and IPC communication with main process.
+ * Terminal component for embedding within AgentNode.
+ * Uses ITerminalService from context for all terminal operations.
+ * Parent controls lifecycle via useAgentViewMode hook.
  */
-export default function AgentTerminalView({ terminalId, selected = false }: AgentTerminalViewProps) {
+export default function AgentTerminalView({
+  workspacePath,
+  sessionId,
+  initialPrompt,
+  selected = false,
+}: AgentTerminalViewProps) {
+  const terminalService = useTerminalService();
+  const agentService = useAgentService();
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isInitializedRef = useRef(false);
-  const terminalProcessCreatedRef = useRef(false);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -59,7 +73,7 @@ export default function AgentTerminalView({ terminalId, selected = false }: Agen
 
     isInitializedRef.current = true;
 
-    // Create terminal instance
+    // Create xterm.js instance (UI layer)
     const terminal = new Terminal({
       theme: TERMINAL_THEME,
       fontSize: 12,
@@ -98,93 +112,52 @@ export default function AgentTerminalView({ terminalId, selected = false }: Agen
 
     terminal.focus();
 
-    // Create terminal process in main process
-    if (window.electronAPI && !terminalProcessCreatedRef.current) {
-      terminalProcessCreatedRef.current = true;
-      window.electronAPI.createTerminal(terminalId);
-
-      // Restore terminal buffer after refresh (if any exists)
-      // This must happen BEFORE setting up data listeners to avoid duplicate output
-      if (window.terminalSessionAPI) {
-        window.terminalSessionAPI.getTerminalBuffer(terminalId).then((buffer) => {
-          if (buffer && buffer.length > 0) {
-            console.log('[AgentTerminalView] Restoring terminal buffer', {
-              terminalId,
-              bufferLength: buffer.length,
-            });
-            terminal.write(buffer);
-          }
-        }).catch((error) => {
-          console.warn('[AgentTerminalView] Failed to restore terminal buffer', error);
+    // Create terminal process and start agent REPL
+    terminalService.create().then(async () => {
+      // Restore terminal buffer after process creation
+      const buffer = await terminalService.getBuffer();
+      if (buffer) {
+        console.log('[AgentTerminalView] Restoring terminal buffer', {
+          terminalId: terminalService.terminalId,
+          bufferLength: buffer.length,
         });
+        terminal.write(buffer);
       }
-    }
 
-    // Send terminal input to main process
-    terminal.onData((inputData: string) => {
-      if (window.electronAPI) {
-        window.electronAPI.sendTerminalInput(terminalId, inputData);
-      }
+      // Start agent REPL in the terminal
+      // agent.start() is idempotent - it checks if already running
+      await agentService.start(workspacePath, sessionId, initialPrompt);
+    }).catch((error) => {
+      console.warn('[AgentTerminalView] Failed to create terminal or start agent', error);
     });
 
-    // Receive terminal output from main process
-    let handleTerminalData: ((data: { terminalId: string; data: string }) => void) | null =
-      null;
-    let handleTerminalExit:
-      | ((data: { terminalId: string; code: number; signal?: number }) => void)
-      | null = null;
+    // Connect xterm.js input to terminal service
+    terminal.onData((inputData: string) => {
+      terminalService.write(inputData);
+    });
 
-    if (window.electronAPI) {
-      handleTerminalData = ({
-        terminalId: dataTerminalId,
-        data: outputData,
-      }: {
-        terminalId: string;
-        data: string;
-      }) => {
-        if (dataTerminalId === terminalId) {
-          terminal.write(outputData);
-        }
-      };
+    // Connect terminal service output to xterm.js
+    const unsubscribeData = terminalService.onData((data: string) => {
+      terminal.write(data);
+    });
 
-      handleTerminalExit = ({
-        terminalId: dataTerminalId,
-        code,
-        signal,
-      }: {
-        terminalId: string;
-        code: number;
-        signal?: number;
-      }) => {
-        if (dataTerminalId === terminalId) {
-          const isImmediateExit = code === 1 && signal === 1;
+    // Handle terminal exit events
+    const unsubscribeExit = terminalService.onExit((code: number, signal?: number) => {
+      const isImmediateExit = code === 1 && signal === 1;
 
-          if (!isImmediateExit) {
-            terminal.write(
-              `\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`
-            );
-          }
+      if (!isImmediateExit) {
+        terminal.write(
+          `\r\n\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`
+        );
+      }
 
-          // Restart terminal
-          if (window.electronAPI) {
-            setTimeout(() => {
-              terminalProcessCreatedRef.current = false;
-              window.electronAPI?.createTerminal(terminalId);
-              terminalProcessCreatedRef.current = true;
-            }, isImmediateExit ? 1000 : 100);
-          }
-        }
-      };
+      // DO NOT auto-restart - parent (AgentNodePresentation) controls terminal lifecycle
+      // via useAgentViewMode hook. This allows proper coordination with chat view
+      // to avoid Claude Code session conflicts.
+      console.log('[AgentTerminalView] Terminal exited, awaiting parent direction');
+    });
 
-      window.electronAPI.onTerminalData(handleTerminalData);
-      window.electronAPI.onTerminalExit(handleTerminalExit);
-    } else {
-      // Fallback when no API available
-      terminal.writeln('Agent Terminal');
-      terminal.write('$ ');
-    }
-
-    // Handle resize
+    // Handle resize via service
     let resizeTimeout: NodeJS.Timeout | null = null;
     let lastResizeDimensions: { cols: number; rows: number } | null = null;
 
@@ -201,14 +174,14 @@ export default function AgentTerminalView({ terminalId, selected = false }: Agen
           const dimensions = fitAddonRef.current?.proposeDimensions();
           // Validate dimensions are positive (required by node-pty)
           // This can be 0 when terminal is hidden via display:none
-          if (dimensions && dimensions.cols > 0 && dimensions.rows > 0 && window.electronAPI) {
+          if (dimensions && dimensions.cols > 0 && dimensions.rows > 0) {
             if (
               !lastResizeDimensions ||
               lastResizeDimensions.cols !== dimensions.cols ||
               lastResizeDimensions.rows !== dimensions.rows
             ) {
               lastResizeDimensions = { cols: dimensions.cols, rows: dimensions.rows };
-              window.electronAPI.sendTerminalResize(terminalId, dimensions.cols, dimensions.rows);
+              terminalService.resize(dimensions.cols, dimensions.rows);
             }
           }
         } catch (error) {
@@ -225,24 +198,28 @@ export default function AgentTerminalView({ terminalId, selected = false }: Agen
     // Initial resize
     setTimeout(handleResize, 100);
 
-    // Cleanup
+    // Cleanup on unmount
+    // NOTE: Terminal PTY lifecycle is managed externally:
+    // - useAgentViewMode.setActiveView('chat') destroys PTY when switching to chat
+    // - AgentNodePresentation unmount stops the agent
+    // This cleanup only disposes the xterm.js UI, not the PTY process.
+    // This is intentional to support React StrictMode (double mount/unmount).
     return () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeObserver.disconnect();
 
-      // Only destroy terminal if it had time to run
+      // Unsubscribe from service events
+      unsubscribeData();
+      unsubscribeExit();
+
+      // Only dispose xterm.js UI if it was initialized
       if (isInitializedRef.current) {
-        if (window.electronAPI) {
-          // Remove listeners using the channel-based API
-          window.electronAPI.removeAllListeners?.('terminal:data');
-          window.electronAPI.removeAllListeners?.('terminal:exit');
-        }
         terminal.dispose();
       }
 
       isInitializedRef.current = false;
     };
-  }, [terminalId]);
+  }, [terminalService, agentService, workspacePath, sessionId, initialPrompt]);
 
   // Handle scroll events when node is selected
   // Only prevent canvas scrolling when node is selected (clicked)

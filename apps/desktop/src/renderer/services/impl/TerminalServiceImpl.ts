@@ -158,6 +158,23 @@ export class TerminalServiceImpl implements ITerminalService {
   }
 
   /**
+   * Get terminal buffer for restoration after view switch
+   */
+  async getBuffer(): Promise<string | null> {
+    if (!window.terminalSessionAPI) {
+      return null;
+    }
+
+    try {
+      const buffer = await window.terminalSessionAPI.getTerminalBuffer(this.terminalId);
+      return buffer && buffer.length > 0 ? buffer : null;
+    } catch (error) {
+      console.warn('[TerminalService] Failed to get terminal buffer:', error);
+      return null;
+    }
+  }
+
+  /**
    * Dispose the service - cleanup resources
    */
   async dispose(): Promise<void> {

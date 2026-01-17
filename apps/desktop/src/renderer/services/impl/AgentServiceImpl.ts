@@ -424,6 +424,60 @@ export class AgentServiceImpl implements IAgentService {
     // but the pty process is still running in the main process.
   }
 
+  /**
+   * Gracefully exit the CLI REPL and wait for process to terminate.
+   * Sends vendor-specific exit command via adapter and waits for terminal exit.
+   * @param timeoutMs - Max time to wait for graceful exit before forcing destroy
+   */
+  async exitRepl(timeoutMs = 3000): Promise<void> {
+    if (!this.terminalService.isRunning()) {
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      let resolved = false;
+
+      // Set up timeout in case REPL doesn't exit gracefully
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.warn('[AgentService] REPL exit timeout, forcing terminal destroy');
+          this.terminalService.destroy().finally(resolve);
+        }
+      }, timeoutMs);
+
+      // Listen for terminal exit
+      const unsubscribe = this.terminalService.onExit(() => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          unsubscribe();
+          console.log('[AgentService] REPL exited gracefully');
+          // Terminal already exited, just update service state
+          this.terminalService.destroy().finally(resolve);
+        }
+      });
+
+      // Send vendor-specific exit command via adapter
+      if (this.adapter) {
+        const exitCommand = this.adapter.getExitCommand();
+        console.log('[AgentService] Sending exit command to REPL');
+        this.terminalService.write(exitCommand);
+      } else {
+        // No adapter - force destroy immediately
+        console.warn('[AgentService] No adapter available, forcing terminal destroy');
+        resolved = true;
+        clearTimeout(timeout);
+        unsubscribe();
+        this.terminalService.destroy().finally(resolve);
+      }
+
+      // Update running state
+      this.isRunning = false;
+      this.updateStatus('idle');
+    });
+  }
+
   // =============================================================================
   // Status
   // =============================================================================

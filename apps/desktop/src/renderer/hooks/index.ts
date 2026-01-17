@@ -77,3 +77,18 @@ export type {
   MilestoneOption as LinearMilestoneOption,
   LinearFilterState,
 } from '../stores/ILinearStore';
+
+// =============================================================================
+// View Mode Hook - Terminal/Chat view coordination
+// =============================================================================
+export { useAgentViewMode } from './useAgentViewMode';
+export type { UseAgentViewModeInput, UseAgentViewModeReturn } from './useAgentViewMode';
+
+// =============================================================================
+// Preloaded Chat Messages Hook - Background message loading for fast view switch
+// =============================================================================
+export { usePreloadedChatMessages } from './usePreloadedChatMessages';
+export type {
+  UsePreloadedChatMessagesOptions,
+  UsePreloadedChatMessagesReturn,
+} from './usePreloadedChatMessages';

@@ -412,6 +412,13 @@ export interface ICodingAgentAdapter {
    */
   buildResumeSessionCommand?(workspacePath: string, sessionId: string): string;
 
+  /**
+   * Get the command to gracefully exit the CLI REPL.
+   * This is vendor-specific (e.g., "/exit" for Claude Code, "exit" for others).
+   * @returns Exit command string including newline
+   */
+  getExitCommand(): string;
+
   // ============================================
   // Events
   // ============================================

@@ -319,6 +319,13 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     return `cd "${escapedPath}" && claude --resume ${sessionId}\n`;
   }
 
+  /**
+   * Get the command to gracefully exit the Claude Code REPL.
+   */
+  getExitCommand(): string {
+    return '/exit\n';
+  }
+
   // ============================================
   // Events
   // ============================================
