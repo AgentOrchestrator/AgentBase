@@ -20,12 +20,19 @@
   max-height: 50px;
 }
 
-/* Handle */
+/* Handle - fully invisible but functional */
 .agent-chat-handle {
-  background: var(--handle-color, transparent);
+  background: transparent !important;
   width: 8px;
   height: 8px;
-  border: none;
+  border: none !important;
+  opacity: 0 !important;
+}
+
+.agent-chat-handle:hover {
+  background: transparent !important;
+  border: none !important;
+  opacity: 0 !important;
 }
 
 /* Header */

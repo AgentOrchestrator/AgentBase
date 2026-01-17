@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { NodeProps } from '@xyflow/react';
+import { NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import type { AgentNodeData } from '../../types/agent-node';
 import { NodeContextProvider } from '../../context';
 import { AgentNodePresentation } from './AgentNodePresentation';
@@ -22,6 +22,8 @@ import { useAgentState } from '../../hooks/useAgentState';
  * 3. Handles workspace selection modal (UI state only)
  */
 function AgentNode({ data, id, selected }: NodeProps) {
+  const updateNodeInternals = useUpdateNodeInternals();
+
   // Capture initial data only once to prevent re-renders from unstable references
   const initialDataRef = useRef<AgentNodeData | null>(null);
   if (!initialDataRef.current) {
@@ -39,6 +41,12 @@ function AgentNode({ data, id, selected }: NodeProps) {
     // This happens when Canvas dispatches update-node events
     setSyncedData(currentData);
   }, [currentData]);
+
+  // Update React Flow's internal handle position tracking after mount
+  // This ensures handles on all sides are properly registered for edge connections
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, updateNodeInternals]);
 
   // ---------------------------------------------------------------------------
   // Single Source of Truth: useAgentState()
