@@ -358,3 +358,150 @@
   background: var(--color-bg-primary);
   border-color: var(--color-border);
 }
+
+/* ============================================ */
+/* Fork Mode Styles                             */
+/* ============================================ */
+
+/* Modal title for fork mode */
+.new-agent-modal-title {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-right: 12px;
+}
+
+/* Fork input row - input + checkbox inline */
+.new-agent-modal-fork-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Fork input - minimal, no border */
+.new-agent-modal-fork-input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: auto;
+  resize: none;
+}
+
+.new-agent-modal-fork-input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Worktree checkbox next to fork input */
+.new-agent-modal-fork-worktree-checkbox {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Proposed worktree path display */
+.new-agent-modal-fork-worktree-path {
+  margin-top: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary, #888);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-agent-modal-fork-worktree-label {
+  color: var(--color-text-tertiary, #666);
+  flex-shrink: 0;
+}
+
+.new-agent-modal-fork-worktree-value {
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  color: var(--color-text-secondary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-agent-modal-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.new-agent-modal-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-accent, #3b82f6);
+}
+
+.new-agent-modal-checkbox-text {
+  color: var(--color-text-secondary, #888);
+  font-size: 12px;
+}
+
+/* Message preview section */
+.new-agent-modal-preview-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.new-agent-modal-preview-toggle {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #888);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-preview-toggle:hover {
+  color: var(--color-text-primary);
+}
+
+.new-agent-modal-preview-content {
+  margin-top: 12px;
+}
+
+.new-agent-modal-preview-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-secondary, #888);
+  font-size: 13px;
+}
+
+/* Fork mode footer with session info */
+.new-agent-modal-footer.fork-mode-footer {
+  justify-content: space-between;
+}
+
+.new-agent-modal-session-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.new-agent-modal-session-id {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  color: var(--color-text-tertiary, #555);
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

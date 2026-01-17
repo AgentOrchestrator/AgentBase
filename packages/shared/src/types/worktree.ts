@@ -59,8 +59,12 @@ export interface WorktreeProvisionOptions {
   baseBranch?: string;
   /** Agent ID to associate with this worktree */
   agentId?: string;
-  /** Custom subdirectory name within base worktree directory */
-  directoryName?: string;
+  /**
+   * Full path where the worktree should be created.
+   * This is required - the caller must provide an explicit path.
+   * Typically this should be a sibling folder to the parent workspace.
+   */
+  worktreePath: string;
 }
 
 /**

@@ -50,6 +50,12 @@ export interface ForkRequest {
    * - false: Text Selection Fork behavior - stays in same workspace
    */
   createWorktree?: boolean;
+  /**
+   * Full path where the worktree will be created.
+   * Required when createWorktree=true.
+   * Should be a sibling folder to the parent workspace.
+   */
+  worktreePath?: string;
 }
 
 /**
@@ -236,12 +242,24 @@ export class ForkService implements IForkService {
       };
     }
 
+    // Validate worktreePath is provided
+    if (!request.worktreePath) {
+      return {
+        success: false,
+        error: {
+          type: 'VALIDATION_FAILED',
+          message: 'worktreePath is required when creating a worktree',
+        },
+      };
+    }
+
     // Step 1: Create worktree
     const branchName = sanitizeBranchName(request.forkTitle);
-    console.log('[ForkService] Creating worktree with branch:', branchName);
+    console.log('[ForkService] Creating worktree with branch:', branchName, 'worktreePath:', request.worktreePath);
 
     const worktreeResult = await worktreeService.createWorktree(request.repoPath, branchName, {
       agentId: request.sourceAgentId,
+      worktreePath: request.worktreePath,
     });
 
     if (!worktreeResult.success || !worktreeResult.worktreeId) {

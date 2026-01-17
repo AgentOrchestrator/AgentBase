@@ -115,7 +115,7 @@ export interface IWorkspaceService extends INodeService {
 
   // Worktree integration
   /** Provision a new git worktree for agent isolation */
-  provisionWorktree(branchName: string): Promise<WorktreeInfo>;
+  provisionWorktree(branchName: string, worktreePath: string): Promise<WorktreeInfo>;
   /** Release a worktree */
   releaseWorktree(worktreeId: string): Promise<void>;
   /** Get currently active worktree */

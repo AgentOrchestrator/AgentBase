@@ -92,11 +92,11 @@ function createMockWorkspaceService(
       currentPath = path;
     },
     getWorkspacePath: () => currentPath,
-    provisionWorktree: async (branchName) => {
+    provisionWorktree: async (branchName, worktreePath) => {
       const worktree: WorktreeInfo = {
         id: `mock-worktree-${Date.now()}`,
         repoPath: currentPath || '/mock/repo',
-        worktreePath: `/mock/worktrees/${branchName}`,
+        worktreePath,
         branchName,
         status: 'active',
         provisionedAt: new Date().toISOString(),

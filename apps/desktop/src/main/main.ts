@@ -202,7 +202,9 @@ const createWindow = (): void => {
     // Open DevTools in development
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '../../../index.html'));
+    // In production, renderer is at dist/renderer/index.html
+    // __dirname is dist/main/src/main, so we go up to dist/ then into renderer/
+    win.loadFile(path.join(__dirname, '../../../renderer/index.html'));
   }
 
   // Return home directory synchronously

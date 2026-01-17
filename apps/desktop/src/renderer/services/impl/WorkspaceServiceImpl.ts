@@ -54,7 +54,7 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
   /**
    * Provision a new git worktree for agent isolation
    */
-  async provisionWorktree(branchName: string): Promise<WorktreeInfo> {
+  async provisionWorktree(branchName: string, worktreePath: string): Promise<WorktreeInfo> {
     if (!this._workspacePath) {
       throw new Error('Workspace path not set - cannot provision worktree');
     }
@@ -66,7 +66,7 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
     const worktree = await window.worktreeAPI.provision(
       this._workspacePath,
       branchName,
-      { agentId: this.nodeId }
+      { agentId: this.nodeId, worktreePath }
     );
 
     this.activeWorktreeId = worktree.id;

@@ -16,7 +16,6 @@ import {
 import '@xyflow/react/dist/style.css';
 import { MeshGradient, Dithering } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
-import ForkSessionModal from './ForkSessionModal';
 import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import { forkStore, nodeStore } from './stores';
@@ -688,8 +687,14 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
   // =============================================================================
 
   const handleForkConfirm = useCallback(
-    async (forkTitle: string) => {
-      const result = await forkModal.confirm(forkTitle);
+    async (data: {
+      title: string;
+      workspacePath: string;
+      gitInfo: { branch?: string };
+      createWorktree: boolean;
+      branchName?: string;
+    }) => {
+      const result = await forkModal.confirm(data);
       if (result.success) {
         setNodes((nds) => [...nds, result.forkedNode]);
         setEdges((eds) => [...eds, result.newEdge]);
@@ -1968,22 +1973,28 @@ const { screenToFlowPosition, getNodes } = useReactFlow();
           <ForkGhostNode />
         </ReactFlow>
 
-        {/* Fork Session Modal */}
-        {forkModal.isOpen && (
-          <ForkSessionModal
-            onConfirm={handleForkConfirm}
-            onCancel={forkModal.cancel}
-            isLoading={forkModal.isLoading}
-            error={forkModal.error}
+        {/* Fork Session Modal - uses NewAgentModal in fork mode */}
+        {forkModal.isOpen && forkModal.modalData && (
+          <NewAgentModal
+            isOpen={true}
+            onClose={forkModal.cancel}
+            onCreate={() => {}} // Not used in fork mode
+            initialWorkspacePath={forkModal.modalData.workspacePath}
+            // Fork mode props
+            isForkMode={true}
+            forkData={{
+              parentSessionId: forkModal.modalData.sessionId,
+              parentBranch: forkModal.modalData.parentBranch,
+              targetMessageId: forkModal.modalData.targetMessageId,
+              originalTargetMessageId: forkModal.modalData.originalTargetMessageId,
+              createWorktree: forkModal.modalData.createWorktree,
+            }}
             messages={forkModal.messages}
             isLoadingMessages={forkModal.isLoadingMessages}
             onLoadMessages={forkModal.loadMessages}
             cutoffMessageId={forkModal.cutoffMessageId}
-            originalTargetMessageId={forkModal.modalData?.originalTargetMessageId}
             onCutoffChange={forkModal.setCutoffMessageId}
-            createWorktree={forkModal.modalData?.createWorktree}
-            workspacePath={forkModal.modalData?.workspacePath}
-            sessionId={forkModal.modalData?.sessionId}
+            onForkConfirm={handleForkConfirm}
           />
         )}
 

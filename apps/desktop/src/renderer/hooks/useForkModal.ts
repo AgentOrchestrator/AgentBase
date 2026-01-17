@@ -52,6 +52,8 @@ export interface ForkModalData {
    * - false: Text Selection Fork behavior - stays in same workspace
    */
   createWorktree: boolean;
+  /** Parent's current git branch (for default branch value) */
+  parentBranch?: string;
 }
 
 /**
@@ -105,11 +107,19 @@ export interface UseForkModalReturn {
    */
   open: (sourceNodeId: string, position: { x: number; y: number }, targetMessageId?: string, createWorktree?: boolean) => Promise<void>;
   /**
-   * Confirm the fork operation with a title
-   * @param forkTitle - Title for the forked agent
+   * Confirm the fork operation with data from NewAgentModal
+   * @param data - Fork confirmation data from the modal
    * @returns Result with new node/edge data or error
    */
-  confirm: (forkTitle: string) => Promise<ForkConfirmResult | ForkConfirmError>;
+  confirm: (data: {
+    title: string;
+    workspacePath: string;
+    gitInfo: { branch?: string };
+    createWorktree: boolean;
+    branchName?: string;
+    /** Directory name for worktree (deterministic, no timestamp) */
+    worktreeDirectoryName?: string;
+  }) => Promise<ForkConfirmResult | ForkConfirmError>;
   /** Cancel and close the modal */
   cancel: () => void;
   /** Clear the current error */
@@ -235,6 +245,9 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         return;
       }
 
+      // Get parent branch from gitInfo if available
+      const parentBranch = sourceData.gitInfo?.branch;
+
       // Show fork modal with resolved session/workspace and optional message filter
       setModalData({
         sourceNodeId,
@@ -245,6 +258,7 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         originalTargetMessageId: targetMessageId,
         agentType: sourceData.agentType,
         createWorktree,
+        parentBranch,
       });
       // Initialize cutoff from targetMessageId (if provided from text selection)
       setCutoffMessageIdState(targetMessageId || null);
@@ -259,7 +273,16 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
    * Confirm the fork operation
    */
   const confirm = useCallback(
-    async (forkTitle: string): Promise<ForkConfirmResult | ForkConfirmError> => {
+    async (data: {
+      title: string;
+      workspacePath: string;
+      gitInfo: { branch?: string };
+      createWorktree: boolean;
+      branchName?: string;
+      worktreePath?: string;
+    }): Promise<ForkConfirmResult | ForkConfirmError> => {
+      const { title: forkTitle, workspacePath: customWorkspacePath, createWorktree, branchName, worktreePath } = data;
+
       if (!modalData) {
         return { success: false, error: 'No fork operation in progress' };
       }
@@ -279,6 +302,12 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
         return { success: false, error: 'Missing session or workspace' };
       }
 
+      // Use provided createWorktree from modal
+      const shouldCreateWorktree = createWorktree;
+
+      // Use custom workspace path if provided by user
+      const effectiveRepoPath = customWorkspacePath || workspacePath;
+
       setIsLoading(true);
       setError(null);
 
@@ -295,18 +324,22 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           targetMessageId: modalData.targetMessageId,
           effectiveCutoff,
           filterOptions,
-          createWorktree: modalData.createWorktree,
+          createWorktree: shouldCreateWorktree,
+          branchName,
+          customWorkspacePath,
         });
 
         // Call fork service to fork session (with or without worktree)
+        // Pass branchName to forkTitle if user customized it for worktree naming
         const result = await forkService.forkAgent({
           sourceAgentId: sourceData.agentId,
           sessionId,
           agentType: sourceData.agentType,
-          forkTitle,
-          repoPath: workspacePath,
+          forkTitle: branchName || forkTitle, // Use branchName for worktree branch if provided
+          repoPath: effectiveRepoPath,
           filterOptions,
-          createWorktree: modalData.createWorktree,
+          createWorktree: shouldCreateWorktree,
+          worktreePath, // Pass through for deterministic worktree path
         });
 
         if (!result.success) {

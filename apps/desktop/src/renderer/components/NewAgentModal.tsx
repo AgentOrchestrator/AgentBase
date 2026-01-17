@@ -3,7 +3,25 @@ import './NewAgentModal.css';
 import { worktreeService } from '../services/WorktreeService';
 import type { WorktreeInfo } from '../../main/types/worktree';
 import { BranchSwitchWarningDialog } from './BranchSwitchWarningDialog';
+import { MessagePreviewPanel } from './MessagePreviewPanel';
 import type { GitInfo } from '@agent-orchestrator/shared';
+import type { MessagePreview } from '../hooks/useForkModal';
+
+/**
+ * Data for fork mode operations
+ */
+interface ForkData {
+  /** Parent session ID being forked */
+  parentSessionId: string;
+  /** Parent's current git branch */
+  parentBranch?: string;
+  /** Target message ID for filtering context */
+  targetMessageId?: string;
+  /** Original target message ID from text selection */
+  originalTargetMessageId?: string;
+  /** Whether to create a worktree by default */
+  createWorktree?: boolean;
+}
 
 interface NewAgentModalProps {
   isOpen: boolean;
@@ -23,6 +41,35 @@ interface NewAgentModalProps {
   initialWorkspacePath?: string | null;
   autoCreateWorktree?: boolean;
   initialDescription?: string;
+
+  // Fork mode props
+  /** Whether the modal is in fork mode */
+  isForkMode?: boolean;
+  /** Fork operation data */
+  forkData?: ForkData;
+  /** Messages for context preview */
+  messages?: MessagePreview[] | null;
+  /** Whether messages are loading */
+  isLoadingMessages?: boolean;
+  /** Callback to load messages */
+  onLoadMessages?: () => void;
+  /** Currently selected cutoff message ID */
+  cutoffMessageId?: string | null;
+  /** Callback when cutoff changes */
+  onCutoffChange?: (messageId: string) => void;
+  /** Callback for fork confirmation (used instead of onCreate in fork mode) */
+  onForkConfirm?: (data: {
+    title: string;
+    workspacePath: string;
+    gitInfo: GitInfo;
+    createWorktree: boolean;
+    branchName?: string;
+    /**
+     * Explicit worktree path or directory name for worktree creation.
+     * When createWorktree=true, this specifies where the worktree will be created.
+     */
+    worktreePath?: string;
+  }) => void;
 }
 
 export function NewAgentModal({
@@ -33,6 +80,15 @@ export function NewAgentModal({
   initialWorkspacePath,
   autoCreateWorktree = false,
   initialDescription,
+  // Fork mode props
+  isForkMode = false,
+  forkData,
+  messages: forkMessages,
+  isLoadingMessages = false,
+  onLoadMessages,
+  cutoffMessageId,
+  onCutoffChange,
+  onForkConfirm,
 }: NewAgentModalProps) {
   const [description, setDescription] = useState('');
   const [workspacePath, setWorkspacePath] = useState<string | null>(initialWorkspacePath || null);
@@ -52,6 +108,9 @@ export function NewAgentModal({
   const [selectedBranchIndex, setSelectedBranchIndex] = useState<number | null>(null);
   const [keyboardFocus, setKeyboardFocus] = useState<'input' | 'folder' | 'branch'>('input');
   const [dropdownItemIndex, setDropdownItemIndex] = useState<number | null>(null);
+  // Fork mode state
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [shouldCreateWorktreeForFork, setShouldCreateWorktreeForFork] = useState(forkData?.createWorktree ?? true);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -403,12 +462,20 @@ export function NewAgentModal({
 
     try {
       // Generate a branch name based on timestamp or description
-      const branchName = description.trim() 
+      const branchName = description.trim()
         ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}-${Date.now().toString().slice(-6)}`
         : `agent-${Date.now().toString().slice(-6)}`;
 
+      // Compute full sibling worktree path
+      const parentDir = workspacePath.split('/').slice(0, -1).join('/');
+      const dirName = description.trim()
+        ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+        : `agent-${Date.now().toString().slice(-6)}`;
+      const fullWorktreePath = `${parentDir}/${dirName}`;
+
       const result = await worktreeService.createWorktree(workspacePath, branchName, {
         agentId: undefined, // Will be set when agent is created
+        worktreePath: fullWorktreePath,
       });
 
       if (!result.success) {
@@ -538,6 +605,28 @@ export function NewAgentModal({
       return;
     }
 
+    // Fork mode: call onForkConfirm instead of onCreate
+    if (isForkMode && onForkConfirm) {
+      // Compute full sibling worktree path from workspace path
+      const parentDir = finalWorkspacePath.split('/').slice(0, -1).join('/');
+      const dirName = description.trim()
+        ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+        : `agent-fork-${Date.now()}`;
+      const fullWorktreePath = `${parentDir}/${dirName}`;
+
+      onForkConfirm({
+        title: description.trim(),
+        workspacePath: finalWorkspacePath,
+        gitInfo,
+        createWorktree: shouldCreateWorktreeForFork,
+        branchName: gitInfo.branch,
+        worktreePath: shouldCreateWorktreeForFork ? fullWorktreePath : undefined,
+      });
+      onClose();
+      return;
+    }
+
+    // Regular mode: call onCreate
     onCreate({
       title: description.trim() || 'New Agent',
       description: description.trim(),
@@ -560,6 +649,10 @@ export function NewAgentModal({
         {/* Top Bar */}
         <div className="new-agent-modal-header">
           <div className="new-agent-modal-header-left">
+            {/* Fork mode title */}
+            {isForkMode && (
+              <span className="new-agent-modal-title">Fork Agent Session</span>
+            )}
             {/* Show original folder only if no worktree is active */}
             {!worktreeInfo && (
               <div 
@@ -831,44 +924,140 @@ export function NewAgentModal({
 
         {/* Main Content */}
         <div className="new-agent-modal-content">
-          <textarea
-            ref={descriptionInputRef}
-            className="new-agent-modal-description-input"
-            placeholder="Create a new agent"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onKeyDown={(e) => {
-              // Only handle Enter if keyboardFocus is 'input' (text entry box is active)
-              if (keyboardFocus === 'input') {
-                // Shift+Enter: Allow default behavior (line break)
-                if (e.key === 'Enter' && e.shiftKey) {
-                  return; // Allow default behavior
+          {/* Fork mode: Fork name input with inline worktree checkbox */}
+          {isForkMode && (
+            <div className="new-agent-modal-fork-input-row">
+              <textarea
+                ref={descriptionInputRef}
+                className="new-agent-modal-description-input new-agent-modal-fork-input"
+                placeholder="Fork name..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onKeyDown={(e) => {
+                  if (keyboardFocus === 'input') {
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      return;
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleCreate();
+                      return;
+                    }
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleCreate();
+                      return;
+                    }
+                  }
+                }}
+                rows={1}
+              />
+              <label className="new-agent-modal-checkbox-label new-agent-modal-fork-worktree-checkbox">
+                <input
+                  type="checkbox"
+                  className="new-agent-modal-checkbox"
+                  checked={shouldCreateWorktreeForFork}
+                  onChange={(e) => setShouldCreateWorktreeForFork(e.target.checked)}
+                />
+                <span className="new-agent-modal-checkbox-text">Worktree</span>
+              </label>
+            </div>
+          )}
+          {/* Regular mode: standard textarea */}
+          {!isForkMode && (
+            <textarea
+              ref={descriptionInputRef}
+              className="new-agent-modal-description-input"
+              placeholder="Create a new agent"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => {
+                if (keyboardFocus === 'input') {
+                  if (e.key === 'Enter' && e.shiftKey) {
+                    return;
+                  }
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleCreate();
+                    return;
+                  }
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleCreate();
+                    return;
+                  }
                 }
-                // Enter (without Shift): Create agent
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleCreate();
-                  return;
-                }
-                // Cmd/Ctrl+Enter: Create agent
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleCreate();
-                  return;
-                }
-              }
-              // Tab is handled by global handler
-            }}
-            rows={6}
-          />
+              }}
+              rows={6}
+            />
+          )}
+          {/* Fork mode: Show full worktree path when worktree checkbox is checked */}
+          {isForkMode && shouldCreateWorktreeForFork && workspacePath && (
+            <div className="new-agent-modal-fork-worktree-path">
+              <span className="new-agent-modal-fork-worktree-label">Create Agent in:</span>
+              <span className="new-agent-modal-fork-worktree-value">
+                {(() => {
+                  // Compute sibling path: parent directory of workspace + directory name
+                  const parentDir = workspacePath.split('/').slice(0, -1).join('/');
+                  const dirName = description.trim()
+                    ? `agent-${description.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30)}`
+                    : 'agent-fork';
+                  return `${parentDir}/${dirName}`;
+                })()}
+              </span>
+            </div>
+          )}
+
+          {/* Fork mode: Message preview section */}
+          {isForkMode && onLoadMessages && (
+            <div className="new-agent-modal-preview-section">
+              <button
+                type="button"
+                className="new-agent-modal-preview-toggle"
+                onClick={() => {
+                  if (!isPreviewExpanded && !forkMessages) {
+                    onLoadMessages();
+                  }
+                  setIsPreviewExpanded(!isPreviewExpanded);
+                }}
+              >
+                {isPreviewExpanded ? '▼' : '▶'} Preview Context
+              </button>
+
+              {isPreviewExpanded && (
+                <div className="new-agent-modal-preview-content">
+                  {forkMessages && onCutoffChange ? (
+                    <MessagePreviewPanel
+                      messages={forkMessages}
+                      cutoffMessageId={cutoffMessageId ?? null}
+                      originalTargetMessageId={forkData?.originalTargetMessageId}
+                      onCutoffChange={onCutoffChange}
+                      isLoading={isLoadingMessages}
+                    />
+                  ) : isLoadingMessages ? (
+                    <div className="new-agent-modal-preview-loading">Loading messages...</div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom Bar */}
-        <div className="new-agent-modal-footer">
+        <div className={`new-agent-modal-footer ${isForkMode ? 'fork-mode-footer' : ''}`}>
+          {/* Fork mode: Show parent session info on the left */}
+          {isForkMode && forkData && (
+            <div className="new-agent-modal-session-info">
+              <span className="new-agent-modal-session-id">
+                from: {forkData.parentSessionId}
+              </span>
+            </div>
+          )}
           <button
             className="new-agent-modal-create-btn"
             onClick={handleCreate}
             disabled={
+              (isForkMode && !description.trim()) ||
               (isCreatingNewBranch && !newBranchName.trim()) ||
               isCreatingBranch ||
               isCreatingWorktree ||
@@ -881,6 +1070,7 @@ export function NewAgentModal({
              isCreatingWorktree ? 'Creating worktree...' :
              isLoadingGit ? 'Checking git...' :
              !gitInfo ? 'Git required' :
+             isForkMode ? 'Create fork' :
              'Start agent'}
           </button>
         </div>

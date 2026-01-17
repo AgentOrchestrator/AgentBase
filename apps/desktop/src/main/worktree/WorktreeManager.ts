@@ -60,10 +60,12 @@ export class WorktreeManager implements IWorktreeManager {
 
     try {
       await this.validateRepository(repoPath);
-      const worktreePath = this.generateWorktreePath(
-        branchName,
-        options?.directoryName
-      );
+
+      // worktreePath is now required - caller must provide explicit path
+      if (!options?.worktreePath) {
+        throw new Error('worktreePath is required: caller must provide an explicit path for the worktree');
+      }
+      const worktreePath = options.worktreePath;
 
       await this.store.insert({
         id: worktreeId,
@@ -236,6 +238,7 @@ export class WorktreeManager implements IWorktreeManager {
     worktreePath: string,
     branchName: string
   ): Promise<void> {
+    console.log('Adding worktree:', { repoPath, worktreePath, branchName });
     await this.git.exec(repoPath, ['worktree', 'add', worktreePath, branchName]);
   }
 
@@ -259,15 +262,6 @@ export class WorktreeManager implements IWorktreeManager {
   ): Promise<void> {
     const flag = force ? '-D' : '-d';
     await this.git.exec(repoPath, ['branch', flag, branchName]);
-  }
-
-  private generateWorktreePath(
-    branchName: string,
-    directoryName?: string
-  ): string {
-    const safeBranchName = branchName.replace(/[^a-zA-Z0-9-_]/g, '-');
-    const dirName = directoryName ?? `${safeBranchName}-${Date.now()}`;
-    return path.join(this.config.baseWorktreeDirectory, dirName);
   }
 
   private rowToWorktreeInfo(row: WorktreeRow): WorktreeInfo {
