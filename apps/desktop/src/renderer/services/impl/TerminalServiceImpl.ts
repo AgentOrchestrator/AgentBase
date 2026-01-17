@@ -92,12 +92,46 @@ export class TerminalServiceImpl implements ITerminalService {
     await this.create();
   }
 
+  // ===========================================================================
+  // Public I/O Methods (explicit intent)
+  // ===========================================================================
+
   /**
-   * Write data to terminal stdin
+   * Send user keystroke input to terminal.
+   * Use this for forwarding xterm.js onData events (individual keystrokes).
    */
-  write(data: string): void {
+  sendUserInput(data: string): void {
+    this.writeToTerminal(data, 'sendUserInput');
+  }
+
+  /**
+   * Execute a shell command in the terminal.
+   * Appends newline if not present to execute the command.
+   */
+  executeCommand(command: string): void {
+    const commandWithNewline = command.endsWith('\n') ? command : command + '\n';
+    this.writeToTerminal(commandWithNewline, 'executeCommand');
+  }
+
+  /**
+   * Send a terminal control sequence.
+   * Use this for escape sequences like terminal reset (\x1bc).
+   */
+  sendControlSequence(sequence: string): void {
+    this.writeToTerminal(sequence, 'sendControlSequence');
+  }
+
+  // ===========================================================================
+  // Private Write Implementation
+  // ===========================================================================
+
+  /**
+   * Internal method to write data to terminal stdin.
+   * All public I/O methods delegate to this for consistent logging and validation.
+   */
+  private writeToTerminal(data: string, source: string): void {
     if (!this.isCreated) {
-      console.warn('[TerminalService] Cannot write - terminal not created', {
+      console.warn(`[TerminalService] Cannot ${source} - terminal not created`, {
         terminalId: this.terminalId,
         data: data.substring(0, 100),
       });
@@ -105,11 +139,10 @@ export class TerminalServiceImpl implements ITerminalService {
     }
 
     // Log what's being written to the terminal for debugging
-    console.log('[TerminalService] write()', {
+    console.log(`[TerminalService] ${source}()`, {
       terminalId: this.terminalId,
       dataLength: data.length,
       data: data.length > 200 ? data.substring(0, 200) + '...' : data,
-      stack: new Error().stack?.split('\n').slice(2, 5).join('\n'),
     });
 
     if (window.electronAPI) {

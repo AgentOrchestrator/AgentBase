@@ -42,6 +42,7 @@ export class AgentServiceImpl implements IAgentService {
   private statusListeners: Set<StatusChangeListener> = new Set();
   private currentStatus: CodingAgentStatusInfo | null = null;
   private isRunning = false;
+  private isStarting = false; // Guard against concurrent start() calls
 
   constructor(
     nodeId: string,
@@ -289,7 +290,7 @@ export class AgentServiceImpl implements IAgentService {
         // Small delay to ensure full initialization
         setTimeout(() => {
           console.log('[AgentService] Clearing terminal (Claude ready)');
-          this.terminalService.write('\x1bc'); // Full terminal reset
+          this.terminalService.sendControlSequence('\x1bc'); // Full terminal reset
         }, 100);
       }
     });
@@ -300,7 +301,7 @@ export class AgentServiceImpl implements IAgentService {
         resolved = true;
         unsubscribe();
         console.log('[AgentService] Clearing terminal (timeout fallback)');
-        this.terminalService.write('\x1bc');
+        this.terminalService.sendControlSequence('\x1bc');
       }
     }, timeoutMs);
   }
@@ -320,22 +321,30 @@ export class AgentServiceImpl implements IAgentService {
       agentId: this.agentId,
       terminalId: this.terminalService.terminalId,
       isRunning: this.isRunning,
+      isStarting: this.isStarting,
       workspacePath,
       sessionId,
     });
 
-    if (this.isRunning) {
-      console.log('[AgentService] start() skipped - already running', {
+    // Guard against concurrent start() calls (React re-renders can cause multiple calls)
+    if (this.isRunning || this.isStarting) {
+      console.log('[AgentService] start() skipped - already running or starting', {
         agentId: this.agentId,
+        isRunning: this.isRunning,
+        isStarting: this.isStarting,
       });
       return;
     }
+
+    // Set starting flag immediately to prevent concurrent calls
+    this.isStarting = true;
 
     if (!sessionId) {
       console.error('[AgentService] start() requires sessionId');
       this.updateStatus('error', {
         errorMessage: 'Session ID is required to start the agent',
       });
+      this.isStarting = false;
       return;
     }
 
@@ -386,7 +395,7 @@ export class AgentServiceImpl implements IAgentService {
         }
 
         if (cliCommand) {
-          this.terminalService.write(cliCommand);
+          this.terminalService.executeCommand(cliCommand);
           // Set up terminal clear after Claude REPL is ready
           this.setupTerminalClearOnReady();
         }
@@ -394,6 +403,7 @@ export class AgentServiceImpl implements IAgentService {
     }
 
     this.isRunning = true;
+    this.isStarting = false; // Clear starting flag now that we're running
     this.updateStatus('running');
 
     // Persist session state to main process (survives renderer refresh)
@@ -461,7 +471,7 @@ export class AgentServiceImpl implements IAgentService {
       if (this.adapter) {
         const exitCommand = this.adapter.getExitCommand();
         console.log('[AgentService] Sending exit command to REPL');
-        this.terminalService.write(exitCommand);
+        this.terminalService.executeCommand(exitCommand);
       } else {
         // No adapter - force destroy immediately
         console.warn('[AgentService] No adapter available, forcing terminal destroy');

@@ -133,7 +133,7 @@ export default function AgentTerminalView({
 
     // Connect xterm.js input to terminal service
     terminal.onData((inputData: string) => {
-      terminalService.write(inputData);
+      terminalService.sendUserInput(inputData);
     });
 
     // Connect terminal service output to xterm.js

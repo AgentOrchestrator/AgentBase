@@ -17,18 +17,6 @@ import { useState, useCallback, useRef } from 'react';
 import type { AgentNodeView } from '../../types/agent-node';
 import type { UseAgentViewModeInput, UseAgentViewModeReturn } from './types';
 
-/**
- * Gracefully exit the CLI REPL and destroy terminal.
- * Delegates to agentService.exitRepl() which uses vendor-specific exit command.
- */
-async function exitReplAndDestroyTerminal(
-  agentService: UseAgentViewModeInput['agentService'],
-  timeoutMs = 3000
-): Promise<void> {
-  console.log('[useAgentViewMode] Exiting REPL via agentService');
-  await agentService.exitRepl(timeoutMs);
-}
-
 export function useAgentViewMode({
   terminalService,
   agentService,
@@ -57,7 +45,6 @@ export function useAgentViewMode({
         // Must gracefully exit REPL and destroy terminal PTY to release session lock
         if (previousView === 'terminal' && newView === 'chat') {
           console.log('[useAgentViewMode] Exiting REPL and destroying terminal for chat view');
-          await exitReplAndDestroyTerminal(agentService);
         }
 
         // Case 2: Switching FROM chat TO terminal
@@ -72,7 +59,6 @@ export function useAgentViewMode({
         // Need to exit REPL and destroy terminal to be safe
         if (previousView === 'overview' && newView === 'chat' && terminalService.isRunning()) {
           console.log('[useAgentViewMode] Exiting REPL and destroying terminal (was running) for chat view');
-          await exitReplAndDestroyTerminal(agentService);
         }
 
         // Update state

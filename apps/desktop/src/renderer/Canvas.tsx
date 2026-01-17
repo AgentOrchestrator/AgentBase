@@ -66,12 +66,13 @@ type ContextMenu = {
 
 const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
   const nodeIds = new Set(nodes.map((node) => node.id));
-  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-  
+
   return edges
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
     .map((edge) => {
       // Create a clean edge object, explicitly omitting null/undefined handles
+      // Don't infer handle IDs - let React Flow use default connection points
+      // to avoid timing issues where edges are created before handles are registered
       const nextEdge: Edge = {
         id: edge.id,
         source: edge.source,
@@ -81,26 +82,14 @@ const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
         style: edge.style,
         data: edge.data,
         // Only include handles if they are valid non-null strings
-        ...(edge.sourceHandle && edge.sourceHandle !== 'null' && edge.sourceHandle !== '' 
-          ? { sourceHandle: edge.sourceHandle } 
+        ...(edge.sourceHandle && edge.sourceHandle !== 'null' && edge.sourceHandle !== ''
+          ? { sourceHandle: edge.sourceHandle }
           : {}),
-        ...(edge.targetHandle && edge.targetHandle !== 'null' && edge.targetHandle !== '' 
-          ? { targetHandle: edge.targetHandle } 
+        ...(edge.targetHandle && edge.targetHandle !== 'null' && edge.targetHandle !== ''
+          ? { targetHandle: edge.targetHandle }
           : {}),
       };
-      
-      // If no handles specified, try to infer them for agent -> chat connections
-      if (!nextEdge.sourceHandle && !nextEdge.targetHandle) {
-        const sourceNode = nodeMap.get(edge.source);
-        const targetNode = nodeMap.get(edge.target);
-        
-        // If connecting agent node to chat node, use the correct handles
-        if (sourceNode?.type === 'agent' && targetNode?.type === 'agent-chat') {
-          nextEdge.sourceHandle = 'chat-source';
-          nextEdge.targetHandle = 'chat-target';
-        }
-      }
-      
+
       return nextEdge;
     });
 };

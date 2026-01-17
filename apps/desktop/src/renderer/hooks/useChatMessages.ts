@@ -66,6 +66,7 @@ export function useChatMessages({
 
   const loadedSessionIdRef = useRef<string | null>(null);
   const messagesRef = useRef<CodingAgentMessage[]>([]);
+  const isLoadingRef = useRef(false);
 
   // Keep messagesRef in sync with state
   useEffect(() => {
@@ -77,11 +78,17 @@ export function useChatMessages({
       return;
     }
 
-    // Skip if already loaded for this session
+    // Prevent concurrent loads
+    if (isLoadingRef.current) {
+      return;
+    }
+
+    // Skip if already loaded for this session (initial load only)
     if (loadedSessionIdRef.current === sessionId && isLoaded) {
       return;
     }
 
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -100,6 +107,7 @@ export function useChatMessages({
       console.error('[useChatMessages] Failed to load messages:', err);
       setIsLoaded(true); // Mark as loaded even on error to avoid retry loops
     } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
   }, [sessionId, workspacePath, agentService, enabled, isLoaded]);
@@ -127,6 +135,7 @@ export function useChatMessages({
 
   // Watch for external changes to the session file (e.g., from terminal view)
   // This enables real-time synchronization between terminal and chat views
+  // Deduplication handled by useSessionFileWatcher
   useSessionFileWatcher({
     agentType: agentType as CodingAgentType,
     sessionId,
@@ -143,6 +152,7 @@ export function useChatMessages({
       [loadMessages, isStreaming]
     ),
     enabled: enabled && !!sessionId,
+    debounceMs: 300,
   });
 
   // Send a message and stream the response

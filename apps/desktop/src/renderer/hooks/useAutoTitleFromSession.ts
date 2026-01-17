@@ -37,12 +37,20 @@ export function useAutoTitleFromSession({
   onTitleChange,
 }: UseAutoTitleFromSessionOptions): void {
   const hasCheckedRef = useRef(false);
+  const currentTitleRef = useRef<string | null>(null);
+  const isLoadingRef = useRef(false);
 
   // Function to extract and update title from session
   const updateTitleFromSession = useCallback(async () => {
     if (!sessionId || !workspacePath) {
       return;
     }
+
+    // Prevent concurrent loads
+    if (isLoadingRef.current) {
+      return;
+    }
+    isLoadingRef.current = true;
 
     try {
       console.log('[useAutoTitleFromSession] Loading session for title update:', {
@@ -66,13 +74,20 @@ export function useAutoTitleFromSession({
               ? content.slice(0, MAX_TITLE_LENGTH) + '...'
               : content;
 
-          console.log('[useAutoTitleFromSession] Updating title from session:', {
-            sessionId,
-            newTitle,
-            messageCount: session.messages.length,
-            userMessageCount: userMessages.length,
-          });
-          onTitleChange(newTitle);
+          // Only call onTitleChange if title actually changed
+          if (newTitle !== currentTitleRef.current) {
+            console.log('[useAutoTitleFromSession] Updating title from session:', {
+              sessionId,
+              newTitle,
+              previousTitle: currentTitleRef.current,
+              messageCount: session.messages.length,
+              userMessageCount: userMessages.length,
+            });
+            currentTitleRef.current = newTitle;
+            onTitleChange(newTitle);
+          } else {
+            console.log('[useAutoTitleFromSession] Title unchanged, skipping update');
+          }
         } else {
           console.log('[useAutoTitleFromSession] Last user message has no content');
         }
@@ -82,6 +97,8 @@ export function useAutoTitleFromSession({
     } catch (error) {
       // Session not found yet, will retry on next event
       console.log('[useAutoTitleFromSession] Session not found yet:', error);
+    } finally {
+      isLoadingRef.current = false;
     }
   }, [sessionId, workspacePath, agentService, onTitleChange]);
 
@@ -101,7 +118,7 @@ export function useAutoTitleFromSession({
     return () => clearTimeout(timeoutId);
   }, [sessionId, workspacePath, updateTitleFromSession]);
 
-  // Watch for session file changes
+  // Watch for session file changes (deduplication handled by useSessionFileWatcher)
   useSessionFileWatcher({
     agentType: agentType as CodingAgentType,
     sessionId: sessionId ?? undefined,
@@ -122,5 +139,6 @@ export function useAutoTitleFromSession({
       [updateTitleFromSession]
     ),
     enabled: !!sessionId && !!workspacePath,
+    debounceMs: 300,
   });
 }

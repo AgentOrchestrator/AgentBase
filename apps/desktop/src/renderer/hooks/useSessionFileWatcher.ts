@@ -16,6 +16,8 @@ interface UseSessionFileWatcherOptions {
   onSessionChange: (event: SessionFileChangeEvent) => void;
   /** Whether watching is enabled (default: true) */
   enabled?: boolean;
+  /** Debounce window in ms to deduplicate rapid events (default: 100) */
+  debounceMs?: number;
 }
 
 /**
@@ -41,6 +43,7 @@ export function useSessionFileWatcher({
   sessionId,
   onSessionChange,
   enabled = true,
+  debounceMs = 100,
 }: UseSessionFileWatcherOptions): void {
   // Keep callback ref updated to avoid stale closures
   const onSessionChangeRef = useRef(onSessionChange);
@@ -48,7 +51,11 @@ export function useSessionFileWatcher({
     onSessionChangeRef.current = onSessionChange;
   }, [onSessionChange]);
 
-  // Handle incoming file change events
+  // Deduplication: track last processed event to filter duplicates
+  const lastEventRef = useRef<{ sessionId: string; type: string; timestamp: number } | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle incoming file change events with deduplication
   const handleFileChange = useCallback(
     (event: SessionFileChangeEvent) => {
       // Filter by sessionId if specified
@@ -61,10 +68,36 @@ export function useSessionFileWatcher({
         return;
       }
 
-      console.log('[useSessionFileWatcher] Session file changed:', event);
-      onSessionChangeRef.current(event);
+      // Deduplicate: skip if same event within debounce window
+      const lastEvent = lastEventRef.current;
+      if (
+        lastEvent &&
+        lastEvent.sessionId === event.sessionId &&
+        lastEvent.type === event.type &&
+        event.timestamp - lastEvent.timestamp < debounceMs
+      ) {
+        return;
+      }
+
+      // Clear any pending debounced callback
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Update last event tracking
+      lastEventRef.current = {
+        sessionId: event.sessionId,
+        type: event.type,
+        timestamp: event.timestamp,
+      };
+
+      // Debounce the callback to coalesce rapid events
+      debounceTimerRef.current = setTimeout(() => {
+        console.log('[useSessionFileWatcher] Session file changed:', event);
+        onSessionChangeRef.current(event);
+      }, debounceMs);
     },
-    [sessionId, agentType]
+    [sessionId, agentType, debounceMs]
   );
 
   // Set up watcher
@@ -89,6 +122,11 @@ export function useSessionFileWatcher({
 
     return () => {
       cleanup();
+      // Clear any pending debounced callback
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       // Note: We don't unwatch on cleanup because other components may still need it.
       // The watcher will be cleaned up when the app quits.
     };
