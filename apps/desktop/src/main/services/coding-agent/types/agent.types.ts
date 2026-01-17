@@ -35,8 +35,6 @@ export interface AgentConfig {
   type: CodingAgentType;
   /** Custom path to CLI executable (uses system PATH if not provided) */
   executablePath?: string;
-  /** Default working directory for commands */
-  workingDirectory?: string;
   /** Default timeout in milliseconds */
   timeout?: number;
   /** Additional environment variables */

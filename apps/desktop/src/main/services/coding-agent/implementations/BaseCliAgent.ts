@@ -143,7 +143,7 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
   ): Result<ProcessHandle, AgentError> {
     const processId = crypto.randomUUID();
     const executable = this.getExecutablePath();
-    const cwd = options?.workingDirectory ?? this.config.workingDirectory;
+    const cwd = options?.workingDirectory;
 
     console.log(`[${this.agentType}] Spawning process`, {
       processId,

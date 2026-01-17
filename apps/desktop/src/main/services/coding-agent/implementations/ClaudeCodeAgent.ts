@@ -345,6 +345,8 @@ export class ClaudeCodeAgent
 
     try {
       const options = this.buildQueryOptions(request, abortController, true);
+
+      console.log(`[ClaudeCodeAgent] Starting streaming generate query ${queryId} with options:`, options, request);
       const queryResult = query({ prompt: request.prompt, options });
 
       const handle: QueryHandle = {
@@ -402,7 +404,7 @@ export class ClaudeCodeAgent
     streaming = false
   ): Partial<Options> {
     const options: Partial<Options> = {
-      cwd: request.workingDirectory ?? this.config.workingDirectory,
+      cwd: request.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
       canUseTool: this.canUseTool,
@@ -559,7 +561,7 @@ export class ClaudeCodeAgent
     streaming = false
   ): Partial<Options> {
     const options: Partial<Options> = {
-      cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
+      cwd: continueOptions?.workingDirectory,
       abortController,
       hooks: this.hookBridge.hooks,
       canUseTool: this.canUseTool,
@@ -619,9 +621,9 @@ export class ClaudeCodeAgent
     // Handle same-directory fork (original SDK fork behavior)
     const queryId = crypto.randomUUID();
     const abortController = new AbortController();
-  
-    const targetCwd = options?.workingDirectory ?? this.config.workingDirectory ?? process.cwd();
-    const sourceCwd = this.config.workingDirectory ?? process.cwd();
+
+    const targetCwd = options?.workingDirectory ?? process.cwd();
+    const sourceCwd = process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
 
     try {
