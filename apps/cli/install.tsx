@@ -49,7 +49,6 @@ const InstallApp = () => {
 		{ name: 'Configure OpenAI API Key', status: 'pending' },
 		{ name: 'Create .env files', status: 'pending' },
 		{ name: 'Install dependencies', status: 'pending' },
-		{ name: 'Setup Python memory service', status: 'pending' },
 	]);
 	const [openaiKey, setOpenaiKey] = useState('');
 	const [needsOpenaiInput, setNeedsOpenaiInput] = useState(false);
@@ -146,13 +145,6 @@ const InstallApp = () => {
 				CLAUDE_CODE_HOME: '',
 			});
 
-			// Web .env.local (client-side)
-			const webEnvLocalPath = path.join(process.cwd(), '..', '..', 'apps', 'web', '.env.local');
-			mergeEnvFile(webEnvLocalPath, {
-				NEXT_PUBLIC_SUPABASE_URL: url,
-				NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
-			});
-
 			updateStep(2, 'success');
 
 			// Step 3: Install dependencies (monorepo)
@@ -165,64 +157,6 @@ const InstallApp = () => {
 			});
 
 			updateStep(3, 'success');
-
-			// Step 4: Setup Python memory service
-			setCurrentStep(4);
-			updateStep(4, 'running', 'Setting up Python memory service...');
-			const memoryServicePath = path.join(process.cwd(), '..', '..', 'apps', 'memory-service');
-
-			try {
-				// Check if Python 3 is available
-				await execAsync('python3 --version');
-
-				// Create virtual environment if it doesn't exist
-				const venvPath = path.join(memoryServicePath, 'venv');
-				if (!fs.existsSync(venvPath)) {
-					updateStep(4, 'running', 'Creating Python virtual environment...');
-					await execAsync('python3 -m venv venv', {
-						cwd: memoryServicePath,
-					});
-				}
-
-				// Install dependencies in venv
-				updateStep(4, 'running', 'Installing Python dependencies in venv...');
-				const pipInstallCmd = process.platform === 'win32'
-					? 'venv\\Scripts\\pip install -r requirements.txt'
-					: 'venv/bin/pip install -r requirements.txt';
-
-				await execAsync(pipInstallCmd, {
-					cwd: memoryServicePath,
-					maxBuffer: 1024 * 1024 * 10,
-				});
-
-				// Create .env file for memory service
-				const memoryEnvPath = path.join(memoryServicePath, '.env');
-				if (!fs.existsSync(memoryEnvPath)) {
-					const memoryEnvContent = `# Memory Service Configuration
-# Supabase
-SUPABASE_URL=${url}
-SUPABASE_SERVICE_ROLE_KEY=  # TODO: Add your service role key
-SUPABASE_ANON_KEY=${anonKey}
-
-# Anthropic API (for Claude)
-ANTHROPIC_API_KEY=  # TODO: Add your Anthropic API key
-
-# Mem0 Configuration
-MEM0_MODE=self-hosted
-# MEM0_API_KEY=  # Only needed if using Mem0 Platform
-
-# Service Configuration
-SERVICE_PORT=8000
-SERVICE_HOST=0.0.0.0
-LOG_LEVEL=INFO
-`;
-					fs.writeFileSync(memoryEnvPath, memoryEnvContent);
-				}
-
-				updateStep(4, 'success', 'Python memory service ready');
-			} catch (error) {
-				updateStep(4, 'success', 'Python 3 not found - memory service skipped (optional)');
-			}
 
 			setCompleted(true);
 
@@ -384,10 +318,9 @@ LOG_LEVEL=INFO
 					<Text>     Or use </Text>
 					<Text color="cyan">{runCmd} dev:daemon</Text>
 					<Text> and </Text>
-					<Text color="cyan">{runCmd} dev:web</Text>
+					<Text color="cyan">{runCmd} dev:desktop</Text>
 					<Text> separately</Text>
-					<Text>  2. Access the web app at </Text>
-					<Text color="cyan">http://localhost:3000</Text>
+					<Text>  2. Launch the desktop app</Text>
 					<Newline />
 					<Text dimColor>To stop services: Press Ctrl+C</Text>
 				</Box>

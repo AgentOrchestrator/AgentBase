@@ -3,7 +3,6 @@ import { TrayManager, DaemonStatus } from './tray-manager.js';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,23 +86,12 @@ function handleAuthenticate() {
 
   if (authUrl) {
     // Open the captured auth URL with device_id
-    exec(`open "${authUrl}"`, (error) => {
-      if (error) {
-        console.error('Failed to open browser:', error);
-      } else {
-        console.log('[Electron] Opened browser for authentication');
-      }
+    electron.shell.openExternal(authUrl).catch((error) => {
+      console.error('Failed to open browser:', error);
     });
+    console.log('[Electron] Opened browser for authentication');
   } else {
-    // Fallback: open default daemon-auth page
-    const webUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
-    exec(`open "${webUrl}/daemon-auth"`, (error) => {
-      if (error) {
-        console.error('Failed to open browser:', error);
-      } else {
-        console.log('[Electron] Opened browser for authentication (no device_id captured yet)');
-      }
-    });
+    console.log('[Electron] No auth URL captured yet - waiting for daemon to provide one');
   }
 }
 
@@ -116,11 +104,9 @@ function handleSyncNow() {
 
 function handleOpenDashboard() {
   console.log('Opening dashboard...');
-  exec('open http://localhost:3000', (error) => {
-    if (error) {
-      console.error('Failed to open browser:', error);
-    }
-  });
+  // Dashboard is now in the desktop app - this callback may need to be updated
+  // to show the desktop app window instead
+  console.log('[Electron] Dashboard is available in the desktop app');
 }
 
 electron.app.whenReady().then(() => {

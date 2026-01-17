@@ -131,8 +131,8 @@ export class AuthManager {
   }
 
   getAuthUrl(): string {
-    const webUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
-    return `${webUrl}/daemon-auth?device_id=${this.deviceId}`;
+    // Auth is now handled through the desktop app
+    return `agent-base://auth?device_id=${this.deviceId}`;
   }
 
   async waitForAuth(timeoutMs: number = 300000): Promise<boolean> {

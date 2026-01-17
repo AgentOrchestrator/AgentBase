@@ -175,13 +175,6 @@ For REMOTE Supabase:
 			SESSION_LOOKBACK_DAYS: '30',
 		});
 
-		// Web .env.local (client-side)
-		const webEnvLocalPath = path.join(process.cwd(), '..', '..', 'apps', 'web', '.env.local');
-		mergeEnvFile(webEnvLocalPath, {
-			NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
-			NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
-		});
-
 		log('Environment files created', 'success');
 
 		// Step 4: Install dependencies (skip if already in postinstall)
@@ -199,73 +192,14 @@ For REMOTE Supabase:
 			log(`Skipping dependency installation (already running as part of ${packageManager} install)`, 'info');
 		}
 
-		// Step 5: Install Python dependencies for memory service
-		log('Setting up memory service (Python)...', 'running');
-		const memoryServicePath = path.join(process.cwd(), '..', '..', 'apps', 'memory-service');
-		try {
-			// Check if Python 3 is available
-			await execAsync('python3 --version');
-
-			// Create virtual environment if it doesn't exist
-			const venvPath = path.join(memoryServicePath, 'venv');
-			if (!fs.existsSync(venvPath)) {
-				log('Creating Python virtual environment...', 'running');
-				await execAsync('python3 -m venv venv', {
-					cwd: memoryServicePath,
-				});
-				log('Virtual environment created', 'success');
-			}
-
-			// Install dependencies in venv
-			log('Installing Python dependencies in venv...', 'running');
-			const pipInstallCmd = process.platform === 'win32'
-				? 'venv\\Scripts\\pip install -r requirements.txt'
-				: 'venv/bin/pip install -r requirements.txt';
-
-			await execAsync(pipInstallCmd, {
-				cwd: memoryServicePath,
-				maxBuffer: 1024 * 1024 * 10,
-			});
-			log('Python dependencies installed', 'success');
-
-			// Create .env file for memory service
-			const memoryEnvPath = path.join(memoryServicePath, '.env');
-			if (!fs.existsSync(memoryEnvPath)) {
-				const memoryEnvContent = `# Memory Service Configuration
-# Supabase
-SUPABASE_URL=${supabaseUrl}
-SUPABASE_SERVICE_ROLE_KEY=  # TODO: Add your service role key from supabase status
-SUPABASE_ANON_KEY=${supabaseAnonKey}
-
-# Anthropic API (for Claude)
-ANTHROPIC_API_KEY=  # TODO: Add your Anthropic API key
-
-# Mem0 Configuration
-MEM0_MODE=self-hosted
-# MEM0_API_KEY=  # Only needed if using Mem0 Platform
-
-# Service Configuration
-SERVICE_PORT=8000
-SERVICE_HOST=0.0.0.0
-LOG_LEVEL=INFO
-`;
-				fs.writeFileSync(memoryEnvPath, memoryEnvContent);
-				log('Memory service .env file created', 'success');
-			}
-		} catch (error) {
-			log('Python 3 not found - memory service will be skipped', 'info');
-			log('To enable memory service later: Install Python 3.11+ and run:', 'info');
-			log('  cd apps/memory-service && python3 -m venv venv && venv/bin/pip install -r requirements.txt', 'info');
-		}
-
 		// Completion message
 		const pm = detectPackageManager();
 		const runCmd = pm === 'npm' ? 'npm run' : pm;
 		console.log('\n✨ Installation Complete!\n');
 		console.log('Next steps:');
 		console.log(`  1. Run ${runCmd} dev to start all services`);
-		console.log(`     Or use ${runCmd} dev:daemon and ${runCmd} dev:web separately`);
-		console.log('  2. Access the web app at http://localhost:3000\n');
+		console.log(`     Or use ${runCmd} dev:daemon and ${runCmd} dev:desktop separately`);
+		console.log('  2. Launch the desktop app\n');
 		console.log('To stop services: Press Ctrl+C');
 
 		process.exit(0);

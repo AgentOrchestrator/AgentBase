@@ -8,7 +8,6 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { waitForHealthy } from './utils/health-check.js';
 
 const execAsync = promisify(exec);
 
@@ -34,7 +33,6 @@ const StartApp = () => {
 	const { exit } = useApp();
 	const [services, setServices] = useState<Service[]>([
 		{ name: 'Supabase', status: 'starting' },
-		{ name: 'Web App', status: 'starting', url: 'http://localhost:3000' },
 		{ name: 'Daemon', status: 'starting' },
 	]);
 	const [allRunning, setAllRunning] = useState(false);
@@ -56,10 +54,9 @@ const StartApp = () => {
 			const monorepoRoot = path.resolve(__dirname, '..', '..');
 
 			// Check if node_modules exist
-			const webModules = path.join(monorepoRoot, 'apps', 'web', 'node_modules');
 			const daemonModules = path.join(monorepoRoot, 'apps', 'daemon', 'node_modules');
 
-			if (!fs.existsSync(webModules) || !fs.existsSync(daemonModules)) {
+			if (!fs.existsSync(daemonModules)) {
 				throw new Error('Dependencies not installed. Please run ./install.sh first');
 			}
 
@@ -113,40 +110,7 @@ const StartApp = () => {
 				}
 			}
 
-			// Start Web App FIRST (daemon needs web to be ready for auth)
-			updateService('Web App', { status: 'starting', message: 'Launching...' });
-			const webProcess = spawn('npm', ['run', 'dev'], {
-				cwd: path.join(monorepoRoot, 'apps', 'web'),
-				stdio: ['ignore', 'pipe', 'pipe'],
-				detached: false,
-			});
-
-			processesRef.current.push(webProcess);
-
-			// Pipe web logs to file
-			const webLog = fs.createWriteStream(path.join(monorepoRoot, 'web.log'), { flags: 'a' });
-			webProcess.stdout?.pipe(webLog);
-			webProcess.stderr?.pipe(webLog);
-
-			// Wait for web app to be healthy
-			updateService('Web App', { status: 'starting', message: 'Waiting for health check...' });
-			const webHealthy = await waitForHealthy('http://localhost:3000', 60000, 1000);
-
-			if (!webHealthy) {
-				throw new Error('Web app failed to become healthy within 60 seconds');
-			}
-
-			if (webProcess.killed) {
-				throw new Error('Web app process died');
-			}
-
-			updateService('Web App', {
-				status: 'running',
-				pid: webProcess.pid,
-				message: `PID: ${webProcess.pid}`,
-			});
-
-			// Now start Daemon (web is ready for auth redirects)
+			// Start Daemon
 			updateService('Daemon', { status: 'starting', message: 'Launching...' });
 			const daemonProcess = spawn('npm', ['run', 'dev'], {
 				cwd: path.join(monorepoRoot, 'apps', 'daemon'),
@@ -172,10 +136,9 @@ const StartApp = () => {
 				});
 
 				// Check for authentication URL pattern
-				const urlMatch = stdoutBuffer.match(/daemon-auth\?device_id=([a-f0-9-]+)/);
+				const urlMatch = stdoutBuffer.match(/agent-base:\/\/auth\?device_id=([a-f0-9-]+)/);
 				if (urlMatch) {
-					const webUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
-					const authUrl = `${webUrl}/daemon-auth?device_id=${urlMatch[1]}`;
+					const authUrl = `agent-base://auth?device_id=${urlMatch[1]}`;
 					setAuthPrompt({ url: authUrl, timestamp: Date.now() });
 				}
 
@@ -219,10 +182,6 @@ const StartApp = () => {
 			// Handle process exits
 			daemonProcess.on('exit', (code) => {
 				updateService('Daemon', { status: 'stopped', message: `Exited with code ${code}` });
-			});
-
-			webProcess.on('exit', (code) => {
-				updateService('Web App', { status: 'stopped', message: `Exited with code ${code}` });
 			});
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -348,7 +307,7 @@ const StartApp = () => {
 					)}
 
 					<Box marginTop={1} flexDirection="column">
-						<Text dimColor>Full logs: <Text color="gray">tail -f web.log daemon.log</Text></Text>
+						<Text dimColor>Full logs: <Text color="gray">tail -f daemon.log</Text></Text>
 					</Box>
 					<Box marginTop={1}>
 						<Text color="yellow">Press Ctrl+C to stop all services</Text>

@@ -80,12 +80,8 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Then open **http://localhost:3000** in your browser!
-
 **Docker includes:**
-- ✅ Web UI (port 3000)
 - ✅ Daemon service
-- ✅ Memory service (port 8000)
 - ✅ Local Supabase database (port 54322)
 - ✅ Supabase Studio (port 54323)
 
@@ -127,8 +123,8 @@ pnpm run setup --non-interactive \
 ```
 
 ### Access points:
-- **Web UI**: http://localhost:3000
 - **Supabase Studio** (local only): http://localhost:54323
+- **Desktop App**: Launch the Electron desktop application
 
 > **Note**: Authentication tokens are cached in `$HOME/.agent-orchestrator/auth.json` for persistent login sessions.
 
@@ -156,9 +152,9 @@ All commands work with both **pnpm** (recommended) and **npm**. For npm, use `np
 |--------------|----------------|-------------|
 | `pnpm install` | `npm install` | Install all dependencies for the monorepo |
 | `pnpm run setup` | `npm run setup` | Interactive setup wizard - configures environment and Supabase |
-| `pnpm dev` | `npm run dev` | Start all services in development mode (daemon + web with hot reload) |
+| `pnpm dev` | `npm run dev` | Start all services in development mode (daemon + desktop with hot reload) |
 | `pnpm dev:daemon` | `npm run dev:daemon` | Start only the daemon service in development mode |
-| `pnpm dev:web` | `npm run dev:web` | Start only the web interface in development mode |
+| `pnpm dev:desktop` | `npm run dev:desktop` | Start only the desktop app in development mode |
 | `pnpm build` | `npm run build` | Build all apps for production |
 | `pnpm start` | `npm run start` | Start all services in production mode (requires build first) |
 
@@ -249,7 +245,7 @@ Want to see your favorite AI assistant integrated? [Open an issue](https://githu
 
 Contributions welcome! This is a monorepo, so all code lives in one place:
 - **Backend (daemon)**: `apps/daemon/`
-- **Frontend (web)**: `apps/web/`
+- **Desktop App**: `apps/desktop/`
 - **CLI**: `apps/cli/`
 - **Shared code**: `packages/shared/`
 
