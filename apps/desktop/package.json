@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "pack": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --dir --config electron-builder.config.js",
-    "dist": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --config electron-builder.config.js"
+    "dist": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --config electron-builder.config.js",
+    "dist:full": "node scripts/build-dist.js"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",

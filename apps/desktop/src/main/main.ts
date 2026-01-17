@@ -3,7 +3,7 @@ import * as pty from 'node-pty';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as os from 'os';
-import { spawn } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
 import * as fs from 'fs';
 import { DatabaseFactory } from './database';
 import { IDatabase } from './database/IDatabase';
@@ -17,6 +17,46 @@ import type {
   AddWorkspaceOptions,
   RecentWorkspace,
 } from '@agent-orchestrator/shared';
+
+/**
+ * Fix PATH for packaged macOS apps.
+ * When launched from Finder/Dock, Electron apps don't inherit the user's shell PATH.
+ * This function gets the PATH from the user's login shell.
+ */
+function fixPath(): void {
+  if (process.platform !== 'darwin') return;
+  if (!app.isPackaged) return; // Only needed for packaged apps
+
+  try {
+    const userShell = process.env.SHELL || '/bin/zsh';
+    // Run the login shell to get the full PATH
+    // Using execFileSync with -ilc to run as interactive login shell
+    const result = execFileSync(userShell, ['-ilc', 'echo $PATH'], {
+      encoding: 'utf8',
+      timeout: 5000,
+    }).trim();
+
+    if (result) {
+      process.env.PATH = result;
+      console.log('[Main] Fixed PATH for packaged app');
+    }
+  } catch (error) {
+    console.warn('[Main] Failed to fix PATH:', error);
+    // Fallback: add common paths
+    const commonPaths = [
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/sbin',
+      `${process.env.HOME}/.local/bin`,
+      `${process.env.HOME}/.cargo/bin`,
+    ];
+    const currentPath = process.env.PATH || '';
+    process.env.PATH = [...commonPaths, currentPath].join(':');
+  }
+}
+
+// Fix PATH before anything else
+fixPath();
 import {
   CodingAgentFactory,
   isSessionResumable,
