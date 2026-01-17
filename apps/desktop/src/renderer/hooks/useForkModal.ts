@@ -400,12 +400,23 @@ export function useForkModal({ nodes, onNodeUpdate }: UseForkModalInput): UseFor
           style: sourceNode.style,
         };
 
-        // Create edge from source to forked node
+        // Create edge from source to forked node (agent to agent)
+        // Use solid style to differentiate from chat edges (agent to chat view)
+        // Use fork-source handle on the source node and fork-target handle on the target node
         const newEdgeId = `edge-${Date.now()}`;
         const newEdge: Edge = {
           id: newEdgeId,
           source: modalData.sourceNodeId,
           target: newNodeId,
+          sourceHandle: 'fork-source',
+          targetHandle: 'fork-target',
+          type: 'default',
+          animated: false,
+          style: { 
+            stroke: '#4a5568', 
+            strokeWidth: 2,
+            // No strokeDasharray = solid line
+          },
         };
 
         console.log('[useForkModal] Fork created successfully:', {

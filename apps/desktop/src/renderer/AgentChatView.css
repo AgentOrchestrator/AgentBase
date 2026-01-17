@@ -5,6 +5,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 300px;
+  position: relative;
 }
 
 /* Messages - using conversation-content class to match ConversationNode */
@@ -19,7 +20,9 @@
   -webkit-overflow-scrolling: touch;
   min-height: 0;
   padding: 12px;
+  padding-top: 40px;
   padding-right: 8px;
+  padding-bottom: 60px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -65,7 +68,7 @@
 
 .agent-chat-view-empty {
   text-align: center;
-  color: #888;
+  color: var(--color-text-secondary);
   padding: 40px 20px;
   font-size: 13px;
 }
@@ -77,6 +80,24 @@
   border-radius: 6px;
   padding: 8px;
   background: var(--color-bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  /* Add subtle shadow when sticky to indicate it's floating */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  /* Smooth transition for transform changes */
+  transition: transform 0.3s ease;
+}
+
+/* When a user message is currently sticky, keep it in place */
+.conversation-user-message.sticky-active {
+  transform: translateY(0);
+}
+
+/* When another user message is sticky, push this one up and out of view */
+.conversation-user-message.sticky-fade {
+  transform: translateY(-2000%);
+  pointer-events: none;
 }
 
 .conversation-user-content {
@@ -269,7 +290,7 @@
 
 /* Tool Summary - compact gray text (matches ConversationNode) */
 .conversation-tool-summary {
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 11px;
   margin: 0;
   padding: 0;
@@ -324,18 +345,27 @@
 
 /* Error */
 .agent-chat-view-error {
+  position: absolute;
+  bottom: 70px;
+  left: 12px;
+  right: 12px;
   padding: 8px 12px;
   background: var(--error-bg, #5c2020);
   color: var(--error-text, #f88);
   font-size: 12px;
-  margin: 0 12px;
   border-radius: 4px;
+  z-index: 5;
 }
 
 /* Input Area */
 .agent-chat-view-input-area {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: 12px;
   background: transparent;
+  z-index: 10;
 }
 
 .agent-chat-view-input-container {
@@ -345,7 +375,8 @@
   border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 4px 4px 4px 12px;
-  background: transparent;
+  background: var(--color-bg-primary);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .agent-chat-view-input {

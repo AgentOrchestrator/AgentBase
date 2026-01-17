@@ -75,7 +75,7 @@
 }
 
 .agent-node-status-indicator .status-label {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 500;
 }
@@ -107,7 +107,7 @@
 .agent-node-status-indicator .status-paused .status-icon {
   width: 16px;
   height: 16px;
-  background: rgb(255, 204, 0);
+  background: var(--yellow);
   border-radius: 50%;
   font-size: 0;
 }
@@ -115,7 +115,7 @@
 .agent-node-status-indicator .status-completed .status-icon {
   width: 16px;
   height: 16px;
-  background: rgb(52, 199, 89);
+  background: var(--green);
   border-radius: 50%;
   font-size: 0;
 }
@@ -123,7 +123,7 @@
 .agent-node-status-indicator .status-error .status-icon {
   width: 16px;
   height: 16px;
-  background: rgb(255, 56, 60);
+  background: var(--error);
   border-radius: 50%;
   font-size: 0;
 }
@@ -149,7 +149,7 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  color: #000;
+  color: var(--color-text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -162,7 +162,7 @@
 .agent-view-button svg {
   width: 16px;
   height: 16px;
-  color: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .agent-node:hover .agent-view-button {
@@ -173,14 +173,34 @@
   background: transparent;
 }
 
+.agent-view-button:hover svg {
+  color: var(--color-text-secondary);
+}
+
 .agent-view-button.active {
   background: transparent;
-  color: #000;
+  color: var(--color-text-primary);
   border: none;
 }
 
 .agent-view-button.active svg {
-  color: #000;
+  color: var(--color-text-primary);
+}
+
+/* Terminal view backdrop for icons */
+.agent-node-view-switcher.terminal-active .agent-view-button {
+  position: relative;
+}
+
+.agent-node-view-switcher.terminal-active .agent-view-button::before {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  opacity: 1;
+  z-index: -1;
 }
 
 /* Content Area */
@@ -194,10 +214,10 @@
 
 /* Handle styles */
 .agent-node .react-flow__handle {
-  background: #888;
+  background: var(--handle-color, transparent);
   width: 10px;
   height: 10px;
-  border: 2px solid var(--color-bg-primary);
+  border: none;
 }
 
 /* Resize handles - increase size and hit area (but not corner handles) - invisible but functional */
@@ -317,36 +337,6 @@
   pointer-events: auto;
 }
 
-/* Chat button */
-.agent-node-chat-button {
-  width: 24px;
-  height: 24px;
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  color: #000;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease, background 0.2s ease;
-  padding: 0;
-}
-
-.agent-node-chat-button svg {
-  width: 16px;
-  height: 16px;
-  color: var(--color-border);
-}
-
-.agent-node:hover .agent-node-chat-button {
-  opacity: 1;
-}
-
-.agent-node:hover .agent-node-chat-button:hover {
-  background: #f5f5f5;
-}
 
 /* Fork button wrapper - allows click handling while preserving drag */
 .agent-node-fork-button-wrapper {

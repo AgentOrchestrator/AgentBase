@@ -106,7 +106,7 @@ export function AgentChatNodePresentation({
 
   return (
     <div className={`agent-chat-node ${selected ? 'selected' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}>
-      <Handle type="target" position={Position.Top} className="agent-chat-handle" />
+      <Handle type="target" position={Position.Top} id="chat-target" className="agent-chat-handle" />
 
       {/* Header */}
       <div className="agent-chat-header" onClick={handleToggleExpand}>

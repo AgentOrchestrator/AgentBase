@@ -10,6 +10,7 @@ export function AgentNodeForkHandle({ nodeId }: AgentNodeForkHandleProps) {
       <Handle
         type="source"
         position={Position.Bottom}
+        id="fork-source"
         className="agent-node-bottom-handle"
         onMouseDown={(e) => {
           // Allow drag to still work - only treat as click if there's no movement.

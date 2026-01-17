@@ -12,6 +12,7 @@ import {
   Node,
   useReactFlow,
   OnConnectStartParams,
+  useUpdateNodeInternals,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { MeshGradient, Dithering } from '@paper-design/shaders-react';
@@ -42,6 +43,9 @@ import { NewAgentModal } from './components/NewAgentModal';
 import { ActionPill } from './components/ActionPill';
 import { useTheme } from './context';
 import { createLinearIssueAttachment } from './types/attachments';
+import type { AgentNodeData } from './types/agent-node';
+import { createServiceFactories } from './services/factories/ServiceFactories';
+import { TerminalServiceImpl } from './services/impl/TerminalServiceImpl';
 
 // Use node types from the registry (single source of truth)
 // Also include conversation node types for debugging
@@ -62,16 +66,41 @@ type ContextMenu = {
 
 const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
   const nodeIds = new Set(nodes.map((node) => node.id));
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  
   return edges
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
     .map((edge) => {
-      const nextEdge: Edge = { ...edge };
-      if (nextEdge.sourceHandle == null || nextEdge.sourceHandle === 'null') {
-        delete nextEdge.sourceHandle;
+      // Create a clean edge object, explicitly omitting null/undefined handles
+      const nextEdge: Edge = {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        animated: edge.animated,
+        style: edge.style,
+        data: edge.data,
+        // Only include handles if they are valid non-null strings
+        ...(edge.sourceHandle && edge.sourceHandle !== 'null' && edge.sourceHandle !== '' 
+          ? { sourceHandle: edge.sourceHandle } 
+          : {}),
+        ...(edge.targetHandle && edge.targetHandle !== 'null' && edge.targetHandle !== '' 
+          ? { targetHandle: edge.targetHandle } 
+          : {}),
+      };
+      
+      // If no handles specified, try to infer them for agent -> chat connections
+      if (!nextEdge.sourceHandle && !nextEdge.targetHandle) {
+        const sourceNode = nodeMap.get(edge.source);
+        const targetNode = nodeMap.get(edge.target);
+        
+        // If connecting agent node to chat node, use the correct handles
+        if (sourceNode?.type === 'agent' && targetNode?.type === 'agent-chat') {
+          nextEdge.sourceHandle = 'chat-source';
+          nextEdge.targetHandle = 'chat-target';
+        }
       }
-      if (nextEdge.targetHandle == null || nextEdge.targetHandle === 'null') {
-        delete nextEdge.targetHandle;
-      }
+      
       return nextEdge;
     });
 };
@@ -169,6 +198,22 @@ function CanvasFlow() {
     }
   }, [nodes, isCanvasLoading, persistNodes]);
 
+  // Sanitize edges whenever they change to remove any "null" string handles
+  useEffect(() => {
+    if (!isCanvasLoading && edges.length > 0) {
+      const sanitized = sanitizeEdges(edges, nodes);
+      // Only update if sanitization changed anything
+      const hasChanges = sanitized.some((edge, index) => {
+        const original = edges[index];
+        return edge.sourceHandle !== original.sourceHandle || 
+               edge.targetHandle !== original.targetHandle;
+      });
+      if (hasChanges) {
+        setEdges(sanitized);
+      }
+    }
+  }, [edges, nodes, isCanvasLoading, setEdges]);
+
   // Persist edges when they change
   const prevEdgesRef = useRef<Edge[]>(edges);
   useEffect(() => {
@@ -249,7 +294,8 @@ function CanvasFlow() {
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
+  const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
   const [_isShiftPressed, setIsShiftPressed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -467,23 +513,22 @@ const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
   // =============================================================================
 
   const onConnect = useCallback(
-    (params: Connection) =>
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            sourceHandle:
-              params.sourceHandle == null || params.sourceHandle === 'null'
-                ? null
-                : params.sourceHandle,
-            targetHandle:
-              params.targetHandle == null || params.targetHandle === 'null'
-                ? null
-                : params.targetHandle,
-          },
-          eds
-        )
-      ),
+    (params: Connection) => {
+      // Clean up the connection params - remove null/undefined handles
+      // Use null (not undefined) to match Connection type, but filter out string "null"
+      const cleanParams: Connection = {
+        source: params.source,
+        target: params.target,
+        sourceHandle: params.sourceHandle && params.sourceHandle !== 'null' && params.sourceHandle !== '' 
+          ? params.sourceHandle 
+          : null,
+        targetHandle: params.targetHandle && params.targetHandle !== 'null' && params.targetHandle !== '' 
+          ? params.targetHandle 
+          : null,
+      };
+      
+      setEdges((eds) => addEdge(cleanParams, eds));
+    },
     [setEdges]
   );
 
@@ -643,19 +688,52 @@ const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
         },
       };
 
-      // Create edge connecting the nodes
+      // Get the border color from CSS variable to match node borders
+      const borderColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-border')
+        .trim() || '#232323'; // Fallback to dark theme default
+
+      // Create edge connecting the nodes (agent to chat view)
+      // Use dashed style to differentiate from fork edges (agent to agent)
+      // Don't specify handle IDs - let React Flow use default connection points
+      // This avoids timing issues where edges are created before handles are registered
+      // Explicitly omit handle properties to avoid any "null" string issues
       const edge: Edge = {
         id: `edge-${nodeId}-${chatNodeId}`,
         source: nodeId,
         target: chatNodeId,
-        type: 'smooth',
+        type: 'default',
         animated: false,
-        style: { stroke: '#4a5568', strokeWidth: 2 },
+        style: { 
+          stroke: borderColor, 
+          strokeWidth: 2,
+          strokeDasharray: '5, 5', // Dashed line pattern
+        },
+        // Explicitly do NOT include sourceHandle or targetHandle
+        // React Flow will use default connection points
       };
 
-      // Add the new node and edge
+      // Add the new node first
       setNodes((nds) => [...nds, chatNode]);
-      setEdges((eds) => [...eds, edge]);
+      
+      // Defer edge addition until after the node is rendered and handles are measured
+      // This ensures React Flow can properly calculate edge positions
+      requestAnimationFrame(() => {
+        // Update node internals to ensure handles are measured
+        updateNodeInternals(chatNodeId);
+        updateNodeInternals(nodeId);
+        
+        // Add edge after a short delay to ensure node internals are updated
+        requestAnimationFrame(() => {
+          setEdges((eds) => {
+            // Get current nodes to include the newly added chatNode
+            const currentNodes = getNodes();
+            // Sanitize the new edge before adding it
+            const sanitizedEdges = sanitizeEdges([...eds, edge], currentNodes);
+            return sanitizedEdges;
+          });
+        });
+      });
 
       console.log('[Canvas] Created chat node from agent node:', {
         sourceNodeId: nodeId,
@@ -668,7 +746,7 @@ const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
     return () => {
       window.removeEventListener('agent-node:create-chat-node', handleCreateChatNode as EventListener);
     };
-  }, [nodes, edges, setNodes, setEdges]);
+  }, [nodes, edges, setNodes, setEdges, updateNodeInternals, getNodes]);
 
   const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
@@ -696,11 +774,30 @@ const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
     }) => {
       const result = await forkModal.confirm(data);
       if (result.success) {
+        // Add the forked node first
         setNodes((nds) => [...nds, result.forkedNode]);
-        setEdges((eds) => [...eds, result.newEdge]);
+        
+        // Defer edge addition until after the node is rendered and handles are measured
+        // This ensures React Flow can properly calculate edge positions
+        requestAnimationFrame(() => {
+          // Update node internals to ensure handles are measured
+          updateNodeInternals(result.forkedNode.id);
+          updateNodeInternals(result.newEdge.source);
+          
+          // Add edge after a short delay to ensure node internals are updated
+          requestAnimationFrame(() => {
+            setEdges((eds) => {
+              // Get current nodes to include the newly added forked node
+              const currentNodes = getNodes();
+              // Sanitize the new edge before adding it
+              const sanitizedEdges = sanitizeEdges([...eds, result.newEdge], currentNodes);
+              return sanitizedEdges;
+            });
+          });
+        });
       }
     },
-    [forkModal, setNodes, setEdges]
+    [forkModal, setNodes, setEdges, updateNodeInternals, getNodes]
   );
 
   // =============================================================================
@@ -2441,6 +2538,130 @@ const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
         )}
 
         <ActionPill />
+
+        {/* Debug Button - Update All Agent Titles */}
+        <button
+          className="debug-update-titles-button"
+          onClick={async () => {
+            const MAX_TITLE_LENGTH = 50;
+            const serviceFactories = createServiceFactories();
+            let updatedCount = 0;
+            let errorCount = 0;
+            let skippedCount = 0;
+
+            // Get all agent nodes
+            const agentNodes = nodes.filter((node) => node.type === 'agent');
+            
+            console.log('[Canvas] Debug: Updating titles for', agentNodes.length, 'agent nodes');
+
+            for (const node of agentNodes) {
+              const nodeData = node.data as unknown as AgentNodeData;
+              
+              console.log('[Canvas] Debug: Processing node', node.id, {
+                sessionId: nodeData.sessionId,
+                workspacePath: nodeData.workspacePath,
+                currentTitle: nodeData.title?.value,
+              });
+              
+              if (!nodeData.sessionId || !nodeData.workspacePath) {
+                skippedCount++;
+                console.log('[Canvas] Debug: Skipping node', node.id, '- missing sessionId or workspacePath');
+                continue;
+              }
+
+              try {
+                // Create temporary services for this node
+                const terminalService = new TerminalServiceImpl(node.id, nodeData.terminalId);
+                const agentService = serviceFactories.createAgentService(
+                  node.id,
+                  nodeData.agentId,
+                  nodeData.agentType,
+                  terminalService
+                );
+
+                console.log('[Canvas] Debug: Loading session for node', node.id);
+
+                // Load session
+                const session = await agentService.getSession(
+                  nodeData.sessionId,
+                  nodeData.workspacePath,
+                  { roles: ['user'] }
+                );
+
+                console.log('[Canvas] Debug: Session loaded for node', node.id, {
+                  hasSession: !!session,
+                  messageCount: session?.messages?.length || 0,
+                });
+
+                if (session?.messages && session.messages.length > 0) {
+                  // Get last user message
+                  const userMessages = session.messages.filter((m) => m.role === 'user');
+                  const lastUserMessage = userMessages[userMessages.length - 1];
+
+                  console.log('[Canvas] Debug: User messages found for node', node.id, {
+                    userMessageCount: userMessages.length,
+                    lastMessageContent: lastUserMessage?.content?.substring(0, 50),
+                  });
+
+                  if (lastUserMessage?.content) {
+                    const content = lastUserMessage.content.trim();
+                    const newTitle =
+                      content.length > MAX_TITLE_LENGTH
+                        ? content.slice(0, MAX_TITLE_LENGTH) + '...'
+                        : content;
+
+                    console.log('[Canvas] Debug: Updating node', node.id, 'title from', nodeData.title?.value, 'to', newTitle);
+
+                    // Update node via event
+                    window.dispatchEvent(
+                      new CustomEvent('update-node', {
+                        detail: {
+                          nodeId: node.id,
+                          data: {
+                            ...nodeData,
+                            title: { value: newTitle, isManuallySet: true },
+                          },
+                        },
+                      })
+                    );
+
+                    updatedCount++;
+                    console.log('[Canvas] Debug: Successfully updated title for node', node.id);
+                  } else {
+                    skippedCount++;
+                    console.log('[Canvas] Debug: No content in last user message for node', node.id);
+                  }
+                } else {
+                  skippedCount++;
+                  console.log('[Canvas] Debug: No messages in session for node', node.id);
+                }
+              } catch (error) {
+                errorCount++;
+                console.error('[Canvas] Debug: Error updating title for node', node.id, ':', error);
+              }
+            }
+
+            const message = `Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`;
+            console.log('[Canvas] Debug: Title update complete.', message);
+            alert(message);
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            padding: '8px 16px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            zIndex: 1000,
+          }}
+          title="Debug: Update all agent node titles from last user message"
+        >
+          🔄 Update Titles
+        </button>
 
         {/* Linear Issue Details Modal */}
         {selectedIssueId && (
