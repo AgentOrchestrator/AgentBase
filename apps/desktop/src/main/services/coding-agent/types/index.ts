@@ -43,6 +43,7 @@ export {
   type GenerateRequest,
   type GenerateResponse,
   type StreamCallback,
+  type StructuredStreamCallback,
   type MessageType,
   type ToolCategory,
   type ToolInfo,
@@ -60,4 +61,8 @@ export {
   type AgentWebSearchResultBlock,
   type AgentWebSearchToolResultError,
   type AgentWebSearchToolResultErrorCode,
+  // Streaming types
+  type StreamingChunk,
+  type StreamingContentBlock,
+  type StreamingBlockType,
 } from './message.types';

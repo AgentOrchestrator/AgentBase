@@ -122,6 +122,61 @@ export type AgentContentBlock =
   | AgentServerToolUseBlock
   | AgentWebSearchToolResultBlock;
 
+// =============================================================================
+// Streaming Content Blocks (for real-time structured streaming)
+// =============================================================================
+
+/**
+ * Block types that can be streamed
+ */
+export type StreamingBlockType = 'text' | 'thinking' | 'tool_use';
+
+/**
+ * Represents an in-progress content block during streaming
+ */
+export interface StreamingContentBlock {
+  /** Block index from the API (used to track which block deltas belong to) */
+  index: number;
+  /** Type of content block */
+  type: StreamingBlockType;
+  /** Accumulated text content (for text blocks) */
+  text?: string;
+  /** Accumulated thinking content (for thinking blocks) */
+  thinking?: string;
+  /** Tool use ID (for tool_use blocks) */
+  id?: string;
+  /** Tool name (for tool_use blocks) */
+  name?: string;
+  /** Accumulated JSON string for tool input (for tool_use blocks) */
+  input?: string;
+  /** Whether this block has been completed */
+  isComplete: boolean;
+}
+
+/**
+ * A streaming chunk event from the SDK
+ */
+export interface StreamingChunk {
+  /** Event type */
+  type: 'block_start' | 'block_delta' | 'block_stop';
+  /** Block index this chunk applies to */
+  index: number;
+  /** Block type (only for block_start) */
+  blockType?: StreamingBlockType;
+  /** Block metadata (only for block_start) */
+  block?: {
+    type: StreamingBlockType;
+    id?: string;
+    name?: string;
+  };
+  /** Delta content (only for block_delta) */
+  delta?: {
+    text?: string;
+    thinking?: string;
+    inputJson?: string;
+  };
+}
+
 /**
  * Message format for coding agent sessions
  */

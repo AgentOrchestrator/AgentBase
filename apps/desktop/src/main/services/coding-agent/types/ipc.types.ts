@@ -1,5 +1,11 @@
 import type { CodingAgentType, AgentCapabilities } from './agent.types';
-import type { GenerateRequest, GenerateResponse, StreamCallback } from './message.types';
+import type {
+  GenerateRequest,
+  GenerateResponse,
+  StreamCallback,
+  StructuredStreamCallback,
+  StreamingChunk,
+} from './message.types';
 import type {
   SessionIdentifier,
   SessionInfo,
@@ -25,6 +31,13 @@ export interface CodingAgentAPI {
     agentType: CodingAgentType,
     request: GenerateRequest,
     onChunk: StreamCallback
+  ) => Promise<GenerateResponse>;
+
+  /** Generate a response with structured streaming (content blocks) */
+  generateStreamingStructured: (
+    agentType: CodingAgentType,
+    request: GenerateRequest,
+    onChunk: StructuredStreamCallback
   ) => Promise<GenerateResponse>;
 
   /** Continue an existing session */
@@ -88,6 +101,11 @@ export interface CodingAgentAPI {
   /** Subscribe to stream chunks */
   onStreamChunk: (
     callback: (data: { requestId: string; chunk: string }) => void
+  ) => () => void;
+
+  /** Subscribe to structured stream chunks (content blocks) */
+  onStreamChunkStructured: (
+    callback: (data: { requestId: string; chunk: StreamingChunk }) => void
   ) => () => void;
 
   /** Subscribe to agent hook events */

@@ -39,6 +39,7 @@ import type {
   ContinueOptions,
   SessionFilterOptions,
   MessageFilterOptions,
+  StreamingChunk,
 } from './services/coding-agent';
 import {
   LLMServiceFactory,
@@ -1270,6 +1271,114 @@ function registerIpcHandlers(): void {
           durationMs: duration,
           chunksSent,
           totalBytesSent,
+        });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
+  // Structured streaming generation handler (with content blocks)
+  ipcMain.handle(
+    'coding-agent:generate-streaming-structured',
+    async (
+      event,
+      requestId: string,
+      agentType: CodingAgentType,
+      request: GenerateRequest
+    ) => {
+      const startTime = Date.now();
+      let chunksSent = 0;
+
+      console.log('[Main] Starting structured streaming generation', {
+        requestId,
+        agentType,
+        promptPreview: request.prompt.slice(0, 100),
+        promptLength: request.prompt.length,
+        workingDirectory: request.workingDirectory,
+      });
+
+      try {
+        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        if (agentResult.success === false) {
+          console.error('[Main] Error getting coding agent for structured streaming', {
+            requestId,
+            agentType,
+            error: agentResult.error,
+          });
+          return { success: false, error: agentResult.error.message };
+        }
+
+        // Check if agent supports structured streaming
+        const agent = agentResult.data;
+        if (!('generateStreamingStructured' in agent)) {
+          console.error('[Main] Agent does not support structured streaming', {
+            requestId,
+            agentType,
+          });
+          return { success: false, error: 'Agent does not support structured streaming' };
+        }
+
+        console.log('[Main] Agent acquired, starting structured streaming', {
+          requestId,
+          agentType,
+          timeSinceStart: `${Date.now() - startTime}ms`,
+        });
+
+        ensureAgentEventBridge(agent);
+        const agentWithStructured = agent as typeof agent & {
+          generateStreamingStructured: (
+            request: GenerateRequest,
+            onChunk: (chunk: StreamingChunk) => void
+          ) => ReturnType<typeof agent.generateStreaming>;
+        };
+        const result = await agentWithStructured.generateStreamingStructured(
+          request,
+          (chunk: StreamingChunk) => {
+            chunksSent++;
+
+            if (chunksSent === 1) {
+              console.log('[Main] First structured chunk received', {
+                requestId,
+                chunkType: chunk.type,
+                timeSinceStart: `${Date.now() - startTime}ms`,
+              });
+            }
+
+            // Send structured chunk to renderer
+            event.sender.send('coding-agent:stream-chunk-structured', { requestId, chunk });
+          }
+        );
+
+        const duration = Date.now() - startTime;
+
+        if (result.success === false) {
+          console.error('[Main] Error in structured streaming generation', {
+            requestId,
+            agentType,
+            error: result.error,
+            durationMs: duration,
+            chunksSent,
+          });
+          return { success: false, error: result.error.message };
+        }
+
+        console.log('[Main] Structured streaming generation complete', {
+          requestId,
+          agentType,
+          contentLength: result.data.content.length,
+          durationMs: duration,
+          chunksSent,
+        });
+        return { success: true, data: result.data };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        console.error('[Main] Error in coding-agent:generate-streaming-structured', {
+          requestId,
+          agentType,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          durationMs: duration,
+          chunksSent,
         });
         return { success: false, error: (error as Error).message };
       }

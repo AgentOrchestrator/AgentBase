@@ -7,7 +7,12 @@
  */
 
 import type { AgentType } from '../../../../types/coding-agent-status';
-import type { MessageFilterOptions as SharedMessageFilterOptions } from '@agent-orchestrator/shared';
+import type {
+  MessageFilterOptions as SharedMessageFilterOptions,
+  StreamingChunk,
+  StreamingBlockType,
+  StreamingContentBlock,
+} from '@agent-orchestrator/shared';
 
 // ============================================
 // Result Type (matches main-side contract)
@@ -92,9 +97,17 @@ export interface GenerateResponse {
 }
 
 /**
- * Callback for streaming chunks
+ * Callback for streaming chunks (plain text)
  */
 export type StreamCallback = (chunk: string) => void;
+
+/**
+ * Callback for structured streaming chunks (content blocks)
+ */
+export type StructuredStreamCallback = (chunk: StreamingChunk) => void;
+
+// Re-export streaming types for consumers
+export type { StreamingChunk, StreamingBlockType, StreamingContentBlock };
 
 /**
  * Session identifier types
@@ -329,6 +342,16 @@ export interface ICodingAgentAdapter {
   generateStreaming(
     request: GenerateRequest,
     onChunk: StreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>>;
+
+  /**
+   * Generate a response with structured streaming (content blocks)
+   * Streams thinking, tool_use, and text blocks as they arrive
+   * Returns the final complete response while emitting structured chunks via callback
+   */
+  generateStreamingStructured?(
+    request: GenerateRequest,
+    onChunk: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>>;
 
   // ============================================

@@ -17,6 +17,7 @@ import type {
   GenerateRequest,
   GenerateResponse,
   StreamCallback,
+  StructuredStreamCallback,
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
@@ -135,6 +136,31 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
 
     try {
       const response = await this.api!.generateStreaming(this.agentType, request, onChunk);
+      return ok(response);
+    } catch (error) {
+      return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));
+    }
+  }
+
+  async generateStreamingStructured(
+    request: GenerateRequest,
+    onChunk: StructuredStreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
+    const apiError = this.checkApiAvailable();
+    if (apiError) {
+      return err(apiError);
+    }
+
+    // Check if the API supports structured streaming
+    if (!this.api!.generateStreamingStructured) {
+      return err(agentError(
+        AgentErrorCode.CAPABILITY_NOT_SUPPORTED,
+        'Structured streaming is not supported by this API version'
+      ));
+    }
+
+    try {
+      const response = await this.api!.generateStreamingStructured(this.agentType, request, onChunk);
       return ok(response);
     } catch (error) {
       return err(this.wrapError(error, AgentErrorCode.GENERATION_FAILED));

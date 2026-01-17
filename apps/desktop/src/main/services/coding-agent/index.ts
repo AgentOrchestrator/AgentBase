@@ -68,6 +68,11 @@ export type {
   GenerateRequest,
   GenerateResponse,
   StreamCallback,
+  StructuredStreamCallback,
+  // Streaming types
+  StreamingChunk,
+  StreamingContentBlock,
+  StreamingBlockType,
 } from './types';
 
 // Error codes and helpers

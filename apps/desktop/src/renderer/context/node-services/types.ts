@@ -16,6 +16,7 @@ import type { GitInfo } from '@agent-orchestrator/shared';
 import type {
   GenerateResponse,
   StreamCallback,
+  StructuredStreamCallback,
   SessionInfo,
   CodingAgentSessionContent,
   MessageFilterOptions,
@@ -228,6 +229,23 @@ export interface IAgentService extends INodeService {
     workspacePath: string,
     sessionId: string,
     onChunk: StreamCallback
+  ): Promise<GenerateResponse>;
+
+  /**
+   * Send a message with structured streaming (content blocks).
+   * Streams thinking, tool_use, and text blocks as they arrive.
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required - caller must provide)
+   * @param onChunk - Callback for structured streaming chunks
+   * @throws Error if adapter fails or structured streaming not supported
+   */
+  sendMessageStreamingStructured(
+    prompt: string,
+    workspacePath: string,
+    sessionId: string,
+    onChunk: StructuredStreamCallback
   ): Promise<GenerateResponse>;
 
   // =========================================================================

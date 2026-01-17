@@ -20,6 +20,7 @@ import type {
   ICodingAgentAdapter,
   GenerateResponse,
   StreamCallback,
+  StructuredStreamCallback,
   SessionInfo,
   CodingAgentSessionContent,
   MessageFilterOptions,
@@ -596,6 +597,56 @@ export class AgentServiceImpl implements IAgentService {
 
     try {
       const result = await adapter.generateStreaming(
+        {
+          prompt,
+          workingDirectory: workspacePath,
+          sessionId,
+          agentId: this.agentId,
+        },
+        onChunk
+      );
+
+      const response = this.unwrapResult(result);
+
+      await this.persistSessionStateToMainProcess(sessionId);
+
+      this.updateStatus('idle');
+      return response;
+    } catch (error) {
+      this.updateStatus('error', {
+        errorMessage: error instanceof Error ? error.message : 'Generation failed',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send a message with structured streaming (content blocks).
+   * Streams thinking, tool_use, and text blocks as they arrive.
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required)
+   * @param onChunk - Callback for structured streaming chunks
+   * @throws Error if adapter fails or structured streaming not supported
+   */
+  async sendMessageStreamingStructured(
+    prompt: string,
+    workspacePath: string,
+    sessionId: string,
+    onChunk: StructuredStreamCallback
+  ): Promise<GenerateResponse> {
+    const adapter = this.requireAdapter();
+
+    // Check if adapter supports structured streaming
+    if (!adapter.generateStreamingStructured) {
+      throw new Error('Adapter does not support structured streaming');
+    }
+
+    this.updateStatus('running');
+
+    try {
+      const result = await adapter.generateStreamingStructured(
         {
           prompt,
           workingDirectory: workspacePath,

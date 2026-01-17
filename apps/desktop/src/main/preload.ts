@@ -30,6 +30,7 @@ import type {
   ForkOptions,
   ContinueOptions,
   CodingAgentAPI,
+  StreamingChunk,
 } from './services/coding-agent';
 import type {
   ChatRequest,
@@ -325,6 +326,33 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     }
   },
 
+  generateStreamingStructured: async (
+    agentType: CodingAgentType,
+    request: GenerateRequest,
+    onChunk: (chunk: StreamingChunk) => void
+  ) => {
+    const requestId = globalThis.crypto.randomUUID();
+
+    // Set up structured chunk listener
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: StreamingChunk }
+    ) => {
+      if (data.requestId === requestId) {
+        onChunk(data.chunk);
+      }
+    };
+    ipcRenderer.on('coding-agent:stream-chunk-structured', handler);
+
+    try {
+      return await unwrapResponse<GenerateResponse>(
+        ipcRenderer.invoke('coding-agent:generate-streaming-structured', requestId, agentType, request)
+      );
+    } finally {
+      ipcRenderer.removeListener('coding-agent:stream-chunk-structured', handler);
+    }
+  },
+
   continueSession: (
     agentType: CodingAgentType,
     identifier: SessionIdentifier,
@@ -405,6 +433,17 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     ipcRenderer.on('coding-agent:stream-chunk', handler);
     // Return cleanup function
     return () => ipcRenderer.removeListener('coding-agent:stream-chunk', handler);
+  },
+  onStreamChunkStructured: (
+    callback: (data: { requestId: string; chunk: StreamingChunk }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: StreamingChunk }
+    ) => callback(data);
+    ipcRenderer.on('coding-agent:stream-chunk-structured', handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener('coding-agent:stream-chunk-structured', handler);
   },
   onAgentEvent: (callback: (event: unknown) => void) => {
     const handler = (

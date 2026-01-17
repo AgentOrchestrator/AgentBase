@@ -8,9 +8,62 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { CodingAgentMessage, CodingAgentType } from '@agent-orchestrator/shared';
+import type {
+  CodingAgentMessage,
+  CodingAgentType,
+  StreamingChunk,
+  StreamingContentBlock,
+  AgentContentBlock,
+  AgentTextBlock,
+  AgentThinkingBlock,
+  AgentToolUseBlock,
+} from '@agent-orchestrator/shared';
 import type { IAgentService } from '../context/node-services';
 import { useSessionFileWatcher } from './useSessionFileWatcher';
+
+/**
+ * Convert streaming content blocks to AgentContentBlock array
+ * Sorts by index and maps to the appropriate block type
+ */
+function convertStreamingToContentBlocks(
+  blocks: Map<number, StreamingContentBlock>
+): AgentContentBlock[] {
+  return Array.from(blocks.values())
+    .sort((a, b) => a.index - b.index)
+    .map((block): AgentContentBlock | null => {
+      if (block.type === 'thinking' && block.thinking) {
+        return {
+          type: 'thinking',
+          thinking: block.thinking,
+        } satisfies AgentThinkingBlock;
+      }
+      if (block.type === 'tool_use' && block.id && block.name) {
+        // Safe parse of accumulated JSON
+        let input: Record<string, unknown> = {};
+        if (block.input) {
+          try {
+            input = JSON.parse(block.input);
+          } catch {
+            input = { _partial: true, _raw: block.input };
+          }
+        }
+        return {
+          type: 'tool_use',
+          id: block.id,
+          name: block.name,
+          input,
+        } satisfies AgentToolUseBlock;
+      }
+      if (block.type === 'text' && block.text) {
+        return {
+          type: 'text',
+          text: block.text,
+        } satisfies AgentTextBlock;
+      }
+      return null;
+    })
+    .filter((block): block is AgentContentBlock => block !== null);
+}
 
 export interface UseChatMessagesOptions {
   /** Session ID to load messages for */
@@ -155,7 +208,7 @@ export function useChatMessages({
     debounceMs: 300,
   });
 
-  // Send a message and stream the response
+  // Send a message and stream the response with structured content blocks
   const sendMessage = useCallback(async (prompt: string) => {
     if (!sessionId || !workspacePath) {
       onError?.('Session ID and workspace path are required');
@@ -177,11 +230,11 @@ export function useChatMessages({
     setMessages(withUserMessage);
 
     // Create placeholder assistant message
-    let assistantContent = '';
     const assistantMessage: CodingAgentMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
       content: '',
+      contentBlocks: [],
       timestamp: new Date().toISOString(),
       messageType: 'assistant',
     };
@@ -189,37 +242,118 @@ export function useChatMessages({
     messagesRef.current = withAssistantMessage;
     setMessages(withAssistantMessage);
 
+    // Track streaming content blocks by index
+    const streamingBlocks = new Map<number, StreamingContentBlock>();
+
+    // Helper to update assistant message with current state
+    const updateAssistantMessage = () => {
+      const contentBlocks = convertStreamingToContentBlocks(streamingBlocks);
+      // Build plain text content from text blocks for backward compatibility
+      const textContent = contentBlocks
+        .filter((b): b is AgentTextBlock => b.type === 'text')
+        .map((b) => b.text)
+        .join('\n');
+
+      const updatedMessages = [
+        ...messagesRef.current.slice(0, -1),
+        { ...assistantMessage, content: textContent, contentBlocks },
+      ];
+      messagesRef.current = updatedMessages;
+      setMessages(updatedMessages);
+    };
+
     try {
-      const handleChunk = (chunk: string) => {
-        assistantContent += chunk;
-        // Update last message with new content
-        const updatedMessages = [
-          ...messagesRef.current.slice(0, -1),
-          { ...assistantMessage, content: assistantContent },
-        ];
-        messagesRef.current = updatedMessages;
-        setMessages(updatedMessages);
+      const handleStructuredChunk = (chunk: StreamingChunk) => {
+        if (chunk.type === 'block_start' && chunk.blockType && chunk.block) {
+          // Initialize new block
+          streamingBlocks.set(chunk.index, {
+            index: chunk.index,
+            type: chunk.blockType,
+            id: chunk.block.id,
+            name: chunk.block.name,
+            text: chunk.blockType === 'text' ? '' : undefined,
+            thinking: chunk.blockType === 'thinking' ? '' : undefined,
+            input: chunk.blockType === 'tool_use' ? '' : undefined,
+            isComplete: false,
+          });
+          updateAssistantMessage();
+        } else if (chunk.type === 'block_delta' && chunk.delta) {
+          const block = streamingBlocks.get(chunk.index);
+          if (block) {
+            // Append delta content to appropriate field
+            if (chunk.delta.text !== undefined) {
+              block.text = (block.text || '') + chunk.delta.text;
+            }
+            if (chunk.delta.thinking !== undefined) {
+              block.thinking = (block.thinking || '') + chunk.delta.thinking;
+            }
+            if (chunk.delta.inputJson !== undefined) {
+              block.input = (block.input || '') + chunk.delta.inputJson;
+            }
+            updateAssistantMessage();
+          }
+        } else if (chunk.type === 'block_stop') {
+          const block = streamingBlocks.get(chunk.index);
+          if (block) {
+            block.isComplete = true;
+            updateAssistantMessage();
+          }
+        }
       };
 
-      // Stateless API - adapter handles create vs continue based on session file existence
-      const result = await agentService.sendMessageStreaming(prompt, workspacePath, sessionId, handleChunk);
+      // Use structured streaming API
+      const result = await agentService.sendMessageStreamingStructured(
+        prompt,
+        workspacePath,
+        sessionId,
+        handleStructuredChunk
+      );
 
       // Notify caller of session (useful for first message)
       onSessionCreated?.(sessionId);
 
-      // Final update with complete content
+      // Final update with complete content from result
+      const finalContentBlocks = convertStreamingToContentBlocks(streamingBlocks);
+      const finalTextContent = finalContentBlocks
+        .filter((b): b is AgentTextBlock => b.type === 'text')
+        .map((b) => b.text)
+        .join('\n');
+
       const finalMessages = [
         ...messagesRef.current.slice(0, -1),
-        { ...assistantMessage, content: result?.content || assistantContent },
+        {
+          ...assistantMessage,
+          content: result?.content || finalTextContent,
+          contentBlocks: finalContentBlocks,
+        },
       ];
       messagesRef.current = finalMessages;
       setMessages(finalMessages);
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Failed to send message');
-      // Remove incomplete assistant message on error
-      const rollbackMessages = messagesRef.current.slice(0, -1);
-      messagesRef.current = rollbackMessages;
-      setMessages(rollbackMessages);
+      // Keep partial content on error if we have any blocks
+      if (streamingBlocks.size > 0) {
+        const partialBlocks = convertStreamingToContentBlocks(streamingBlocks);
+        const partialContent = partialBlocks
+          .filter((b): b is AgentTextBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('\n');
+        const errorMessages = [
+          ...messagesRef.current.slice(0, -1),
+          {
+            ...assistantMessage,
+            content: partialContent || 'Error: Response incomplete',
+            contentBlocks: partialBlocks,
+          },
+        ];
+        messagesRef.current = errorMessages;
+        setMessages(errorMessages);
+      } else {
+        // Remove incomplete assistant message on error if no content
+        const rollbackMessages = messagesRef.current.slice(0, -1);
+        messagesRef.current = rollbackMessages;
+        setMessages(rollbackMessages);
+      }
     } finally {
       setIsStreaming(false);
     }

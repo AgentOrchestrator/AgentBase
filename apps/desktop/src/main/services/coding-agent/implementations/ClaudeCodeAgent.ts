@@ -28,6 +28,7 @@ import type {
   GenerateRequest,
   GenerateResponse,
   StreamCallback,
+  StructuredStreamCallback,
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
@@ -43,6 +44,7 @@ import {
   mapSdkMessagesToResponse,
   findResultMessage,
   extractStreamingChunk,
+  extractStructuredStreamingChunk,
   isResultError,
 } from '../utils/sdk-message-mapper';
 import {
@@ -278,13 +280,15 @@ export class ClaudeCodeAgent
    *
    * @param prompt - The prompt to send
    * @param options - SDK query options (must include abortController)
-   * @param onChunk - Optional streaming callback
+   * @param onChunk - Optional streaming callback for plain text
+   * @param onStructuredChunk - Optional structured streaming callback for content blocks
    * @returns Result with GenerateResponse or AgentError
    */
   private async executeQuery(
     prompt: string,
     options: Partial<Options>,
-    onChunk?: StreamCallback
+    onChunk?: StreamCallback,
+    onStructuredChunk?: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>> {
     const queryId = crypto.randomUUID();
     const abortController = options.abortController!;
@@ -308,10 +312,21 @@ export class ClaudeCodeAgent
         console.log(`[ClaudeCodeAgent] Query ${queryId} received message:`, message);
         messages.push(message);
 
-        if (onChunk && message.type === 'stream_event') {
-          const chunk = extractStreamingChunk(message);
-          if (chunk) {
-            onChunk(chunk);
+        if (message.type === 'stream_event') {
+          // Plain text streaming callback (backward compatible)
+          if (onChunk) {
+            const chunk = extractStreamingChunk(message);
+            if (chunk) {
+              onChunk(chunk);
+            }
+          }
+
+          // Structured streaming callback (content blocks)
+          if (onStructuredChunk) {
+            const structuredChunk = extractStructuredStreamingChunk(message);
+            if (structuredChunk) {
+              onStructuredChunk(structuredChunk);
+            }
           }
         }
       }
@@ -346,13 +361,15 @@ export class ClaudeCodeAgent
    *
    * @param prompt - The prompt to send to Claude
    * @param options - SDK query options
-   * @param onChunk - Optional streaming callback for partial messages
+   * @param onChunk - Optional streaming callback for partial messages (plain text)
+   * @param onStructuredChunk - Optional structured streaming callback (content blocks)
    * @returns Result with GenerateResponse or AgentError
    */
   private async runQuery(
     prompt: string,
     options: Partial<Options>,
-    onChunk?: StreamCallback
+    onChunk?: StreamCallback,
+    onStructuredChunk?: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>> {
     const abortController = options.abortController ?? new AbortController();
     const baseOptions: Partial<Options> = {
@@ -374,7 +391,7 @@ export class ClaudeCodeAgent
       console.log(`[ClaudeCodeAgent] Attempting to resume session: ${sessionId}`);
 
       try {
-        return await this.executeQuery(prompt, resumeOptions, onChunk);
+        return await this.executeQuery(prompt, resumeOptions, onChunk, onStructuredChunk);
       } catch (error) {
         console.log(`[ClaudeCodeAgent] Resume failed, falling back to new session with session-id: ${sessionId}`, error);
 
@@ -388,7 +405,7 @@ export class ClaudeCodeAgent
         };
 
         try {
-          return await this.executeQuery(prompt, fallbackOptions, onChunk);
+          return await this.executeQuery(prompt, fallbackOptions, onChunk, onStructuredChunk);
         } catch (fallbackError) {
           return err(mapSdkError(fallbackError));
         }
@@ -397,7 +414,7 @@ export class ClaudeCodeAgent
 
     // No sessionId, just execute directly
     try {
-      return await this.executeQuery(prompt, baseOptions, onChunk);
+      return await this.executeQuery(prompt, baseOptions, onChunk, onStructuredChunk);
     } catch (error) {
       return err(mapSdkError(error));
     }
@@ -428,6 +445,30 @@ export class ClaudeCodeAgent
 
     const options = this.buildQueryOptions(request, new AbortController(), true);
     return this.runQuery(request.prompt, options, onChunk);
+  }
+
+  /**
+   * Generate a streaming response with structured content blocks.
+   *
+   * Unlike generateStreaming which only streams plain text, this method
+   * streams structured content blocks (thinking, tool_use, text) as they arrive.
+   *
+   * @param request - The generation request
+   * @param onChunk - Callback for structured streaming chunks
+   * @returns Result with GenerateResponse or AgentError
+   */
+  async generateStreamingStructured(
+    request: GenerateRequest,
+    onChunk: StructuredStreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
+    const initCheck = this.ensureInitialized();
+    if (initCheck.success === false) {
+      return { success: false, error: initCheck.error };
+    }
+
+    const options = this.buildQueryOptions(request, new AbortController(), true);
+    // Pass undefined for plain text callback, use structured callback
+    return this.runQuery(request.prompt, options, undefined, onChunk);
   }
 
   /**

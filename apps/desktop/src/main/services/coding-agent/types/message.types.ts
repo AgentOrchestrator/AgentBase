@@ -4,6 +4,9 @@
  * Re-exports rich type information from shared package.
  */
 
+// Import StreamingChunk for use in StructuredStreamCallback definition
+import type { StreamingChunk as _StreamingChunk } from '@agent-orchestrator/shared';
+
 // Re-export rich message types from shared package
 export type {
   MessageType,
@@ -24,6 +27,10 @@ export type {
   AgentWebSearchToolResultError,
   AgentWebSearchToolResultErrorCode,
   CodingAgentMessage,
+  // Streaming types
+  StreamingChunk,
+  StreamingContentBlock,
+  StreamingBlockType,
 } from '@agent-orchestrator/shared';
 
 /**
@@ -61,6 +68,11 @@ export interface GenerateResponse {
 }
 
 /**
- * Callback for streaming output chunks
+ * Callback for streaming output chunks (plain text)
  */
 export type StreamCallback = (chunk: string) => void;
+
+/**
+ * Callback for structured streaming chunks (with content block types)
+ */
+export type StructuredStreamCallback = (chunk: _StreamingChunk) => void;
