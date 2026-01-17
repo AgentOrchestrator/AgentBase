@@ -17,7 +17,7 @@ import {
   createLinearIssueAttachment,
   TerminalAttachment,
 } from '../../types/attachments';
-import type { AgentNodeData, AgentNodeView } from '../../types/agent-node';
+import type { AgentNodeData, AgentNodeView, AgentProgress } from '../../types/agent-node';
 import {
   useAgentService,
   useTerminalService,
@@ -105,6 +105,7 @@ export function AgentNodePresentation({
   const prevStatusRef = useRef<string | null>(null);
   const prevTitleRef = useRef<string | null>(null);
   const prevSummaryRef = useRef<string | null>(null);
+  const prevProgressRef = useRef<AgentProgress | null>(null);
 
   // Sync status changes from overview to node data
   useEffect(() => {
@@ -139,6 +140,20 @@ export function AgentNodePresentation({
       onDataChange({ summary: sessionOverview.summary });
     }
   }, [sessionOverview.summary, onDataChange]);
+
+  // Sync progress changes from overview to node data
+  useEffect(() => {
+    const currentProgress = sessionOverview.progress;
+    const prevProgress = prevProgressRef.current;
+
+    // Compare by JSON stringification to detect deep changes
+    const hasChanged = JSON.stringify(currentProgress) !== JSON.stringify(prevProgress);
+
+    if (hasChanged) {
+      prevProgressRef.current = currentProgress;
+      onDataChange({ progress: currentProgress });
+    }
+  }, [sessionOverview.progress, onDataChange]);
 
   // Handle view change - delegates to useAgentViewMode hook which manages
   // terminal lifecycle and persists view state via onViewChange callback

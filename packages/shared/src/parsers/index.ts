@@ -15,6 +15,8 @@ export type {
   ParsedContentBlocks,
   ParsedJsonlLine,
   ParsedChatLine,
+  RawTodoItem,
+  ExtractedTodoList,
 } from './types.js';
 
 // =============================================================================
@@ -63,3 +65,13 @@ export { JSONLFile, type JSONLFileReplaceOptions } from './JSONLFile.js';
 // =============================================================================
 
 export { categorizeToolByName } from './tool-categorizer.js';
+
+// =============================================================================
+// Todo Extraction
+// =============================================================================
+
+export {
+  extractLatestTodoList,
+  extractTodosFromJsonlLine,
+  toTodoListProgress,
+} from './todo-extractor.js';

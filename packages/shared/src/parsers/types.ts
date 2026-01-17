@@ -86,6 +86,32 @@ export interface ClaudeCodeJsonlLine {
 }
 
 // =============================================================================
+// TodoWrite Types
+// =============================================================================
+
+/**
+ * Raw todo item as stored in JSONL TodoWrite tool_use blocks
+ */
+export interface RawTodoItem {
+  /** Description of the task */
+  content: string;
+  /** Task status: pending, in_progress, or completed */
+  status: 'pending' | 'in_progress' | 'completed';
+  /** Optional active/in-progress form of the description */
+  activeForm?: string;
+}
+
+/**
+ * Result from extracting todos from JSONL content
+ */
+export interface ExtractedTodoList {
+  /** The todo items */
+  items: RawTodoItem[];
+  /** Timestamp of the TodoWrite call */
+  timestamp?: string;
+}
+
+// =============================================================================
 // Parser Options and Results
 // =============================================================================
 

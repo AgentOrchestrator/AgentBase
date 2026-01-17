@@ -8,10 +8,13 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { CodingAgentType, CodingAgentMessage } from '@agent-orchestrator/shared';
+import { extractLatestTodoList, toTodoListProgress } from '@agent-orchestrator/shared';
 import type { CodingAgentStatusInfo } from '../../../types/coding-agent-status';
 import type { IAgentService } from '../context/node-services/types';
+import type { AgentProgress } from '../types/agent-node';
 import { useSessionFileWatcher } from './useSessionFileWatcher';
 import { createStatusService } from '../services/status';
+import { getConversationFilePath } from '../utils/getConversationFilePath';
 
 // =============================================================================
 // Types
@@ -39,6 +42,8 @@ export interface SessionOverviewState {
   status: CodingAgentStatusInfo | null;
   /** AI-generated summary of agent purpose (max 10 words) */
   summary: string | null;
+  /** Todo list progress from latest TodoWrite call */
+  progress: AgentProgress | null;
   /** Whether data is currently loading */
   isLoading: boolean;
   /** Whether initial data has been loaded */
@@ -127,6 +132,7 @@ export function useSessionOverview({
   const [mostRecentUserMessage, setMostRecentUserMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<CodingAgentStatusInfo | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [progress, setProgress] = useState<AgentProgress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -208,6 +214,27 @@ export function useSessionOverview({
 
         // Track loaded session
         loadedSessionIdRef.current = currentSessionId;
+      }
+
+      // Extract todo progress from raw JSONL file
+      try {
+        const filePath = getConversationFilePath(currentSessionId, currentWorkspacePath);
+        const fileAPI = (window as unknown as { fileAPI?: { readFile: (path: string) => Promise<string> } }).fileAPI;
+        if (fileAPI) {
+          const content = await fileAPI.readFile(filePath);
+          if (content) {
+            const lines = content.split('\n').filter((line: string) => line.trim());
+            const extracted = extractLatestTodoList(lines);
+            if (extracted && extracted.items.length > 0) {
+              setProgress(toTodoListProgress(extracted));
+            } else {
+              setProgress(null);
+            }
+          }
+        }
+      } catch (progressError) {
+        // Non-critical - just log and continue
+        console.warn('[useSessionOverview] Failed to extract progress:', progressError);
       }
 
       setIsLoaded(true);
@@ -464,6 +491,7 @@ export function useSessionOverview({
     mostRecentUserMessage,
     status,
     summary,
+    progress,
     isLoading,
     isLoaded,
     reload,
