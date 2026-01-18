@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css';
 import { Dithering, MeshGradient } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
 import IssueDetailsModal from './IssueDetailsModal';
+import LinearCreateTicketModal from './LinearCreateTicketModal';
 import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
@@ -106,6 +107,9 @@ function CanvasFlow() {
 
   // Linear issue details modal state
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+
+  // Linear create ticket modal state
+  const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
 
   // Canvas persistence hook - centralized save/restore logic
   const {
@@ -2156,6 +2160,28 @@ function CanvasFlow() {
                     </svg>
                   </span>
                   <h3 className="sidebar-linear-issues-title">Linear</h3>
+                  <button
+                    className="sidebar-linear-add-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCreateTicketModal(true);
+                    }}
+                    title="Create new issue"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
                 </div>
 
                 {!isLinearCollapsed && (
@@ -2948,6 +2974,16 @@ function CanvasFlow() {
         {/* Linear Issue Details Modal */}
         {selectedIssueId && (
           <IssueDetailsModal issueId={selectedIssueId} onClose={() => setSelectedIssueId(null)} />
+        )}
+
+        {/* Linear Create Ticket Modal */}
+        {showCreateTicketModal && (
+          <LinearCreateTicketModal
+            onClose={() => setShowCreateTicketModal(false)}
+            onSuccess={() => {
+              linear.fetchIssues();
+            }}
+          />
         )}
       </div>
     </div>

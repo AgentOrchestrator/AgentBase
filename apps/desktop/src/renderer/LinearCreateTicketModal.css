@@ -1,0 +1,338 @@
+/* Linear Create Ticket Modal */
+.linear-create-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  animation: fadeIn 0.2s ease;
+  pointer-events: all;
+}
+
+.linear-create-modal {
+  background: #1e1e1e;
+  border: 1px solid #d4d4d4;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  animation: slideUp 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.linear-create-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1e1e1e;
+}
+
+.linear-create-title {
+  margin: 0;
+  color: #d4d4d4;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.linear-create-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.linear-create-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d4d4d4;
+}
+
+/* Content */
+.linear-create-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.linear-create-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.linear-create-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.linear-create-content::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+.linear-create-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Error message */
+.linear-create-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  color: #ef4444;
+  font-size: 14px;
+}
+
+/* Field */
+.linear-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linear-create-label {
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.linear-create-required {
+  color: #ef4444;
+}
+
+.linear-create-input {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+  color: #d4d4d4;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.linear-create-input:focus {
+  border-color: #5e5ce6;
+  box-shadow: 0 0 0 2px rgba(94, 92, 230, 0.2);
+}
+
+.linear-create-input::placeholder {
+  color: #666;
+}
+
+.linear-create-textarea {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+  color: #d4d4d4;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: all 0.2s ease;
+  min-height: 100px;
+}
+
+.linear-create-textarea:focus {
+  border-color: #5e5ce6;
+  box-shadow: 0 0 0 2px rgba(94, 92, 230, 0.2);
+}
+
+.linear-create-textarea::placeholder {
+  color: #666;
+}
+
+/* Properties Grid */
+.linear-create-properties {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.linear-create-property {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linear-create-property-label {
+  color: #888;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.linear-create-select {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #d4d4d4;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.linear-create-select:hover:not(:disabled) {
+  border-color: #555;
+}
+
+.linear-create-select:focus {
+  border-color: #5e5ce6;
+  box-shadow: 0 0 0 2px rgba(94, 92, 230, 0.2);
+}
+
+.linear-create-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Labels */
+.linear-create-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linear-create-label-chip {
+  padding: 6px 12px;
+  border-radius: 16px;
+  color: #d4d4d4;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid;
+  background: transparent;
+}
+
+.linear-create-label-chip:hover {
+  opacity: 0.8;
+}
+
+.linear-create-label-chip.selected {
+  color: #fff;
+}
+
+/* Actions */
+.linear-create-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid #333;
+  margin-top: 4px;
+}
+
+.linear-create-cancel-button,
+.linear-create-submit-button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.linear-create-cancel-button {
+  background: #2a2a2a;
+  color: #d4d4d4;
+  border: 1px solid #444;
+}
+
+.linear-create-cancel-button:hover:not(:disabled) {
+  background: #333;
+}
+
+.linear-create-cancel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linear-create-submit-button {
+  background: #5e5ce6;
+  color: #fff;
+}
+
+.linear-create-submit-button:hover:not(:disabled) {
+  background: #4e4cd6;
+}
+
+.linear-create-submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading state */
+.linear-create-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  color: #888;
+  font-size: 14px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .linear-create-properties {
+    grid-template-columns: 1fr;
+  }
+
+  .linear-create-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+}
