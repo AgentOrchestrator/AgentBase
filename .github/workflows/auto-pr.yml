@@ -1,0 +1,70 @@
+name: Auto Create PR
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - 'release/**'
+
+jobs:
+  create-pr:
+    name: Create Pull Request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if PR already exists
+        id: check-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          PR_EXISTS=$(gh pr list --head "$BRANCH_NAME" --json number --jq 'length')
+          echo "exists=$PR_EXISTS" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.check-pr.outputs.exists == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          # Try to extract type and description from branch name
+          # Supports formats: feat/description, fix-something, feature_name
+          if [[ "$BRANCH_NAME" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)[/\-_](.+)$ ]]; then
+            TYPE="${BASH_REMATCH[1]}"
+            DESCRIPTION="${BASH_REMATCH[2]}"
+            # Replace dashes/underscores with spaces for readability
+            DESCRIPTION=$(echo "$DESCRIPTION" | tr '-_' ' ')
+            PR_TITLE="${TYPE}: ${DESCRIPTION}"
+          else
+            # Fallback: use branch name as title
+            PR_TITLE="$BRANCH_NAME"
+          fi
+
+          # Create PR body with commit list
+          PR_BODY=$(cat <<EOF
+          ## Summary
+
+          Auto-generated PR for branch \`${BRANCH_NAME}\`
+
+          ## Changes
+
+          $(git log main..HEAD --format="- %s" | head -10)
+
+          ---
+          *This PR was automatically created. Please update the description with relevant details.*
+          EOF
+          )
+
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --draft
