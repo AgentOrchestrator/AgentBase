@@ -26,7 +26,7 @@ import { ActionPill } from './components/ActionPill';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
-import { NewAgentModal } from './components/NewAgentModal';
+import { type ExistingRepo, NewAgentModal } from './components/NewAgentModal';
 import UserMessageNode from './components/UserMessageNode';
 import { useTheme } from './context';
 import {
@@ -391,6 +391,28 @@ function CanvasFlow() {
       setIsNewAgentModalOpen(true);
     },
   });
+
+  // Compute existing repos from canvas nodes for worktree creation
+  const existingRepos = useMemo<ExistingRepo[]>(() => {
+    const repos = new Map<string, ExistingRepo>();
+    for (const node of nodes) {
+      if (node.type !== 'agent') continue;
+      const data = node.data as unknown as AgentNodeData;
+      if (!data.workspacePath) continue;
+      // Skip worktree paths (only include main repos)
+      // Worktree paths are typically in sibling directories with "agent-" prefix
+      const folderName = data.workspacePath.split('/').pop() || '';
+      if (folderName.startsWith('agent-')) continue;
+      // Dedupe by workspace path
+      if (repos.has(data.workspacePath)) continue;
+      repos.set(data.workspacePath, {
+        workspacePath: data.workspacePath,
+        name: folderName,
+        branch: data.gitInfo?.branch,
+      });
+    }
+    return Array.from(repos.values());
+  }, [nodes]);
 
   // Chat message fork - listen for text selection fork events
   useEffect(() => {
@@ -1827,6 +1849,7 @@ function CanvasFlow() {
         initialPosition={pendingAgentPosition}
         initialWorkspacePath={folderLock.lockedFolderPath}
         autoCreateWorktree={autoCreateWorktree}
+        existingRepos={existingRepos}
         initialDescription={
           pendingLinearIssue
             ? pendingLinearIssue.description

@@ -23,6 +23,18 @@ interface ForkData {
   createWorktree?: boolean;
 }
 
+/**
+ * Existing repository info for creating worktrees
+ */
+export interface ExistingRepo {
+  /** Workspace path of the repository */
+  workspacePath: string;
+  /** Name of the folder (last segment of path) */
+  name: string;
+  /** Current branch of the repository */
+  branch?: string;
+}
+
 interface NewAgentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -36,11 +48,17 @@ interface NewAgentModalProps {
     assignee?: string;
     project?: string;
     labels?: string[];
+    /** Worktree info if created from existing repo */
+    worktreeId?: string;
+    /** Source repo path if worktree was created */
+    sourceRepoPath?: string;
   }) => void;
   initialPosition?: { x: number; y: number };
   initialWorkspacePath?: string | null;
   autoCreateWorktree?: boolean;
   initialDescription?: string;
+  /** List of existing repositories from canvas nodes */
+  existingRepos?: ExistingRepo[];
 
   // Fork mode props
   /** Whether the modal is in fork mode */
@@ -80,6 +98,7 @@ export function NewAgentModal({
   initialWorkspacePath,
   autoCreateWorktree = false,
   initialDescription,
+  existingRepos = [],
   // Fork mode props
   isForkMode = false,
   forkData,
@@ -98,6 +117,11 @@ export function NewAgentModal({
   const [_isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
+  // Existing repo selection state
+  const [isExistingRepoDropdownOpen, setIsExistingRepoDropdownOpen] = useState(false);
+  const [selectedExistingRepo, setSelectedExistingRepo] = useState<ExistingRepo | null>(null);
+  const [sourceRepoPath, setSourceRepoPath] = useState<string | null>(null);
+  const existingRepoDropdownRef = useRef<HTMLDivElement>(null);
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const [isCreatingNewBranch, setIsCreatingNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
@@ -163,6 +187,10 @@ export function NewAgentModal({
       setKeyboardFocus('input');
       setDropdownItemIndex(null);
       setIsBranchDropdownOpen(false);
+      // Reset existing repo selection
+      setIsExistingRepoDropdownOpen(false);
+      setSelectedExistingRepo(null);
+      setSourceRepoPath(null);
       // Keep workspace path from initialWorkspacePath
       if (initialWorkspacePath) {
         setWorkspacePath(initialWorkspacePath);
@@ -173,6 +201,7 @@ export function NewAgentModal({
       setShowBranchSwitchWarning(false);
       setKeyboardFocus('input');
       setDropdownItemIndex(null);
+      setIsExistingRepoDropdownOpen(false);
     }
   }, [isOpen, initialWorkspacePath, initialDescription]);
 
@@ -210,6 +239,74 @@ export function NewAgentModal({
       setIsSelectingFolder(false);
     }
   }, []);
+
+  // Handle selecting an existing repo and creating a worktree from it
+  const handleSelectExistingRepo = useCallback(
+    async (repo: ExistingRepo) => {
+      setSelectedExistingRepo(repo);
+      setIsExistingRepoDropdownOpen(false);
+      setIsCreatingWorktree(true);
+
+      try {
+        // Generate a branch name based on description or timestamp
+        const branchName = description.trim()
+          ? `agent-${description
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .slice(0, 30)}-${Date.now().toString().slice(-6)}`
+          : `agent-${Date.now().toString().slice(-6)}`;
+
+        // Compute sibling worktree path (next to the source repo)
+        const parentDir = repo.workspacePath.split('/').slice(0, -1).join('/');
+        const dirName = description.trim()
+          ? `agent-${description
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .slice(0, 30)}`
+          : `agent-${Date.now().toString().slice(-6)}`;
+        const fullWorktreePath = `${parentDir}/${dirName}`;
+
+        const result = await worktreeService.createWorktree(repo.workspacePath, branchName, {
+          agentId: undefined, // Will be set when agent is created
+          worktreePath: fullWorktreePath,
+        });
+
+        if (!result.success) {
+          alert(`Failed to create worktree: ${result.error || 'Unknown error'}`);
+          setSelectedExistingRepo(null);
+          setIsCreatingWorktree(false);
+          return;
+        }
+
+        // Get the full worktree info
+        if (result.worktreeId) {
+          const worktree = await worktreeService.getWorktree(result.worktreeId);
+          if (worktree) {
+            setWorktreeInfo(worktree);
+            // Store source repo path for tracking
+            setSourceRepoPath(repo.workspacePath);
+            setOriginalWorkspacePath(repo.workspacePath);
+            // Update workspace path to the worktree path
+            setWorkspacePath(worktree.worktreePath);
+            // Refresh git info for the worktree
+            const updatedInfo = await window.gitAPI?.getInfo(worktree.worktreePath);
+            if (updatedInfo) {
+              setGitInfo(updatedInfo);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[NewAgentModal] Error creating worktree from existing repo:', error);
+        alert(`Error creating worktree: ${(error as Error).message}`);
+        setSelectedExistingRepo(null);
+      } finally {
+        setIsCreatingWorktree(false);
+      }
+    },
+    [description]
+  );
 
   // Get dropdown items (actions + branches) - only actionable items, no dividers
   const dropdownItems = useMemo(() => {
@@ -441,6 +538,13 @@ export function NewAgentModal({
       // Close branch dropdown if clicking outside
       if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
         setIsBranchDropdownOpen(false);
+      }
+      // Close existing repo dropdown if clicking outside
+      if (
+        existingRepoDropdownRef.current &&
+        !existingRepoDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsExistingRepoDropdownOpen(false);
       }
     };
 
@@ -680,6 +784,9 @@ export function NewAgentModal({
       description: description.trim(),
       workspacePath: finalWorkspacePath,
       gitInfo,
+      // Include worktree info if created from existing repo
+      worktreeId: worktreeInfo?.id,
+      sourceRepoPath: sourceRepoPath || undefined,
     });
 
     onClose();
@@ -700,7 +807,107 @@ export function NewAgentModal({
             {/* Fork mode title */}
             {isForkMode && <span className="new-agent-modal-title">Fork Agent Session</span>}
             {/* Show original folder only if no worktree is active */}
-            {!worktreeInfo && (
+            {!worktreeInfo && !isForkMode && (
+              <div
+                className={`new-agent-modal-folder-wrapper ${keyboardFocus === 'folder' ? 'keyboard-selected' : ''}`}
+                ref={existingRepoDropdownRef}
+                style={{ position: 'relative' }}
+              >
+                <div
+                  onClick={() => {
+                    if (existingRepos.length > 0) {
+                      setIsExistingRepoDropdownOpen(!isExistingRepoDropdownOpen);
+                    } else {
+                      handleBrowseFolder();
+                    }
+                  }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  title={
+                    existingRepos.length > 0
+                      ? 'Click to select folder or existing repo'
+                      : 'Click to select folder'
+                  }
+                >
+                  <div className="new-agent-modal-folder-icon">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 512 512"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="32"
+                      />
+                      <path
+                        d="M479.9,226.55,463.68,392a40,40,0,0,1-39.93,40H88.25a40,40,0,0,1-39.93-40L32.1,226.55A32,32,0,0,1,64,192h384.1A32,32,0,0,1,479.9,226.55Z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="32"
+                      />
+                    </svg>
+                  </div>
+                  <span className="new-agent-modal-folder-path">
+                    {getFolderName(workspacePath || originalWorkspacePath)}
+                  </span>
+                  {existingRepos.length > 0 && (
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      style={{ marginLeft: '2px', opacity: 0.6 }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  )}
+                </div>
+                {isExistingRepoDropdownOpen && existingRepos.length > 0 && (
+                  <div className="new-agent-modal-branch-dropdown new-agent-modal-existing-repo-dropdown">
+                    <div
+                      className="new-agent-modal-branch-dropdown-item"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExistingRepoDropdownOpen(false);
+                        handleBrowseFolder();
+                      }}
+                    >
+                      Browse...
+                    </div>
+                    <div className="new-agent-modal-branch-dropdown-divider" />
+                    <div className="new-agent-modal-dropdown-section-label">
+                      Create worktree from existing repo
+                    </div>
+                    {existingRepos.map((repo) => (
+                      <div
+                        key={repo.workspacePath}
+                        className="new-agent-modal-branch-dropdown-item new-agent-modal-existing-repo-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectExistingRepo(repo);
+                        }}
+                        title={repo.workspacePath}
+                      >
+                        <span className="new-agent-modal-existing-repo-name">{repo.name}</span>
+                        {repo.branch && (
+                          <span className="new-agent-modal-existing-repo-branch">{repo.branch}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Fork mode folder selector (no existing repos dropdown) */}
+            {!worktreeInfo && isForkMode && (
               <div
                 className={`new-agent-modal-folder-wrapper ${keyboardFocus === 'folder' ? 'keyboard-selected' : ''}`}
                 onClick={handleBrowseFolder}
