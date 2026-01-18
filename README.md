@@ -10,11 +10,11 @@
 When working with AI coding agents, you often want to explore multiple approaches simultaneously. Agent Base gives you a visual canvas to launch and manage multiple agents working in parallel, each with shared context but isolated edits, so they don't step on each other's toes.
 
 <div align="center">
-<img src="./assets/agent_base_1.png" alt="Agent Base" width="618"/>
+<img src="./assets/canvas-overview.png" alt="Agent Base" width="618"/>
 
 <p align="center">
-  <img src="./assets/agent_base_2.png" alt="Agent Base" width="364"/>
-  <img src="./assets/agent_base_3.gif" alt="Agent Base" width="250"/>
+  <img src="./assets/parallel-agents-workspace.png" alt="Agent Base" width="364"/>
+  <img src="./assets/interactive-code-analysis.gif" alt="Agent Base" width="250"/>
 </p>
 <div align="left">
 
@@ -50,9 +50,7 @@ Agent Base is local-first — everything runs on your machine.
 ## 🚀 Installation
 
 **Platform Compatibility:**
-- ✅ **macOS** - Supported
-- 🚧 **Windows** - Coming soon
-- 🚧 **Linux** - Coming soon
+- ✅ **macOS**
 
 Choose your preferred installation method:
 
@@ -116,7 +114,7 @@ This is the tool we wished we had: a way to orchestrate multiple AI agents visua
 
 ## 🔌 Integrations
 
-The visual canvas currently supports **Claude Code** with full orchestration capabilities. We welcome contributions to integrate additional AI coding assistants.
+The visual canvas currently supports **Claude Code** with full orchestration capabilities. Any other agent runs in the canvas via the terminal. We welcome contributions to integrate additional AI coding assistants.
 
 ### Canvas Support:
 
