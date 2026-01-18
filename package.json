@@ -29,6 +29,7 @@
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/.next apps/*/dist",
     "dev:daemon": "npm run dev --workspace=agent-orchestrator-daemon",
     "dev:desktop": "npm run build --workspace=@agent-orchestrator/shared && npm run dev --workspace=desktop",
+    "dev:web": "npm run dev --workspace=@agent-orchestrator/web",
     "prepare": "husky"
   },
   "devDependencies": {
