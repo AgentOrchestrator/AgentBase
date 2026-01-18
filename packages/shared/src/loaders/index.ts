@@ -13,26 +13,26 @@
 export type {
   // Core types
   AgentType,
-  SessionSource,
-  ChatMessage,
-  SessionMetadata,
   ChatHistory,
-  ProjectInfo,
-  LoaderOptions,
-  // Rich message types (NEW)
-  MessageType,
-  ToolCategory,
-  ToolInfo,
-  ThinkingInfo,
-  McpInfo,
+  ChatMessage,
   ErrorInfo,
+  LoaderOptions,
+  McpInfo,
   // Filter types (NEW)
   MessageFilterOptions,
+  // Rich message types (NEW)
+  MessageType,
+  ProjectInfo,
+  SessionChange,
+  SessionContent,
   SessionFilterOptions,
+  SessionMetadata,
+  SessionSource,
   // Session types (NEW)
   SessionSummary,
-  SessionContent,
-  SessionChange,
+  ThinkingInfo,
+  ToolCategory,
+  ToolInfo,
 } from './types.js';
 
 // =============================================================================
@@ -41,12 +41,12 @@ export type {
 
 export type {
   IChatHistoryLoader,
-  IIncrementalLoader,
-  IDatabaseLoader,
-  LoaderFactory,
-  ILoaderRegistry,
   // Chat history provider (NEW)
   IChatHistoryProvider,
+  IDatabaseLoader,
+  IIncrementalLoader,
+  ILoaderRegistry,
+  LoaderFactory,
 } from './interfaces.js';
 
 // =============================================================================
@@ -54,12 +54,12 @@ export type {
 // =============================================================================
 
 export type {
-  SyncStrategyType,
-  SyncOptions,
-  SyncCandidate,
   ISyncStrategy,
   SessionIndexEntry,
+  SyncCandidate,
+  SyncOptions,
   SyncStrategyFactory,
+  SyncStrategyType,
 } from './sync-strategy.js';
 
 // =============================================================================
@@ -67,16 +67,16 @@ export type {
 // =============================================================================
 
 export {
-  normalizeTimestamp,
   extractProjectNameFromPath,
+  fileExists,
   generateDeterministicUUID,
   getHomeDir,
-  fileExists,
   IDE_DATA_PATHS,
+  normalizeTimestamp,
 } from './utilities.js';
 
 // =============================================================================
 // Registry
 // =============================================================================
 
-export { LoaderRegistry, createLoaderRegistry } from './registry.js';
+export { createLoaderRegistry, LoaderRegistry } from './registry.js';

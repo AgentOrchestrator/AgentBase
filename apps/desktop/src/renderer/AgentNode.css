@@ -4,10 +4,17 @@
  * Dark theme wrapper component with tabs for switching between views.
  */
 
+/* Agent Node Wrapper - allows label to float outside */
+.agent-node-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 /* Agent Node Container */
 .agent-node {
-  background: #2a2c36;
-  border: none;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
   width: 100%;
@@ -16,59 +23,185 @@
   min-height: 350px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .agent-node:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.agent-node.selected {
+  border-color: var(--color-text-primary);
+}
+
+/* Hide React Flow's default selection border/outline */
+.react-flow__node.agentNode.react-flow__node-selected {
+  outline: none;
+  border: none;
 }
 
 .agent-node.drag-over {
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
   transform: scale(1.01);
 }
 
-/* Tab Bar */
-.agent-node-tabs {
+/* Status Indicator - Top Left, vertically aligned with buttons */
+.agent-node-status-indicator {
+  position: absolute;
+  top: 8px;
+  left: 16px;
+  z-index: 10;
+  pointer-events: auto;
   display: flex;
-  background: #1e1e1e;
-  border-bottom: 1px solid #3a3c46;
-  padding: 0;
-  flex-shrink: 0;
+  align-items: center;
+  height: 24px;
 }
 
-.agent-tab {
-  flex: 1;
-  padding: 10px 16px;
+.agent-node-status-indicator .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
   background: transparent;
   border: none;
-  color: #888;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: 0;
+  opacity: 1;
+  height: 24px;
+}
+
+.agent-node-status-indicator .status-icon {
+  font-size: 16px;
+  color: var(--status-color, #888);
+  display: inline-block;
   position: relative;
 }
 
-.agent-tab:hover {
-  color: #d4d4d4;
-  background: rgba(74, 158, 255, 0.05);
+.agent-node-status-indicator .status-label {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.agent-tab.active {
-  color: #4a9eff;
-  background: rgba(74, 158, 255, 0.1);
+/* Status-specific styles */
+.agent-node-status-indicator .status-idle .status-icon {
+  /* Dashed circle - using border instead of solid character */
+  width: 16px;
+  height: 16px;
+  border: 2px dashed var(--status-color, #888);
+  border-radius: 50%;
+  background: transparent;
+  font-size: 0;
 }
 
-.agent-tab.active::after {
-  content: '';
+.agent-node-status-indicator .status-blinking .status-icon {
+  animation: status-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes status-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.agent-node-status-indicator .status-paused .status-icon {
+  width: 16px;
+  height: 16px;
+  background: var(--yellow);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-completed .status-icon {
+  width: 16px;
+  height: 16px;
+  background: var(--green);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-error .status-icon {
+  width: 16px;
+  height: 16px;
+  background: var(--error);
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.agent-node-status-indicator .status-awaiting {
+  gap: 0;
+}
+
+/* View Switcher Buttons - Top Right */
+.agent-node-view-switcher {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #4a9eff;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.agent-view-button {
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  padding: 0;
+}
+
+.agent-view-button svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-primary);
+}
+
+.agent-node:hover .agent-view-button {
+  opacity: 1;
+}
+
+.agent-view-button:hover {
+  background: transparent;
+}
+
+.agent-view-button:hover svg {
+  color: var(--color-text-secondary);
+}
+
+.agent-view-button.active {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: none;
+}
+
+.agent-view-button.active svg {
+  color: var(--color-text-primary);
+}
+
+/* Terminal view backdrop for icons */
+.agent-node-view-switcher.terminal-active .agent-view-button {
+  position: relative;
+}
+
+.agent-node-view-switcher.terminal-active .agent-view-button::before {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  opacity: 1;
+  z-index: -1;
 }
 
 /* Content Area */
@@ -80,59 +213,211 @@
   min-height: 0;
 }
 
-/* Handle styles */
-.agent-node .react-flow__handle {
-  background: #4a9eff;
+/* Handle styles - fully invisible but functional (except fork anchors) */
+.agent-node .react-flow__handle:not(.agent-node-bottom-handle):not(.agent-node-fork-anchor) {
+  background: transparent;
   width: 10px;
   height: 10px;
-  border: 2px solid #2a2c36;
+  border: none;
+  opacity: 0;
 }
 
-.agent-node .react-flow__handle:hover {
-  background: #6bb3ff;
+/* Resize handles - increase size and hit area (but not corner handles) - invisible but functional */
+.react-flow__node.agentNode
+.react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(
+  .handle-top-right
+):not(.handle-bottom-left),
+.agent-node
+  .react-flow__resize-control.handle:not(.handle-bottom-right):not(.handle-top-left):not(
+    .handle-top-right
+  ):not(.handle-bottom-left) {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+  box-sizing: border-box;
 }
 
-/* Resize handles */
-.agent-node .react-flow__resize-control.handle {
-  width: 8px;
-  height: 8px;
-  border: 1px solid #666;
-  background: #888;
-  border-radius: 50%;
-  opacity: 0.5;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
+.react-flow__node.agentNode .react-flow__resize-control.handle:hover,
 .agent-node .react-flow__resize-control.handle:hover {
+  opacity: 0;
+  transform: none;
+}
+
+/* Corner handles - 100px for easy grabbing, completely invisible */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right,
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left,
+.agent-node .react-flow__resize-control.handle-bottom-right,
+.agent-node .react-flow__resize-control.handle-top-left,
+.agent-node .react-flow__resize-control.handle-top-right,
+.agent-node .react-flow__resize-control.handle-bottom-left {
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  min-height: 100px;
+  max-width: 100px;
+  max-height: 100px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  /* Override any transforms or other visual properties */
+  transform: none;
+  box-sizing: border-box;
+}
+
+/* Hide any child elements, pseudo-elements, and visual content inside corner handles */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right > *,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left > *,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right > *,
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left > *,
+.agent-node .react-flow__resize-control.handle-bottom-right > *,
+.agent-node .react-flow__resize-control.handle-top-left > *,
+.agent-node .react-flow__resize-control.handle-top-right > *,
+.agent-node .react-flow__resize-control.handle-bottom-left > * {
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  background: transparent;
+  border: none;
+}
+
+/* Visual indicator inside corner handles - hidden */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right::before,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left::before,
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right::before,
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left::before,
+.agent-node .react-flow__resize-control.handle-bottom-right::before,
+.agent-node .react-flow__resize-control.handle-top-left::before,
+.agent-node .react-flow__resize-control.handle-top-right::before,
+.agent-node .react-flow__resize-control.handle-bottom-left::before {
+  display: none;
+}
+
+/* Ensure corner handles have proper cursor */
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-right,
+.agent-node .react-flow__resize-control.handle-bottom-right {
+  cursor: nwse-resize;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-left,
+.agent-node .react-flow__resize-control.handle-top-left {
+  cursor: nwse-resize;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle-top-right,
+.agent-node .react-flow__resize-control.handle-top-right {
+  cursor: nesw-resize;
+}
+
+.react-flow__node.agentNode .react-flow__resize-control.handle-bottom-left,
+.agent-node .react-flow__resize-control.handle-bottom-left {
+  cursor: nesw-resize;
+}
+
+.agent-node .react-flow__handle:not(.agent-node-bottom-handle):not(.agent-node-fork-anchor):hover {
+  background: transparent;
+  opacity: 0;
+}
+
+/* Bottom buttons container - holds fork handles */
+.agent-node-bottom-buttons {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Fork anchor points - discrete points around the border */
+.agent-node-fork-anchor {
+  width: 24px;
+  height: 24px;
+  background: #000;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    background 0.2s ease;
+  z-index: 20;
+}
+
+.agent-node-fork-anchor.active {
   opacity: 1;
-  transform: scale(1.3);
+  pointer-events: auto;
 }
 
-/* Position resize handles at corners */
-.agent-node .react-flow__resize-control.handle.top-left {
-  top: -4px;
-  left: -4px;
+.agent-node-fork-anchor:hover {
+  background: #333;
 }
 
-.agent-node .react-flow__resize-control.handle.top-right {
-  top: -4px;
-  right: -4px;
+/* Git fork icon for anchor points */
+.agent-node-fork-anchor::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' clip-rule='evenodd' d='M6 4C5.44772 4 5 4.44772 5 5C5 5.55228 5.44772 6 6 6C6.55228 6 7 5.55228 7 5C7 4.44772 6.55228 4 6 4ZM9 5C9 6.30622 8.16519 7.41746 7 7.82929V9C7 10.1046 7.89543 11 9 11C10.1947 11 11.2671 11.5238 12 12.3542C12.7329 11.5238 13.8053 11 15 11C16.1046 11 17 10.1046 17 9V7.82929C15.8348 7.41746 15 6.30622 15 5C15 3.34315 16.3431 2 18 2C19.6569 2 21 3.34315 21 5C21 6.30622 20.1652 7.41746 19 7.82929V9C19 11.2091 17.2091 13 15 13C13.8954 13 13 13.8954 13 15V16.1707C14.1652 16.5825 15 17.6938 15 19C15 20.6569 13.6569 22 12 22C10.3431 22 9 20.6569 9 19C9 17.6938 9.83481 16.5825 11 16.1707V15C11 13.8954 10.1046 13 9 13C6.79086 13 5 11.2091 5 9V7.82929C3.83481 7.41746 3 6.30622 3 5C3 3.34315 4.34315 2 6 2C7.65685 2 9 3.34315 9 5ZM12 18C11.4477 18 11 18.4477 11 19C11 19.5523 11.4477 20 12 20C12.5523 20 13 19.5523 13 19C13 18.4477 12.5523 18 12 18ZM18 6C18.5523 6 19 5.55228 19 5C19 4.44772 18.5523 4 18 4C17.4477 4 17 4.44772 17 5C17 5.55228 17.4477 6 18 6Z' fill='%23ffffff'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  pointer-events: none;
 }
 
-.agent-node .react-flow__resize-control.handle.bottom-left {
-  bottom: -4px;
-  left: -4px;
+/* Rotate icon based on edge position */
+.agent-node .react-flow__handle-top.agent-node-fork-anchor::after {
+  transform: translate(-50%, -50%) rotate(0deg);
+}
+.agent-node .react-flow__handle-right.agent-node-fork-anchor::after {
+  transform: translate(-50%, -50%) rotate(270deg);
+}
+.agent-node .react-flow__handle-bottom.agent-node-fork-anchor::after {
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+.agent-node .react-flow__handle-left.agent-node-fork-anchor::after {
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 
-.agent-node .react-flow__resize-control.handle.bottom-right {
-  bottom: -4px;
-  right: -4px;
+/* Margin from border - offset handles outside the node */
+.agent-node .react-flow__handle-top.agent-node-fork-anchor {
+  top: -16px;
 }
+.agent-node .react-flow__handle-bottom.agent-node-fork-anchor {
+  bottom: -16px;
+  top: auto;
+}
+.agent-node .react-flow__handle-left.agent-node-fork-anchor {
+  left: -16px;
+}
+.agent-node .react-flow__handle-right.agent-node-fork-anchor {
+  right: -16px;
+  left: auto;
+}
+
+/* Resize handles - hidden (removed, using visible handles above) */
 
 /* Attachment headers within agent node */
 .agent-node .terminal-node-header {
-  background: #1e1e1e;
-  border-bottom: 1px solid #3a3c46;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid #888;
   padding: 8px 12px;
   display: flex;
   align-items: center;
@@ -149,14 +434,14 @@
 }
 
 .agent-node .terminal-node-header .issue-id {
-  color: #4a9eff;
+  color: var(--color-text-primary);
   font-weight: 600;
   font-size: 12px;
   flex-shrink: 0;
 }
 
 .agent-node .terminal-node-header .issue-title {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,13 +459,13 @@
 }
 
 .agent-node .terminal-node-header .issue-external-link-icon:hover {
-  color: #4a9eff;
-  background: rgba(74, 158, 255, 0.1);
+  color: var(--color-text-primary);
+  background: rgba(136, 136, 136, 0.15);
 }
 
 /* Workspace header styles */
 .agent-node .workspace-header {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+  background: rgba(136, 136, 136, 0.08);
 }
 
 .agent-node .workspace-info {
@@ -194,7 +479,7 @@
 }
 
 .agent-node .workspace-name {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-size: 12px;
   font-weight: 500;
 }
@@ -214,7 +499,7 @@
 .agent-node .project-type-badge {
   color: #888;
   font-size: 10px;
-  background: #3a3c46;
+  background: rgba(136, 136, 136, 0.2);
   padding: 2px 6px;
   border-radius: 3px;
   text-transform: uppercase;
@@ -223,7 +508,7 @@
 
 /* Inherited workspace styles */
 .agent-node .workspace-header.inherited {
-  border-left: 2px solid #007acc;
+  border-left: 2px solid #888;
 }
 
 .agent-node .inherited-badge {
@@ -232,8 +517,8 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  background: #007acc33;
-  color: #007acc;
+  background: rgba(136, 136, 136, 0.2);
+  color: #888;
   border-radius: 50%;
   font-size: 10px;
   margin-left: 4px;
@@ -241,7 +526,130 @@
 
 /* Git dirty indicator */
 .agent-node .git-dirty {
-  color: #f0ad4e;
+  color: #888;
   margin-left: 4px;
   font-size: 12px;
+}
+
+/* Frame Label - Figma-style label above node */
+.agent-node-frame-label {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: auto;
+  font-weight: 500;
+}
+
+.agent-node-frame-label .frame-label-icon {
+  width: 12px;
+  height: 12px;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.agent-node-frame-label .frame-label-text {
+  color: #888;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.agent-node-frame-label .frame-label-folder-name {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.agent-node-frame-label .frame-label-folder-name:hover {
+  color: var(--color-text-primary);
+}
+
+/* Session Label - Bottom of node */
+.agent-node-session-label {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #666;
+  white-space: nowrap;
+  opacity: 0.7;
+  font-family: monospace;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Side handles - fully invisible but functional for edge connections */
+.agent-node-side-handle {
+  width: 12px;
+  height: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.agent-node:hover .agent-node-side-handle {
+  opacity: 0;
+}
+
+.agent-node-side-handle:hover {
+  background: transparent;
+  border: none;
+  opacity: 0;
+}
+
+/* Position source and target handles on same side with offset to avoid overlap */
+/* Top handles - source left of center, target right of center */
+.agent-node .react-flow__handle[data-handleid="source-top"] {
+  left: 40%;
+}
+.agent-node .react-flow__handle[data-handleid="target-top"] {
+  left: 60%;
+}
+
+/* Bottom handles - source left of center, target right of center */
+.agent-node .react-flow__handle[data-handleid="source-bottom"] {
+  left: 40%;
+}
+.agent-node .react-flow__handle[data-handleid="target-bottom"] {
+  left: 60%;
+}
+
+/* Left handles - source above center, target below center */
+.agent-node .react-flow__handle[data-handleid="source-left"] {
+  top: 40%;
+}
+.agent-node .react-flow__handle[data-handleid="target-left"] {
+  top: 60%;
+}
+
+/* Right handles - source above center, target below center */
+.agent-node .react-flow__handle[data-handleid="source-right"] {
+  top: 40%;
+}
+.agent-node .react-flow__handle[data-handleid="target-right"] {
+  top: 60%;
+}
+
+/* When connecting (dragging from a handle), keep handles invisible */
+.react-flow__node.connecting .agent-node-side-handle {
+  opacity: 0;
+  border: none;
+}
+
+.react-flow__node.connecting .agent-node-side-handle.valid {
+  opacity: 0;
+  border: none;
+}
+
+.react-flow__node.connecting .agent-node-side-handle.valid:hover {
+  background: transparent;
+  opacity: 0;
 }

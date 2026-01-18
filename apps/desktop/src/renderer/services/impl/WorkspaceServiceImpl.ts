@@ -6,7 +6,7 @@
  */
 
 import type { WorktreeInfo } from '../../../main/types/worktree';
-import type { IWorkspaceService, GitInfo } from '../../context/node-services';
+import type { GitInfo, IWorkspaceService } from '../../context/node-services';
 
 /**
  * Workspace service implementation using Electron IPC
@@ -54,7 +54,7 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
   /**
    * Provision a new git worktree for agent isolation
    */
-  async provisionWorktree(branchName: string): Promise<WorktreeInfo> {
+  async provisionWorktree(branchName: string, worktreePath: string): Promise<WorktreeInfo> {
     if (!this._workspacePath) {
       throw new Error('Workspace path not set - cannot provision worktree');
     }
@@ -63,11 +63,10 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
       throw new Error('worktreeAPI not available');
     }
 
-    const worktree = await window.worktreeAPI.provision(
-      this._workspacePath,
-      branchName,
-      { agentId: this.nodeId }
-    );
+    const worktree = await window.worktreeAPI.provision(this._workspacePath, branchName, {
+      agentId: this.nodeId,
+      worktreePath,
+    });
 
     this.activeWorktreeId = worktree.id;
     return worktree;
@@ -129,7 +128,12 @@ export class WorkspaceServiceImpl implements IWorkspaceService {
       return null;
     }
 
-    return window.gitAPI.getInfo(this._workspacePath);
+    try {
+      return await window.gitAPI.getInfo(this._workspacePath);
+    } catch {
+      // Not a git repository
+      return null;
+    }
   }
 
   /**

@@ -1,29 +1,29 @@
 import type {
-  IRepresentationService,
-  IRepresentationProvider,
-  IRepresentationImageProvider,
-  IRepresentationSummaryProvider,
-  IRepresentationAudioProvider,
-  ImageTransformOptions,
-  SummaryTransformOptions,
-  SummaryStreamCallback,
   AudioTransformOptions,
+  ImageTransformOptions,
+  IRepresentationAudioProvider,
+  IRepresentationImageProvider,
+  IRepresentationProvider,
+  IRepresentationService,
+  IRepresentationSummaryProvider,
+  SummaryStreamCallback,
+  SummaryTransformOptions,
 } from '../interfaces';
 import type {
-  RepresentationResult,
-  RepresentationError,
-  RepresentationType,
-  RepresentationInput,
   AnyRepresentationOutput,
-  ImageRepresentationOutput,
-  SummaryRepresentationOutput,
   AudioRepresentationOutput,
+  ImageRepresentationOutput,
+  RepresentationError,
+  RepresentationInput,
+  RepresentationResult,
+  RepresentationType,
+  SummaryRepresentationOutput,
 } from '../types';
-import { RepresentationErrorCode, ok, err, representationError } from '../types';
+import { err, ok, RepresentationErrorCode, representationError } from '../types';
 import {
+  isAudioProvider,
   isImageProvider,
   isSummaryProvider,
-  isAudioProvider,
   supportsSummaryStreaming,
 } from '../utils/capability-checker';
 

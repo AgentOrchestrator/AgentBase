@@ -3,8 +3,9 @@
  * Defines the contract that all database implementations must follow
  */
 
-import { CanvasState, CanvasMetadata } from '../types/database';
+import type { RecentWorkspace } from '@agent-orchestrator/shared';
 import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type { CanvasMetadata, CanvasState } from '../types/database';
 
 export interface IDatabase {
   /**
@@ -84,4 +85,86 @@ export interface IDatabase {
    * @returns Array of all agent states
    */
   loadAllAgentStatuses(): Promise<CodingAgentState[]>;
+
+  // ==========================================================================
+  // Recent Workspaces Methods
+  // ==========================================================================
+
+  /**
+   * Add or update a recent workspace entry
+   * @param workspace - The workspace data to upsert
+   */
+  upsertRecentWorkspace(workspace: RecentWorkspace): Promise<void>;
+
+  /**
+   * Get recent workspaces sorted by lastOpenedAt descending
+   * @param limit - Maximum number of entries to return (default: 20)
+   */
+  getRecentWorkspaces(limit?: number): Promise<RecentWorkspace[]>;
+
+  /**
+   * Remove a workspace from the recent list
+   * @param path - Workspace path to remove
+   */
+  removeRecentWorkspace(path: string): Promise<void>;
+
+  /**
+   * Clear all recent workspaces
+   */
+  clearAllRecentWorkspaces(): Promise<void>;
+
+  /**
+   * Get a specific workspace by path
+   * @param path - Workspace path to find
+   */
+  getRecentWorkspaceByPath(path: string): Promise<RecentWorkspace | null>;
+
+  // ==========================================================================
+  // Session Summary Cache Methods
+  // ==========================================================================
+
+  /**
+   * Get a cached summary for a session
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   * @returns The cached summary record, or null if not found
+   */
+  getSessionSummary(
+    sessionId: string,
+    workspacePath: string
+  ): Promise<{ summary: string; messageCount: number } | null>;
+
+  /**
+   * Save or update a summary for a session
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   * @param summary - The AI-generated summary
+   * @param messageCount - Message count at time of generation (for staleness check)
+   */
+  saveSessionSummary(
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ): Promise<void>;
+
+  /**
+   * Check if a cached summary exists and is still valid
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   * @param currentMessageCount - Current message count to compare against
+   * @returns true if summary is stale or doesn't exist
+   */
+  isSessionSummaryStale(
+    sessionId: string,
+    workspacePath: string,
+    currentMessageCount: number
+  ): Promise<boolean>;
+
+  /**
+   * Delete a cached summary
+   * @param sessionId - Session ID
+   * @param workspacePath - Workspace path
+   */
+  deleteSessionSummary(sessionId: string, workspacePath: string): Promise<void>;
 }

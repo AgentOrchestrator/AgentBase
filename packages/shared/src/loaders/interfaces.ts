@@ -4,16 +4,16 @@
  */
 
 import type {
+  AgentType,
   ChatHistory,
   ChatMessage,
-  ProjectInfo,
   LoaderOptions,
-  AgentType,
-  SessionSummary,
-  SessionContent,
-  SessionChange,
-  SessionFilterOptions,
   MessageFilterOptions,
+  ProjectInfo,
+  SessionChange,
+  SessionContent,
+  SessionFilterOptions,
+  SessionSummary,
 } from './types.js';
 
 /**
@@ -135,9 +135,7 @@ export interface IChatHistoryProvider extends IChatHistoryLoader {
    * @param filter - Optional filter options
    * @returns Map of session ID to last modification timestamp (Unix ms)
    */
-  getSessionModificationTimes(
-    filter?: SessionFilterOptions
-  ): Promise<Map<string, number>>;
+  getSessionModificationTimes(filter?: SessionFilterOptions): Promise<Map<string, number>>;
 
   /**
    * List sessions with summaries (without full messages)

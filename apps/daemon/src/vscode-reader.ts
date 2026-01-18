@@ -1,24 +1,28 @@
-import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
-  ChatMessage,
   ChatHistory,
-  SessionMetadata,
-  ProjectInfo,
-  LoaderOptions,
   IDatabaseLoader,
+  LoaderOptions,
+  ProjectInfo,
+  SessionMetadata,
 } from '@agent-orchestrator/shared';
 import {
-  IDE_DATA_PATHS,
-  normalizeTimestamp,
   extractProjectNameFromPath,
   generateDeterministicUUID,
   getHomeDir,
+  IDE_DATA_PATHS,
+  normalizeTimestamp,
 } from '@agent-orchestrator/shared';
+import Database from 'better-sqlite3';
 
 // Re-export types for backward compatibility
-export type { ChatMessage, ChatHistory, SessionMetadata, ProjectInfo } from '@agent-orchestrator/shared';
+export type {
+  ChatHistory,
+  ChatMessage,
+  ProjectInfo,
+  SessionMetadata,
+} from '@agent-orchestrator/shared';
 
 export interface VSCodeMessage {
   id: string;
@@ -87,14 +91,14 @@ function getWorkspaceInfo(workspaceDir: string): WorkspaceInfo | null {
     return {
       workspaceId,
       folder,
-      workspace: workspaceJson
+      workspace: workspaceJson,
     };
   } catch {
     return null;
   }
 }
 
-function buildWorkspaceMap(): Map<string, WorkspaceInfo> {
+function _buildWorkspaceMap(): Map<string, WorkspaceInfo> {
   const workspaceMap = new Map<string, WorkspaceInfo>();
   const workspaceStoragePath = getVSCodeWorkspaceStoragePath();
 
@@ -103,13 +107,14 @@ function buildWorkspaceMap(): Map<string, WorkspaceInfo> {
   }
 
   try {
-    const workspaceDirs = fs.readdirSync(workspaceStoragePath)
-      .map(name => path.join(workspaceStoragePath, name))
-      .filter(p => fs.statSync(p).isDirectory());
+    const workspaceDirs = fs
+      .readdirSync(workspaceStoragePath)
+      .map((name) => path.join(workspaceStoragePath, name))
+      .filter((p) => fs.statSync(p).isDirectory());
 
     for (const workspaceDir of workspaceDirs) {
       const workspaceInfo = getWorkspaceInfo(workspaceDir);
-      if (workspaceInfo && workspaceInfo.workspaceId) {
+      if (workspaceInfo?.workspaceId) {
         workspaceMap.set(workspaceInfo.workspaceId, workspaceInfo);
       }
     }
@@ -131,9 +136,10 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
     return conversations;
   }
 
-  const workspaceDirs = fs.readdirSync(workspaceStoragePath)
-    .map(name => path.join(workspaceStoragePath, name))
-    .filter(p => fs.statSync(p).isDirectory());
+  const workspaceDirs = fs
+    .readdirSync(workspaceStoragePath)
+    .map((name) => path.join(workspaceStoragePath, name))
+    .filter((p) => fs.statSync(p).isDirectory());
 
   console.log(`[VSCode Chat] Scanning ${workspaceDirs.length} workspace directories...`);
 
@@ -152,8 +158,7 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
     }
 
     try {
-      const sessionFiles = fs.readdirSync(chatSessionsDir)
-        .filter(f => f.endsWith('.json'));
+      const sessionFiles = fs.readdirSync(chatSessionsDir).filter((f) => f.endsWith('.json'));
 
       for (const sessionFile of sessionFiles) {
         const sessionPath = path.join(chatSessionsDir, sessionFile);
@@ -168,7 +173,9 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
 
           const messages: VSCodeMessage[] = [];
           const sessionId = sessionData.sessionId || path.basename(sessionFile, '.json');
-          const sessionTimestamp = normalizeTimestamp(sessionData.lastMessageDate || sessionData.creationDate);
+          const sessionTimestamp = normalizeTimestamp(
+            sessionData.lastMessageDate || sessionData.creationDate
+          );
 
           for (const request of sessionData.requests) {
             const requestTimestamp = normalizeTimestamp(request.timestamp || sessionTimestamp);
@@ -179,7 +186,7 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
                 role: 'user',
                 content: request.message.text,
                 timestamp: requestTimestamp,
-                sessionId
+                sessionId,
               });
             }
 
@@ -195,7 +202,7 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
                   role: 'assistant',
                   content: responseText,
                   timestamp: requestTimestamp,
-                  sessionId
+                  sessionId,
                 });
               }
             }
@@ -219,7 +226,7 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
 
           const metadata: SessionMetadata = {
             workspaceId: workspaceInfo.workspaceId,
-            source: 'vscode-chat'
+            source: 'vscode-chat',
           };
 
           if (workspaceInfo.folder) {
@@ -250,17 +257,11 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
             timestamp: lastMessage.timestamp,
             messages,
             conversationType: 'chat',
-            metadata
+            metadata,
           });
-
-        } catch {
-          continue;
-        }
+        } catch {}
       }
-
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   console.log(`[VSCode Chat] ✓ Found ${totalSessions} chat sessions`);
@@ -268,7 +269,9 @@ async function readChatSessions(cutoffDate: Date | null = null): Promise<VSCodeC
   return conversations;
 }
 
-async function readInlineChatHistory(cutoffDate: Date | null = null): Promise<VSCodeConversation[]> {
+async function readInlineChatHistory(
+  _cutoffDate: Date | null = null
+): Promise<VSCodeConversation[]> {
   const conversations: VSCodeConversation[] = [];
   const statePath = getVSCodeStatePath();
 
@@ -281,18 +284,18 @@ async function readInlineChatHistory(cutoffDate: Date | null = null): Promise<VS
     const db = new Database(statePath, { readonly: true });
 
     try {
-      const tables = db.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='ItemTable'"
-      ).all();
+      const tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ItemTable'")
+        .all();
 
       if (tables.length === 0) {
         db.close();
         return conversations;
       }
 
-      const historyRow = db.prepare(
-        "SELECT value FROM ItemTable WHERE key = 'inline-chat-history'"
-      ).get() as { value: string } | undefined;
+      const historyRow = db
+        .prepare("SELECT value FROM ItemTable WHERE key = 'inline-chat-history'")
+        .get() as { value: string } | undefined;
 
       if (historyRow) {
         try {
@@ -307,12 +310,12 @@ async function readInlineChatHistory(cutoffDate: Date | null = null): Promise<VS
               role: (index % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
               content: typeof item === 'string' ? item : JSON.stringify(item),
               timestamp,
-              sessionId
+              sessionId,
             }));
 
             if (messages.length > 0) {
               const metadata: SessionMetadata = {
-                source: 'vscode-inline-chat'
+                source: 'vscode-inline-chat',
               };
 
               conversations.push({
@@ -320,7 +323,7 @@ async function readInlineChatHistory(cutoffDate: Date | null = null): Promise<VS
                 timestamp,
                 messages,
                 conversationType: 'inline',
-                metadata
+                metadata,
               });
 
               console.log(`[VSCode Inline Chat] ✓ Found ${messages.length} inline chat messages`);
@@ -330,11 +333,9 @@ async function readInlineChatHistory(cutoffDate: Date | null = null): Promise<VS
           // Skip malformed data
         }
       }
-
     } finally {
       db.close();
     }
-
   } catch (error) {
     console.error('[VSCode] Error reading inline chat history:', error);
   }
@@ -347,8 +348,8 @@ async function readInlineChatHistory(cutoffDate: Date | null = null): Promise<VS
  */
 export async function readVSCodeHistories(
   lookbackDays?: number,
-  accessToken?: string,
-  refreshToken?: string,
+  _accessToken?: string,
+  _refreshToken?: string,
   sinceTimestamp?: number
 ): Promise<VSCodeConversation[]> {
   const conversations: VSCodeConversation[] = [];
@@ -356,7 +357,9 @@ export async function readVSCodeHistories(
   let cutoffDate: Date | null = null;
   if (sinceTimestamp && sinceTimestamp > 0) {
     cutoffDate = new Date(sinceTimestamp);
-    console.log(`[VSCode Reader] Filtering conversations after ${cutoffDate.toISOString()} (incremental sync)`);
+    console.log(
+      `[VSCode Reader] Filtering conversations after ${cutoffDate.toISOString()} (incremental sync)`
+    );
   } else if (lookbackDays && lookbackDays > 0) {
     cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
@@ -372,13 +375,12 @@ export async function readVSCodeHistories(
     const inlineChatConversations = await readInlineChatHistory(cutoffDate);
     conversations.push(...inlineChatConversations);
 
-    const chatCount = conversations.filter(c => c.conversationType === 'chat').length;
-    const inlineCount = conversations.filter(c => c.conversationType === 'inline').length;
+    const chatCount = conversations.filter((c) => c.conversationType === 'chat').length;
+    const inlineCount = conversations.filter((c) => c.conversationType === 'inline').length;
 
     console.log(`\n[VSCode] ✓ Total conversations collected: ${conversations.length}`);
     console.log(`[VSCode]   • Chat: ${chatCount}`);
     console.log(`[VSCode]   • Inline: ${inlineCount}`);
-
   } catch (error) {
     console.error('[VSCode] Error reading VSCode histories:', error);
   }
@@ -389,24 +391,22 @@ export async function readVSCodeHistories(
 /**
  * Convert VSCode conversations to the standard ChatHistory format
  */
-export function convertVSCodeToStandardFormat(
-  conversations: VSCodeConversation[]
-): ChatHistory[] {
-  return conversations.map(conv => ({
+export function convertVSCodeToStandardFormat(conversations: VSCodeConversation[]): ChatHistory[] {
+  return conversations.map((conv) => ({
     id: conv.id,
     timestamp: conv.timestamp,
     agent_type: 'vscode' as const,
-    messages: conv.messages.map(msg => ({
+    messages: conv.messages.map((msg) => ({
       display: msg.content,
       pastedContents: {},
       role: msg.role,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
     })),
     metadata: {
       ...conv.metadata,
       source: 'vscode',
-      conversationType: conv.conversationType
-    }
+      conversationType: conv.conversationType,
+    },
   }));
 }
 
@@ -416,14 +416,17 @@ export function convertVSCodeToStandardFormat(
 export function extractProjectsFromConversations(
   conversations: VSCodeConversation[]
 ): ProjectInfo[] {
-  const projectsMap = new Map<string, {
-    name: string;
-    path: string;
-    workspaceIds: Set<string>;
-    chatCount: number;
-    inlineChatCount: number;
-    lastActivity: Date;
-  }>();
+  const projectsMap = new Map<
+    string,
+    {
+      name: string;
+      path: string;
+      workspaceIds: Set<string>;
+      chatCount: number;
+      inlineChatCount: number;
+      lastActivity: Date;
+    }
+  >();
 
   for (const conv of conversations) {
     const projectPath = conv.metadata?.projectPath;
@@ -440,7 +443,7 @@ export function extractProjectsFromConversations(
         workspaceIds: new Set(),
         chatCount: 0,
         inlineChatCount: 0,
-        lastActivity: new Date(conv.timestamp)
+        lastActivity: new Date(conv.timestamp),
       });
     }
 
@@ -462,12 +465,12 @@ export function extractProjectsFromConversations(
     }
   }
 
-  return Array.from(projectsMap.values()).map(project => ({
+  return Array.from(projectsMap.values()).map((project) => ({
     name: project.name,
     path: project.path,
     workspaceIds: Array.from(project.workspaceIds),
     vscodeSessionCount: project.chatCount + project.inlineChatCount,
-    lastActivity: project.lastActivity.toISOString()
+    lastActivity: project.lastActivity.toISOString(),
   }));
 }
 
@@ -495,18 +498,20 @@ export class VSCodeLoader implements IDatabaseLoader {
 
   extractProjects(histories: ChatHistory[]): ProjectInfo[] {
     // Convert back to VSCodeConversation format for project extraction
-    const conversations: VSCodeConversation[] = histories.map(h => ({
+    const conversations: VSCodeConversation[] = histories.map((h) => ({
       id: h.id,
       timestamp: h.timestamp,
-      messages: h.messages.map((m, i) => ({
-        id: `${h.id}-${i}`,
-        role: m.role || 'user',
-        content: m.display,
-        timestamp: m.timestamp || h.timestamp,
-        sessionId: h.id
-      })),
+      messages: h.messages
+        .filter((m) => m.role !== 'system')
+        .map((m, i) => ({
+          id: `${h.id}-${i}`,
+          role: (m.role || 'user') as 'user' | 'assistant',
+          content: m.display,
+          timestamp: m.timestamp || h.timestamp,
+          sessionId: h.id,
+        })),
       conversationType: (h.metadata?.conversationType as 'chat' | 'inline') || 'chat',
-      metadata: h.metadata
+      metadata: h.metadata,
     }));
     return extractProjectsFromConversations(conversations);
   }

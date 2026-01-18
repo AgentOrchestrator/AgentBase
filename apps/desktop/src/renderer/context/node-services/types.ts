@@ -5,14 +5,24 @@
  * Each node type gets appropriate services via NodeContext.
  */
 
-import type { WorktreeInfo } from '../../../main/types/worktree';
+import type { GitInfo } from '@agent-orchestrator/shared';
 import type {
   AgentType,
   CodingAgentStatus,
   CodingAgentStatusInfo,
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
-import type { GitInfo } from '@agent-orchestrator/shared';
+import type { WorktreeInfo } from '../../../main/types/worktree';
+import type {
+  AgentAdapterEventType,
+  AgentEventHandler,
+  CodingAgentSessionContent,
+  GenerateResponse,
+  MessageFilterOptions,
+  SessionInfo,
+  StreamCallback,
+  StructuredStreamCallback,
+} from './coding-agent-adapter';
 
 // Re-export for consumers
 export type { GitInfo };
@@ -24,7 +34,7 @@ export type { GitInfo };
 /**
  * Discriminator for node types
  */
-export type NodeType = 'agent' | 'terminal' | 'workspace' | 'custom';
+export type NodeType = 'agent' | 'terminal' | 'custom' | 'conversation';
 
 // =============================================================================
 // Base Service Interface
@@ -66,8 +76,28 @@ export interface ITerminalService extends INodeService {
   restart(): Promise<void>;
 
   // I/O
-  /** Write data to terminal stdin */
-  write(data: string): void;
+  /**
+   * Send user keystroke input to terminal.
+   * Use this for forwarding xterm.js onData events (individual keystrokes).
+   * @param data - Raw keystroke data from xterm.js
+   */
+  sendUserInput(data: string): void;
+
+  /**
+   * Execute a shell command in the terminal.
+   * Appends newline if not present to execute the command.
+   * Use this for programmatic command execution (e.g., starting Claude CLI).
+   * @param command - The command to execute
+   */
+  executeCommand(command: string): void;
+
+  /**
+   * Send a terminal control sequence.
+   * Use this for escape sequences like terminal reset (\x1bc).
+   * @param sequence - The control sequence to send
+   */
+  sendControlSequence(sequence: string): void;
+
   /** Resize terminal dimensions */
   resize(cols: number, rows: number): void;
 
@@ -80,6 +110,10 @@ export interface ITerminalService extends INodeService {
   // State
   /** Check if terminal process is running */
   isRunning(): boolean;
+
+  // Buffer
+  /** Get terminal buffer for restoration after view switch */
+  getBuffer(): Promise<string | null>;
 }
 
 // =============================================================================
@@ -102,7 +136,7 @@ export interface IWorkspaceService extends INodeService {
 
   // Worktree integration
   /** Provision a new git worktree for agent isolation */
-  provisionWorktree(branchName: string): Promise<WorktreeInfo>;
+  provisionWorktree(branchName: string, worktreePath: string): Promise<WorktreeInfo>;
   /** Release a worktree */
   releaseWorktree(worktreeId: string): Promise<void>;
   /** Get currently active worktree */
@@ -120,8 +154,12 @@ export interface IWorkspaceService extends INodeService {
 // =============================================================================
 
 /**
- * Agent service - manages coding agent CLI lifecycle.
- * Orchestrates terminal + coding agent operations.
+ * Agent service - manages coding agent lifecycle via adapter.
+ * Orchestrates terminal display + adapter-driven agent operations.
+ *
+ * The service layer unwraps Result types from the adapter and throws
+ * exceptions for cleaner consumer API, while maintaining status updates
+ * and session persistence.
  */
 export interface IAgentService extends INodeService {
   /** Agent identifier */
@@ -129,13 +167,30 @@ export interface IAgentService extends INodeService {
   /** Agent type (claude_code, cursor, etc.) */
   readonly agentType: AgentType;
 
+  // =========================================================================
   // Lifecycle
-  /** Start the coding agent CLI in the terminal */
-  start(command?: string): Promise<void>;
-  /** Stop the coding agent (sends interrupt) */
-  stop(): Promise<void>;
+  // =========================================================================
 
+  /**
+   * Start the coding agent CLI REPL in the terminal.
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Optional session ID for resume
+   * @param initialPrompt - Optional initial prompt
+   */
+  start(workspacePath: string, sessionId?: string, initialPrompt?: string): Promise<void>;
+  /** Stop the coding agent (cancels operations) */
+  stop(): Promise<void>;
+  /**
+   * Gracefully exit the CLI REPL and wait for process to terminate.
+   * Sends vendor-specific exit command via adapter and waits for terminal exit.
+   * @param timeoutMs - Max time to wait for graceful exit before forcing destroy
+   */
+  exitRepl(timeoutMs?: number): Promise<void>;
+
+  // =========================================================================
   // Status
+  // =========================================================================
+
   /** Get current agent status */
   getStatus(): CodingAgentStatusInfo | null;
   /** Update agent status */
@@ -146,20 +201,93 @@ export interface IAgentService extends INodeService {
   /** Subscribe to status changes */
   onStatusChange(listener: StatusChangeListener): () => void;
 
-  // Configuration
-  /** Check if CLI auto-start is enabled */
-  isAutoStartEnabled(): boolean;
-  /** Enable/disable CLI auto-start */
-  setAutoStart(enabled: boolean): void;
+  // =========================================================================
+  // Generation (Adapter-driven, stateless)
+  // =========================================================================
 
-  // Workspace
   /**
-   * Set workspace and navigate terminal to it.
-   * If autoStartCli is true, also starts the CLI after navigation.
+   * Send a message and get response (non-streaming).
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required - caller must provide)
+   * @throws Error if adapter fails
    */
-  setWorkspace(path: string, autoStartCli?: boolean): Promise<void>;
+  sendMessage(prompt: string, workspacePath: string, sessionId: string): Promise<GenerateResponse>;
 
-  // Session management
-  /** Get CLI command for this agent type */
-  getCliCommand(): string;
+  /**
+   * Send a message with streaming (chunks emitted via callback).
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required - caller must provide)
+   * @param onChunk - Callback for streaming chunks
+   * @throws Error if adapter fails
+   */
+  sendMessageStreaming(
+    prompt: string,
+    workspacePath: string,
+    sessionId: string,
+    onChunk: StreamCallback
+  ): Promise<GenerateResponse>;
+
+  /**
+   * Send a message with structured streaming (content blocks).
+   * Streams thinking, tool_use, and text blocks as they arrive.
+   * Creates or continues a session based on whether the session file exists.
+   * @param prompt - The message to send
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID (required - caller must provide)
+   * @param onChunk - Callback for structured streaming chunks
+   * @throws Error if adapter fails or structured streaming not supported
+   */
+  sendMessageStreamingStructured(
+    prompt: string,
+    workspacePath: string,
+    sessionId: string,
+    onChunk: StructuredStreamCallback
+  ): Promise<GenerateResponse>;
+
+  // =========================================================================
+  // Session Queries (stateless)
+  // =========================================================================
+
+  /**
+   * Get session content with optional message filtering.
+   * @param sessionId - Session ID to retrieve
+   * @param workspacePath - Working directory to scope session lookup
+   * @param filter - Optional message filter options
+   * @throws Error if adapter fails
+   */
+  getSession(
+    sessionId: string,
+    workspacePath: string,
+    filter?: MessageFilterOptions
+  ): Promise<CodingAgentSessionContent | null>;
+
+  /**
+   * Check if a session is active (file exists).
+   * @param sessionId - Session ID to check
+   * @param workspacePath - Working directory to scope session lookup
+   */
+  isSessionActive(sessionId: string, workspacePath: string): Promise<boolean>;
+
+  /**
+   * Get the latest session for a workspace.
+   * Returns null if no sessions exist or capability not supported.
+   * @param workspacePath - Working directory to scope session lookup
+   */
+  getLatestSession(workspacePath: string): Promise<SessionInfo | null>;
+
+  // =========================================================================
+  // Events
+  // =========================================================================
+
+  /**
+   * Subscribe to typed agent events (permission requests, session events, etc.)
+   * @param type - Event type to subscribe to
+   * @param handler - Handler called when event occurs
+   * @returns Unsubscribe function
+   */
+  onAgentEvent<T extends AgentAdapterEventType>(type: T, handler: AgentEventHandler<T>): () => void;
 }

@@ -1,20 +1,20 @@
+import type {
+  AnyRepresentationOutput,
+  AudioRepresentationOutput,
+  ImageRepresentationOutput,
+  RepresentationError,
+  RepresentationInput,
+  RepresentationResult,
+  RepresentationType,
+  SummaryRepresentationOutput,
+} from '../types';
+import type { AudioTransformOptions } from './IRepresentationAudioProvider';
+import type { ImageTransformOptions } from './IRepresentationImageProvider';
 import type { IRepresentationProvider } from './IRepresentationProvider';
 import type {
-  RepresentationResult,
-  RepresentationError,
-  RepresentationType,
-  RepresentationInput,
-  AnyRepresentationOutput,
-  ImageRepresentationOutput,
-  SummaryRepresentationOutput,
-  AudioRepresentationOutput,
-} from '../types';
-import type { ImageTransformOptions } from './IRepresentationImageProvider';
-import type {
-  SummaryTransformOptions,
   SummaryStreamCallback,
+  SummaryTransformOptions,
 } from './IRepresentationSummaryProvider';
-import type { AudioTransformOptions } from './IRepresentationAudioProvider';
 
 /**
  * Service lifecycle interface

@@ -59,9 +59,9 @@ export class SimpleTitleComputer implements ITitleComputer {
 
     if (lastSpace > maxLength * 0.5) {
       // Only truncate at word boundary if we keep at least half the content
-      return truncated.slice(0, lastSpace) + '...';
+      return `${truncated.slice(0, lastSpace)}...`;
     }
 
-    return truncated + '...';
+    return `${truncated}...`;
   }
 }

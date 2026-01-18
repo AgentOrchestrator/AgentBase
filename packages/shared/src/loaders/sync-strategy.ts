@@ -7,7 +7,7 @@
  * - Hybrid: Index in database + read-through cache (recommended)
  */
 
-import type { ChatHistory, AgentType } from './types.js';
+import type { AgentType, ChatHistory } from './types.js';
 
 /**
  * Type of sync strategy

@@ -1,4 +1,4 @@
-import type { Result, LLMError, VendorId } from '../types';
+import type { LLMError, Result, VendorId } from '../types';
 
 /**
  * Repository abstraction for API key storage.

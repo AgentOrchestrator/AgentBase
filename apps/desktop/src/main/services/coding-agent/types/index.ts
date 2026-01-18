@@ -1,48 +1,66 @@
 // Result types
-export {
-  type Result,
-  type AgentError,
-  AgentErrorCode,
-  ok,
-  err,
-  agentError,
-} from './result.types';
 
 // Agent types
 export {
-  type CodingAgentType,
   type AgentCapabilities,
   type AgentConfig,
+  type CodingAgentType,
   DEFAULT_AGENT_CONFIG,
 } from './agent.types';
 
+// IPC API types
+export type { CodingAgentAPI } from './ipc.types';
+// Message types
+export type {
+  AgentContentBlock,
+  AgentRedactedThinkingBlock,
+  AgentServerToolUseBlock,
+  AgentTextBlock,
+  AgentThinkingBlock,
+  AgentToolUseBlock,
+  AgentWebSearchResultBlock,
+  AgentWebSearchToolResultBlock,
+  AgentWebSearchToolResultContent,
+  AgentWebSearchToolResultError,
+  AgentWebSearchToolResultErrorCode,
+  CodingAgentMessage,
+  ErrorInfo,
+  GenerateRequest,
+  GenerateResponse,
+  McpInfo,
+  MessageType,
+  StreamCallback,
+  StreamingBlockType,
+  // Streaming types
+  StreamingChunk,
+  StreamingContentBlock,
+  StructuredStreamCallback,
+  ThinkingInfo,
+  ToolCategory,
+  ToolInfo,
+} from './message.types';
+export {
+  type AgentError,
+  AgentErrorCode,
+  agentError,
+  err,
+  ok,
+  type Result,
+} from './result.types';
 // Session types
 export {
-  type SessionIdentifier,
-  type SessionInfo,
-  type SessionContent,
-  type SessionSummary,
-  type SessionFilter,
-  type SessionFilterOptions,
-  type MessageFilterOptions,
-  type SessionChange,
+  type CodingAgentSessionContent,
   type ContinueOptions,
   type ForkOptions,
+  latestSession,
+  type MessageFilterOptions,
+  type SessionChange,
+  type SessionContent,
+  type SessionFilter,
+  type SessionFilterOptions,
+  type SessionIdentifier,
+  type SessionInfo,
+  type SessionSummary,
   sessionById,
   sessionByName,
-  latestSession,
 } from './session.types';
-
-// Message types
-export {
-  type ChatMessage,
-  type GenerateRequest,
-  type GenerateResponse,
-  type StreamCallback,
-  type MessageType,
-  type ToolCategory,
-  type ToolInfo,
-  type ThinkingInfo,
-  type McpInfo,
-  type ErrorInfo,
-} from './message.types';

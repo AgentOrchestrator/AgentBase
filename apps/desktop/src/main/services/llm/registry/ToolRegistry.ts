@@ -1,11 +1,6 @@
 import type { IToolRegistry } from '../interfaces';
-import type {
-  Result,
-  LLMError,
-  ToolDefinition,
-  ToolExecutor,
-} from '../types';
-import { ok, err, llmError, LLMErrorCode } from '../types';
+import type { LLMError, Result, ToolDefinition, ToolExecutor } from '../types';
+import { err, LLMErrorCode, llmError, ok } from '../types';
 
 interface RegisteredTool {
   definition: ToolDefinition;
@@ -19,10 +14,7 @@ interface RegisteredTool {
 export class ToolRegistry implements IToolRegistry {
   private readonly tools = new Map<string, RegisteredTool>();
 
-  register(
-    definition: ToolDefinition,
-    executor: ToolExecutor
-  ): Result<void, LLMError> {
+  register(definition: ToolDefinition, executor: ToolExecutor): Result<void, LLMError> {
     if (this.tools.has(definition.name)) {
       return err(
         llmError(
@@ -38,9 +30,7 @@ export class ToolRegistry implements IToolRegistry {
 
   unregister(name: string): Result<void, LLMError> {
     if (!this.tools.has(name)) {
-      return err(
-        llmError(LLMErrorCode.TOOL_NOT_FOUND, `Tool "${name}" is not registered`)
-      );
+      return err(llmError(LLMErrorCode.TOOL_NOT_FOUND, `Tool "${name}" is not registered`));
     }
 
     this.tools.delete(name);
@@ -53,19 +43,14 @@ export class ToolRegistry implements IToolRegistry {
 
   getDefinitionsByNames(names: string[]): ToolDefinition[] {
     return names
-      .filter((name) => this.tools.has(name))
-      .map((name) => this.tools.get(name)!.definition);
+      .map((name) => this.tools.get(name)?.definition)
+      .filter((def): def is ToolDefinition => def !== undefined);
   }
 
-  async execute(
-    name: string,
-    args: Record<string, unknown>
-  ): Promise<Result<unknown, LLMError>> {
+  async execute(name: string, args: Record<string, unknown>): Promise<Result<unknown, LLMError>> {
     const tool = this.tools.get(name);
     if (!tool) {
-      return err(
-        llmError(LLMErrorCode.TOOL_NOT_FOUND, `Tool "${name}" is not registered`)
-      );
+      return err(llmError(LLMErrorCode.TOOL_NOT_FOUND, `Tool "${name}" is not registered`));
     }
 
     try {

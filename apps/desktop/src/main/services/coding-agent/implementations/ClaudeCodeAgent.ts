@@ -1,48 +1,61 @@
-import { EventEmitter } from 'events';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { Query, SDKMessage, Options } from '@anthropic-ai/claude-agent-sdk';
+import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import type { AgentEvent, PermissionPayload, SessionPayload } from '@agent-orchestrator/shared';
+import {
+  ClaudeCodeJsonlParser,
+  createEventRegistry,
+  createSDKHookBridge,
+  type EventRegistry,
+  type SDKHookBridge,
+} from '@agent-orchestrator/shared';
 import type {
-  ICodingAgentProvider,
-  ISessionResumable,
-  ISessionForkable,
-  IProcessLifecycle,
+  CanUseTool,
+  Options,
+  PermissionResult,
+  Query,
+  SDKMessage,
+} from '@anthropic-ai/claude-agent-sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
+import type {
   IChatHistoryProvider,
+  ICodingAgentProvider,
+  IProcessLifecycle,
+  ISessionForkable,
+  ISessionResumable,
+  ISessionValidator,
 } from '../interfaces';
 import type {
-  Result,
-  AgentError,
-  AgentConfig,
   AgentCapabilities,
+  AgentConfig,
+  AgentError,
+  CodingAgentMessage,
+  CodingAgentSessionContent,
   CodingAgentType,
+  ContinueOptions,
+  ForkOptions,
   GenerateRequest,
   GenerateResponse,
-  StreamCallback,
+  MessageFilterOptions,
+  Result,
+  SessionFilterOptions,
   SessionIdentifier,
   SessionInfo,
   SessionSummary,
-  SessionContent,
-  SessionFilterOptions,
-  MessageFilterOptions,
-  ContinueOptions,
-  ForkOptions,
-  ChatMessage,
-  ToolCategory,
+  StreamCallback,
+  StructuredStreamCallback,
 } from '../types';
-import { AgentErrorCode, ok, err, agentError } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
+import { mapSdkError, mapSdkResultError, noResultError } from '../utils/sdk-error-mapper';
 import {
-  mapSdkMessagesToResponse,
-  findResultMessage,
   extractStreamingChunk,
+  extractStructuredStreamingChunk,
+  findResultMessage,
   isResultError,
+  mapSdkMessagesToResponse,
 } from '../utils/sdk-message-mapper';
-import {
-  mapSdkError,
-  mapSdkResultError,
-  noResultError,
-} from '../utils/sdk-error-mapper';
 
 /**
  * Active query handle for tracking and cancellation
@@ -72,30 +85,133 @@ interface QueryHandle {
  */
 
 /**
- * JSONL line structure from Claude Code session files
+ * Configuration for ClaudeCodeAgent with hook options
  */
-interface JsonlLine {
-  type?: string;
-  message?: {
-    role: string;
-    content: unknown;
-  };
-  timestamp?: string | number;
-  sessionId?: string;
-  summary?: string;
+export interface ClaudeCodeAgentConfig extends AgentConfig {
+  /** Enable debug logging for hooks */
+  debugHooks?: boolean;
 }
 
 export class ClaudeCodeAgent
   extends EventEmitter
-  implements ICodingAgentProvider, ISessionResumable, ISessionForkable, IProcessLifecycle, IChatHistoryProvider
+  implements
+    ICodingAgentProvider,
+    ISessionResumable,
+    ISessionForkable,
+    IProcessLifecycle,
+    IChatHistoryProvider,
+    ISessionValidator
 {
   protected readonly config: AgentConfig;
+  private readonly eventRegistry: EventRegistry;
+  private readonly hookBridge: SDKHookBridge;
+  private readonly debugHooks: boolean;
   private readonly activeQueries = new Map<string, QueryHandle>();
+  private readonly jsonlParser = new ClaudeCodeJsonlParser();
   private isInitialized = false;
+  private currentSessionId: string | null = null;
+  private currentWorkspacePath: string | null = null;
+  private readonly queryContexts = new WeakMap<
+    AbortSignal,
+    { agentId?: string; sessionId?: string; workspacePath?: string }
+  >();
+  private readonly canUseTool: CanUseTool = async (
+    toolName: string,
+    input: Record<string, unknown>,
+    options
+  ): Promise<PermissionResult> => {
+    const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
+    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
+    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    const event: AgentEvent<PermissionPayload> = {
+      id: crypto.randomUUID(),
+      type: 'permission:request',
+      agent: 'claude_code',
+      agentId: context?.agentId,
+      sessionId,
+      workspacePath,
+      timestamp: new Date().toISOString(),
+      payload: {
+        toolName,
+        command: typeof input.command === 'string' ? input.command : undefined,
+        args: Array.isArray(input.args) ? (input.args as string[]) : undefined,
+        filePath:
+          typeof input.file_path === 'string'
+            ? input.file_path
+            : typeof input.filePath === 'string'
+              ? input.filePath
+              : undefined,
+        workingDirectory: workspacePath,
+        reason: options.decisionReason,
+      },
+      raw: {
+        toolInput: input,
+        toolUseId: options.toolUseID,
+        signal: options.signal,
+        suggestions: options.suggestions,
+      },
+    };
 
-  constructor(config: AgentConfig) {
+    const results = await this.eventRegistry.emit(event);
+    const denyResult = results.find((result) => result.action === 'deny');
+    if (denyResult) {
+      return {
+        behavior: 'deny',
+        message: denyResult.message || 'Permission denied',
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    const modifyResult = results.find((result) => result.action === 'modify');
+    if (modifyResult) {
+      return {
+        behavior: 'allow',
+        updatedInput: modifyResult.modifiedPayload as Record<string, unknown>,
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    const allowResult = results.find((result) => result.action === 'allow');
+    if (allowResult) {
+      return {
+        behavior: 'allow',
+        updatedInput: input,
+        toolUseID: options.toolUseID,
+      };
+    }
+
+    return {
+      behavior: 'allow',
+      updatedInput: input,
+      toolUseID: options.toolUseID,
+    };
+  };
+
+  constructor(config: ClaudeCodeAgentConfig) {
     super();
     this.config = config;
+    this.debugHooks = config.debugHooks ?? false;
+    this.eventRegistry = createEventRegistry();
+    this.hookBridge = createSDKHookBridge(this.eventRegistry, {
+      debug: this.debugHooks,
+    });
+    // Avoid double-emitting permission requests when canUseTool handles them.
+    delete this.hookBridge.hooks.PermissionRequest;
+    this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
+      this.currentSessionId = event.payload.sessionId;
+      return { action: 'continue' };
+    });
+    this.eventRegistry.on<SessionPayload>('session:end', async () => {
+      this.currentSessionId = null;
+      return { action: 'continue' };
+    });
+  }
+
+  /**
+   * Get the event registry for registering custom handlers
+   */
+  getEventRegistry(): EventRegistry {
+    return this.eventRegistry;
   }
 
   get agentType(): CodingAgentType {
@@ -142,6 +258,8 @@ export class ClaudeCodeAgent
 
   async dispose(): Promise<void> {
     await this.cancelAll();
+    this.hookBridge.cleanup();
+    this.eventRegistry.clear();
     this.isInitialized = false;
     this.removeAllListeners();
   }
@@ -162,21 +280,29 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // ICodingAgentProvider Implementation
+  // Central Query Execution
   // ============================================
 
-  async generate(request: GenerateRequest): Promise<Result<GenerateResponse, AgentError>> {
-    const initCheck = this.ensureInitialized();
-    if (initCheck.success === false) {
-      return { success: false, error: initCheck.error };
-    }
-
+  /**
+   * Execute a single query attempt and collect messages.
+   *
+   * @param prompt - The prompt to send
+   * @param options - SDK query options (must include abortController)
+   * @param onChunk - Optional streaming callback for plain text
+   * @param onStructuredChunk - Optional structured streaming callback for content blocks
+   * @returns Result with GenerateResponse or AgentError
+   */
+  private async executeQuery(
+    prompt: string,
+    options: Partial<Options>,
+    onChunk?: StreamCallback,
+    onStructuredChunk?: StructuredStreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
     const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
+    const abortController = options.abortController!;
 
     try {
-      const options = this.buildQueryOptions(request, abortController);
-      const queryResult = query({ prompt: request.prompt, options });
+      const queryResult = query({ prompt, options });
 
       const handle: QueryHandle = {
         id: queryId,
@@ -186,17 +312,39 @@ export class ClaudeCodeAgent
       };
       this.activeQueries.set(queryId, handle);
 
-      // Collect all messages
+      console.log(`[ClaudeCodeAgent] Starting query ${queryId}`);
+      console.log(`[ClaudeCodeAgent] Query Result:`, queryResult);
+
       const messages: SDKMessage[] = [];
       for await (const message of queryResult) {
+        console.log(`[ClaudeCodeAgent] Query ${queryId} received message:`, message);
         messages.push(message);
+
+        if (message.type === 'stream_event') {
+          // Plain text streaming callback (backward compatible)
+          if (onChunk) {
+            const chunk = extractStreamingChunk(message);
+            if (chunk) {
+              onChunk(chunk);
+            }
+          }
+
+          // Structured streaming callback (content blocks)
+          if (onStructuredChunk) {
+            const structuredChunk = extractStructuredStreamingChunk(message);
+            if (structuredChunk) {
+              onStructuredChunk(structuredChunk);
+            }
+          }
+        }
       }
 
+      console.log(`[ClaudeCodeAgent] Completed query ${queryId} with ${messages.length} messages`);
       this.activeQueries.delete(queryId);
 
-      // Find result message and check for errors
       const resultMessage = findResultMessage(messages);
       if (!resultMessage) {
+        console.error(`[ClaudeCodeAgent] No result message found for query ${queryId}`);
         return err(noResultError());
       }
 
@@ -207,8 +355,94 @@ export class ClaudeCodeAgent
       return ok(mapSdkMessagesToResponse(messages, resultMessage));
     } catch (error) {
       this.activeQueries.delete(queryId);
+      throw error; // Re-throw for runQuery to handle fallback
+    }
+  }
+
+  /**
+   * Central method for executing SDK queries with resume fallback logic.
+   *
+   * When a sessionId is provided, this method:
+   * 1. First tries to resume the session using `options.resume`
+   * 2. If resume fails (session doesn't exist), falls back to creating a new session
+   *    with `extraArgs['session-id']`
+   *
+   * @param prompt - The prompt to send to Claude
+   * @param options - SDK query options
+   * @param onChunk - Optional streaming callback for partial messages (plain text)
+   * @param onStructuredChunk - Optional structured streaming callback (content blocks)
+   * @returns Result with GenerateResponse or AgentError
+   */
+  private async runQuery(
+    prompt: string,
+    options: Partial<Options>,
+    onChunk?: StreamCallback,
+    onStructuredChunk?: StructuredStreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
+    const abortController = options.abortController ?? new AbortController();
+    const baseOptions: Partial<Options> = {
+      ...options,
+      abortController,
+    };
+
+    // Extract sessionId from extraArgs if present (for fallback scenario)
+    const sessionId = baseOptions.extraArgs?.['session-id'] as string | undefined;
+
+    // If we have a sessionId, try resume first
+    if (sessionId) {
+      const resumeOptions: Partial<Options> = {
+        ...baseOptions,
+        resume: sessionId,
+        extraArgs: undefined, // Remove extraArgs when using resume
+      };
+
+      console.log(`[ClaudeCodeAgent] Attempting to resume session: ${sessionId}`);
+
+      try {
+        return await this.executeQuery(prompt, resumeOptions, onChunk, onStructuredChunk);
+      } catch (error) {
+        console.log(
+          `[ClaudeCodeAgent] Resume failed, falling back to new session with session-id: ${sessionId}`,
+          error
+        );
+
+        // Create a new AbortController for the retry
+        const retryAbortController = new AbortController();
+        const fallbackOptions: Partial<Options> = {
+          ...baseOptions,
+          abortController: retryAbortController,
+          resume: undefined, // Clear resume
+          extraArgs: { 'session-id': sessionId },
+        };
+
+        try {
+          return await this.executeQuery(prompt, fallbackOptions, onChunk, onStructuredChunk);
+        } catch (fallbackError) {
+          return err(mapSdkError(fallbackError));
+        }
+      }
+    }
+
+    // No sessionId, just execute directly
+    try {
+      return await this.executeQuery(prompt, baseOptions, onChunk, onStructuredChunk);
+    } catch (error) {
       return err(mapSdkError(error));
     }
+  }
+
+  // ============================================
+  // ICodingAgentProvider Implementation
+  // ============================================
+
+  async generate(request: GenerateRequest): Promise<Result<GenerateResponse, AgentError>> {
+    const initCheck = this.ensureInitialized();
+    if (initCheck.success === false) {
+      return { success: false, error: initCheck.error };
+    }
+
+    const options = this.buildQueryOptions(request, new AbortController(), false);
+    return this.runQuery(request.prompt, options);
   }
 
   async generateStreaming(
@@ -220,56 +454,43 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const options = this.buildQueryOptions(request, abortController, true);
-      const queryResult = query({ prompt: request.prompt, options });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect messages and stream chunks
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        messages.push(message);
-
-        // Stream partial messages
-        if (message.type === 'stream_event') {
-          const chunk = extractStreamingChunk(message);
-          if (chunk) {
-            onChunk(chunk);
-          }
-        }
-      }
-
-      this.activeQueries.delete(queryId);
-
-      // Find result message and check for errors
-      const resultMessage = findResultMessage(messages);
-      if (!resultMessage) {
-        return err(noResultError());
-      }
-
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
-      }
-
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    const options = this.buildQueryOptions(request, new AbortController(), true);
+    return this.runQuery(request.prompt, options, onChunk);
   }
 
   /**
-   * Build SDK query options from a generate request
+   * Generate a streaming response with structured content blocks.
+   *
+   * Unlike generateStreaming which only streams plain text, this method
+   * streams structured content blocks (thinking, tool_use, text) as they arrive.
+   *
+   * @param request - The generation request
+   * @param onChunk - Callback for structured streaming chunks
+   * @returns Result with GenerateResponse or AgentError
+   */
+  async generateStreamingStructured(
+    request: GenerateRequest,
+    onChunk: StructuredStreamCallback
+  ): Promise<Result<GenerateResponse, AgentError>> {
+    const initCheck = this.ensureInitialized();
+    if (initCheck.success === false) {
+      return { success: false, error: initCheck.error };
+    }
+
+    const options = this.buildQueryOptions(request, new AbortController(), true);
+    // Pass undefined for plain text callback, use structured callback
+    return this.runQuery(request.prompt, options, undefined, onChunk);
+  }
+
+  /**
+   * Build SDK query options from a generate request.
+   *
+   * Note: Session handling (resume vs new session) is handled by runQuery(),
+   * which tries resume first and falls back to extraArgs['session-id'].
+   *
+   * @param request - The generate request
+   * @param abortController - Controller for aborting the query
+   * @param streaming - Whether to enable streaming partial messages
    */
   private buildQueryOptions(
     request: GenerateRequest,
@@ -277,10 +498,13 @@ export class ClaudeCodeAgent
     streaming = false
   ): Partial<Options> {
     const options: Partial<Options> = {
-      cwd: request.workingDirectory ?? this.config.workingDirectory,
+      cwd: request.workingDirectory,
       abortController,
+      hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
     };
+    this.currentWorkspacePath = options.cwd ?? null;
 
     // Handle system prompt
     if (request.systemPrompt) {
@@ -292,6 +516,17 @@ export class ClaudeCodeAgent
     } else {
       options.systemPrompt = { type: 'preset', preset: 'claude_code' };
     }
+
+    // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
+    if (request.sessionId) {
+      options.extraArgs = { 'session-id': request.sessionId };
+    }
+
+    this.queryContexts.set(abortController.signal, {
+      agentId: request.agentId,
+      sessionId: request.sessionId,
+      workspacePath: options.cwd ?? undefined,
+    });
 
     // Enable streaming partial messages
     if (streaming) {
@@ -315,43 +550,8 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const sdkOptions = this.buildContinueOptions(identifier, abortController, options);
-      const queryResult = query({ prompt, options: sdkOptions });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect all messages
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        messages.push(message);
-      }
-
-      this.activeQueries.delete(queryId);
-
-      const resultMessage = findResultMessage(messages);
-      if (!resultMessage) {
-        return err(noResultError());
-      }
-
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
-      }
-
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    const sdkOptions = this.buildContinueOptions(identifier, new AbortController(), options);
+    return this.runQuery(prompt, sdkOptions);
   }
 
   async continueSessionStreaming(
@@ -365,54 +565,15 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
-    try {
-      const sdkOptions = this.buildContinueOptions(identifier, abortController, options, true);
-      const queryResult = query({ prompt, options: sdkOptions });
-
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect messages and stream chunks
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        messages.push(message);
-
-        if (message.type === 'stream_event') {
-          const chunk = extractStreamingChunk(message);
-          if (chunk) {
-            onChunk(chunk);
-          }
-        }
-      }
-
-      this.activeQueries.delete(queryId);
-
-      const resultMessage = findResultMessage(messages);
-      if (!resultMessage) {
-        return err(noResultError());
-      }
-
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
-      }
-
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
+    const sdkOptions = this.buildContinueOptions(identifier, new AbortController(), options, true);
+    return this.runQuery(prompt, sdkOptions, onChunk);
   }
 
   /**
-   * Build SDK options for session continuation
+   * Build SDK options for session continuation.
+   *
+   * Note: For 'id' and 'name' identifiers, we use extraArgs['session-id']
+   * and let runQuery() handle the resume fallback logic.
    */
   private buildContinueOptions(
     identifier: SessionIdentifier,
@@ -421,22 +582,33 @@ export class ClaudeCodeAgent
     streaming = false
   ): Partial<Options> {
     const options: Partial<Options> = {
-      cwd: continueOptions?.workingDirectory ?? this.config.workingDirectory,
+      cwd: continueOptions?.workingDirectory,
       abortController,
+      hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
       systemPrompt: { type: 'preset', preset: 'claude_code' },
     };
+    this.currentWorkspacePath = options.cwd ?? null;
 
     // Map SessionIdentifier to SDK options
     switch (identifier.type) {
       case 'latest':
+        // 'latest' uses continue: true (no session ID)
         options.continue = true;
         break;
       case 'id':
       case 'name':
-        options.resume = identifier.value;
+        // Use extraArgs - runQuery() handles resume fallback
+        options.extraArgs = { 'session-id': identifier.value };
         break;
     }
+
+    this.queryContexts.set(abortController.signal, {
+      agentId: continueOptions?.agentId,
+      sessionId: identifier.type === 'id' ? identifier.value : undefined,
+      workspacePath: options.cwd ?? undefined,
+    });
 
     if (streaming) {
       options.includePartialMessages = true;
@@ -449,89 +621,126 @@ export class ClaudeCodeAgent
   // ISessionForkable Implementation
   // ============================================
 
-  async forkSession(
-    parentIdentifier: SessionIdentifier,
-    options?: ForkOptions
-  ): Promise<Result<SessionInfo, AgentError>> {
+  async forkSession(options: ForkOptions): Promise<Result<SessionInfo, AgentError>> {
     const initCheck = this.ensureInitialized();
     if (initCheck.success === false) {
       return { success: false, error: initCheck.error };
     }
 
-    // Resolve the parent session ID
-    const parentId = this.resolveSessionId(parentIdentifier);
-    if (!parentId) {
-      return err(
-        agentError(
-          AgentErrorCode.SESSION_INVALID,
-          'Cannot fork from "latest" session - please specify a session ID or name'
-        )
-      );
+    // Get session ID from options (required field)
+    const sourceSessionId = options.sessionId;
+
+    const targetCwd = options.workspacePath ?? process.cwd();
+    const sourceCwd = process.cwd();
+    const isCrossDirectory = targetCwd !== sourceCwd;
+    const createWorktree = options.createWorktree !== false; // Default to true for backward compatibility
+
+    // Determine target session ID:
+    // - Cross-directory (worktree) forks: use same session ID (file is in different project directory)
+    // - Same-directory forks without worktree: generate new session ID
+    const targetSessionId = createWorktree ? sourceSessionId : crypto.randomUUID();
+
+    console.log('[ClaudeCodeAgent] Fork operation:', {
+      sourceSessionId,
+      targetSessionId,
+      isCrossDirectory,
+      createWorktree,
+      sourceCwd,
+      targetCwd,
+    });
+
+    // Build fork options
+    const abortController = new AbortController();
+    const sdkOptions: Partial<Options> = {
+      abortController,
+      hooks: this.hookBridge.hooks,
+      canUseTool: this.canUseTool,
+      tools: { type: 'preset', preset: 'claude_code' },
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+    };
+
+    if (isCrossDirectory) {
+      // For cross-directory forks, use extraArgs to create new session
+      sdkOptions.extraArgs = { 'session-id': sourceSessionId };
+    } else if (!createWorktree) {
+      // For same-directory forks without worktree, use extraArgs with new session ID
+      sdkOptions.extraArgs = { 'session-id': targetSessionId };
+    } else {
+      // For same-directory forks with worktree (shouldn't happen normally), use SDK's built-in fork
+      sdkOptions.resume = sourceSessionId;
+      sdkOptions.forkSession = true;
     }
 
-    const queryId = crypto.randomUUID();
-    const abortController = new AbortController();
-
+    // Trigger fork via empty prompt query (fire-and-forget style)
     try {
-      const sdkOptions: Partial<Options> = {
-        resume: parentId,
-        forkSession: true,
-        abortController,
-        tools: { type: 'preset', preset: 'claude_code' },
-      };
+      await this.executeQuery('', sdkOptions);
+    } catch (error) {
+      console.error('[ClaudeCodeAgent] Failed to create new session', { error });
+    }
 
-      // Use empty prompt to trigger the fork
-      const queryResult = query({ prompt: '', options: sdkOptions });
+    // Handle forks that need JSONL file copying
+    // - Cross-directory forks: copy to new project directory
+    // - Same-directory forks without worktree: copy with new session ID
+    if (isCrossDirectory || !createWorktree) {
+      console.log('[ClaudeCodeAgent] Fork requires JSONL file copy', {
+        isCrossDirectory,
+        createWorktree,
+        sourceCwd,
+        targetCwd,
+      });
 
-      const handle: QueryHandle = {
-        id: queryId,
-        query: queryResult,
-        abortController,
-        startTime: Date.now(),
-      };
-      this.activeQueries.set(queryId, handle);
-
-      // Collect messages to get the new session ID
-      let newSessionId: string | null = null;
-      for await (const message of queryResult) {
-        // Extract session_id from any message
-        if ('session_id' in message && message.session_id) {
-          newSessionId = message.session_id;
-        }
-      }
-
-      this.activeQueries.delete(queryId);
-
-      if (!newSessionId) {
+      // Get fork adapter for Claude Code
+      const adapter = ForkAdapterFactory.getAdapter('claude_code');
+      if (!adapter) {
         return err(
-          agentError(AgentErrorCode.SESSION_INVALID, 'Failed to obtain new session ID from fork')
+          agentError(AgentErrorCode.CAPABILITY_NOT_SUPPORTED, 'Fork adapter not available')
         );
       }
 
-      const now = new Date().toISOString();
-      return ok({
-        id: newSessionId,
-        name: options?.newSessionName,
-        agentType: 'claude_code',
-        createdAt: now,
-        updatedAt: now,
-        messageCount: 0,
-        parentSessionId: parentId,
-      });
-    } catch (error) {
-      this.activeQueries.delete(queryId);
-      return err(mapSdkError(error));
-    }
-  }
+      try {
+        // Resolve real path of target (handles symlinks like /tmp -> /private/tmp on macOS)
+        let resolvedTargetCwd = targetCwd;
+        try {
+          if (!fs.existsSync(targetCwd)) {
+            fs.mkdirSync(targetCwd, { recursive: true });
+          }
+          resolvedTargetCwd = fs.realpathSync(targetCwd);
+        } catch {
+          // If resolution fails, use original path
+        }
 
-  private resolveSessionId(identifier: SessionIdentifier): string | null {
-    switch (identifier.type) {
-      case 'id':
-      case 'name':
-        return identifier.value;
-      case 'latest':
-        return null; // Cannot resolve latest without session context
+        // For same-directory forks, source and target cwd are the same
+        // but we use different session IDs
+        const forkResult = await adapter.forkSessionFile(
+          sourceSessionId,
+          targetSessionId,
+          sourceCwd,
+          isCrossDirectory ? resolvedTargetCwd : sourceCwd, // Same cwd for non-worktree forks
+          options.filterOptions // Pass filter options for partial context fork
+        );
+
+        if (forkResult.success === false) {
+          console.error('[ClaudeCodeAgent] Fork adapter failed to fork session', {
+            error: forkResult.error,
+          });
+          throw forkResult.error;
+        }
+      } catch (error) {
+        return err(
+          agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to fork session file: ${error}`)
+        );
+      }
     }
+
+    return ok({
+      id: targetSessionId,
+      name: options.newSessionName,
+      agentType: 'claude_code',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messageCount: 0,
+      parentSessionId: sourceSessionId,
+    });
   }
 
   // ============================================
@@ -552,6 +761,33 @@ export class ClaudeCodeAgent
 
   getDataPaths(): string[] {
     return [this.getProjectsDir()];
+  }
+
+  /**
+   * Encode a workspace path the same way Claude Code does.
+   * Both forward slashes and spaces are replaced with hyphens.
+   * Example: /Users/foo/My Project -> -Users-foo-My-Project
+   */
+  private encodeWorkspacePath(workspacePath: string): string {
+    return workspacePath.replace(/[/ ]/g, '-');
+  }
+
+  /**
+   * Check if a session file exists for the given session ID and workspace path.
+   * A session is considered "active" if its JSONL file exists on disk.
+   */
+  async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
+    const encodedPath = this.encodeWorkspacePath(workspacePath);
+    const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
+    const res = fs.existsSync(sessionFilePath);
+
+    console.log('[ClaudeCodeAgent] Checking session active', {
+      sessionId,
+      workspacePath,
+      sessionFilePath,
+      res,
+    });
+    return res;
   }
 
   async getSessionModificationTimes(
@@ -579,7 +815,7 @@ export class ClaudeCodeAgent
           if (projectName !== filter.projectName) continue;
         }
 
-        const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
+        const sessionFiles = fs.readdirSync(projectDirPath).filter((f) => f.endsWith('.jsonl'));
 
         for (const sessionFile of sessionFiles) {
           const sessionFilePath = path.join(projectDirPath, sessionFile);
@@ -626,14 +862,19 @@ export class ClaudeCodeAgent
         const projectDirPath = path.join(projectsDir, projectDir);
         if (!fs.statSync(projectDirPath).isDirectory()) continue;
 
-        const projectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
-        const projectName = path.basename(projectPath);
+        // Decode the project path (note: paths with hyphens can't be perfectly decoded)
+        const decodedProjectPath = projectDir.replace(/^-/, '/').replace(/-/g, '/');
+        const projectName = path.basename(decodedProjectPath);
 
-        // Apply project filter
+        // For filtering, encode the filter path the same way Claude Code does
+        // so we can compare encoded paths directly (avoids hyphen corruption issue)
+        if (filter?.projectPath) {
+          const encodedFilterPath = this.encodeWorkspacePath(filter.projectPath);
+          if (projectDir !== encodedFilterPath) continue;
+        }
         if (filter?.projectName && projectName !== filter.projectName) continue;
-        if (filter?.projectPath && projectPath !== filter.projectPath) continue;
 
-        const sessionFiles = fs.readdirSync(projectDirPath).filter(f => f.endsWith('.jsonl'));
+        const sessionFiles = fs.readdirSync(projectDirPath).filter((f) => f.endsWith('.jsonl'));
 
         for (const sessionFile of sessionFiles) {
           const sessionFilePath = path.join(projectDirPath, sessionFile);
@@ -644,12 +885,18 @@ export class ClaudeCodeAgent
           if (mtime < Math.max(cutoffTime, minTime)) continue;
 
           const sessionId = path.basename(sessionFile, '.jsonl');
-          const summary = this.parseSessionSummary(sessionFilePath, sessionId, projectPath, projectName);
+          const summary = this.parseSessionSummary(
+            sessionFilePath,
+            sessionId,
+            decodedProjectPath,
+            projectName
+          );
 
           if (summary) {
             // Apply additional filters
             if (filter?.hasThinking && !summary.hasThinking) continue;
-            if (filter?.minToolCallCount && summary.toolCallCount < filter.minToolCallCount) continue;
+            if (filter?.minToolCallCount && summary.toolCallCount < filter.minToolCallCount)
+              continue;
 
             summaries.push(summary);
           }
@@ -667,10 +914,7 @@ export class ClaudeCodeAgent
       return ok(summaries);
     } catch (error) {
       return err(
-        agentError(
-          AgentErrorCode.UNKNOWN_ERROR,
-          `Failed to list session summaries: ${error}`
-        )
+        agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to list session summaries: ${error}`)
       );
     }
   }
@@ -683,73 +927,25 @@ export class ClaudeCodeAgent
   ): SessionSummary | null {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const lines = content.trim().split('\n').filter(line => line.trim());
+      const stats = this.jsonlParser.parseStats(content);
 
-      if (lines.length === 0) return null;
+      if (stats.messageCount === 0) return null;
 
-      let messageCount = 0;
-      let toolCallCount = 0;
-      let hasThinking = false;
-      let firstUserMessage: string | undefined;
-      let lastAssistantMessage: string | undefined;
-      let lastTimestamp: string | undefined;
-
-      for (const line of lines) {
-        try {
-          const data: JsonlLine = JSON.parse(line);
-
-          if (data.timestamp) {
-            lastTimestamp = this.normalizeTimestamp(data.timestamp);
-          }
-
-          if (data.type === 'user' && data.message?.content) {
-            messageCount++;
-            if (!firstUserMessage) {
-              firstUserMessage = this.extractDisplayContent(data.message.content);
-            }
-          }
-
-          if (data.type === 'assistant' && data.message?.content) {
-            messageCount++;
-            const display = this.extractDisplayContent(data.message.content);
-            if (display) lastAssistantMessage = display;
-
-            // Check for tool use blocks
-            if (Array.isArray(data.message.content)) {
-              for (const part of data.message.content) {
-                if (typeof part === 'object' && part !== null) {
-                  if ((part as Record<string, unknown>).type === 'tool_use') {
-                    toolCallCount++;
-                  }
-                  if ((part as Record<string, unknown>).type === 'thinking') {
-                    hasThinking = true;
-                  }
-                }
-              }
-            }
-          }
-        } catch {
-          // Skip malformed lines
-        }
-      }
-
-      if (messageCount === 0) return null;
-
-      const stats = fs.statSync(filePath);
+      const fileStats = fs.statSync(filePath);
 
       return {
         id: sessionId,
         agentType: 'claude_code',
-        createdAt: stats.birthtime.toISOString(),
-        updatedAt: stats.mtime.toISOString(),
-        timestamp: lastTimestamp || stats.mtime.toISOString(),
+        createdAt: fileStats.birthtime.toISOString(),
+        updatedAt: fileStats.mtime.toISOString(),
+        timestamp: stats.lastTimestamp || fileStats.mtime.toISOString(),
         projectPath,
         projectName,
-        messageCount,
-        firstUserMessage: firstUserMessage?.substring(0, 200),
-        lastAssistantMessage: lastAssistantMessage?.substring(0, 200),
-        toolCallCount,
-        hasThinking,
+        messageCount: stats.messageCount,
+        firstUserMessage: stats.firstUserMessage?.substring(0, 200),
+        lastAssistantMessage: stats.lastAssistantMessage?.substring(0, 200),
+        toolCallCount: stats.toolCallCount,
+        hasThinking: stats.hasThinking,
       };
     } catch {
       return null;
@@ -759,15 +955,55 @@ export class ClaudeCodeAgent
   async getFilteredSession(
     sessionId: string,
     filter?: MessageFilterOptions
-  ): Promise<Result<SessionContent | null, AgentError>> {
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
     const projectsDir = this.getProjectsDir();
-
+    console.log('[ClaudeCodeAgent] Getting filtered session', { sessionId, filter, projectsDir });
     try {
       if (!fs.existsSync(projectsDir)) {
         return ok(null);
       }
 
-      // Search for the session file
+      // If workspacePath is provided, search in that specific project directory first
+      // This is important for forked sessions that share the same sessionId
+      // but exist in different project directories (parent vs worktree workspace)
+      if (filter?.workspacePath) {
+        console.log('[ClaudeCodeAgent] Searching for session in specified workspacePath', {
+          sessionId,
+          workspacePath: filter.workspacePath,
+        });
+
+        const encodedPath = this.encodeWorkspacePath(filter.workspacePath);
+        const targetDirPath = path.join(projectsDir, encodedPath);
+        const sessionFilePath = path.join(targetDirPath, `${sessionId}.jsonl`);
+
+        if (fs.existsSync(sessionFilePath)) {
+          console.log('[ClaudeCodeAgent] Found session in target workspace', {
+            sessionId,
+            workspacePath: filter.workspacePath,
+            sessionFilePath,
+          });
+          return ok(
+            this.parseSessionContent(sessionFilePath, sessionId, filter.workspacePath, filter)
+          );
+        }
+
+        // If not found in target workspace and strict mode would be helpful,
+        // we could return null here. For now, fall through to search all directories
+        // to maintain backward compatibility.
+        console.log('[ClaudeCodeAgent] Session not found in target workspace, searching all', {
+          sessionId,
+          workspacePath: filter.workspacePath,
+        });
+      } else {
+        console.log(
+          '[ClaudeCodeAgent] No workspacePath filter provided, searching all directories for session',
+          {
+            sessionId,
+          }
+        );
+      }
+
+      // Search for the session file across all project directories
       const projectDirs = fs.readdirSync(projectsDir);
 
       for (const projectDir of projectDirs) {
@@ -783,12 +1019,7 @@ export class ClaudeCodeAgent
 
       return ok(null);
     } catch (error) {
-      return err(
-        agentError(
-          AgentErrorCode.UNKNOWN_ERROR,
-          `Failed to get session: ${error}`
-        )
-      );
+      return err(agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to get session: ${error}`));
     }
   }
 
@@ -797,34 +1028,30 @@ export class ClaudeCodeAgent
     sessionId: string,
     projectPath: string,
     filter?: MessageFilterOptions
-  ): SessionContent {
+  ): CodingAgentSessionContent {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
-    const messages: ChatMessage[] = [];
+    const { messages: allMessages } = this.jsonlParser.parseMessages(content);
 
-    for (const line of lines) {
-      try {
-        const data: JsonlLine = JSON.parse(line);
-        const parsedMessages = this.parseJsonlLine(data);
-
-        for (const msg of parsedMessages) {
-          // Apply filters
-          if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
-            continue;
-          }
-          if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
-            continue;
-          }
-          if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
-            continue;
-          }
-
-          messages.push(msg);
-        }
-      } catch {
-        // Skip malformed lines
+    // Apply filters
+    const messages = allMessages.filter((msg) => {
+      if (
+        filter?.messageTypes &&
+        msg.messageType &&
+        !filter.messageTypes.includes(msg.messageType)
+      ) {
+        return false;
       }
-    }
+      if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
+        return false;
+      }
+      if (
+        filter?.searchText &&
+        !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
 
     const stats = fs.statSync(filePath);
     const projectName = path.basename(projectPath);
@@ -845,193 +1072,13 @@ export class ClaudeCodeAgent
     };
   }
 
-  private parseJsonlLine(data: JsonlLine): ChatMessage[] {
-    const messages: ChatMessage[] = [];
-    const timestamp = this.normalizeTimestamp(data.timestamp);
-
-    if (data.type === 'user' && data.message?.content) {
-      const display = this.extractDisplayContent(data.message.content);
-      if (display) {
-        messages.push({
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: display,
-          timestamp,
-          messageType: 'user',
-          agentMetadata: { rawType: data.type },
-        });
-      }
-    }
-
-    if (data.type === 'assistant' && data.message?.content) {
-      const contentParts = Array.isArray(data.message.content)
-        ? data.message.content
-        : [data.message.content];
-
-      for (const part of contentParts) {
-        if (typeof part === 'string') {
-          messages.push({
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: part,
-            timestamp,
-            messageType: 'assistant',
-            agentMetadata: { rawType: data.type },
-          });
-        } else if (typeof part === 'object' && part !== null) {
-          const partObj = part as Record<string, unknown>;
-
-          if (partObj.type === 'text' && partObj.text) {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.text),
-              timestamp,
-              messageType: 'assistant',
-              agentMetadata: { rawType: data.type },
-            });
-          } else if (partObj.type === 'tool_use') {
-            messages.push({
-              id: String(partObj.id || crypto.randomUUID()),
-              role: 'assistant',
-              content: `Tool: ${partObj.name}`,
-              timestamp,
-              messageType: 'tool_call',
-              tool: {
-                name: String(partObj.name || 'unknown'),
-                category: this.categorizeToolByName(String(partObj.name || '')),
-                input: partObj.input as Record<string, unknown> | undefined,
-                status: 'pending',
-              },
-              agentMetadata: { rawType: 'tool_use', rawContent: part },
-            });
-          } else if (partObj.type === 'tool_result') {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.content || ''),
-              timestamp,
-              messageType: 'tool_result',
-              tool: {
-                name: 'tool_result',
-                category: 'unknown',
-                output: String(partObj.content || ''),
-                status: partObj.is_error ? 'error' : 'success',
-              },
-              agentMetadata: { rawType: 'tool_result', toolUseId: partObj.tool_use_id },
-            });
-          } else if (partObj.type === 'thinking') {
-            messages.push({
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: String(partObj.thinking || ''),
-              timestamp,
-              messageType: 'thinking',
-              thinking: {
-                content: String(partObj.thinking || ''),
-                isRedacted: false,
-              },
-              agentMetadata: { rawType: 'thinking' },
-            });
-          }
-        }
-      }
-    }
-
-    return messages;
-  }
-
-  private categorizeToolByName(name: string): ToolCategory {
-    const lowerName = name.toLowerCase();
-
-    if (['read', 'cat', 'head', 'tail'].some(t => lowerName.includes(t))) {
-      return 'file_read';
-    }
-    if (['write', 'edit', 'touch'].some(t => lowerName.includes(t))) {
-      return 'file_write';
-    }
-    if (['glob', 'grep', 'find', 'search'].some(t => lowerName.includes(t))) {
-      return 'file_search';
-    }
-    if (['bash', 'shell', 'terminal', 'exec'].some(t => lowerName.includes(t))) {
-      return 'shell';
-    }
-    if (['web', 'fetch', 'http', 'url'].some(t => lowerName.includes(t))) {
-      return 'web';
-    }
-    if (['lsp', 'definition', 'reference', 'hover'].some(t => lowerName.includes(t))) {
-      return 'code_intel';
-    }
-    if (lowerName.startsWith('mcp')) {
-      return 'mcp';
-    }
-
-    return 'custom';
-  }
-
-  private extractDisplayContent(content: unknown): string {
-    if (typeof content === 'string') {
-      return content;
-    }
-
-    if (Array.isArray(content)) {
-      const textParts: string[] = [];
-      for (const part of content) {
-        if (typeof part === 'string') {
-          textParts.push(part);
-        } else if (typeof part === 'object' && part !== null) {
-          const obj = part as Record<string, unknown>;
-          if (obj.type === 'text' && obj.text) {
-            textParts.push(String(obj.text));
-          }
-        }
-      }
-      return textParts.join('\n');
-    }
-
-    return '';
-  }
-
-  private normalizeTimestamp(timestamp: string | number | undefined): string {
-    if (!timestamp) return new Date().toISOString();
-
-    if (typeof timestamp === 'string') {
-      // First, try to parse as ISO date string (most common case)
-      const date = new Date(timestamp);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-
-      // If not a valid date string, try parsing as numeric timestamp
-      const num = parseInt(timestamp, 10);
-      if (!isNaN(num) && num > 0) {
-        timestamp = num;
-      } else {
-        return new Date().toISOString();
-      }
-    }
-
-    if (typeof timestamp === 'number') {
-      // If > year 2000 in ms
-      if (timestamp > 946684800000) {
-        return new Date(timestamp).toISOString();
-      }
-      // If in seconds
-      if (timestamp > 946684800) {
-        return new Date(timestamp * 1000).toISOString();
-      }
-    }
-
-    return new Date().toISOString();
-  }
-
   /**
    * Stream messages one at a time (generator-based)
    */
   async *streamSessionMessages(
     sessionId: string,
     filter?: MessageFilterOptions
-  ): AsyncGenerator<ChatMessage, void, unknown> {
+  ): AsyncGenerator<CodingAgentMessage, void, unknown> {
     const projectsDir = this.getProjectsDir();
 
     if (!fs.existsSync(projectsDir)) return;
@@ -1046,30 +1093,27 @@ export class ClaudeCodeAgent
       if (!fs.existsSync(sessionFilePath)) continue;
 
       const content = fs.readFileSync(sessionFilePath, 'utf-8');
-      const lines = content.trim().split('\n').filter(line => line.trim());
 
-      for (const line of lines) {
-        try {
-          const data: JsonlLine = JSON.parse(line);
-          const parsedMessages = this.parseJsonlLine(data);
-
-          for (const msg of parsedMessages) {
-            // Apply filters
-            if (filter?.messageTypes && msg.messageType && !filter.messageTypes.includes(msg.messageType)) {
-              continue;
-            }
-            if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
-              continue;
-            }
-            if (filter?.searchText && !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())) {
-              continue;
-            }
-
-            yield msg;
-          }
-        } catch {
-          // Skip malformed lines
+      for (const msg of this.jsonlParser.streamMessages(content)) {
+        // Apply filters
+        if (
+          filter?.messageTypes &&
+          msg.messageType &&
+          !filter.messageTypes.includes(msg.messageType)
+        ) {
+          continue;
         }
+        if (filter?.roles && msg.role && !filter.roles.includes(msg.role)) {
+          continue;
+        }
+        if (
+          filter?.searchText &&
+          !msg.content.toLowerCase().includes(filter.searchText.toLowerCase())
+        ) {
+          continue;
+        }
+
+        yield msg;
       }
 
       return; // Found the session, done

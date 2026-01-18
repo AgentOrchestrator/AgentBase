@@ -1,11 +1,11 @@
 import type {
-  Result,
-  LLMError,
   ChatRequest,
   ChatResponse,
-  StreamCallback,
   LLMCapabilities,
+  LLMError,
   ModelInfo,
+  Result,
+  StreamCallback,
 } from '../types';
 
 /**

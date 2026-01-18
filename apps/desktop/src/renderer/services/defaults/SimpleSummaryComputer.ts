@@ -71,9 +71,9 @@ export class SimpleSummaryComputer implements ISummaryComputer {
     // Fall back to word boundary
     const lastSpace = truncated.lastIndexOf(' ');
     if (lastSpace > maxLength * 0.5) {
-      return truncated.slice(0, lastSpace) + '...';
+      return `${truncated.slice(0, lastSpace)}...`;
     }
 
-    return truncated + '...';
+    return `${truncated}...`;
   }
 }

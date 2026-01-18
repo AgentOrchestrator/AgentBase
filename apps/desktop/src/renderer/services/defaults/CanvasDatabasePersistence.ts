@@ -5,10 +5,7 @@
  * Uses the existing canvasAPI bridge pattern.
  */
 
-import type {
-  CodingAgentState,
-  IStatusPersistence,
-} from '../../../../types/coding-agent-status';
+import type { CodingAgentState, IStatusPersistence } from '../../../../types/coding-agent-status';
 
 /**
  * Interface for the agent status API exposed via preload.
@@ -32,10 +29,7 @@ export class CanvasDatabasePersistence implements IStatusPersistence {
     try {
       await this.api.saveAgentStatus(state.agentId, state);
     } catch (error) {
-      console.error(
-        `[CanvasDatabasePersistence] Failed to save agent status:`,
-        error
-      );
+      console.error(`[CanvasDatabasePersistence] Failed to save agent status:`, error);
       throw error;
     }
   }
@@ -44,10 +38,7 @@ export class CanvasDatabasePersistence implements IStatusPersistence {
     try {
       return await this.api.loadAgentStatus(agentId);
     } catch (error) {
-      console.error(
-        `[CanvasDatabasePersistence] Failed to load agent status:`,
-        error
-      );
+      console.error(`[CanvasDatabasePersistence] Failed to load agent status:`, error);
       return null;
     }
   }
@@ -56,10 +47,7 @@ export class CanvasDatabasePersistence implements IStatusPersistence {
     try {
       await this.api.deleteAgentStatus(agentId);
     } catch (error) {
-      console.error(
-        `[CanvasDatabasePersistence] Failed to delete agent status:`,
-        error
-      );
+      console.error(`[CanvasDatabasePersistence] Failed to delete agent status:`, error);
       throw error;
     }
   }
@@ -68,10 +56,7 @@ export class CanvasDatabasePersistence implements IStatusPersistence {
     try {
       return await this.api.loadAllAgentStatuses();
     } catch (error) {
-      console.error(
-        `[CanvasDatabasePersistence] Failed to load all agent statuses:`,
-        error
-      );
+      console.error(`[CanvasDatabasePersistence] Failed to load all agent statuses:`, error);
       return [];
     }
   }

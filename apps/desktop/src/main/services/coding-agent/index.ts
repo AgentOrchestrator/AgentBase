@@ -33,58 +33,66 @@
 
 // Factory - main entry point
 export { CodingAgentFactory } from './factory/CodingAgentFactory';
-
-// Interfaces - for type annotations
-export type {
-  ICodingAgentProvider,
-  ISessionManager,
-  ISessionResumable,
-  ISessionForkable,
-  IProcessLifecycle,
-  IFullCodingAgent,
-  IMinimalCodingAgent,
-} from './interfaces';
-
-// Types - for working with requests/responses
-export type {
-  Result,
-  AgentError,
-  CodingAgentType,
-  AgentCapabilities,
-  AgentConfig,
-  SessionIdentifier,
-  SessionInfo,
-  SessionContent,
-  SessionFilter,
-  ContinueOptions,
-  ForkOptions,
-  ChatMessage,
-  GenerateRequest,
-  GenerateResponse,
-  StreamCallback,
-} from './types';
-
-// Error codes and helpers
-export {
-  AgentErrorCode,
-  ok,
-  err,
-  agentError,
-  DEFAULT_AGENT_CONFIG,
-  sessionById,
-  sessionByName,
-  latestSession,
-} from './types';
-
-// Capability checking utilities
-export {
-  isSessionResumable,
-  isSessionForkable,
-  hasSessionManager,
-  supportsStreaming,
-  getMissingCapabilities,
-} from './utils/capability-checker';
-
 // Concrete implementations - exported for advanced use cases
 // Prefer using CodingAgentFactory.getAgent() instead of direct instantiation
 export { ClaudeCodeAgent } from './implementations';
+// Interfaces - for type annotations
+export type {
+  ICodingAgentProvider,
+  IFullCodingAgent,
+  IMinimalCodingAgent,
+  IProcessLifecycle,
+  ISessionForkable,
+  ISessionManager,
+  ISessionResumable,
+  ISessionValidator,
+} from './interfaces';
+// Types - for working with requests/responses
+export type {
+  AgentCapabilities,
+  AgentConfig,
+  AgentError,
+  CodingAgentAPI,
+  CodingAgentMessage,
+  CodingAgentSessionContent,
+  CodingAgentType,
+  ContinueOptions,
+  ForkOptions,
+  GenerateRequest,
+  GenerateResponse,
+  MessageFilterOptions,
+  Result,
+  SessionContent, // Backward compatibility alias
+  SessionFilter,
+  SessionFilterOptions,
+  SessionIdentifier,
+  SessionInfo,
+  SessionSummary,
+  StreamCallback,
+  StreamingBlockType,
+  // Streaming types
+  StreamingChunk,
+  StreamingContentBlock,
+  StructuredStreamCallback,
+} from './types';
+// Error codes and helpers
+export {
+  AgentErrorCode,
+  agentError,
+  DEFAULT_AGENT_CONFIG,
+  err,
+  latestSession,
+  ok,
+  sessionById,
+  sessionByName,
+} from './types';
+// Capability checking utilities
+export {
+  getMissingCapabilities,
+  hasSessionManager,
+  isChatHistoryProvider,
+  isSessionForkable,
+  isSessionResumable,
+  isSessionValidator,
+  supportsStreaming,
+} from './utils/capability-checker';

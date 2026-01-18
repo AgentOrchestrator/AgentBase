@@ -1,7 +1,7 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import Database from 'better-sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
 
 /**
  * Get the data directory path for the current platform
@@ -11,7 +11,6 @@ export function getAppDataPath(): string {
   // Use ~/.agent-orchestrator for all platforms
   return path.join(os.homedir(), '.agent-orchestrator');
 }
-
 
 interface AuthData {
   id: number;
@@ -31,19 +30,19 @@ interface DeviceData {
 
 export interface SyncStateData {
   id: number;
-  last_sync_completed_at: number;  // Timestamp of last successful sync
-  last_sync_started_at: number;    // Timestamp when current/last sync started
+  last_sync_completed_at: number; // Timestamp of last successful sync
+  last_sync_started_at: number; // Timestamp when current/last sync started
   sync_status: 'idle' | 'syncing' | 'error';
   error_message: string | null;
-  sessions_synced_count: number;   // Count from last sync
-  sessions_failed_count: number;   // Count from last sync
+  sessions_synced_count: number; // Count from last sync
+  sessions_failed_count: number; // Count from last sync
   updated_at: number;
 }
 
 export interface FailedSyncData {
   id: number;
   session_id: string;
-  session_source: string;  // 'claude_code' | 'cursor-composer' | 'cursor-copilot'
+  session_source: string; // 'claude_code' | 'cursor-composer' | 'cursor-copilot'
   error_message: string;
   retry_count: number;
   first_failed_at: number;
@@ -141,10 +140,168 @@ export class AppDatabase {
     `);
 
     // Initialize sync_state with a single row if it doesn't exist
-    const syncStateCount = this.db.prepare('SELECT COUNT(*) as count FROM sync_state').get() as { count: number };
+    const syncStateCount = this.db.prepare('SELECT COUNT(*) as count FROM sync_state').get() as {
+      count: number;
+    };
     if (syncStateCount.count === 0) {
       this.db.prepare('INSERT INTO sync_state DEFAULT VALUES').run();
     }
+
+    // Create users table for local storage
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL DEFAULT 'local@localhost',
+        display_name TEXT,
+        avatar_url TEXT,
+        github_username TEXT,
+        github_avatar_url TEXT,
+        is_admin INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create projects table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        project_path TEXT,
+        description TEXT,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        workspace_metadata TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, name)
+      );
+    `);
+
+    // Create chat_histories table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_histories (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        project_id TEXT,
+        agent_type TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        messages TEXT NOT NULL,
+        metadata TEXT,
+        latest_message_timestamp TEXT,
+        ai_summary TEXT,
+        ai_summary_generated_at TEXT,
+        ai_summary_message_count INTEGER,
+        ai_title TEXT,
+        ai_title_generated_at TEXT,
+        ai_keywords_type TEXT,
+        ai_keywords_topic TEXT,
+        ai_keywords_generated_at TEXT,
+        ai_keywords_message_count INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create llm_api_keys table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS llm_api_keys (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        api_key TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(account_id, provider)
+      );
+    `);
+
+    // Create user_preferences table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id TEXT PRIMARY KEY,
+        ai_summary_enabled INTEGER NOT NULL DEFAULT 1,
+        ai_title_enabled INTEGER NOT NULL DEFAULT 1,
+        ai_model_provider TEXT DEFAULT 'openai',
+        ai_model_name TEXT DEFAULT 'gpt-4o-mini',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create active_sessions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS active_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        project_id TEXT,
+        editor_type TEXT NOT NULL,
+        workspace_path TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        last_activity_at TEXT NOT NULL,
+        recent_files TEXT,
+        session_metadata TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create user_canvas_layouts table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS user_canvas_layouts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        position_x REAL NOT NULL,
+        position_y REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, node_id)
+      );
+    `);
+
+    // Create pinned_conversations table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS pinned_conversations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        pinned_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, conversation_id)
+      );
+    `);
+
+    // Create session_summaries table for caching AI-generated summaries
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_summaries (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        workspace_path TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(session_id, workspace_path)
+      );
+    `);
+
+    // Create indexes for new tables
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+      CREATE INDEX IF NOT EXISTS idx_projects_is_default ON projects(user_id, is_default);
+      CREATE INDEX IF NOT EXISTS idx_chat_histories_account_id ON chat_histories(account_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_histories_project_id ON chat_histories(project_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_histories_timestamp ON chat_histories(latest_message_timestamp);
+      CREATE INDEX IF NOT EXISTS idx_active_sessions_user_id ON active_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_active_sessions_active ON active_sessions(user_id, is_active);
+      CREATE INDEX IF NOT EXISTS idx_canvas_layouts_user_id ON user_canvas_layouts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_pinned_conversations_user_id ON pinned_conversations(user_id);
+      CREATE INDEX IF NOT EXISTS idx_session_summaries_session_id ON session_summaries(session_id);
+    `);
   }
 
   /**
@@ -187,7 +344,10 @@ export class AppDatabase {
             user_id: authData.userId,
             expires_at: authData.expiresAt,
           });
-          console.log('[Database] Migrated auth data from file-based storage for user:', authData.userId);
+          console.log(
+            '[Database] Migrated auth data from file-based storage for user:',
+            authData.userId
+          );
           // Remove the old file after successful migration
           fs.unlinkSync(authPath);
           console.log('[Database] Removed legacy auth.json file');
@@ -250,24 +410,13 @@ export class AppDatabase {
       VALUES (?, ?, ?, ?, ?, ?)
     `);
     const now = Date.now();
-    stmt.run(
-      auth.access_token,
-      auth.refresh_token,
-      auth.user_id,
-      auth.expires_at,
-      now,
-      now
-    );
+    stmt.run(auth.access_token, auth.refresh_token, auth.user_id, auth.expires_at, now, now);
   }
 
   /**
    * Update the auth tokens (for token refresh)
    */
-  updateAuth(auth: {
-    access_token: string;
-    refresh_token: string;
-    expires_at: number;
-  }): void {
+  updateAuth(auth: { access_token: string; refresh_token: string; expires_at: number }): void {
     const stmt = this.db.prepare(`
       UPDATE auth
       SET access_token = ?,
@@ -276,12 +425,7 @@ export class AppDatabase {
           updated_at = ?
       WHERE id = (SELECT id FROM auth ORDER BY created_at DESC LIMIT 1)
     `);
-    stmt.run(
-      auth.access_token,
-      auth.refresh_token,
-      auth.expires_at,
-      Date.now()
-    );
+    stmt.run(auth.access_token, auth.refresh_token, auth.expires_at, Date.now());
   }
 
   /**
@@ -407,7 +551,7 @@ export class AppDatabase {
    * Clear old failed syncs (older than 7 days)
    */
   clearOldFailedSyncs(): void {
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const stmt = this.db.prepare(`
       DELETE FROM failed_syncs
       WHERE first_failed_at < ?
@@ -427,6 +571,13 @@ export class AppDatabase {
    */
   getDbPath(): string {
     return this.dbPath;
+  }
+
+  /**
+   * Get the raw database instance for direct access (used by repositories)
+   */
+  getRawDb(): Database.Database {
+    return this.db;
   }
 }
 

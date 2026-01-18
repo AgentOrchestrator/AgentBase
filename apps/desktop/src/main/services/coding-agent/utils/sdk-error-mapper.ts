@@ -4,8 +4,8 @@
  * Maps errors from @anthropic-ai/claude-agent-sdk to internal AgentError type
  */
 
-import { AbortError } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import { AbortError } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentError } from '../types/result.types';
 import { AgentErrorCode, agentError } from '../types/result.types';
 
@@ -15,7 +15,12 @@ import { AgentErrorCode, agentError } from '../types/result.types';
 export function mapSdkError(error: unknown): AgentError {
   // Handle AbortError (cancellation)
   if (error instanceof AbortError) {
-    return agentError(AgentErrorCode.PROCESS_KILLED, 'Operation was cancelled', undefined, error);
+    return agentError(
+      AgentErrorCode.PROCESS_KILLED,
+      'Operation was cancelled',
+      undefined,
+      error instanceof Error ? error : undefined
+    );
   }
 
   // Handle standard Error instances
@@ -111,10 +116,7 @@ export function mapSdkResultError(result: SDKResultMessage): AgentError {
  * Create an error for when no result message is received
  */
 export function noResultError(): AgentError {
-  return agentError(
-    AgentErrorCode.UNKNOWN_ERROR,
-    'No result message received from SDK query'
-  );
+  return agentError(AgentErrorCode.UNKNOWN_ERROR, 'No result message received from SDK query');
 }
 
 /**

@@ -1,12 +1,18 @@
-import { generateMockSummary, generateMockKeywords } from './mock-summarizer.js';
-import { getUserLLMConfig, generateLLMText, type LLMConfig, getUserPreferences } from './llm-client.js';
 import type {
-  IChatHistoryRepository,
-  IUserPreferencesRepository,
-  IApiKeyRepository,
-  IRepositoryFactory,
   ChatHistoryRecord,
+  IApiKeyRepository,
+  IChatHistoryRepository,
+  IRepositoryFactory,
+  IUserPreferencesRepository,
 } from './interfaces/repositories.js';
+import {
+  generateLLMText,
+  getUserLLMConfig,
+  getUserPreferences,
+  type LLMConfig,
+} from './llm-client.js';
+import { generateMockKeywords, generateMockSummary } from './mock-summarizer.js';
+import type { ServiceContainer } from './service-container.js';
 
 // Check if we're in development mode
 const isDevelopment = process.env.DEVELOPMENT === 'true';
@@ -47,7 +53,7 @@ async function generateSessionSummary(
     return JSON.stringify({
       summary: 'No messages yet',
       problems: [],
-      progress: 'smooth'
+      progress: 'smooth',
     });
   }
 
@@ -90,19 +96,15 @@ Example:
 }
 \`\`\``;
 
-  const systemPrompt = 'You are an expert at analyzing software development conversations. Always respond with valid JSON only, wrapped in ```json ``` code blocks.';
+  const systemPrompt =
+    'You are an expert at analyzing software development conversations. Always respond with valid JSON only, wrapped in ```json ``` code blocks.';
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const content = await generateLLMText(
-        llmConfig,
-        prompt,
-        systemPrompt,
-        {
-          temperature: 0.3,
-          maxTokens: 200,
-        }
-      );
+      const content = await generateLLMText(llmConfig, prompt, systemPrompt, {
+        temperature: 0.3,
+        maxTokens: 200,
+      });
 
       if (!content) {
         // No LLM available, use fallback
@@ -136,7 +138,7 @@ Example:
         // If this is not the last retry, try again
         if (attempt < retries) {
           console.log(`[Summary] Retrying due to parse error (${attempt + 1}/${retries})...`);
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
           continue;
         }
 
@@ -144,17 +146,19 @@ Example:
         return JSON.stringify({
           summary: 'Summary generation failed',
           problems: ['JSON parsing error'],
-          progress: 'smooth'
+          progress: 'smooth',
         });
       }
     } catch (error: any) {
       // Handle rate limit errors with exponential backoff
       if (error?.code === 'rate_limit_exceeded' && attempt < retries) {
         const waitTime = error?.error?.message?.match(/try again in (\d+)ms/)?.[1];
-        const delayMs = waitTime ? parseInt(waitTime) + 100 : Math.pow(2, attempt) * 1000;
+        const delayMs = waitTime ? parseInt(waitTime, 10) + 100 : 2 ** attempt * 1000;
 
-        console.log(`[Summary] Rate limit hit, waiting ${delayMs}ms before retry ${attempt + 1}/${retries}...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(
+          `[Summary] Rate limit hit, waiting ${delayMs}ms before retry ${attempt + 1}/${retries}...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
 
@@ -164,7 +168,7 @@ Example:
       return JSON.stringify({
         summary: 'Error generating summary',
         problems: [],
-        progress: 'smooth'
+        progress: 'smooth',
       });
     }
   }
@@ -204,19 +208,15 @@ Provide a JSON response with two arrays:
 Respond ONLY with valid JSON in this exact format:
 {"type": ["feature", "refactor"], "topic": ["gmail integration", "email parser"]}`;
 
-  const systemPrompt = 'You are an expert at analyzing software development conversations and extracting structured keyword classifications. Always respond with valid JSON only.';
+  const systemPrompt =
+    'You are an expert at analyzing software development conversations and extracting structured keyword classifications. Always respond with valid JSON only.';
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const content = await generateLLMText(
-        llmConfig,
-        prompt,
-        systemPrompt,
-        {
-          temperature: 0.3,
-          maxTokens: 150,
-        }
-      );
+      const content = await generateLLMText(llmConfig, prompt, systemPrompt, {
+        temperature: 0.3,
+        maxTokens: 150,
+      });
 
       if (!content) {
         // No LLM available, use fallback
@@ -239,10 +239,12 @@ Respond ONLY with valid JSON in this exact format:
       // Handle rate limit errors with exponential backoff
       if (error?.code === 'rate_limit_exceeded' && attempt < retries) {
         const waitTime = error?.error?.message?.match(/try again in (\d+)ms/)?.[1];
-        const delayMs = waitTime ? parseInt(waitTime) + 100 : Math.pow(2, attempt) * 1000;
+        const delayMs = waitTime ? parseInt(waitTime, 10) + 100 : 2 ** attempt * 1000;
 
-        console.log(`[Keywords] Rate limit hit, waiting ${delayMs}ms before retry ${attempt + 1}/${retries}...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(
+          `[Keywords] Rate limit hit, waiting ${delayMs}ms before retry ${attempt + 1}/${retries}...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
 
@@ -285,19 +287,15 @@ ${conversationText}
 
 Provide ONLY the title, nothing else:`;
 
-  const systemPrompt = 'You are an expert at creating concise, descriptive titles for software development sessions. Respond with only the title.';
+  const systemPrompt =
+    'You are an expert at creating concise, descriptive titles for software development sessions. Respond with only the title.';
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const content = await generateLLMText(
-        llmConfig,
-        prompt,
-        systemPrompt,
-        {
-          temperature: 0.7,
-          maxTokens: 50,
-        }
-      );
+      const content = await generateLLMText(llmConfig, prompt, systemPrompt, {
+        temperature: 0.7,
+        maxTokens: 50,
+      });
 
       if (!content) {
         // No LLM available, use fallback
@@ -311,10 +309,12 @@ Provide ONLY the title, nothing else:`;
       // Handle rate limit errors with exponential backoff
       if (error?.code === 'rate_limit_exceeded' && attempt < retries) {
         const waitTime = error?.error?.message?.match(/try again in (\d+)ms/)?.[1];
-        const delayMs = waitTime ? parseInt(waitTime) + 100 : Math.pow(2, attempt) * 1000;
+        const delayMs = waitTime ? parseInt(waitTime, 10) + 100 : 2 ** attempt * 1000;
 
-        console.log(`[Title] Rate limit hit, waiting ${delayMs}ms before retry ${attempt + 1}/${retries}...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(
+          `[Title] Rate limit hit, waiting ${delayMs}ms before retry ${attempt + 1}/${retries}...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
 
@@ -342,7 +342,9 @@ export async function getSessionsNeedingSummaryUpdate(
 
   console.log(`[Summary Updater] Fetching sessions needing summary update...`);
   console.log(`[Summary Updater] Cutoff time: ${cutoffTime.toISOString()}`);
-  console.log(`[Summary Updater] Thresholds: ${MESSAGE_THRESHOLD} messages, ${TIME_THROTTLE_MINUTES} minutes`);
+  console.log(
+    `[Summary Updater] Thresholds: ${MESSAGE_THRESHOLD} messages, ${TIME_THROTTLE_MINUTES} minutes`
+  );
 
   const sessions = await ctx.chatHistories.findRecentByUser(ctx.userId, cutoffTime);
 
@@ -356,9 +358,7 @@ export async function getSessionsNeedingSummaryUpdate(
   const needsUpdate: ChatHistoryRecord[] = [];
 
   for (const session of sessions) {
-    const currentMessageCount = Array.isArray(session.messages)
-      ? session.messages.length
-      : 0;
+    const currentMessageCount = Array.isArray(session.messages) ? session.messages.length : 0;
 
     if (currentMessageCount === 0) {
       continue;
@@ -414,9 +414,7 @@ export async function getSessionsNeedingKeywordUpdate(
   const needsUpdate: ChatHistoryRecord[] = [];
 
   for (const session of sessions) {
-    const currentMessageCount = Array.isArray(session.messages)
-      ? session.messages.length
-      : 0;
+    const currentMessageCount = Array.isArray(session.messages) ? session.messages.length : 0;
 
     if (currentMessageCount === 0) {
       continue;
@@ -467,9 +465,7 @@ export async function getSessionsNeedingTitleUpdate(
   const needsUpdate: ChatHistoryRecord[] = [];
 
   for (const session of sessions) {
-    const currentMessageCount = Array.isArray(session.messages)
-      ? session.messages.length
-      : 0;
+    const currentMessageCount = Array.isArray(session.messages) ? session.messages.length : 0;
 
     if (currentMessageCount === 0) {
       continue;
@@ -555,7 +551,10 @@ export async function updateSessionKeywords(
 
     const llmConfig = await getUserLLMConfig(ctx.userPreferences, ctx.apiKeys, ctx.userId);
 
-    const keywords = await generateKeywordClassification(messages as unknown as Message[], llmConfig);
+    const keywords = await generateKeywordClassification(
+      messages as unknown as Message[],
+      llmConfig
+    );
 
     const success = await ctx.chatHistories.updateAiKeywords(sessionId, keywords, messageCount);
 
@@ -640,7 +639,7 @@ export async function batchUpdateSessionSummaries(
       results.push({ sessionId, ...result });
 
       if (i < sessionIds.length - 1 && result.success) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenRequests));
       }
     } catch (error) {
       results.push({
@@ -684,7 +683,7 @@ export async function batchUpdateSessionKeywords(
       results.push({ sessionId, ...result });
 
       if (i < sessionIds.length - 1 && result.success) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenRequests));
       }
     } catch (error) {
       results.push({
@@ -728,7 +727,7 @@ export async function batchUpdateSessionTitles(
       results.push({ sessionId, ...result });
 
       if (i < sessionIds.length - 1 && result.success) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenRequests));
       }
     } catch (error) {
       results.push({
@@ -843,6 +842,113 @@ export async function runPeriodicTitleUpdate(
 
     const ctx: SummarizerContext = { userId, chatHistories, userPreferences, apiKeys };
 
+    const sessions = await getSessionsNeedingTitleUpdate(ctx);
+
+    if (sessions.length === 0) {
+      console.log('[Title Updater] No sessions need updating');
+      return;
+    }
+
+    console.log(`[Title Updater] Found ${sessions.length} sessions needing title updates`);
+
+    const sessionIds = sessions.map((s) => s.id);
+    const result = await batchUpdateSessionTitles(ctx, sessionIds);
+
+    console.log('[Title Updater] Update complete:', {
+      total: sessionIds.length,
+      updated: result.updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('[Title Updater] Error during periodic update:', error);
+  }
+}
+
+// ============================================================================
+// ServiceContainer-based entry points (recommended for new code)
+// ============================================================================
+
+/**
+ * Helper to create SummarizerContext from ServiceContainer
+ */
+function createContextFromContainer(container: ServiceContainer): SummarizerContext {
+  const { chatHistories, userPreferences, apiKeys } = container.getRepositories();
+  return {
+    userId: container.getUserId(),
+    chatHistories,
+    userPreferences,
+    apiKeys,
+  };
+}
+
+/**
+ * Run summary update using ServiceContainer
+ */
+export async function runSummaryUpdateWithContainer(container: ServiceContainer): Promise<void> {
+  console.log('[Summary Updater] Starting periodic summary update...');
+
+  try {
+    const ctx = createContextFromContainer(container);
+    const sessions = await getSessionsNeedingSummaryUpdate(ctx);
+
+    if (sessions.length === 0) {
+      console.log('[Summary Updater] No sessions need updating');
+      return;
+    }
+
+    console.log(`[Summary Updater] Found ${sessions.length} sessions needing summary updates`);
+
+    const sessionIds = sessions.map((s) => s.id);
+    const result = await batchUpdateSessionSummaries(ctx, sessionIds);
+
+    console.log('[Summary Updater] Update complete:', {
+      total: sessionIds.length,
+      updated: result.updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('[Summary Updater] Error during periodic update:', error);
+  }
+}
+
+/**
+ * Run keyword update using ServiceContainer
+ */
+export async function runKeywordUpdateWithContainer(container: ServiceContainer): Promise<void> {
+  console.log('[Keyword Updater] Starting periodic keyword update...');
+
+  try {
+    const ctx = createContextFromContainer(container);
+    const sessions = await getSessionsNeedingKeywordUpdate(ctx);
+
+    if (sessions.length === 0) {
+      console.log('[Keyword Updater] No sessions need updating');
+      return;
+    }
+
+    console.log(`[Keyword Updater] Found ${sessions.length} sessions needing keyword updates`);
+
+    const sessionIds = sessions.map((s) => s.id);
+    const result = await batchUpdateSessionKeywords(ctx, sessionIds);
+
+    console.log('[Keyword Updater] Update complete:', {
+      total: sessionIds.length,
+      updated: result.updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error('[Keyword Updater] Error during periodic update:', error);
+  }
+}
+
+/**
+ * Run title update using ServiceContainer
+ */
+export async function runTitleUpdateWithContainer(container: ServiceContainer): Promise<void> {
+  console.log('[Title Updater] Starting periodic title update...');
+
+  try {
+    const ctx = createContextFromContainer(container);
     const sessions = await getSessionsNeedingTitleUpdate(ctx);
 
     if (sessions.length === 0) {

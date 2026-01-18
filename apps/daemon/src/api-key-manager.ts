@@ -50,7 +50,9 @@ export async function getApiKey(
 
   // Priority 1: Check environment variable
   if (envVarName && process.env[envVarName]) {
-    console.log(`[API Key Manager] Using ${provider} API key from environment variable ${envVarName}`);
+    console.log(
+      `[API Key Manager] Using ${provider} API key from environment variable ${envVarName}`
+    );
     return process.env[envVarName] || null;
   }
 
@@ -63,7 +65,9 @@ export async function getApiKey(
   }
 
   // Priority 3: No API key found
-  console.log(`[API Key Manager] No ${provider} API key found (will use fallback mode if applicable)`);
+  console.log(
+    `[API Key Manager] No ${provider} API key found (will use fallback mode if applicable)`
+  );
   return null;
 }
 

@@ -1,26 +1,59 @@
-import { readChatHistories, extractProjectsFromClaudeCodeHistories } from './claude-code-reader.js';
-import { readCursorHistories, convertCursorToStandardFormat, extractProjectsFromConversations } from './cursor-reader.js';
-import { readVSCodeHistories, convertVSCodeToStandardFormat, extractProjectsFromConversations as extractVSCodeProjects } from './vscode-reader.js';
-import { readFactoryHistories, extractProjectsFromFactoryHistories } from './factory-reader.js';
-import { readCodexHistories, extractProjectsFromCodexHistories } from './codex-reader.js';
-import { uploadAllHistoriesWithTokens, syncProjectsWithTokens } from './uploader.js';
-import { runPeriodicSummaryUpdate, runPeriodicKeywordUpdate, runPeriodicTitleUpdate } from './summarizer.js';
 import { AuthManager } from './auth-manager.js';
-import { mergeProjects } from './project-aggregator.js';
+import { extractProjectsFromClaudeCodeHistories, readChatHistories } from './claude-code-reader.js';
+import { extractProjectsFromCodexHistories, readCodexHistories } from './codex-reader.js';
+import {
+  convertCursorToStandardFormat,
+  extractProjectsFromConversations,
+  readCursorHistories,
+} from './cursor-reader.js';
 import { getDatabase } from './database.js';
-import { createSupabaseAuthProvider, createSupabaseRepositoryFactory } from './infrastructure/supabase/index.js';
-import type { IRepositoryFactory } from './interfaces/repositories.js';
+import { extractProjectsFromFactoryHistories, readFactoryHistories } from './factory-reader.js';
+import {
+  createLocalAuthProvider,
+  createSQLiteAuthStateStore,
+  createSQLiteRepositoryFactory,
+} from './infrastructure/sqlite/index.js';
+import {
+  createSupabaseAuthProvider,
+  createSupabaseRepositoryFactory,
+} from './infrastructure/supabase/index.js';
+import { mergeProjects } from './project-aggregator.js';
+import { createServiceContainer, type ServiceContainer } from './service-container.js';
+import {
+  runKeywordUpdateWithContainer,
+  runSummaryUpdateWithContainer,
+  runTitleUpdateWithContainer,
+} from './summarizer.js';
+import { syncProjects, uploadAllHistories } from './uploader.js';
+import {
+  convertVSCodeToStandardFormat,
+  extractProjectsFromConversations as extractVSCodeProjects,
+  readVSCodeHistories,
+} from './vscode-reader.js';
+
+// Determine storage backend from environment variable
+// Default to local SQLite storage, use USE_SUPABASE=true for cloud sync
+const USE_SUPABASE = process.env.USE_SUPABASE === 'true';
 
 // Create infrastructure instances
-const authProvider = createSupabaseAuthProvider();
-const repositoryFactory: IRepositoryFactory = createSupabaseRepositoryFactory();
+const db = getDatabase();
 
-let authManager: AuthManager;
+// Select backend based on environment
+const authProvider = USE_SUPABASE ? createSupabaseAuthProvider() : createLocalAuthProvider(db);
+const authStateStore = createSQLiteAuthStateStore(db);
+const repositoryFactory = USE_SUPABASE
+  ? createSupabaseRepositoryFactory()
+  : createSQLiteRepositoryFactory(db);
+
+// Create the global service container
+const serviceContainer: ServiceContainer = createServiceContainer(repositoryFactory);
+
+// Create auth manager with injected dependencies
+const authManager = new AuthManager(authProvider, authStateStore);
 
 async function processHistories() {
   console.log('Processing chat histories...');
 
-  const db = getDatabase();
   const syncState = db.getSyncState();
 
   // Mark sync as started
@@ -30,7 +63,9 @@ async function processHistories() {
   if (syncState && syncState.last_sync_completed_at > 0) {
     const lastSyncDate = new Date(syncState.last_sync_completed_at);
     console.log(`Last successful sync: ${lastSyncDate.toISOString()}`);
-    console.log(`Last sync stats: ${syncState.sessions_synced_count} synced, ${syncState.sessions_failed_count} failed`);
+    console.log(
+      `Last sync stats: ${syncState.sessions_synced_count} synced, ${syncState.sessions_failed_count} failed`
+    );
   }
 
   try {
@@ -49,16 +84,27 @@ async function processHistories() {
       }
     }
 
-    const accountId = authManager.getUserId();
     const accessToken = authManager.getAccessToken();
     const refreshToken = authManager.getRefreshToken();
-    console.log(`✓ Authenticated as user: ${accountId}`);
 
     if (!accessToken || !refreshToken) {
       console.log('⚠️  No access token or refresh token available. Skipping upload.');
       db.completeSyncError('No access token or refresh token');
       return;
     }
+
+    // Initialize or reinitialize the service container with current tokens
+    if (!serviceContainer.isInitialized()) {
+      await serviceContainer.initialize(accessToken, refreshToken);
+    } else {
+      // Reinitialize to ensure we have fresh repositories with current tokens
+      await serviceContainer.reinitialize(accessToken, refreshToken);
+    }
+
+    const userId = serviceContainer.getUserId();
+    const { projects: projectRepo, chatHistories: chatHistoryRepo } =
+      serviceContainer.getRepositories();
+    console.log(`✓ Authenticated as user: ${userId}`);
 
     // Get session lookback period from environment (default: 7 days)
     const lookbackDays = parseInt(process.env.SESSION_LOOKBACK_DAYS || '7', 10);
@@ -67,7 +113,8 @@ async function processHistories() {
     // Calculate the time threshold for filtering sessions
     // Use last sync time if available, otherwise fall back to lookback period
     const lastSyncTime = syncState?.last_sync_completed_at || 0;
-    const useIncrementalSync = lastSyncTime > 0 && (Date.now() - lastSyncTime) < (lookbackDays * 24 * 60 * 60 * 1000);
+    const useIncrementalSync =
+      lastSyncTime > 0 && Date.now() - lastSyncTime < lookbackDays * 24 * 60 * 60 * 1000;
 
     if (useIncrementalSync) {
       console.log(`Using incremental sync since ${new Date(lastSyncTime).toISOString()}`);
@@ -75,25 +122,45 @@ async function processHistories() {
 
     // Read Claude Code histories (with file modification time filtering)
     // Pass the last sync time for incremental filtering
-    const claudeHistories = readChatHistories(lookbackDays, useIncrementalSync ? lastSyncTime : undefined);
+    const claudeHistories = readChatHistories(
+      lookbackDays,
+      useIncrementalSync ? lastSyncTime : undefined
+    );
     console.log(`Found ${claudeHistories.length} Claude Code chat histories.`);
 
     // Read Cursor histories (with timestamp filtering and authenticated session for heuristic timestamps)
-    const cursorConversations = await readCursorHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined, repositoryFactory);
+    const cursorConversations = await readCursorHistories(
+      lookbackDays,
+      accessToken,
+      refreshToken,
+      useIncrementalSync ? lastSyncTime : undefined,
+      serviceContainer
+    );
     const cursorHistories = convertCursorToStandardFormat(cursorConversations);
     console.log(`Found ${cursorHistories.length} Cursor chat histories.`);
 
     // Read VSCode histories (with timestamp filtering)
-    const vscodeConversations = await readVSCodeHistories(lookbackDays, accessToken, refreshToken, useIncrementalSync ? lastSyncTime : undefined);
+    const vscodeConversations = await readVSCodeHistories(
+      lookbackDays,
+      accessToken,
+      refreshToken,
+      useIncrementalSync ? lastSyncTime : undefined
+    );
     const vscodeHistories = convertVSCodeToStandardFormat(vscodeConversations);
     console.log(`Found ${vscodeHistories.length} VSCode chat histories.`);
 
     // Read Factory histories (with file modification time filtering)
-    const factoryHistories = readFactoryHistories(lookbackDays, useIncrementalSync ? lastSyncTime : undefined);
+    const factoryHistories = readFactoryHistories(
+      lookbackDays,
+      useIncrementalSync ? lastSyncTime : undefined
+    );
     console.log(`Found ${factoryHistories.length} Factory chat histories.`);
 
     // Read Codex histories (with date-based folder filtering)
-    const codexHistories = readCodexHistories(lookbackDays, useIncrementalSync ? lastSyncTime : undefined);
+    const codexHistories = readCodexHistories(
+      lookbackDays,
+      useIncrementalSync ? lastSyncTime : undefined
+    );
     console.log(`Found ${codexHistories.length} Codex chat histories.`);
 
     // Retry any previously failed syncs
@@ -108,14 +175,26 @@ async function processHistories() {
     const vscodeProjects = extractVSCodeProjects(vscodeConversations);
     const factoryProjects = extractProjectsFromFactoryHistories(factoryHistories);
     const codexProjects = extractProjectsFromCodexHistories(codexHistories);
-    const allProjects = mergeProjects(cursorProjects, claudeCodeProjects, vscodeProjects, factoryProjects, codexProjects);
+    const allProjects = mergeProjects(
+      cursorProjects,
+      claudeCodeProjects,
+      vscodeProjects,
+      factoryProjects,
+      codexProjects
+    );
 
     if (allProjects.length > 0) {
-      await syncProjectsWithTokens(allProjects, accountId, accessToken, refreshToken, repositoryFactory);
+      await syncProjects(allProjects, userId, projectRepo);
     }
 
     // Combine all histories
-    const allHistories = [...claudeHistories, ...cursorHistories, ...vscodeHistories, ...factoryHistories, ...codexHistories];
+    const allHistories = [
+      ...claudeHistories,
+      ...cursorHistories,
+      ...vscodeHistories,
+      ...factoryHistories,
+      ...codexHistories,
+    ];
 
     if (allHistories.length === 0 && failedSyncs.length === 0) {
       console.log('No new chat histories found and no failed syncs to retry.');
@@ -124,7 +203,13 @@ async function processHistories() {
     }
 
     console.log(`Total: ${allHistories.length} chat histories to sync.`);
-    const uploadResult = await uploadAllHistoriesWithTokens(allHistories, accountId, accessToken, refreshToken, repositoryFactory, failedSyncs);
+    const uploadResult = await uploadAllHistories(
+      allHistories,
+      userId,
+      projectRepo,
+      chatHistoryRepo,
+      failedSyncs
+    );
     console.log('Upload complete.');
 
     // Mark sync as completed successfully
@@ -141,10 +226,8 @@ async function processHistories() {
 
 async function main() {
   console.log('Agent Orchestrator Daemon Starting...');
+  console.log(`Storage backend: ${USE_SUPABASE ? 'Supabase (cloud)' : 'SQLite (local)'}`);
   console.log('Running in background watch mode...');
-
-  // Initialize auth manager with the auth provider
-  authManager = new AuthManager(authProvider);
 
   // Check authentication status on startup
   const alreadyAuthenticated = await authManager.isAuthenticated();
@@ -152,16 +235,21 @@ async function main() {
     console.log('✓ Using existing authentication session');
   }
 
-  // Set up periodic token refresh (every 30 minutes)
-  // This ensures the session stays alive even during long-running daemon processes
-  setInterval(async () => {
-    const stillAuthenticated = await authManager.isAuthenticated();
-    if (stillAuthenticated) {
-      console.log('[Auth] Token refreshed successfully');
-    } else {
-      console.log('[Auth] Token refresh failed - authentication required');
-    }
-  }, 30 * 60 * 1000); // 30 minutes
+  // Set up periodic token refresh only for Supabase mode (every 30 minutes)
+  // Local mode doesn't need token refresh
+  if (USE_SUPABASE) {
+    setInterval(
+      async () => {
+        const stillAuthenticated = await authManager.isAuthenticated();
+        if (stillAuthenticated) {
+          console.log('[Auth] Token refreshed successfully');
+        } else {
+          console.log('[Auth] Token refresh failed - authentication required');
+        }
+      },
+      30 * 60 * 1000
+    ); // 30 minutes
+  }
 
   // Process immediately on startup
   await processHistories();
@@ -169,7 +257,9 @@ async function main() {
   // Set up periodic session data sync
   // Get sync interval from environment variable (default: 10 minutes)
   const syncIntervalMs = parseInt(process.env.PERIODIC_SYNC_INTERVAL_MS || '600000', 10);
-  console.log(`Setting up periodic session sync (every ${syncIntervalMs}ms / ${syncIntervalMs / 1000}s)...`);
+  console.log(
+    `Setting up periodic session sync (every ${syncIntervalMs}ms / ${syncIntervalMs / 1000}s)...`
+  );
 
   setInterval(async () => {
     console.log('\n[Periodic Sync] Checking for new session data...');
@@ -189,17 +279,20 @@ async function main() {
       return;
     }
 
-    const accessToken = authManager.getAccessToken();
-    const refreshToken = authManager.getRefreshToken();
-
-    if (!accessToken || !refreshToken) {
-      console.log('[AI Updaters] No tokens available, skipping update');
-      return;
+    // Ensure service container is initialized
+    if (!serviceContainer.isInitialized()) {
+      const accessToken = authManager.getAccessToken();
+      const refreshToken = authManager.getRefreshToken();
+      if (!accessToken || !refreshToken) {
+        console.log('[AI Updaters] No tokens available, skipping update');
+        return;
+      }
+      await serviceContainer.initialize(accessToken, refreshToken);
     }
 
-    await runPeriodicSummaryUpdate(accessToken, refreshToken, repositoryFactory);
-    await runPeriodicKeywordUpdate(accessToken, refreshToken, repositoryFactory);
-    await runPeriodicTitleUpdate(accessToken, refreshToken, repositoryFactory);
+    await runSummaryUpdateWithContainer(serviceContainer);
+    await runKeywordUpdateWithContainer(serviceContainer);
+    await runTitleUpdateWithContainer(serviceContainer);
   };
 
   // Run immediately on startup
@@ -217,7 +310,7 @@ async function main() {
   });
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

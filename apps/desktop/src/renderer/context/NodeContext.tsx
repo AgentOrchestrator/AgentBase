@@ -6,27 +6,25 @@
  * type-appropriate services that are disposed on unmount.
  */
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-} from 'react';
+import type React from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentType } from '../../../types/coding-agent-status';
+import type { NodeServiceConfig } from './NodeServicesRegistry';
+import { useNodeServicesRegistry } from './NodeServicesRegistry';
 import type {
-  NodeType,
+  IAgentService,
+  IConversationService,
   ITerminalService,
   IWorkspaceService,
-  IAgentService,
   NodeServices,
+  NodeType,
 } from './node-services';
 import {
+  hasAgentService,
+  hasConversationService,
   hasTerminalService,
   hasWorkspaceService,
-  hasAgentService,
 } from './node-services';
-import { useNodeServicesRegistry } from './NodeServicesRegistry';
 
 // =============================================================================
 // Context Types
@@ -46,22 +44,6 @@ export interface NodeContextValue<T extends NodeServices = NodeServices> {
   isInitialized: boolean;
   /** Error during initialization (if any) */
   error: Error | null;
-}
-
-/**
- * Configuration for node services
- */
-export interface NodeServiceConfig {
-  /** Terminal ID (for terminal/agent nodes) */
-  terminalId?: string;
-  /** Agent ID (for agent nodes) */
-  agentId?: string;
-  /** Agent type (for agent nodes) */
-  agentType?: AgentType;
-  /** Workspace path (for all nodes with workspace support) */
-  workspacePath?: string;
-  /** Auto-start CLI on mount (for agent nodes) */
-  autoStartCli?: boolean;
 }
 
 // =============================================================================
@@ -84,11 +66,13 @@ export interface NodeContextProviderProps {
   /** Agent ID (required for agent nodes) */
   agentId?: string;
   /** Agent type (required for agent nodes) */
-  agentType?: AgentType;
+  agentType?: AgentType | string;
+  /** Session ID (required for conversation nodes) */
+  sessionId?: string;
   /** Workspace path */
   workspacePath?: string;
-  /** Auto-start CLI on mount (agent nodes only) */
-  autoStartCli?: boolean;
+  /** Initial prompt to send to the agent when it starts */
+  initialPrompt?: string;
   /** Child components */
   children: React.ReactNode;
 }
@@ -109,8 +93,9 @@ export function NodeContextProvider({
   terminalId,
   agentId,
   agentType,
+  sessionId,
   workspacePath,
-  autoStartCli = false,
+  initialPrompt,
   children,
 }: NodeContextProviderProps) {
   const registry = useNodeServicesRegistry();
@@ -119,14 +104,19 @@ export function NodeContextProvider({
   const servicesRef = useRef<NodeServices | null>(null);
   const isDisposingRef = useRef(false);
 
-  // Build service config
-  const config: NodeServiceConfig = {
-    terminalId: terminalId || `terminal-${nodeId}`,
-    agentId: agentId || `agent-${nodeId}`,
-    agentType: agentType || 'claude_code',
-    workspacePath,
-    autoStartCli,
-  };
+  // Memoize service config to prevent infinite re-renders
+  // Without useMemo, config object is recreated on every render with a new reference,
+  // causing the useEffect below to re-run infinitely
+  const config = useMemo<NodeServiceConfig>(
+    () => ({
+      terminalId: terminalId || `terminal-${nodeId}`,
+      agentId: agentId || `agent-${nodeId}`,
+      agentType: (agentType as AgentType) || 'claude_code',
+      sessionId,
+      workspacePath,
+    }),
+    [terminalId, nodeId, agentId, agentType, sessionId, workspacePath]
+  );
 
   // Track the previous workspace path to detect changes
   const prevWorkspacePathRef = useRef<string | undefined>(undefined);
@@ -178,7 +168,7 @@ export function NodeContextProvider({
         });
       }
     };
-  }, [nodeId, nodeType, registry]);
+  }, [nodeId, nodeType, registry, config]);
 
   // Handle workspace path changes after initialization
   useEffect(() => {
@@ -202,25 +192,7 @@ export function NodeContextProvider({
     }
 
     console.log(`[NodeContext] Workspace path changed: ${previousPath} -> ${workspacePath}`);
-
-    const services = servicesRef.current;
-
-    // Delegate workspace handling to the appropriate service
-    if (hasAgentService(services)) {
-      // Agent service handles terminal navigation + CLI start
-      services.agent.setWorkspace(workspacePath, autoStartCli);
-    } else if (hasTerminalService(services)) {
-      // For non-agent nodes, just navigate the terminal
-      const terminal = services.terminal;
-      if (!terminal.isRunning()) {
-        terminal.create().then(() => {
-          setTimeout(() => terminal.write(`cd "${workspacePath}"\n`), 300);
-        });
-      } else {
-        terminal.write(`cd "${workspacePath}"\n`);
-      }
-    }
-  }, [isInitialized, workspacePath, autoStartCli]);
+  }, [isInitialized, workspacePath]);
 
   // Build context value
   const contextValue: NodeContextValue | null = servicesRef.current
@@ -238,9 +210,7 @@ export function NodeContextProvider({
     return null;
   }
 
-  return (
-    <NodeContext.Provider value={contextValue}>{children}</NodeContext.Provider>
-  );
+  return <NodeContext.Provider value={contextValue}>{children}</NodeContext.Provider>;
 }
 
 // =============================================================================
@@ -272,9 +242,7 @@ export function useNodeServices<T extends NodeServices = NodeServices>(): T {
 export function useTerminalService(): ITerminalService {
   const context = useNodeContext();
   if (!hasTerminalService(context.services)) {
-    throw new Error(
-      `Terminal service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Terminal service not available for node type: ${context.nodeType}`);
   }
   return context.services.terminal;
 }
@@ -285,9 +253,7 @@ export function useTerminalService(): ITerminalService {
 export function useWorkspaceService(): IWorkspaceService {
   const context = useNodeContext();
   if (!hasWorkspaceService(context.services)) {
-    throw new Error(
-      `Workspace service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Workspace service not available for node type: ${context.nodeType}`);
   }
   return context.services.workspace;
 }
@@ -298,11 +264,20 @@ export function useWorkspaceService(): IWorkspaceService {
 export function useAgentService(): IAgentService {
   const context = useNodeContext();
   if (!hasAgentService(context.services)) {
-    throw new Error(
-      `Agent service not available for node type: ${context.nodeType}`
-    );
+    throw new Error(`Agent service not available for node type: ${context.nodeType}`);
   }
   return context.services.agent;
+}
+
+/**
+ * Access conversation service (throws if not available)
+ */
+export function useConversationService(): IConversationService {
+  const context = useNodeContext();
+  if (!hasConversationService(context.services)) {
+    throw new Error(`Conversation service not available for node type: ${context.nodeType}`);
+  }
+  return context.services.conversation;
 }
 
 /**

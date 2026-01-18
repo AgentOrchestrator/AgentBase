@@ -7,5 +7,5 @@
 
 export { AgentNode, AgentNodePresentation } from './AgentNode';
 
-// Note: TerminalNode and WorkspaceNode can be migrated to this pattern
+// Note: TerminalNode can be migrated to this pattern
 // by creating similar container/presentation splits.

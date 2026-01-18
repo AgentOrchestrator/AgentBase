@@ -1,0 +1,187 @@
+.browser-node {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  min-width: 400px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.browser-node.selected {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+}
+
+/* Hide React Flow's default selection border/outline */
+.react-flow__node-browser.selected {
+  outline: none;
+}
+
+/* Show resize handles only when selected */
+.react-flow__node-browser.selected .react-flow__resize-control {
+  display: block;
+}
+
+.react-flow__node-browser:not(.selected) .react-flow__resize-control {
+  display: none;
+}
+
+/* Browser Header */
+.browser-node-header {
+  background: var(--color-bg-primary);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-bg-hover);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Navigation controls */
+.browser-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.browser-nav-button {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.browser-nav-button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.browser-nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.browser-nav-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* URL input form */
+.browser-url-form {
+  flex: 1;
+  display: flex;
+}
+
+.browser-url-input {
+  flex: 1;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.browser-url-input:focus {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
+}
+
+.browser-url-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Title bar */
+.browser-title-bar {
+  background: var(--color-bg-secondary);
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--color-bg-hover);
+}
+
+.browser-page-title {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Browser content area */
+.browser-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+.browser-webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Empty state */
+.browser-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+}
+
+.browser-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.browser-empty-text {
+  font-size: 14px;
+}
+
+/* Resize handles */
+.browser-node .react-flow__resize-control {
+  background: transparent;
+  border: none;
+}
+
+.browser-node .react-flow__resize-control.line {
+  border-color: transparent;
+}
+
+.browser-node .react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+
+.browser-node .react-flow__resize-control.handle:hover {
+  opacity: 0;
+  transform: none;
+}

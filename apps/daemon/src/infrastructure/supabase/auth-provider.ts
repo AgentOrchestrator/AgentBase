@@ -2,10 +2,43 @@
  * Supabase implementation of IAuthProvider
  */
 
-import type { IAuthProvider, AuthTokens, DeviceAuthSession } from '../../interfaces/auth.js';
+import type {
+  AuthProviderInfo,
+  AuthTokens,
+  DeviceAuthSession,
+  IAuthProvider,
+  TokenValidationResult,
+} from '../../interfaces/auth.js';
 import { supabaseClient } from './client.js';
 
 export class SupabaseAuthProvider implements IAuthProvider {
+  // ===========================================================================
+  // Provider Info
+  // ===========================================================================
+
+  getProviderInfo(): AuthProviderInfo {
+    return {
+      name: 'supabase',
+      version: '1.0.0',
+      capabilities: {
+        supportsDeviceAuth: true,
+        supportsTokenRefresh: true,
+        supportsTokenValidation: true,
+        supportsSessionIntrospection: true,
+      },
+    };
+  }
+
+  getAuthUrl(deviceId: string): string {
+    // Default URL scheme for Agent Base app
+    // Can be made configurable via environment variable if needed
+    return `agent-base://auth?device_id=${deviceId}`;
+  }
+
+  // ===========================================================================
+  // Token Operations
+  // ===========================================================================
+
   async refreshTokens(refreshToken: string): Promise<AuthTokens | null> {
     try {
       const { data, error } = await supabaseClient.auth.refreshSession({
@@ -77,6 +110,33 @@ export class SupabaseAuthProvider implements IAuthProvider {
       }
     } catch (error) {
       console.error('[SupabaseAuthProvider] Unexpected error marking session consumed:', error);
+    }
+  }
+
+  // ===========================================================================
+  // Optional: Token Validation
+  // ===========================================================================
+
+  async validateToken(accessToken: string): Promise<TokenValidationResult> {
+    try {
+      const { data, error } = await supabaseClient.auth.getUser(accessToken);
+
+      if (error || !data.user) {
+        return {
+          valid: false,
+          error: error?.message ?? 'No user found',
+        };
+      }
+
+      return {
+        valid: true,
+        userId: data.user.id,
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   }
 }

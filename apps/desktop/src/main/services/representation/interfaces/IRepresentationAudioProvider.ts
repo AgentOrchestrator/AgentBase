@@ -1,11 +1,11 @@
-import type { IRepresentationProvider } from './IRepresentationProvider';
 import type {
-  RepresentationResult,
+  AudioFormat,
+  AudioRepresentationOutput,
   RepresentationError,
   RepresentationInput,
-  AudioRepresentationOutput,
-  AudioFormat,
+  RepresentationResult,
 } from '../types';
+import type { IRepresentationProvider } from './IRepresentationProvider';
 
 /**
  * Extended options for audio transformation

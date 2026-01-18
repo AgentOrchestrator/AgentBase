@@ -2,138 +2,128 @@
  * AgentNode (Container)
  *
  * Container component that sets up NodeContext for the agent node.
- * Wraps AgentNodePresentation with the appropriate context provider.
+ * Uses useAgentState() as the single source of truth for all agent state.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { NodeProps } from '@xyflow/react';
-import type { AgentNodeData } from '../../types/agent-node';
-import { NodeContextProvider } from '../../context';
-import { agentStore } from '../../stores';
-import { AgentNodePresentation } from './AgentNodePresentation';
-import { useWorkspaceInheritance } from '../../hooks';
+import { type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { WorkspaceSelectionModal } from '../../components/WorkspaceSelectionModal';
-import { createWorkspaceMetadataAttachment } from '../../types/attachments';
+import { NodeContextProvider } from '../../context';
+import { useAgentState } from '../../hooks/useAgentState';
+import type { AgentNodeData } from '../../types/agent-node';
+import { AgentNodePresentation } from './AgentNodePresentation';
 
 /**
  * AgentNode
  *
  * Container component that:
- * 1. Sets up NodeContextProvider with agent-specific services
- * 2. Subscribes to the agent store for data updates
- * 3. Dispatches data changes to the canvas
+ * 1. Uses useAgentState() for all state management
+ * 2. Sets up NodeContextProvider with agent-specific services
+ * 3. Handles workspace selection modal (UI state only)
  */
-function AgentNode({ data, id }: NodeProps) {
-  const nodeData = data as unknown as AgentNodeData;
+function AgentNode({ data, id, selected }: NodeProps) {
+  const updateNodeInternals = useUpdateNodeInternals();
 
-  // Subscribe to store updates for this agent
-  const [agentData, setAgentData] = useState<AgentNodeData>(nodeData);
+  // Capture initial data only once to prevent re-renders from unstable references
+  const initialDataRef = useRef<AgentNodeData | null>(null);
+  if (!initialDataRef.current) {
+    initialDataRef.current = data as unknown as AgentNodeData;
+  }
+  const initialNodeData = initialDataRef.current;
 
-  // Workspace selection modal state
-  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
-
-  // Get inherited workspace from parent nodes
-  const { inheritedWorkspacePath } = useWorkspaceInheritance(id);
+  // Sync with React Flow node data updates (e.g., from Canvas update-node events)
+  // This ensures useAgentState receives the latest data when Canvas updates the node
+  const currentData = data as unknown as AgentNodeData;
+  const [syncedData, setSyncedData] = useState<AgentNodeData>(initialNodeData);
 
   useEffect(() => {
-    // Try to get data from store first
-    const storeData = agentStore.getAgent(nodeData.agentId);
-    if (storeData) {
-      setAgentData(storeData);
+    // Update synced data when React Flow node data changes
+    // This happens when Canvas dispatches update-node events
+    setSyncedData(currentData);
+  }, [currentData]);
+
+  // Update React Flow's internal handle position tracking after mount
+  // This ensures handles on all sides are properly registered for edge connections
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, updateNodeInternals]);
+
+  // ---------------------------------------------------------------------------
+  // Single Source of Truth: useAgentState()
+  // ---------------------------------------------------------------------------
+  const agent = useAgentState({
+    nodeId: id,
+    initialNodeData: syncedData,
+  });
+
+  // ---------------------------------------------------------------------------
+  // UI State (modal visibility - not domain state)
+  // ---------------------------------------------------------------------------
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+
+  // Show modal if no workspace is available (auto-open on mount)
+  // Workspace path should already be set in initialNodeData if created with one
+  useEffect(() => {
+    if (!agent.workspace.path && !showWorkspaceModal) {
+      setShowWorkspaceModal(true);
     }
+  }, [agent.workspace.path, showWorkspaceModal]);
 
-    // Subscribe to updates
-    const unsubscribe = agentStore.subscribe(nodeData.agentId, (updatedAgent) => {
-      setAgentData(updatedAgent);
-    });
+  // ---------------------------------------------------------------------------
+  // Event Handlers
+  // ---------------------------------------------------------------------------
+  const handleWorkspaceSelect = useCallback(
+    (path: string) => {
+      setShowWorkspaceModal(false);
+      agent.actions.setWorkspace(path);
+    },
+    [agent.actions]
+  );
 
-    return unsubscribe;
-  }, [nodeData.agentId]);
+  const handleWorkspaceCancel = useCallback(() => {
+    agent.actions.deleteNode();
+  }, [agent.actions]);
 
-  // Helper to update state and notify canvas (single source of truth)
-  const dispatchNodeUpdate = useCallback(
-    (updatedData: AgentNodeData) => {
-      setAgentData(updatedData);
+  const handleDataChange = useCallback(
+    (updates: Partial<AgentNodeData>) => {
+      // Dispatch update directly to Canvas for node data changes
       window.dispatchEvent(
         new CustomEvent('update-node', {
-          detail: { nodeId: id, data: updatedData },
+          detail: { nodeId: id, data: { ...agent.nodeData, ...updates } },
         })
       );
     },
-    [id]
+    [id, agent.nodeData]
   );
 
-  // Handle data changes from presentation component
-  const handleDataChange = useCallback(
-    (updates: Partial<AgentNodeData>) => {
-      dispatchNodeUpdate({ ...agentData, ...updates });
-    },
-    [agentData, dispatchNodeUpdate]
-  );
-
-  // Extract workspace path from attachments (use find instead of filter/map)
-  const workspaceAttachment = agentData.attachments?.find(
-    (a) => a.type === 'workspace-metadata'
-  ) as { path: string } | undefined;
-  const attachmentWorkspacePath = workspaceAttachment?.path;
-
-  // Determine final workspace path (priority: attachment > selected > inherited)
-  const workspacePath = attachmentWorkspacePath || selectedWorkspace || inheritedWorkspacePath;
-
-  // Show modal if no workspace is available (auto-open on mount)
-  useEffect(() => {
-    if (!workspacePath && !showWorkspaceModal) {
-      setShowWorkspaceModal(true);
-    }
-  }, [workspacePath, showWorkspaceModal]);
-
-  // Handler for workspace selection
-  const handleWorkspaceSelect = useCallback(
-    (path: string) => {
-      setSelectedWorkspace(path);
-      setShowWorkspaceModal(false);
-
-      // Create workspace attachment and update node data
-      const newAttachment = createWorkspaceMetadataAttachment({
-        path,
-        name: path.split('/').pop() || 'Workspace',
-      });
-
-      dispatchNodeUpdate({
-        ...agentData,
-        attachments: [...(agentData.attachments || []), newAttachment],
-      });
-    },
-    [agentData, dispatchNodeUpdate]
-  );
-
-  const handleWorkspaceCancel = () => {
-    // Close modal - node will remain without workspace
-    setShowWorkspaceModal(false);
-  };
-
-  // Always render the node structure - modal is overlaid when needed
-  // Only auto-start CLI when workspace is available
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <NodeContextProvider
       nodeId={id}
       nodeType="agent"
-      terminalId={agentData.terminalId}
-      agentId={agentData.agentId}
-      agentType={agentData.agentType}
-      workspacePath={workspacePath}
-      autoStartCli={!!workspacePath}
+      terminalId={agent.config.terminalId}
+      agentId={agent.config.agentId}
+      sessionId={agent.session.id ?? undefined}
+      agentType={agent.config.agentType}
+      workspacePath={agent.workspace.path ?? undefined}
+      initialPrompt={agent.config.initialPrompt}
     >
       <AgentNodePresentation
-        data={agentData}
+        data={agent.nodeData}
         onDataChange={handleDataChange}
+        selected={selected}
+        sessionReadiness={agent.session.readiness}
+        nodeId={id}
+        sessionCreatedAgo={agent.session.createdAgo}
       />
-      {/* Modal overlay - rendered inside node to maintain React tree */}
+      {/* Modal overlay - UI state managed locally */}
       <WorkspaceSelectionModal
-        isOpen={showWorkspaceModal && !workspacePath}
+        isOpen={showWorkspaceModal && !agent.workspace.path}
         onSelect={handleWorkspaceSelect}
         onCancel={handleWorkspaceCancel}
+        initialPath={null}
       />
     </NodeContextProvider>
   );

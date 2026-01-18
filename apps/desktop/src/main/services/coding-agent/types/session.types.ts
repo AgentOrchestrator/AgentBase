@@ -1,11 +1,12 @@
 import type { CodingAgentType } from './agent.types';
-import type { ChatMessage } from './message.types';
+import type { CodingAgentMessage } from './message.types';
 
-// Re-export filter options from shared
+// Re-export types from shared (source of truth)
 export type {
+  ForkOptions,
   MessageFilterOptions,
-  SessionFilterOptions,
   SessionChange,
+  SessionFilterOptions,
 } from '@agent-orchestrator/shared';
 
 /**
@@ -32,13 +33,22 @@ export interface SessionInfo {
 }
 
 /**
- * Full session content including messages
+ * Full session content including messages for coding agents.
+ * Uses CodingAgentMessage (with rich content blocks) rather than ChatMessage.
+ *
+ * Note: This is distinct from the shared SessionContent which uses ChatMessage.
  */
-export interface SessionContent extends SessionInfo {
-  messages: ChatMessage[];
+export interface CodingAgentSessionContent extends SessionInfo {
+  messages: CodingAgentMessage[];
   /** Session metadata */
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * Alias for CodingAgentSessionContent for backward compatibility.
+ * Prefer using CodingAgentSessionContent for clarity.
+ */
+export type SessionContent = CodingAgentSessionContent;
 
 /**
  * Session summary for efficient listing (without full messages)
@@ -73,18 +83,28 @@ export interface SessionFilter {
  * Options for continuing a session
  */
 export interface ContinueOptions {
+  /** Agent node identifier for scoping hook events */
+  agentId?: string;
   workingDirectory?: string;
   timeout?: number;
 }
 
 /**
- * Options for forking a session
+ * Options for checking whether a session can be forked
  */
-export interface ForkOptions {
-  /** Human-readable name for the new session */
-  newSessionName?: string;
-  /** Custom session ID (auto-generated if not provided) */
-  customSessionId?: string;
+export interface SessionForkCheckOptions {
+  /** Workspace/project path used to locate session storage */
+  workspacePath?: string;
+}
+
+/**
+ * Result of checking whether a session can be forked
+ */
+export interface SessionForkability {
+  /** Whether the session is eligible for forking */
+  forkable: boolean;
+  /** Optional reason when forking is not allowed */
+  reason?: string;
 }
 
 /**

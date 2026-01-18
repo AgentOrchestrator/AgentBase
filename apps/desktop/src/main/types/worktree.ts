@@ -1,48 +1,26 @@
 /**
- * Worktree type definitions
- * Types for managing git worktrees for agent isolation
+ * Worktree Type Definitions
+ *
+ * Re-exports worktree types from @agent-orchestrator/shared.
+ * This file is kept for backwards compatibility with existing imports.
+ *
+ * Note: WorktreeRow is kept local as it's a database-specific mapping.
  */
 
-export type WorktreeStatus =
-  | 'provisioning'
-  | 'active'
-  | 'releasing'
-  | 'orphaned'
-  | 'error';
+export type {
+  WorktreeInfo,
+  WorktreeManagerConfig,
+  WorktreeProvisionOptions,
+  WorktreeReleaseOptions,
+  WorktreeStatus,
+} from '@agent-orchestrator/shared';
 
-export interface WorktreeInfo {
-  id: string;
-  repoPath: string;
-  worktreePath: string;
-  branchName: string;
-  status: WorktreeStatus;
-  provisionedAt: string;
-  lastActivityAt: string;
-  agentId?: string;
-  errorMessage?: string;
-}
+import type { WorktreeStatus } from '@agent-orchestrator/shared';
 
-export interface WorktreeProvisionOptions {
-  /** Branch to create worktree from (default: HEAD) */
-  baseBranch?: string;
-  /** Agent ID to associate with this worktree */
-  agentId?: string;
-  /** Custom subdirectory name within base worktree directory */
-  directoryName?: string;
-}
-
-export interface WorktreeReleaseOptions {
-  /** Delete branch on release (default: false) */
-  deleteBranch?: boolean;
-  /** Force removal with uncommitted changes (default: false) */
-  force?: boolean;
-}
-
-export interface WorktreeManagerConfig {
-  /** Base directory where all worktrees will be created */
-  baseWorktreeDirectory: string;
-}
-
+/**
+ * Database row representation of a worktree.
+ * This is specific to SQLite storage and maps to the worktrees table.
+ */
 export interface WorktreeRow {
   id: string;
   repo_path: string;

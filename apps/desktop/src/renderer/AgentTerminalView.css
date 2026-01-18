@@ -5,17 +5,17 @@
 .agent-terminal-view {
   flex: 1;
   min-height: 200px;
-  user-select: none !important;
+  user-select: none;
   background: #1e1e1e;
 }
 
 .agent-terminal-view .xterm {
-  user-select: text !important;
+  user-select: text;
   padding: 8px;
 }
 
 .agent-terminal-view .xterm-viewport {
-  overflow-y: auto !important;
+  overflow-y: auto;
 }
 
 /* Scrollbar styling for terminal */

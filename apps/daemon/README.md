@@ -27,10 +27,18 @@ npm run dev:tray
 
 ## Environment Variables
 
-See `.env.example` for required configuration:
+See `.env.example` for configuration options:
+
+**Required:**
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_ANON_KEY` - Supabase anon key
-- `OPENAI_API_KEY` - OpenAI API key for generating summaries
+
+**Optional:**
+- `OPENAI_API_KEY` - OpenAI API key for summaries (uses fallback if not set)
+- `DEVELOPMENT` - Set to `true` to use fallback summarization (default: `false`)
+- `CLAUDE_CODE_HOME` - Custom Claude Code home directory
+- `PERIODIC_SYNC_INTERVAL_MS` - Sync interval in ms (default: `600000` / 10 min)
+- `SESSION_LOOKBACK_DAYS` - Days to look back for sessions (default: `30`)
 
 ## Data Storage
 

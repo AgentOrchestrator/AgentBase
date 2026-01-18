@@ -21,15 +21,15 @@
 
 import type { IChatHistoryProvider } from '../interfaces';
 import type {
+  AgentError,
+  CodingAgentSessionContent,
   CodingAgentType,
-  SessionSummary,
-  SessionContent,
-  SessionFilterOptions,
   MessageFilterOptions,
   Result,
-  AgentError,
+  SessionFilterOptions,
+  SessionSummary,
 } from '../types';
-import { ok, err, agentError, AgentErrorCode } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
 
 /**
  * Extended filter options that include agent selection
@@ -188,7 +188,7 @@ export class ProviderRegistry {
   async getFilteredSession(
     sessionId: string,
     filter?: ProviderMessageFilterOptions
-  ): Promise<Result<SessionContent | null, AgentError>> {
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
     // Single provider query
     if (filter?.agent) {
       const provider = this.providers.get(filter.agent);
@@ -294,12 +294,10 @@ export class ProviderRegistry {
       dataPaths: string[];
     }>;
   } {
-    const providers = Array.from(this.providers.entries()).map(
-      ([agentType, provider]) => ({
-        agentType,
-        dataPaths: provider.getDataPaths(),
-      })
-    );
+    const providers = Array.from(this.providers.entries()).map(([agentType, provider]) => ({
+      agentType,
+      dataPaths: provider.getDataPaths(),
+    }));
 
     return {
       registered: this.providers.size,

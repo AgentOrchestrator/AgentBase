@@ -1,4 +1,4 @@
-import type { RepresentationOutput, ImageFormat, AudioFormat } from './representation.types';
+import type { AudioFormat, ImageFormat, RepresentationOutput } from './representation.types';
 
 /**
  * Image representation output

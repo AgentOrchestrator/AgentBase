@@ -1,9 +1,6 @@
 import { ipcMain } from 'electron';
+import type { WorktreeProvisionOptions, WorktreeReleaseOptions } from '../types/worktree';
 import { WorktreeManagerFactory } from './WorktreeManagerFactory';
-import type {
-  WorktreeProvisionOptions,
-  WorktreeReleaseOptions,
-} from '../types/worktree';
 
 /**
  * Register IPC handlers for worktree operations.
@@ -12,12 +9,7 @@ import type {
 export function registerWorktreeIpcHandlers(): void {
   ipcMain.handle(
     'worktree:provision',
-    async (
-      _event,
-      repoPath: string,
-      branchName: string,
-      options?: WorktreeProvisionOptions
-    ) => {
+    async (_event, repoPath: string, branchName: string, options?: WorktreeProvisionOptions) => {
       try {
         const manager = await WorktreeManagerFactory.getManager();
         const worktree = await manager.provision(repoPath, branchName, options);

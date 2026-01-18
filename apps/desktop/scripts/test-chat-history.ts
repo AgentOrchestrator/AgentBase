@@ -34,7 +34,9 @@ async function main() {
   console.log(`Found ${summaries.length} sessions\n`);
 
   if (summaries.length === 0) {
-    console.log('No sessions found. Make sure you have Claude Code sessions in ~/.claude/projects/');
+    console.log(
+      'No sessions found. Make sure you have Claude Code sessions in ~/.claude/projects/'
+    );
     return;
   }
 
@@ -44,7 +46,9 @@ async function main() {
   for (const summary of summaries.slice(0, 5)) {
     console.log(`ID: ${summary.id.substring(0, 8)}...`);
     console.log(`  Project: ${summary.projectName || summary.projectPath}`);
-    console.log(`  Messages: ${summary.messageCount}, Tools: ${summary.toolCallCount}, Thinking: ${summary.hasThinking}`);
+    console.log(
+      `  Messages: ${summary.messageCount}, Tools: ${summary.toolCallCount}, Thinking: ${summary.hasThinking}`
+    );
     console.log(`  Updated: ${summary.updatedAt}`);
     console.log(`  First user msg: ${(summary.firstUserMessage || '(none)').substring(0, 60)}...`);
     console.log('-'.repeat(100));
@@ -68,7 +72,7 @@ async function main() {
   console.log('');
 
   // Show first message
-  const firstUserMsg = session.messages.find(m => m.messageType === 'user');
+  const firstUserMsg = session.messages.find((m) => m.messageType === 'user');
   if (firstUserMsg) {
     console.log('='.repeat(80));
     console.log('FIRST USER MESSAGE:');
@@ -82,7 +86,9 @@ async function main() {
   }
 
   // Show last message (reverse find for assistant message)
-  const lastAssistantMsg = [...session.messages].reverse().find(m => m.messageType === 'assistant');
+  const lastAssistantMsg = [...session.messages]
+    .reverse()
+    .find((m) => m.messageType === 'assistant');
   if (lastAssistantMsg) {
     console.log('='.repeat(80));
     console.log('LAST ASSISTANT MESSAGE:');

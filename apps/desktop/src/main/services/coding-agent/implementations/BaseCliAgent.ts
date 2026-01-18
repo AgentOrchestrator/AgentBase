@@ -1,15 +1,15 @@
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import type { IProcessLifecycle } from '../interfaces';
 import type {
-  Result,
-  AgentError,
-  AgentConfig,
   AgentCapabilities,
+  AgentConfig,
+  AgentError,
   CodingAgentType,
   GenerateResponse,
+  Result,
 } from '../types';
-import { AgentErrorCode, ok, err, agentError } from '../types';
+import { AgentErrorCode, agentError, err, ok } from '../types';
 
 /**
  * Managed process handle
@@ -142,10 +142,19 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
     options?: SpawnOptions
   ): Result<ProcessHandle, AgentError> {
     const processId = crypto.randomUUID();
+    const executable = this.getExecutablePath();
+    const cwd = options?.workingDirectory;
+
+    console.log(`[${this.agentType}] Spawning process`, {
+      processId,
+      executable,
+      args,
+      cwd,
+    });
 
     try {
-      const proc = spawn(this.getExecutablePath(), args, {
-        cwd: options?.workingDirectory ?? this.config.workingDirectory,
+      const proc = spawn(executable, args, {
+        cwd,
         env: { ...process.env, ...this.config.environment },
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: false,
@@ -159,8 +168,20 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
 
       this.activeProcesses.set(processId, handle);
 
+      console.log(`[${this.agentType}] Process spawned successfully`, {
+        processId,
+        pid: proc.pid,
+      });
+
       // Cleanup on process exit
-      proc.on('close', () => {
+      proc.on('close', (code) => {
+        const duration = Date.now() - handle.startTime;
+        console.log(`[${this.agentType}] Process closed`, {
+          processId,
+          pid: proc.pid,
+          exitCode: code,
+          durationMs: duration,
+        });
         this.activeProcesses.delete(processId);
       });
 
@@ -172,6 +193,12 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
 
       return ok(handle);
     } catch (error) {
+      console.error(`[${this.agentType}] Failed to spawn process`, {
+        processId,
+        executable,
+        args,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return err(
         agentError(
           AgentErrorCode.PROCESS_SPAWN_FAILED,
@@ -204,7 +231,10 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           this.activeProcesses.delete(handle.id);
           resolve(
             err(
-              agentError(AgentErrorCode.PROCESS_TIMEOUT, `Process timed out after ${effectiveTimeout}ms`)
+              agentError(
+                AgentErrorCode.PROCESS_TIMEOUT,
+                `Process timed out after ${effectiveTimeout}ms`
+              )
             )
           );
         }
@@ -224,14 +254,7 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           clearTimeout(timeoutId);
           this.activeProcesses.delete(handle.id);
           resolve(
-            err(
-              agentError(
-                AgentErrorCode.PROCESS_SPAWN_FAILED,
-                error.message,
-                undefined,
-                error
-              )
-            )
+            err(agentError(AgentErrorCode.PROCESS_SPAWN_FAILED, error.message, undefined, error))
           );
         }
       });
@@ -286,17 +309,36 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
       const allChunks: string[] = [];
       let stderr = '';
       let resolved = false;
+      let chunkCount = 0;
+      let totalBytes = 0;
 
       const effectiveTimeout = timeout ?? this.config.timeout ?? 120_000;
+
+      console.log(`[${this.agentType}] Starting stream output collection`, {
+        processId: handle.id,
+        pid: handle.process.pid,
+        timeoutMs: effectiveTimeout,
+      });
 
       const timeoutId = setTimeout(() => {
         if (!resolved) {
           resolved = true;
+          console.warn(`[${this.agentType}] Process timeout`, {
+            processId: handle.id,
+            pid: handle.process.pid,
+            timeoutMs: effectiveTimeout,
+            chunksReceived: chunkCount,
+            bytesReceived: totalBytes,
+            stderrPreview: stderr.slice(0, 500),
+          });
           handle.process.kill('SIGKILL');
           this.activeProcesses.delete(handle.id);
           resolve(
             err(
-              agentError(AgentErrorCode.PROCESS_TIMEOUT, `Process timed out after ${effectiveTimeout}ms`)
+              agentError(
+                AgentErrorCode.PROCESS_TIMEOUT,
+                `Process timed out after ${effectiveTimeout}ms`
+              )
             )
           );
         }
@@ -305,27 +347,48 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
       handle.process.stdout?.on('data', (data: Buffer) => {
         const chunk = data.toString();
         allChunks.push(chunk);
+        chunkCount++;
+        totalBytes += data.length;
+
+        if (chunkCount === 1) {
+          console.log(`[${this.agentType}] First stdout chunk received`, {
+            processId: handle.id,
+            chunkLength: chunk.length,
+            chunkPreview: chunk.slice(0, 100),
+          });
+        } else if (chunkCount % 10 === 0) {
+          console.log(`[${this.agentType}] Streaming progress`, {
+            processId: handle.id,
+            chunkCount,
+            totalBytes,
+          });
+        }
+
         onChunk(chunk);
       });
 
       handle.process.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        const chunk = data.toString();
+        stderr += chunk;
+        console.log(`[${this.agentType}] stderr received`, {
+          processId: handle.id,
+          chunkLength: chunk.length,
+          stderrPreview: chunk.slice(0, 200),
+        });
       });
 
       handle.process.on('error', (error) => {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeoutId);
+          console.error(`[${this.agentType}] Process error`, {
+            processId: handle.id,
+            error: error.message,
+            stack: error.stack,
+          });
           this.activeProcesses.delete(handle.id);
           resolve(
-            err(
-              agentError(
-                AgentErrorCode.PROCESS_SPAWN_FAILED,
-                error.message,
-                undefined,
-                error
-              )
-            )
+            err(agentError(AgentErrorCode.PROCESS_SPAWN_FAILED, error.message, undefined, error))
           );
         }
       });
@@ -336,11 +399,30 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
           clearTimeout(timeoutId);
           this.activeProcesses.delete(handle.id);
 
+          const duration = Date.now() - handle.startTime;
+          console.log(`[${this.agentType}] Stream output complete`, {
+            processId: handle.id,
+            exitCode: code,
+            durationMs: duration,
+            totalChunks: chunkCount,
+            totalBytes,
+            hasStderr: stderr.length > 0,
+          });
+
           if (code === 0) {
             try {
               const response = this.parseOutput(allChunks.join(''));
+              console.log(`[${this.agentType}] Output parsed successfully`, {
+                processId: handle.id,
+                responseLength: response.content.length,
+              });
               resolve(ok(response));
             } catch (parseError) {
+              console.error(`[${this.agentType}] Failed to parse output`, {
+                processId: handle.id,
+                error: parseError instanceof Error ? parseError.message : String(parseError),
+                outputPreview: allChunks.join('').slice(0, 500),
+              });
               resolve(
                 err(
                   agentError(
@@ -353,6 +435,11 @@ export abstract class BaseCliAgent extends EventEmitter implements IProcessLifec
               );
             }
           } else {
+            console.error(`[${this.agentType}] Process exited with error`, {
+              processId: handle.id,
+              exitCode: code,
+              stderr: stderr.slice(0, 1000),
+            });
             resolve(
               err(
                 agentError(

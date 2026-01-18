@@ -1,15 +1,15 @@
-import * as path from 'path';
+import * as path from 'node:path';
 import { app } from 'electron';
-import { IWorktreeManager } from './IWorktreeManager';
-import { WorktreeManager } from './WorktreeManager';
-import { WorktreeManagerConfig } from '../types/worktree';
+import type { WorktreeManagerConfig } from '../types/worktree';
 import {
-  GitExecutor,
-  Filesystem,
-  WorktreeStore,
-  UuidGenerator,
   ConsoleLogger,
+  Filesystem,
+  GitExecutor,
+  UuidGenerator,
+  WorktreeStore,
 } from './dependencies';
+import type { IWorktreeManager } from './IWorktreeManager';
+import { WorktreeManager } from './WorktreeManager';
 
 /**
  * Factory for creating and managing the WorktreeManager singleton.
@@ -24,10 +24,10 @@ export class WorktreeManagerFactory {
    * @param config - WorktreeManager configuration
    */
   static configure(config: WorktreeManagerConfig): void {
-    if (this.instance) {
+    if (WorktreeManagerFactory.instance) {
       throw new Error('Cannot configure after manager has been initialized');
     }
-    this.config = config;
+    WorktreeManagerFactory.config = config;
   }
 
   /**
@@ -35,14 +35,12 @@ export class WorktreeManagerFactory {
    * Must call configure() before first call to getManager().
    */
   static async getManager(): Promise<IWorktreeManager> {
-    if (this.instance) {
-      return this.instance;
+    if (WorktreeManagerFactory.instance) {
+      return WorktreeManagerFactory.instance;
     }
 
-    if (!this.config) {
-      throw new Error(
-        'WorktreeManagerFactory not configured. Call configure() first.'
-      );
+    if (!WorktreeManagerFactory.config) {
+      throw new Error('WorktreeManagerFactory not configured. Call configure() first.');
     }
 
     const dbPath = path.join(app.getPath('userData'), 'worktrees.db');
@@ -53,8 +51,8 @@ export class WorktreeManagerFactory {
     const idGenerator = new UuidGenerator();
     const logger = new ConsoleLogger('[WorktreeManager]');
 
-    this.instance = new WorktreeManager(
-      this.config,
+    WorktreeManagerFactory.instance = new WorktreeManager(
+      WorktreeManagerFactory.config,
       store,
       git,
       fs,
@@ -62,17 +60,17 @@ export class WorktreeManagerFactory {
       logger
     );
 
-    await this.instance.initialize();
-    return this.instance;
+    await WorktreeManagerFactory.instance.initialize();
+    return WorktreeManagerFactory.instance;
   }
 
   /**
    * Close the manager and reset singleton
    */
   static closeManager(): void {
-    if (this.instance) {
-      this.instance.close();
-      this.instance = null;
+    if (WorktreeManagerFactory.instance) {
+      WorktreeManagerFactory.instance.close();
+      WorktreeManagerFactory.instance = null;
     }
   }
 
@@ -80,7 +78,7 @@ export class WorktreeManagerFactory {
    * Reset factory state (for testing)
    */
   static reset(): void {
-    this.closeManager();
-    this.config = null;
+    WorktreeManagerFactory.closeManager();
+    WorktreeManagerFactory.config = null;
   }
 }

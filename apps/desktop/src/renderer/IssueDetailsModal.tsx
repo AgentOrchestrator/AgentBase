@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import InteractiveMarkdown from './InteractiveMarkdown';
 import './IssueDetailsModal.css';
 
@@ -133,11 +133,11 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': apiKey,
+            Authorization: apiKey,
           },
           body: JSON.stringify({
             query,
-            variables: { id: issueId }
+            variables: { id: issueId },
           }),
         });
 
@@ -170,19 +170,20 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
     }
   }, [issue]);
 
-  const updateIssue = useCallback(async (updates: {
-    stateId?: string;
-    priority?: number;
-    estimate?: number;
-    assigneeId?: string | null;
-    description?: string;
-  }) => {
-    const apiKey = localStorage.getItem('linear_api_key');
-    if (!apiKey || !issue) return;
+  const updateIssue = useCallback(
+    async (updates: {
+      stateId?: string;
+      priority?: number;
+      estimate?: number;
+      assigneeId?: string | null;
+      description?: string;
+    }) => {
+      const apiKey = localStorage.getItem('linear_api_key');
+      if (!apiKey || !issue) return;
 
-    setUpdating(true);
-    try {
-      const mutation = `
+      setUpdating(true);
+      try {
+        const mutation = `
         mutation($id: String!, $input: IssueUpdateInput!) {
           issueUpdate(id: $id, input: $input) {
             success
@@ -206,44 +207,51 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
         }
       `;
 
-      const response = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({
-          query: mutation,
-          variables: {
-            id: issue.id,
-            input: updates
-          }
-        }),
-      });
+        const response = await fetch('https://api.linear.app/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: apiKey,
+          },
+          body: JSON.stringify({
+            query: mutation,
+            variables: {
+              id: issue.id,
+              input: updates,
+            },
+          }),
+        });
 
-      const data = await response.json();
-      if (data.errors) {
-        throw new Error(data.errors[0]?.message || 'Failed to update issue');
-      }
+        const data = await response.json();
+        if (data.errors) {
+          throw new Error(data.errors[0]?.message || 'Failed to update issue');
+        }
 
-      if (data.data?.issueUpdate?.success && data.data.issueUpdate.issue) {
-        // Update local state with new values
-        setIssue(prev => prev ? {
-          ...prev,
-          state: data.data.issueUpdate.issue.state,
-          priority: data.data.issueUpdate.issue.priority,
-          estimate: data.data.issueUpdate.issue.estimate,
-          assignee: data.data.issueUpdate.issue.assignee,
-          description: updates.description !== undefined ? updates.description : prev.description,
-        } : null);
+        if (data.data?.issueUpdate?.success && data.data.issueUpdate.issue) {
+          // Update local state with new values
+          setIssue((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  state: data.data.issueUpdate.issue.state,
+                  priority: data.data.issueUpdate.issue.priority,
+                  estimate: data.data.issueUpdate.issue.estimate,
+                  assignee: data.data.issueUpdate.issue.assignee,
+                  description:
+                    updates.description !== undefined ? updates.description : prev.description,
+                }
+              : null
+          );
+        }
+      } catch (err) {
+        console.error('Failed to update issue:', err);
+        setError(err instanceof Error ? err.message : 'Failed to update issue');
+      } finally {
+        setUpdating(false);
       }
-    } catch (err) {
-      console.error('Failed to update issue:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update issue');
-    } finally {
-      setUpdating(false);
-    }
-  }, [issue]);
+    },
+    [issue]
+  );
 
   const handleStateChange = (stateId: string) => {
     updateIssue({ stateId });
@@ -271,21 +279,24 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
     setEditingDescription(false);
   };
 
-  const handleDescriptionChange = useCallback((newContent: string) => {
-    setDescriptionValue(newContent);
+  const handleDescriptionChange = useCallback(
+    (newContent: string) => {
+      setDescriptionValue(newContent);
 
-    // Update local state immediately
-    setIssue(prev => prev ? { ...prev, description: newContent } : null);
+      // Update local state immediately
+      setIssue((prev) => (prev ? { ...prev, description: newContent } : null));
 
-    // Debounce the API call
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
+      // Debounce the API call
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
 
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      updateIssue({ description: newContent });
-    }, 1000); // 1 second delay
-  }, [updateIssue]);
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        updateIssue({ description: newContent });
+      }, 1000); // 1 second delay
+    },
+    [updateIssue]
+  );
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -323,7 +334,9 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
       <div className="issue-details-overlay" onClick={onClose}>
         <div className="issue-details-modal" onClick={(e) => e.stopPropagation()}>
           <div className="issue-details-error">{error || 'Issue not found'}</div>
-          <button onClick={onClose} className="issue-details-close-button">Close</button>
+          <button onClick={onClose} className="issue-details-close-button">
+            Close
+          </button>
         </div>
       </div>
     );
@@ -346,7 +359,9 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
               Open in Linear ↗
             </a>
           </div>
-          <button className="issue-details-close" onClick={onClose}>✕</button>
+          <button className="issue-details-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         {/* Content */}
@@ -376,7 +391,6 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
                   className="description-textarea"
                   rows={8}
                   placeholder="Add a description..."
-                  autoFocus
                 />
                 <div className="description-actions">
                   <button
@@ -401,10 +415,11 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
                 onClick={(e) => {
                   // Only trigger edit mode if clicking on the container itself or text
                   const target = e.target as HTMLElement;
-                  const isInteractive = target.tagName === 'INPUT' ||
-                                       target.tagName === 'A' ||
-                                       target.closest('input') ||
-                                       target.closest('a');
+                  const isInteractive =
+                    target.tagName === 'INPUT' ||
+                    target.tagName === 'A' ||
+                    target.closest('input') ||
+                    target.closest('a');
 
                   if (!isInteractive) {
                     setEditingDescription(true);
@@ -436,7 +451,7 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
                 disabled={updating}
                 className="issue-property-select"
               >
-                {workflowStates.map(state => (
+                {workflowStates.map((state) => (
                   <option key={state.id} value={state.id}>
                     {state.name}
                   </option>
@@ -474,7 +489,7 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
                 disabled={updating}
                 className="issue-property-select"
               >
-                {estimateOptions.map(points => (
+                {estimateOptions.map((points) => (
                   <option key={points} value={points}>
                     {points === 0 ? 'None' : points}
                   </option>
@@ -492,7 +507,7 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
                 className="issue-property-select"
               >
                 <option value="unassigned">Unassigned</option>
-                {teamMembers.map(member => (
+                {teamMembers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}
                   </option>
@@ -523,7 +538,7 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
             <div className="issue-details-section">
               <h3 className="issue-details-section-title">Labels</h3>
               <div className="issue-labels">
-                {issue.labels.nodes.map(label => (
+                {issue.labels.nodes.map((label) => (
                   <span
                     key={label.id}
                     className="issue-label"
@@ -541,20 +556,20 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
             <div className="metadata-item">
               <span className="metadata-label">Created:</span>
               <span className="metadata-value">
-                {new Date(issue.createdAt).toLocaleDateString()} at {new Date(issue.createdAt).toLocaleTimeString()}
+                {new Date(issue.createdAt).toLocaleDateString()} at{' '}
+                {new Date(issue.createdAt).toLocaleTimeString()}
               </span>
             </div>
             <div className="metadata-item">
               <span className="metadata-label">Updated:</span>
               <span className="metadata-value">
-                {new Date(issue.updatedAt).toLocaleDateString()} at {new Date(issue.updatedAt).toLocaleTimeString()}
+                {new Date(issue.updatedAt).toLocaleDateString()} at{' '}
+                {new Date(issue.updatedAt).toLocaleTimeString()}
               </span>
             </div>
           </div>
 
-          {updating && (
-            <div className="issue-updating-indicator">Updating...</div>
-          )}
+          {updating && <div className="issue-updating-indicator">Updating...</div>}
         </div>
       </div>
     </div>

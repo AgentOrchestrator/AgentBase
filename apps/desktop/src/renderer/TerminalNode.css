@@ -1,6 +1,6 @@
 .terminal-node {
-  background: #2a2c36;
-  border: none;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
   width: 100%;
@@ -9,19 +9,41 @@
   min-height: 300px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.terminal-node.selected {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+}
+
+/* Hide React Flow's default selection border/outline */
+.react-flow__node-terminal.selected {
+  outline: none;
+}
+
+/* Show resize handles only when selected */
+.react-flow__node-terminal.selected .react-flow__resize-control {
+  display: block;
+}
+
+.react-flow__node-terminal:not(.selected) .react-flow__resize-control {
+  display: none;
 }
 
 .terminal-node.drag-over {
-  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 0 0 3px rgba(74, 158, 255, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
   transform: scale(1.02);
 }
 
 .terminal-node-header {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
   padding: 8px 12px;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid var(--color-bg-hover);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -67,16 +89,16 @@
 
 .terminal-node-header .issue-id {
   color: #888;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-weight: 600;
   font-size: 11px;
-  background: #2a2c36;
+  background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 3px;
 }
 
 .terminal-node-header .issue-title {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 500;
   font-size: 12px;
   white-space: nowrap;
@@ -85,13 +107,13 @@
 }
 
 .terminal-node-title {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
 .terminal-node-id {
   color: #888;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
 }
 
 .terminal-node-content {
@@ -99,33 +121,43 @@
   padding: 0;
   min-height: 250px;
   /* Prevent text selection on the wrapper and all children by default */
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  overflow: hidden;
+}
+
+/* When terminal is not active, dim it slightly to indicate it's not interactive */
+.terminal-node-content:not(.active) {
+  opacity: 0.85;
+}
+
+.terminal-node-content.active {
+  opacity: 1;
 }
 
 /* Re-enable text selection only inside the xterm terminal where text is rendered */
 .terminal-node-content .xterm {
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
 .terminal-node-content .xterm * {
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
 /* Terminal handle styles */
 .terminal-node .react-flow__handle {
-  background: #4a9eff;
+  background: var(--handle-color, transparent);
   width: 10px;
   height: 10px;
-  border: 2px solid #2a2c36;
+  border: none;
 }
 
 .terminal-node .react-flow__handle-top {
@@ -138,7 +170,7 @@
 
 /* Workspace metadata header styles */
 .terminal-node-header.workspace-header {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
 }
 
 .terminal-node-header .workspace-info {
@@ -154,7 +186,7 @@
 }
 
 .terminal-node-header .workspace-name {
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   font-weight: 500;
   font-size: 12px;
   white-space: nowrap;
@@ -167,9 +199,9 @@
   align-items: center;
   gap: 4px;
   color: #888;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-size: 11px;
-  background: #2a2c36;
+  background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 3px;
 }
@@ -181,7 +213,7 @@
 
 .terminal-node-header .project-type-badge {
   color: #4a9eff;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-size: 10px;
   background: rgba(74, 158, 255, 0.2);
   padding: 2px 6px;
@@ -208,15 +240,18 @@
 .terminal-node .react-flow__resize-control.handle {
   width: 8px;
   height: 8px;
-  border: 1px solid #666;
-  background: #888;
-  border-radius: 50%;
-  opacity: 0.5;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+  transition: none;
 }
 
 .terminal-node .react-flow__resize-control.handle:hover {
-  opacity: 1;
-  transform: scale(1.3);
+  opacity: 0;
+  transform: none;
 }
-

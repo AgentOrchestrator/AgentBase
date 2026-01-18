@@ -2,6 +2,10 @@
  * Auth abstractions - no database-specific types exposed
  */
 
+// =============================================================================
+// Token & Session Types
+// =============================================================================
+
 /**
  * Token information for authenticated sessions
  */
@@ -32,11 +36,60 @@ export interface DeviceAuthSession {
   expiresAt: string;
 }
 
+// =============================================================================
+// Provider Info & Capabilities
+// =============================================================================
+
+/**
+ * Auth provider capabilities - allows runtime feature detection
+ */
+export interface AuthProviderCapabilities {
+  supportsDeviceAuth: boolean;
+  supportsTokenRefresh: boolean;
+  supportsTokenValidation: boolean;
+  supportsSessionIntrospection: boolean;
+}
+
+/**
+ * Auth provider metadata
+ */
+export interface AuthProviderInfo {
+  name: string; // e.g., 'supabase', 'firebase', 'auth0'
+  version: string;
+  capabilities: AuthProviderCapabilities;
+}
+
+/**
+ * Result of token validation
+ */
+export interface TokenValidationResult {
+  valid: boolean;
+  userId?: string;
+  expiresAt?: number;
+  error?: string;
+}
+
+// =============================================================================
+// Auth Provider Interface
+// =============================================================================
+
 /**
  * Auth provider interface - abstracts authentication operations
  * Implementations can use Supabase, Firebase, custom auth, etc.
  */
 export interface IAuthProvider {
+  /**
+   * Get provider information and capabilities
+   */
+  getProviderInfo(): AuthProviderInfo;
+
+  /**
+   * Get the authentication URL for device-based auth
+   * Different providers may have different URL schemes
+   * @param deviceId The device identifier to include in the URL
+   */
+  getAuthUrl(deviceId: string): string;
+
   /**
    * Refresh expired tokens using a refresh token
    * @returns New tokens or null if refresh fails
@@ -57,6 +110,13 @@ export interface IAuthProvider {
    * @param sessionId The session ID to mark as consumed
    */
   markDeviceAuthConsumed(sessionId: string): Promise<void>;
+
+  /**
+   * Validate an access token without making authenticated requests
+   * Optional - not all providers support this
+   * @returns Validation result with user info if valid
+   */
+  validateToken?(accessToken: string): Promise<TokenValidationResult>;
 }
 
 /**
@@ -72,7 +132,4 @@ export interface AuthContext {
 /**
  * Factory function type for creating auth contexts
  */
-export type CreateAuthContext = (
-  accessToken: string,
-  refreshToken: string
-) => Promise<AuthContext>;
+export type CreateAuthContext = (accessToken: string, refreshToken: string) => Promise<AuthContext>;

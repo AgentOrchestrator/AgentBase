@@ -2,9 +2,7 @@
  * Result type for explicit error handling
  * Avoids throwing exceptions, making error paths explicit in the type system
  */
-export type Result<T, E = AgentError> =
-  | { success: true; data: T }
-  | { success: false; error: E };
+export type Result<T, E = AgentError> = { success: true; data: T } | { success: false; error: E };
 
 /**
  * Structured error for coding agent operations

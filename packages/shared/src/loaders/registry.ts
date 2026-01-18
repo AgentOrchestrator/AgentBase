@@ -8,11 +8,8 @@
  * - Extract projects across all sources
  */
 
-import type {
-  IChatHistoryLoader,
-  ILoaderRegistry,
-} from './interfaces.js';
-import type { AgentType, ChatHistory, ProjectInfo, LoaderOptions } from './types.js';
+import type { IChatHistoryLoader, ILoaderRegistry } from './interfaces.js';
+import type { AgentType, ChatHistory, LoaderOptions, ProjectInfo } from './types.js';
 
 /**
  * Default implementation of ILoaderRegistry
@@ -139,10 +136,7 @@ export class LoaderRegistry implements ILoaderRegistry {
   /**
    * Read histories from a specific loader by agent type
    */
-  async readHistoriesFrom(
-    agentType: AgentType,
-    options?: LoaderOptions
-  ): Promise<ChatHistory[]> {
+  async readHistoriesFrom(agentType: AgentType, options?: LoaderOptions): Promise<ChatHistory[]> {
     const loader = this.loaders.get(agentType);
 
     if (!loader) {
@@ -239,7 +233,8 @@ function mergeProjectInfo(target: ProjectInfo, source: ProjectInfo): void {
     target.copilotSessionCount = (target.copilotSessionCount || 0) + source.copilotSessionCount;
   }
   if (source.claudeCodeSessionCount) {
-    target.claudeCodeSessionCount = (target.claudeCodeSessionCount || 0) + source.claudeCodeSessionCount;
+    target.claudeCodeSessionCount =
+      (target.claudeCodeSessionCount || 0) + source.claudeCodeSessionCount;
   }
   if (source.vscodeSessionCount) {
     target.vscodeSessionCount = (target.vscodeSessionCount || 0) + source.vscodeSessionCount;

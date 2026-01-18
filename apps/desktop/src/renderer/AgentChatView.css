@@ -1,0 +1,534 @@
+/* AgentChatView Styles */
+
+.agent-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 300px;
+  position: relative;
+}
+
+/* Messages - using conversation-content class to match ConversationNode */
+.conversation-content {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  padding: 12px;
+  padding-top: 40px;
+  padding-right: 8px;
+  padding-bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* Enable text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  /* Text cursor for text content */
+  cursor: text;
+}
+
+/* Forehead - covers everything above the top sticky user message */
+.agent-chat-view-forehead {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--color-bg-primary);
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* Scrollbar styling - always visible */
+.conversation-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.conversation-content::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+  border-radius: 4px;
+}
+
+.conversation-content::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.conversation-content::-webkit-scrollbar-thumb:hover {
+  background: var(--color-bg-hover);
+}
+
+/* Change cursor to grab when Command/Ctrl is pressed */
+.conversation-content.command-pressed,
+.conversation-content.command-pressed * {
+  cursor: grab;
+}
+
+.conversation-content.command-pressed:active,
+.conversation-content.command-pressed:active * {
+  cursor: grabbing;
+}
+
+.agent-chat-view-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: 40px 20px;
+  font-size: 13px;
+}
+
+/* User message styling - matches ConversationNode */
+.conversation-user-message {
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--color-bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  /* Smooth transition for transform changes */
+  transition: transform 0.3s ease;
+}
+
+/* When a user message is currently sticky, keep it in place */
+.conversation-user-message.sticky-active {
+  transform: translateY(0);
+}
+
+/* When another user message is sticky, push this one up and out of view */
+.conversation-user-message.sticky-fade {
+  transform: translateY(-2000%);
+  pointer-events: none;
+}
+
+.conversation-user-content {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative;
+  /* Enable text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  /* Text cursor */
+  cursor: text;
+}
+
+/* Assistant message styling - matches ConversationNode */
+.conversation-assistant-message {
+  margin-bottom: 16px;
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--color-bg-primary);
+}
+
+.conversation-assistant-content {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conversation-assistant-text-content {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  position: relative;
+  /* Enable text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  /* Text cursor */
+  cursor: text;
+}
+
+.agent-chat-view-cursor {
+  animation: blink 1s infinite;
+  display: inline;
+  color: var(--color-text-primary);
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Markdown styling - matches ConversationNode */
+.conversation-assistant-text-content * {
+  /* Enable text selection in all markdown elements */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  /* Text cursor for markdown content */
+  cursor: text;
+}
+
+.conversation-assistant-text-content h1,
+.conversation-assistant-text-content h2,
+.conversation-assistant-text-content h3,
+.conversation-assistant-text-content h4,
+.conversation-assistant-text-content h5,
+.conversation-assistant-text-content h6 {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.conversation-assistant-text-content h1 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #888;
+  padding-bottom: 4px;
+}
+
+.conversation-assistant-text-content h2 {
+  font-size: 1.3em;
+}
+
+.conversation-assistant-text-content h3 {
+  font-size: 1.1em;
+}
+
+.conversation-assistant-text-content p {
+  margin: 2px 0;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.conversation-assistant-text-content ul,
+.conversation-assistant-text-content ol {
+  margin: 2px 0;
+  padding-left: 18px;
+}
+
+.conversation-assistant-text-content li {
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.conversation-assistant-text-content code {
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--color-text-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+.conversation-assistant-text-content pre {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+.conversation-assistant-text-content pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--color-text-primary);
+}
+
+.conversation-assistant-text-content blockquote {
+  border-left: 3px solid #888;
+  padding-left: 12px;
+  margin: 6px 0;
+  color: var(--color-text-primary);
+  font-style: italic;
+}
+
+.conversation-assistant-text-content a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.conversation-assistant-text-content a:hover {
+  text-decoration: underline;
+}
+
+.conversation-assistant-text-content table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  width: 100%;
+}
+
+.conversation-assistant-text-content th,
+.conversation-assistant-text-content td {
+  border: 1px solid #888;
+  padding: 4px 8px;
+  text-align: left;
+  color: var(--color-text-primary);
+}
+
+.conversation-assistant-text-content th {
+  background: rgba(0, 0, 0, 0.3);
+  font-weight: 600;
+}
+
+.conversation-assistant-text-content hr {
+  border: none;
+  border-top: 1px solid #888;
+  margin: 4px 0;
+}
+
+/* Remove extra spacing from first/last children */
+.conversation-assistant-text-content > *:first-child {
+  margin-top: 0;
+}
+
+.conversation-assistant-text-content > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Tool Summary - compact gray text (matches ConversationNode) */
+.conversation-tool-summary {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  /* Enable text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  /* Text cursor */
+  cursor: text;
+}
+
+/* Add space before text content when it follows something else */
+.conversation-tool-summary + .conversation-assistant-text-content,
+.conversation-assistant-text-content + .conversation-assistant-text-content {
+  margin-top: 8px;
+}
+
+/* Thinking Content - Orange text (matches ConversationNode) */
+.conversation-thinking-content {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 6px;
+  color: #fb923c;
+  position: relative;
+  /* Enable text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  /* Text cursor */
+  cursor: text;
+}
+
+.conversation-thinking-content .thinking-label {
+  display: block;
+  font-weight: 600;
+  color: #f97316;
+  margin-bottom: 4px;
+}
+
+.conversation-thinking-content .thinking-text {
+  display: block;
+  font-size: 12px;
+  color: #fdba74;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Error */
+.agent-chat-view-error {
+  position: absolute;
+  bottom: 70px;
+  left: 12px;
+  right: 12px;
+  padding: 8px 12px;
+  background: var(--error-bg, #5c2020);
+  color: var(--error-text, #f88);
+  font-size: 12px;
+  border-radius: 4px;
+  z-index: 5;
+}
+
+/* Input Area */
+.agent-chat-view-input-area {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background: transparent;
+  z-index: 10;
+}
+
+/* Chin - covers everything from 50% of input bar downwards */
+.agent-chat-view-chin {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: var(--color-bg-primary);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Attached text display box - shows selected text from parent conversation */
+.agent-chat-view-attached-text {
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--color-bg-primary);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 11;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.agent-chat-view-attached-text-content {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+  user-select: text;
+  cursor: text;
+}
+
+.agent-chat-view-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 4px 4px 4px 12px;
+  background: var(--color-bg-primary);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 11;
+}
+
+.agent-chat-view-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 8px 12px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  resize: none;
+  min-height: 20px;
+  max-height: 100px;
+  font-family: inherit;
+}
+
+.agent-chat-view-input:focus {
+  outline: none;
+}
+
+.agent-chat-view-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.agent-chat-view-input::placeholder {
+  color: var(--text-muted, #888);
+}
+
+.agent-chat-view-send {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #000000;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.agent-chat-view-send:hover:not(:disabled) {
+  background: #000000;
+  opacity: 0.8;
+}
+
+.agent-chat-view-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-chat-view-send-icon {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+/* Cursor animation for streaming */
+.agent-chat-view-cursor {
+  animation: blink 1s infinite;
+  display: inline;
+  color: var(--color-text-primary);
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Plus button for messages - appears when text is selected, follows mouse */
+.conversation-message-plus-button {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: #000;
+  color: #fff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+  z-index: 20;
+  pointer-events: auto;
+  /* Remove transition to prevent jitter */
+  transform: translateY(-50%);
+  margin-top: 0;
+}

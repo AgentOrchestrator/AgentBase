@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "AgentBase Desktop App",
   "license": "MIT",
   "author": "Hai Dang",
@@ -16,10 +16,14 @@
     "electron": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "pack": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --dir --config electron-builder.config.js",
+    "dist": "npm run build && npm run build:main && node scripts/prepare-build.js && electron-builder --config electron-builder.config.js",
+    "dist:full": "node scripts/build-dist.js"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
+    "electron-builder": "^26.4.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
@@ -35,10 +39,11 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
+    "@agent-orchestrator/shared": "^1.0.0",
     "@ai-sdk/anthropic": "^2.0.40",
     "@ai-sdk/google": "^2.0.26",
     "@ai-sdk/openai": "^2.0.59",
-    "@anthropic-ai/claude-agent-sdk": "^0.1.77",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.7",
     "@types/sqlite3": "^3.1.11",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",
@@ -46,12 +51,14 @@
     "@xyflow/react": "^12.9.2",
     "ai": "^5.0.86",
     "keytar": "^7.9.0",
+    "marked": "^17.0.1",
     "node-pty": "1.1.0-beta35",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.1",
     "sqlite3": "^5.1.7",
-    "zod": "^3.23.0"
+    "zod": "^4.3.5",
+    "@paper-design/shaders-react": "^0.0.70"
   }
 }

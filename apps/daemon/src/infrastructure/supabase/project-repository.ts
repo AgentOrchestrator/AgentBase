@@ -9,7 +9,7 @@ import type { IProjectRepository, Project, ProjectInput } from '../../interfaces
 export class SupabaseProjectRepository implements IProjectRepository {
   constructor(
     private client: SupabaseClient<Database>,
-    private userId: string
+    _userId: string
   ) {}
 
   async findDefaultProject(userId: string): Promise<Project | null> {

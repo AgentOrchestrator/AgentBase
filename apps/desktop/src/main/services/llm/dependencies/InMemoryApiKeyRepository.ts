@@ -1,5 +1,5 @@
 import type { IApiKeyRepository } from '../interfaces';
-import type { Result, LLMError, VendorId } from '../types';
+import type { LLMError, Result, VendorId } from '../types';
 import { ok } from '../types';
 
 /**
@@ -16,10 +16,7 @@ export class InMemoryApiKeyRepository implements IApiKeyRepository {
     return ok(key);
   }
 
-  async setApiKey(
-    vendor: VendorId,
-    apiKey: string
-  ): Promise<Result<void, LLMError>> {
+  async setApiKey(vendor: VendorId, apiKey: string): Promise<Result<void, LLMError>> {
     this.keys.set(vendor, apiKey);
     return ok(undefined);
   }

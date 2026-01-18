@@ -1,13 +1,13 @@
 // Interfaces
-export { IGitExecutor } from './IGitExecutor';
-export { IFilesystem } from './IFilesystem';
-export { IWorktreeStore } from './IWorktreeStore';
-export { IIdGenerator } from './IIdGenerator';
-export { ILogger } from './ILogger';
 
+export { ConsoleLogger } from './ConsoleLogger';
+export { Filesystem } from './Filesystem';
 // Implementations
 export { GitExecutor } from './GitExecutor';
-export { Filesystem } from './Filesystem';
-export { WorktreeStore } from './WorktreeStore';
+export { IFilesystem } from './IFilesystem';
+export { IGitExecutor } from './IGitExecutor';
+export { IIdGenerator } from './IIdGenerator';
+export { ILogger } from './ILogger';
+export { IWorktreeStore } from './IWorktreeStore';
 export { UuidGenerator } from './UuidGenerator';
-export { ConsoleLogger } from './ConsoleLogger';
+export { WorktreeStore } from './WorktreeStore';

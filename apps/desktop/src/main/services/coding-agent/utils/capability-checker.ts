@@ -1,4 +1,11 @@
-import type { ICodingAgentProvider, ISessionManager, ISessionResumable, ISessionForkable } from '../interfaces';
+import type {
+  IChatHistoryProvider,
+  ICodingAgentProvider,
+  ISessionForkable,
+  ISessionManager,
+  ISessionResumable,
+  ISessionValidator,
+} from '../interfaces';
 import type { AgentCapabilities } from '../types';
 
 /**
@@ -40,6 +47,31 @@ export function hasSessionManager(
  */
 export function supportsStreaming(agent: ICodingAgentProvider): boolean {
   return agent.getCapabilities().supportsStreaming;
+}
+
+/**
+ * Type guard to check if an agent provides chat history access
+ */
+export function isChatHistoryProvider(
+  agent: ICodingAgentProvider
+): agent is ICodingAgentProvider & IChatHistoryProvider {
+  const maybeProvider = agent as unknown as IChatHistoryProvider;
+  return (
+    'listSessionSummaries' in agent &&
+    typeof maybeProvider.listSessionSummaries === 'function' &&
+    'getFilteredSession' in agent &&
+    typeof maybeProvider.getFilteredSession === 'function'
+  );
+}
+
+/**
+ * Type guard to check if an agent supports session validation
+ */
+export function isSessionValidator(
+  agent: ICodingAgentProvider
+): agent is ICodingAgentProvider & ISessionValidator {
+  const maybeValidator = agent as unknown as ISessionValidator;
+  return 'checkSessionActive' in agent && typeof maybeValidator.checkSessionActive === 'function';
 }
 
 /**

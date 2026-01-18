@@ -3,10 +3,11 @@
  * Stores canvas state in a local SQLite database
  */
 
+import type { RecentWorkspace } from '@agent-orchestrator/shared';
 import sqlite3 from 'sqlite3';
-import { IDatabase } from './IDatabase';
-import { CanvasState, CanvasMetadata, CanvasNode, CanvasEdge } from '../types/database';
 import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type { CanvasEdge, CanvasMetadata, CanvasNode, CanvasState } from '../types/database';
+import type { IDatabase } from './IDatabase';
 
 export class SQLiteDatabase implements IDatabase {
   private db: sqlite3.Database;
@@ -84,6 +85,40 @@ export class SQLiteDatabase implements IDatabase {
         updated_at INTEGER NOT NULL
       )
     `);
+
+    // Create recent_workspaces table
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS recent_workspaces (
+        path TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        last_opened_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    `);
+
+    // Create index for sorting by last opened
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_recent_workspaces_last_opened ON recent_workspaces(last_opened_at DESC)'
+    );
+
+    // Create session_summaries table for caching AI-generated summaries
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS session_summaries (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        workspace_path TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(session_id, workspace_path)
+      )
+    `);
+
+    // Create index for session lookup
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_session_summaries_session_id ON session_summaries(session_id)'
+    );
   }
 
   async saveCanvas(canvasId: string, state: CanvasState): Promise<void> {
@@ -109,13 +144,9 @@ export class SQLiteDatabase implements IDatabase {
                 state.name || null,
                 state.viewport ? JSON.stringify(state.viewport) : null,
                 now,
-                canvasId
+                canvasId,
               ]
             );
-
-            // Delete existing nodes and edges (will be replaced)
-            await this.run('DELETE FROM nodes WHERE canvas_id = ?', [canvasId]);
-            await this.run('DELETE FROM edges WHERE canvas_id = ?', [canvasId]);
           } else {
             // Insert new canvas
             await this.run(
@@ -125,15 +156,15 @@ export class SQLiteDatabase implements IDatabase {
                 state.name || null,
                 state.viewport ? JSON.stringify(state.viewport) : null,
                 now,
-                now
+                now,
               ]
             );
           }
 
-          // Insert nodes
+          // Insert or replace nodes
           for (const node of state.nodes) {
             await this.run(
-              `INSERT INTO nodes (id, canvas_id, type, position_x, position_y, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT OR REPLACE INTO nodes (id, canvas_id, type, position_x, position_y, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
               [
                 node.id,
                 canvasId,
@@ -141,15 +172,15 @@ export class SQLiteDatabase implements IDatabase {
                 node.position.x,
                 node.position.y,
                 JSON.stringify(node.data),
-                node.style ? JSON.stringify(node.style) : null
+                node.style ? JSON.stringify(node.style) : null,
               ]
             );
           }
 
-          // Insert edges
+          // Insert or replace edges
           for (const edge of state.edges) {
             await this.run(
-              `INSERT INTO edges (id, canvas_id, source, target, type, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT OR REPLACE INTO edges (id, canvas_id, source, target, type, data, style) VALUES (?, ?, ?, ?, ?, ?, ?)`,
               [
                 edge.id,
                 canvasId,
@@ -157,9 +188,34 @@ export class SQLiteDatabase implements IDatabase {
                 edge.target,
                 edge.type || null,
                 edge.data ? JSON.stringify(edge.data) : null,
-                edge.style ? JSON.stringify(edge.style) : null
+                edge.style ? JSON.stringify(edge.style) : null,
               ]
             );
+          }
+
+          // Delete nodes and edges that are no longer in the state
+          if (state.nodes.length > 0) {
+            const nodeIds = state.nodes.map((n) => n.id);
+            const placeholders = nodeIds.map(() => '?').join(',');
+            await this.run(
+              `DELETE FROM nodes WHERE canvas_id = ? AND id NOT IN (${placeholders})`,
+              [canvasId, ...nodeIds]
+            );
+          } else {
+            // If no nodes in state, delete all nodes for this canvas
+            await this.run('DELETE FROM nodes WHERE canvas_id = ?', [canvasId]);
+          }
+
+          if (state.edges.length > 0) {
+            const edgeIds = state.edges.map((e) => e.id);
+            const placeholders = edgeIds.map(() => '?').join(',');
+            await this.run(
+              `DELETE FROM edges WHERE canvas_id = ? AND id NOT IN (${placeholders})`,
+              [canvasId, ...edgeIds]
+            );
+          } else {
+            // If no edges in state, delete all edges for this canvas
+            await this.run('DELETE FROM edges WHERE canvas_id = ?', [canvasId]);
           }
 
           // Commit transaction
@@ -197,18 +253,18 @@ export class SQLiteDatabase implements IDatabase {
       data: string;
       style: string | null;
     }>('SELECT id, type, position_x, position_y, data, style FROM nodes WHERE canvas_id = ?', [
-      canvasId
+      canvasId,
     ]);
 
-    const nodes: CanvasNode[] = nodeRows.map(row => ({
+    const nodes: CanvasNode[] = nodeRows.map((row) => ({
       id: row.id,
-      type: row.type as 'custom' | 'terminal' | 'workspace',
+      type: row.type as 'custom' | 'terminal' | 'agent',
       position: {
         x: row.position_x,
-        y: row.position_y
+        y: row.position_y,
       },
       data: JSON.parse(row.data),
-      style: row.style ? JSON.parse(row.style) : undefined
+      style: row.style ? JSON.parse(row.style) : undefined,
     }));
 
     // Load edges
@@ -221,13 +277,13 @@ export class SQLiteDatabase implements IDatabase {
       style: string | null;
     }>('SELECT id, source, target, type, data, style FROM edges WHERE canvas_id = ?', [canvasId]);
 
-    const edges: CanvasEdge[] = edgeRows.map(row => ({
+    const edges: CanvasEdge[] = edgeRows.map((row) => ({
       id: row.id,
       source: row.source,
       target: row.target,
       type: row.type || undefined,
       data: row.data ? JSON.parse(row.data) : undefined,
-      style: row.style ? JSON.parse(row.style) : undefined
+      style: row.style ? JSON.parse(row.style) : undefined,
     }));
 
     return {
@@ -237,7 +293,7 @@ export class SQLiteDatabase implements IDatabase {
       edges,
       viewport: canvas.viewport ? JSON.parse(canvas.viewport) : undefined,
       createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at
+      updatedAt: canvas.updated_at,
     };
   }
 
@@ -264,13 +320,13 @@ export class SQLiteDatabase implements IDatabase {
       ORDER BY c.updated_at DESC
     `);
 
-    return canvases.map(canvas => ({
+    return canvases.map((canvas) => ({
       id: canvas.id,
       name: canvas.name || undefined,
       nodeCount: canvas.node_count,
       edgeCount: canvas.edge_count,
       createdAt: canvas.created_at,
-      updatedAt: canvas.updated_at
+      updatedAt: canvas.updated_at,
     }));
   }
 
@@ -280,10 +336,9 @@ export class SQLiteDatabase implements IDatabase {
   }
 
   async getCurrentCanvasId(): Promise<string | null> {
-    const result = await this.get<{ value: string }>(
-      'SELECT value FROM settings WHERE key = ?',
-      ['current_canvas_id']
-    );
+    const result = await this.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', [
+      'current_canvas_id',
+    ]);
 
     return result?.value || null;
   }
@@ -291,7 +346,7 @@ export class SQLiteDatabase implements IDatabase {
   async setCurrentCanvasId(canvasId: string): Promise<void> {
     await this.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
       'current_canvas_id',
-      canvasId
+      canvasId,
     ]);
   }
 
@@ -387,7 +442,9 @@ export class SQLiteDatabase implements IDatabase {
       summary: string | null;
       created_at: number;
       updated_at: number;
-    }>('SELECT agent_id, agent_type, status_info, title, summary, created_at, updated_at FROM agent_statuses');
+    }>(
+      'SELECT agent_id, agent_type, status_info, title, summary, created_at, updated_at FROM agent_statuses'
+    );
 
     return rows.map((row) => ({
       agentId: row.agent_id,
@@ -398,6 +455,132 @@ export class SQLiteDatabase implements IDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
+  }
+
+  // ===========================================================================
+  // Recent Workspaces Methods
+  // ===========================================================================
+
+  async upsertRecentWorkspace(workspace: RecentWorkspace): Promise<void> {
+    await this.run(
+      `INSERT OR REPLACE INTO recent_workspaces (path, name, last_opened_at, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [workspace.path, workspace.name, workspace.lastOpenedAt, workspace.createdAt]
+    );
+  }
+
+  async getRecentWorkspaces(limit: number = 20): Promise<RecentWorkspace[]> {
+    const rows = await this.all<{
+      path: string;
+      name: string;
+      last_opened_at: number;
+      created_at: number;
+    }>(
+      'SELECT path, name, last_opened_at, created_at FROM recent_workspaces ORDER BY last_opened_at DESC LIMIT ?',
+      [limit]
+    );
+
+    return rows.map((row) => ({
+      path: row.path,
+      name: row.name,
+      lastOpenedAt: row.last_opened_at,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async removeRecentWorkspace(path: string): Promise<void> {
+    await this.run('DELETE FROM recent_workspaces WHERE path = ?', [path]);
+  }
+
+  async clearAllRecentWorkspaces(): Promise<void> {
+    await this.run('DELETE FROM recent_workspaces');
+  }
+
+  async getRecentWorkspaceByPath(path: string): Promise<RecentWorkspace | null> {
+    const row = await this.get<{
+      path: string;
+      name: string;
+      last_opened_at: number;
+      created_at: number;
+    }>('SELECT path, name, last_opened_at, created_at FROM recent_workspaces WHERE path = ?', [
+      path,
+    ]);
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      path: row.path,
+      name: row.name,
+      lastOpenedAt: row.last_opened_at,
+      createdAt: row.created_at,
+    };
+  }
+
+  // ===========================================================================
+  // Session Summary Cache Methods
+  // ===========================================================================
+
+  async getSessionSummary(
+    sessionId: string,
+    workspacePath: string
+  ): Promise<{ summary: string; messageCount: number } | null> {
+    const row = await this.get<{
+      summary: string;
+      message_count: number;
+    }>(
+      'SELECT summary, message_count FROM session_summaries WHERE session_id = ? AND workspace_path = ?',
+      [sessionId, workspacePath]
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      summary: row.summary,
+      messageCount: row.message_count,
+    };
+  }
+
+  async saveSessionSummary(
+    sessionId: string,
+    workspacePath: string,
+    summary: string,
+    messageCount: number
+  ): Promise<void> {
+    const now = Date.now();
+    const id = `${sessionId}-${workspacePath}`;
+
+    await this.run(
+      `INSERT OR REPLACE INTO session_summaries
+        (id, session_id, workspace_path, summary, message_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, sessionId, workspacePath, summary, messageCount, now, now]
+    );
+  }
+
+  async isSessionSummaryStale(
+    sessionId: string,
+    workspacePath: string,
+    currentMessageCount: number
+  ): Promise<boolean> {
+    const cached = await this.getSessionSummary(sessionId, workspacePath);
+
+    if (!cached) {
+      return true; // No cache exists, needs generation
+    }
+
+    // Stale if message count has changed
+    return cached.messageCount !== currentMessageCount;
+  }
+
+  async deleteSessionSummary(sessionId: string, workspacePath: string): Promise<void> {
+    await this.run('DELETE FROM session_summaries WHERE session_id = ? AND workspace_path = ?', [
+      sessionId,
+      workspacePath,
+    ]);
   }
 
   // Helper methods to promisify sqlite3 callbacks

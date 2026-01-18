@@ -8,21 +8,26 @@
  * If persistence is disabled, you MUST provide a reason.
  */
 
+import { Handle, type NodeProps, Position } from '@xyflow/react';
 import type { ComponentType } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { z } from 'zod';
 
 // Import node components
 import TerminalNode from '../TerminalNode';
-import WorkspaceNode from '../WorkspaceNode';
+import AgentChatNode from './AgentChatNode';
 import { AgentNode } from './AgentNode';
+import BrowserNode from './BrowserNode';
+import ConversationNode from './ConversationNode';
+import StarterNode from './StarterNode';
 
 // Import schemas
 import {
+  AgentChatNodeDataSchema,
+  AgentNodeDataSchema,
+  BrowserNodeDataSchema,
+  ConversationNodeDataSchema,
   CustomNodeDataSchema,
   TerminalNodeDataSchema,
-  WorkspaceNodeDataSchema,
-  AgentNodeDataSchema,
 } from './schemas';
 
 // =============================================================================
@@ -62,9 +67,7 @@ const CustomNode = ({ data }: NodeProps) => {
   return (
     <div className="custom-node">
       <Handle type="target" position={Position.Top} />
-      <div className="custom-node-content">
-        {nodeData.label}
-      </div>
+      <div className="custom-node-content">{nodeData.label}</div>
       <Handle type="source" position={Position.Bottom} />
     </div>
   );
@@ -102,19 +105,43 @@ const NODE_CONFIGS: NodeTypeConfig[] = [
     },
   },
   {
-    type: 'workspace',
-    component: WorkspaceNode as ComponentType<NodeProps>,
-    persistence: {
-      enabled: true,
-      dataSchema: WorkspaceNodeDataSchema,
-    },
-  },
-  {
     type: 'agent',
     component: AgentNode as ComponentType<NodeProps>,
     persistence: {
       enabled: true,
       dataSchema: AgentNodeDataSchema,
+    },
+  },
+  {
+    type: 'conversation',
+    component: ConversationNode as ComponentType<NodeProps>,
+    persistence: {
+      enabled: true,
+      dataSchema: ConversationNodeDataSchema,
+    },
+  },
+  {
+    type: 'agent-chat',
+    component: AgentChatNode as ComponentType<NodeProps>,
+    persistence: {
+      enabled: true,
+      dataSchema: AgentChatNodeDataSchema,
+    },
+  },
+  {
+    type: 'starter',
+    component: StarterNode as ComponentType<NodeProps>,
+    persistence: {
+      enabled: false,
+      reason: 'Starter nodes are transient input fields, not meant to be persisted',
+    },
+  },
+  {
+    type: 'browser',
+    component: BrowserNode as ComponentType<NodeProps>,
+    persistence: {
+      enabled: true,
+      dataSchema: BrowserNodeDataSchema,
     },
   },
 ];
@@ -125,32 +152,33 @@ const NODE_CONFIGS: NodeTypeConfig[] = [
 
 function createNodeRegistry(configs: NodeTypeConfig[]) {
   // Extract all type strings
-  const types = configs.map(c => c.type);
+  const types = configs.map((c) => c.type);
 
   // Create React Flow nodeTypes object
   const reactFlowNodeTypes = Object.fromEntries(
-    configs.map(c => [c.type, c.component])
+    configs.map((c) => [c.type, c.component])
   ) as Record<string, ComponentType<NodeProps>>;
 
   // Get list of persisted types
-  const persistedTypes = configs
-    .filter(c => c.persistence.enabled)
-    .map(c => c.type);
+  const persistedTypes = configs.filter((c) => c.persistence.enabled).map((c) => c.type);
 
   // Build schema map for persisted types
   const schemas = Object.fromEntries(
     configs
-      .filter((c): c is NodeTypeConfig & { persistence: PersistenceEnabled<unknown> } =>
-        c.persistence.enabled)
-      .map(c => [c.type, c.persistence.dataSchema])
+      .filter(
+        (c): c is NodeTypeConfig & { persistence: PersistenceEnabled<unknown> } =>
+          c.persistence.enabled
+      )
+      .map((c) => [c.type, c.persistence.dataSchema])
   ) as Record<string, z.ZodSchema>;
 
   // Get reasons for non-persisted types
   const nonPersistedReasons = Object.fromEntries(
     configs
-      .filter((c): c is NodeTypeConfig & { persistence: PersistenceDisabled } =>
-        !c.persistence.enabled)
-      .map(c => [c.type, c.persistence.reason])
+      .filter(
+        (c): c is NodeTypeConfig & { persistence: PersistenceDisabled } => !c.persistence.enabled
+      )
+      .map((c) => [c.type, c.persistence.reason])
   ) as Record<string, string>;
 
   return {
@@ -203,4 +231,4 @@ function createNodeRegistry(configs: NodeTypeConfig[]) {
 export const nodeRegistry = createNodeRegistry(NODE_CONFIGS);
 
 /** Union type of all registered node types */
-export type NodeType = typeof nodeRegistry.types[number];
+export type NodeType = (typeof nodeRegistry.types)[number];

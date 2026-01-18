@@ -1,7 +1,7 @@
-export { RepresentationService } from './RepresentationService';
 export type {
+  IIdGenerator,
+  ILogger,
   RepresentationServiceConfig,
   RepresentationServiceDependencies,
-  ILogger,
-  IIdGenerator,
 } from './RepresentationService';
+export { RepresentationService } from './RepresentationService';

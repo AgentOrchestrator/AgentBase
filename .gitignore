@@ -38,11 +38,13 @@ temp/
 supabase/.temp/
 
 # Lock files
-package-lock.json
 bun.lockb
-# Keep pnpm-lock.yaml for monorepo
+# Keep package-lock.json for npm CI caching
 
 # Build outputs
 .next/
 .turbo/
+
+# Electron-builder output
+apps/desktop/release/
 

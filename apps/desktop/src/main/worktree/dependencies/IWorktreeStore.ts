@@ -1,4 +1,4 @@
-import { WorktreeRow, WorktreeStatus } from '../../types/worktree';
+import type { WorktreeRow, WorktreeStatus } from '../../types/worktree';
 
 /**
  * Worktree persistence abstraction
@@ -20,11 +20,7 @@ export interface IWorktreeStore {
    * @param status - New status
    * @param errorMessage - Optional error message (for 'error' status)
    */
-  updateStatus(
-    id: string,
-    status: WorktreeStatus,
-    errorMessage?: string
-  ): Promise<void>;
+  updateStatus(id: string, status: WorktreeStatus, errorMessage?: string): Promise<void>;
 
   /**
    * Get worktree by ID

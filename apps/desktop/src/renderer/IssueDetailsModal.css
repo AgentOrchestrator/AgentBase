@@ -16,8 +16,8 @@
 }
 
 .issue-details-modal {
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
+  background: #1e1e1e;
+  border: 1px solid #d4d4d4;
   border-radius: 12px;
   width: 90%;
   max-width: 700px;
@@ -32,7 +32,7 @@
 /* Header */
 .issue-details-header {
   padding: 20px 24px;
-  border-bottom: 1px solid #3a3c46;
+  border-bottom: 1px solid #d4d4d4;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -47,13 +47,13 @@
 
 .issue-id-badge {
   color: #888;
-  font-family: 'Menlo', 'Monaco', monospace;
+  font-family: "Menlo", "Monaco", monospace;
   font-weight: 600;
   font-size: 13px;
-  background: #2a2c36;
+  background: #1e1e1e;
   padding: 4px 10px;
   border-radius: 4px;
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
 }
 
 .issue-external-link {
@@ -86,7 +86,7 @@
 }
 
 .issue-details-close:hover {
-  background: #3a3c46;
+  background: rgba(0, 0, 0, 0.4);
   color: #d4d4d4;
 }
 
@@ -106,12 +106,12 @@
 }
 
 .issue-details-content::-webkit-scrollbar-thumb {
-  background: #3a3c46;
+  background: #888;
   border-radius: 4px;
 }
 
 .issue-details-content::-webkit-scrollbar-thumb:hover {
-  background: #4a4c56;
+  background: #d4d4d4;
 }
 
 .issue-details-title {
@@ -144,11 +144,11 @@
 }
 
 .description-edit-button {
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
-  border-radius: 4px;
+  background: #1e1e1e;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
   padding: 6px 12px;
-  color: #4a9eff;
+  color: #d4d4d4;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -156,7 +156,7 @@
 }
 
 .description-edit-button:hover:not(:disabled) {
-  background: #3a3c46;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .description-edit-button:disabled {
@@ -165,21 +165,21 @@
 }
 
 .issue-details-description {
-  color: #aaa;
+  color: #d4d4d4;
   font-size: 14px;
   line-height: 1.6;
   background: #1e1e1e;
   padding: 16px;
   border-radius: 6px;
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 80px;
 }
 
 .issue-details-description:hover {
-  border-color: #4a9eff;
-  background: #252527;
+  border-color: #d4d4d4;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .description-placeholder {
@@ -209,12 +209,24 @@
   margin-top: 0;
 }
 
-.issue-details-description h1 { font-size: 24px; }
-.issue-details-description h2 { font-size: 20px; }
-.issue-details-description h3 { font-size: 18px; }
-.issue-details-description h4 { font-size: 16px; }
-.issue-details-description h5 { font-size: 14px; }
-.issue-details-description h6 { font-size: 13px; }
+.issue-details-description h1 {
+  font-size: 24px;
+}
+.issue-details-description h2 {
+  font-size: 20px;
+}
+.issue-details-description h3 {
+  font-size: 18px;
+}
+.issue-details-description h4 {
+  font-size: 16px;
+}
+.issue-details-description h5 {
+  font-size: 14px;
+}
+.issue-details-description h6 {
+  font-size: 13px;
+}
 
 .issue-details-description p {
   margin: 8px 0;
@@ -239,17 +251,17 @@
 }
 
 .issue-details-description code {
-  background: #2a2c36;
+  background: #1e1e1e;
   color: #f07178;
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
   font-size: 13px;
 }
 
 .issue-details-description pre {
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
+  background: #1e1e1e;
+  border: 1px solid #d4d4d4;
   border-radius: 6px;
   padding: 12px;
   margin: 12px 0;
@@ -263,21 +275,21 @@
 }
 
 .issue-details-description blockquote {
-  border-left: 3px solid #4a9eff;
+  border-left: 3px solid #d4d4d4;
   padding-left: 12px;
   margin: 12px 0;
-  color: #999;
+  color: #888;
   font-style: italic;
 }
 
 .issue-details-description a {
-  color: #4a9eff;
+  color: #d4d4d4;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .issue-details-description a:hover {
-  color: #6bb3ff;
+  color: #d4d4d4;
   text-decoration: underline;
 }
 
@@ -289,7 +301,7 @@
 
 .issue-details-description hr {
   border: none;
-  border-top: 1px solid #3a3c46;
+  border-top: 1px solid #d4d4d4;
   margin: 16px 0;
 }
 
@@ -301,19 +313,19 @@
 
 .issue-details-description table th,
 .issue-details-description table td {
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
   padding: 8px 12px;
   text-align: left;
 }
 
 .issue-details-description table th {
-  background: #2a2c36;
+  background: #1e1e1e;
   color: #d4d4d4;
   font-weight: 600;
 }
 
 .issue-details-description table tr:nth-child(even) {
-  background: rgba(42, 44, 54, 0.3);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .issue-details-description input[type="checkbox"] {
@@ -332,7 +344,7 @@
   width: 100%;
   min-height: 150px;
   background: #1e1e1e;
-  border: 1px solid #4a9eff;
+  border: 1px solid #d4d4d4;
   border-radius: 6px;
   padding: 12px;
   color: #d4d4d4;
@@ -345,7 +357,7 @@
 }
 
 .description-textarea:focus {
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+  box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.3);
 }
 
 .description-textarea::placeholder {
@@ -366,18 +378,18 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
 }
 
 .description-save-button {
-  background: #4a9eff;
-  color: #fff;
-  border-color: #4a9eff;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-color: #d4d4d4;
 }
 
 .description-save-button:hover:not(:disabled) {
-  background: #6bb3ff;
-  border-color: #6bb3ff;
+  background: rgba(0, 0, 0, 0.4);
+  color: #d4d4d4;
 }
 
 .description-save-button:disabled {
@@ -386,12 +398,13 @@
 }
 
 .description-cancel-button {
-  background: #2a2c36;
+  background: #1e1e1e;
   color: #d4d4d4;
+  border-color: #d4d4d4;
 }
 
 .description-cancel-button:hover:not(:disabled) {
-  background: #3a3c46;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .description-cancel-button:disabled {
@@ -424,7 +437,7 @@
 
 .issue-property-select {
   background: #1e1e1e;
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
   border-radius: 6px;
   padding: 10px 12px;
   color: #d4d4d4;
@@ -441,12 +454,12 @@
 }
 
 .issue-property-select:hover:not(:disabled) {
-  border-color: #4a9eff;
+  border-color: #d4d4d4;
 }
 
 .issue-property-select:focus {
-  border-color: #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+  border-color: #d4d4d4;
+  box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.3);
 }
 
 .issue-property-select:disabled {
@@ -471,7 +484,7 @@
   gap: 12px;
   padding: 16px;
   background: #1e1e1e;
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
   border-radius: 8px;
   margin-bottom: 24px;
 }
@@ -480,7 +493,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 2px solid #3a3c46;
+  border: 2px solid #d4d4d4;
 }
 
 .assignee-info {
@@ -521,7 +534,7 @@
 .issue-details-metadata {
   padding: 16px;
   background: #1e1e1e;
-  border: 1px solid #3a3c46;
+  border: 1px solid #d4d4d4;
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -560,8 +573,8 @@
 }
 
 .issue-details-close-button {
-  background: #2a2c36;
-  border: 1px solid #3a3c46;
+  background: #1e1e1e;
+  border: 1px solid #d4d4d4;
   border-radius: 6px;
   padding: 10px 20px;
   color: #d4d4d4;
@@ -573,7 +586,7 @@
 }
 
 .issue-details-close-button:hover {
-  background: #3a3c46;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 /* Updating indicator */
@@ -594,7 +607,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

@@ -7,7 +7,7 @@ import { getDatabase } from './database.js';
  */
 function main() {
   console.log('Agent Orchestrator Daemon - Sync Status\n');
-  console.log('=' .repeat(50));
+  console.log('='.repeat(50));
 
   const db = getDatabase();
   const syncState = db.getSyncState();
@@ -19,11 +19,12 @@ function main() {
   }
 
   // Sync status
-  const statusEmoji = {
-    idle: '✅',
-    syncing: '🔄',
-    error: '❌'
-  }[syncState.sync_status] || '❓';
+  const statusEmoji =
+    {
+      idle: '✅',
+      syncing: '🔄',
+      error: '❌',
+    }[syncState.sync_status] || '❓';
 
   console.log(`\n📊 Sync Status: ${statusEmoji} ${syncState.sync_status.toUpperCase()}`);
 
@@ -75,7 +76,9 @@ function main() {
     const recentFailed = failedSyncs.slice(0, 5);
     for (const failed of recentFailed) {
       const firstFailed = new Date(failed.first_failed_at);
-      const source = failed.session_source.replace('cursor-', '').replace('claude_code', 'Claude Code');
+      const source = failed.session_source
+        .replace('cursor-', '')
+        .replace('claude_code', 'Claude Code');
       console.log(`   • ${failed.session_id.substring(0, 8)}... [${source}]`);
       console.log(`     First failed: ${firstFailed.toLocaleString()}`);
       console.log(`     Retry count: ${failed.retry_count}`);
@@ -93,7 +96,7 @@ function main() {
   console.log(`\n📁 Database Location:`);
   console.log(`   ${db.getDbPath()}`);
 
-  console.log('\n' + '='.repeat(50));
+  console.log(`\n${'='.repeat(50)}`);
 
   db.close();
 }

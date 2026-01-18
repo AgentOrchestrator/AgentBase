@@ -1,204 +1,33 @@
 /**
  * Agent Node Type Definitions
  *
- * Types for the AgentNode component that wraps overview and terminal views.
- * Uses discriminated unions following the attachments.ts pattern.
+ * Re-exports all agent node types from @agent-orchestrator/shared.
+ * This file is kept for backwards compatibility with existing imports.
  */
 
-import type {
-  CodingAgentStatus,
-  AgentType,
-  CodingAgentStatusInfo,
-} from '../../../types/coding-agent-status';
-import type { TerminalAttachment } from './attachments';
+export type {
+  AgentChatMessage,
+  // Main node data
+  AgentNodeData,
+  // View types
+  AgentNodeView,
+  AgentProgress,
+  // Title types
+  AgentTitle,
+  // Progress types
+  BaseProgress,
+  PercentageProgress,
+  TodoItem,
+  TodoListProgress,
+} from '@agent-orchestrator/shared';
 
-// =============================================================================
-// Progress Variants (Discriminated Union)
-// =============================================================================
-
-/**
- * Base interface for progress tracking
- */
-export interface BaseProgress {
-  /** Discriminator field for type-safe unions */
-  type: string;
-}
-
-/**
- * Percentage-based progress (e.g., "45%")
- */
-export interface PercentageProgress extends BaseProgress {
-  type: 'percentage';
-  /** Progress value from 0 to 100 */
-  value: number;
-  /** Optional label describing what's being measured */
-  label?: string;
-}
-
-/**
- * Individual todo item for checklist progress
- */
-export interface TodoItem {
-  /** Unique identifier for the todo */
-  id: string;
-  /** Description of the task */
-  content: string;
-  /** Whether the task is completed */
-  completed: boolean;
-  /** Optional active/in-progress form of the description */
-  activeForm?: string;
-}
-
-/**
- * Todo list progress (checklist with checkmarks)
- */
-export interface TodoListProgress extends BaseProgress {
-  type: 'todoList';
-  /** List of todo items */
-  items: TodoItem[];
-  /** Optional title for the todo list */
-  title?: string;
-}
-
-/**
- * Union type of all progress variants
- */
-export type AgentProgress = PercentageProgress | TodoListProgress;
-
-// =============================================================================
-// Type Guards for Progress
-// =============================================================================
-
-/**
- * Type guard to check if progress is percentage-based
- */
-export function isPercentageProgress(
-  progress: AgentProgress
-): progress is PercentageProgress {
-  return progress.type === 'percentage';
-}
-
-/**
- * Type guard to check if progress is todo list based
- */
-export function isTodoListProgress(
-  progress: AgentProgress
-): progress is TodoListProgress {
-  return progress.type === 'todoList';
-}
-
-// =============================================================================
-// Agent Title
-// =============================================================================
-
-/**
- * Title configuration with manual/computed tracking
- */
-export interface AgentTitle {
-  /** The display title */
-  value: string;
-  /** Whether manually edited by user */
-  isManuallySet: boolean;
-}
-
-// =============================================================================
-// Agent Node View
-// =============================================================================
-
-/**
- * View mode for the agent node
- */
-export type AgentNodeView = 'overview' | 'terminal';
-
-// =============================================================================
-// Agent Node Data
-// =============================================================================
-
-/**
- * Data structure for AgentNode (passed via NodeProps)
- */
-export interface AgentNodeData {
-  /** Unique agent identifier (links to CodingAgentStatusManager) */
-  agentId: string;
-
-  /** Terminal ID for the embedded terminal */
-  terminalId: string;
-
-  /** Agent type */
-  agentType: AgentType;
-
-  /** Current agent status */
-  status: CodingAgentStatus;
-
-  /** Detailed status info */
-  statusInfo?: CodingAgentStatusInfo;
-
-  /** Title configuration */
-  title: AgentTitle;
-
-  /** Short summary of current task */
-  summary: string | null;
-
-  /** Progress tracking (percentage or todo list) */
-  progress: AgentProgress | null;
-
-  /** Attached metadata (Linear tickets, workspace info, etc.) */
-  attachments?: TerminalAttachment[];
-
-  /** Current active view */
-  activeView?: AgentNodeView;
-}
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/**
- * Create a default agent title
- */
-export function createDefaultAgentTitle(value = 'Untitled Agent'): AgentTitle {
-  return {
-    value,
-    isManuallySet: false,
-  };
-}
-
-/**
- * Create a percentage progress object
- */
-export function createPercentageProgress(
-  value: number,
-  label?: string
-): PercentageProgress {
-  return {
-    type: 'percentage',
-    value: Math.min(100, Math.max(0, value)),
-    label,
-  };
-}
-
-/**
- * Create a todo list progress object
- */
-export function createTodoListProgress(
-  items: Omit<TodoItem, 'id'>[],
-  title?: string
-): TodoListProgress {
-  return {
-    type: 'todoList',
-    items: items.map((item, index) => ({
-      ...item,
-      id: `todo-${index}-${Date.now()}`,
-    })),
-    title,
-  };
-}
-
-/**
- * Calculate completion percentage from todo list
- */
-export function getTodoListCompletionPercent(progress: TodoListProgress): number {
-  if (progress.items.length === 0) return 0;
-  const completed = progress.items.filter((item) => item.completed).length;
-  return Math.round((completed / progress.items.length) * 100);
-}
+export {
+  // Helper functions
+  createDefaultAgentTitle,
+  createPercentageProgress,
+  createTodoListProgress,
+  getTodoListCompletionPercent,
+  // Type guards
+  isPercentageProgress,
+  isTodoListProgress,
+} from '@agent-orchestrator/shared';

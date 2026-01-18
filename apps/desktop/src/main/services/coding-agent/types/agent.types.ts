@@ -1,7 +1,15 @@
+import type { AgentType } from '@agent-orchestrator/shared';
+
 /**
- * Supported coding agent types
+ * Re-export AgentType from shared package
  */
-export type CodingAgentType = 'claude_code' | 'cursor' | 'codex';
+export type { AgentType };
+
+/**
+ * Alias for backwards compatibility
+ * Supported coding agent types: 'claude_code' | 'codex' | 'cursor' | 'vscode' | 'windsurf' | 'factory' | 'other'
+ */
+export type CodingAgentType = AgentType;
 
 /**
  * Agent capabilities for runtime capability checking
@@ -27,8 +35,6 @@ export interface AgentConfig {
   type: CodingAgentType;
   /** Custom path to CLI executable (uses system PATH if not provided) */
   executablePath?: string;
-  /** Default working directory for commands */
-  workingDirectory?: string;
   /** Default timeout in milliseconds */
   timeout?: number;
   /** Additional environment variables */

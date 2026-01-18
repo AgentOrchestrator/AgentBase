@@ -1,0 +1,74 @@
+/**
+ * Fork Ghost Node Styles
+ *
+ * Semi-transparent preview appearance during fork drag.
+ */
+
+.fork-ghost-node {
+  position: absolute;
+  width: 300px;
+  min-height: 100px;
+  background: rgba(42, 44, 54, 0.7);
+  border: 2px dashed rgba(74, 158, 255, 0.6);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.8;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 20px rgba(74, 158, 255, 0.2);
+  animation: ghost-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ghost-pulse {
+  0%,
+  100% {
+    border-color: rgba(74, 158, 255, 0.4);
+    box-shadow: 0 4px 20px rgba(74, 158, 255, 0.15);
+  }
+  50% {
+    border-color: rgba(74, 158, 255, 0.8);
+    box-shadow: 0 4px 24px rgba(74, 158, 255, 0.3);
+  }
+}
+
+.fork-ghost-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(30, 30, 30, 0.6);
+  border-bottom: 1px solid rgba(58, 60, 70, 0.5);
+  border-radius: 10px 10px 0 0;
+}
+
+.fork-ghost-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(74, 158, 255, 0.2);
+  border-radius: 50%;
+  color: #4a9eff;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.fork-ghost-node-title {
+  color: #d4d4d4;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.fork-ghost-node-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.fork-ghost-node-hint {
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+}

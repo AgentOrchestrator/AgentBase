@@ -5,18 +5,20 @@
  * Caches services per node and handles disposal.
  */
 
-import React, { createContext, useContext, useRef, useCallback } from 'react';
+import type React from 'react';
+import { createContext, useCallback, useContext, useRef } from 'react';
 import type { AgentType } from '../../../types/coding-agent-status';
 import type {
-  NodeType,
+  AgentNodeServices,
+  ConversationNodeServices,
+  CustomNodeServices,
+  IAgentService,
+  IConversationService,
   ITerminalService,
   IWorkspaceService,
-  IAgentService,
   NodeServices,
+  NodeType,
   TerminalNodeServices,
-  AgentNodeServices,
-  WorkspaceNodeServices,
-  CustomNodeServices,
 } from './node-services';
 
 // =============================================================================
@@ -31,14 +33,19 @@ export interface ServiceFactories {
   createTerminalService: (nodeId: string, terminalId: string) => ITerminalService;
   /** Create a workspace service */
   createWorkspaceService: (nodeId: string, workspacePath?: string) => IWorkspaceService;
-  /** Create an agent service */
+  /** Create an agent service (creates adapter internally based on agentType) */
   createAgentService: (
     nodeId: string,
     agentId: string,
     agentType: AgentType,
-    terminalService: ITerminalService,
-    workspacePath?: string
+    terminalService: ITerminalService
   ) => IAgentService;
+  /** Create a conversation service */
+  createConversationService: (
+    nodeId: string,
+    sessionId: string,
+    agentType: string
+  ) => IConversationService;
 }
 
 /**
@@ -49,7 +56,8 @@ export interface NodeServiceConfig {
   agentId?: string;
   agentType?: AgentType;
   workspacePath?: string;
-  autoStartCli?: boolean;
+  /** Session ID for conversation nodes */
+  sessionId?: string;
 }
 
 // =============================================================================
@@ -109,8 +117,11 @@ export function NodeServicesRegistryProvider({
       // Return cached if exists
       const cached = servicesCache.current.get(nodeId);
       if (cached) {
+        console.log('[NodeServicesRegistry] Returning CACHED services', { nodeId, nodeType });
         return cached;
       }
+
+      console.log('[NodeServicesRegistry] Creating NEW services', { nodeId, nodeType, config });
 
       // Create new services based on node type
       let services: NodeServices;
@@ -136,12 +147,7 @@ export function NodeServicesRegistryProvider({
 
           const terminal = factories.createTerminalService(nodeId, terminalId);
           const workspace = factories.createWorkspaceService(nodeId, config.workspacePath);
-          const agent = factories.createAgentService(nodeId, agentId, agentType, terminal, config.workspacePath);
-
-          // Configure auto-start if specified
-          if (config.autoStartCli !== undefined) {
-            agent.setAutoStart(config.autoStartCli);
-          }
+          const agent = factories.createAgentService(nodeId, agentId, agentType, terminal);
 
           services = {
             type: 'agent',
@@ -152,17 +158,18 @@ export function NodeServicesRegistryProvider({
           break;
         }
 
-        case 'workspace': {
-          const workspace = factories.createWorkspaceService(nodeId, config.workspacePath);
+        case 'conversation': {
+          const sessionId = config.sessionId || '';
+          const agentType = config.agentType || 'claude_code';
+
+          const conversation = factories.createConversationService(nodeId, sessionId, agentType);
 
           services = {
-            type: 'workspace',
-            workspace,
-          } as WorkspaceNodeServices;
+            type: 'conversation',
+            conversation,
+          } as ConversationNodeServices;
           break;
         }
-
-        case 'custom':
         default: {
           services = { type: 'custom' } as CustomNodeServices;
           break;
@@ -180,8 +187,18 @@ export function NodeServicesRegistryProvider({
    * Dispose services for a node
    */
   const disposeServices = useCallback(async (nodeId: string): Promise<void> => {
+    console.log('[NodeServicesRegistry] disposeServices called', { nodeId });
     const services = servicesCache.current.get(nodeId);
-    if (!services) return;
+    if (!services) {
+      console.log('[NodeServicesRegistry] No services to dispose', { nodeId });
+      return;
+    }
+
+    // IMPORTANT: Remove from cache FIRST to prevent race conditions
+    // This ensures that if getOrCreateServices is called during dispose,
+    // it will create new services instead of returning the ones being disposed
+    servicesCache.current.delete(nodeId);
+    console.log('[NodeServicesRegistry] Removed from cache, now disposing', { nodeId });
 
     // Dispose all services in the bundle
     const disposePromises: Promise<void>[] = [];
@@ -195,9 +212,12 @@ export function NodeServicesRegistryProvider({
     if ('agent' in services && services.agent) {
       disposePromises.push(services.agent.dispose());
     }
+    if ('conversation' in services && services.conversation) {
+      disposePromises.push(services.conversation.dispose());
+    }
 
     await Promise.all(disposePromises);
-    servicesCache.current.delete(nodeId);
+    console.log('[NodeServicesRegistry] Dispose complete', { nodeId });
   }, []);
 
   /**
@@ -231,9 +251,7 @@ export function NodeServicesRegistryProvider({
 export function useNodeServicesRegistry(): NodeServicesRegistryValue {
   const context = useContext(NodeServicesRegistryContext);
   if (!context) {
-    throw new Error(
-      'useNodeServicesRegistry must be used within NodeServicesRegistryProvider'
-    );
+    throw new Error('useNodeServicesRegistry must be used within NodeServicesRegistryProvider');
   }
   return context;
 }

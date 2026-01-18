@@ -1,0 +1,180 @@
+/**
+ * AgentChatNodePresentation
+ *
+ * Presentation component for interactive chat with Claude Code.
+ * Renders chat UI with messages, input area, and streaming support.
+ */
+
+import { Handle, Position } from '@xyflow/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAgentService } from '../../context';
+import { useChatMessages } from '../../hooks/useChatMessages';
+import './AgentChatNode.css';
+import type { CodingAgentMessage } from '@agent-orchestrator/shared';
+
+interface AgentChatNodePresentationProps {
+  selected?: boolean;
+  /** Session ID (required for chat operations) */
+  sessionId: string;
+  agentType: string;
+  /** Workspace path (required for chat operations) */
+  workspacePath: string;
+  title?: string;
+  initialMessages: CodingAgentMessage[];
+  isDraft: boolean;
+  initialExpanded?: boolean;
+  onMessagesChange: (messages: CodingAgentMessage[]) => void;
+  onSessionCreated: (sessionId: string) => void;
+  onExpandedChange: (isExpanded: boolean) => void;
+}
+
+export function AgentChatNodePresentation({
+  selected,
+  sessionId,
+  agentType,
+  workspacePath,
+  title,
+  initialMessages,
+  isDraft,
+  initialExpanded = true,
+  onMessagesChange,
+  onSessionCreated,
+  onExpandedChange,
+}: AgentChatNodePresentationProps) {
+  const agentService = useAgentService();
+  const [isExpanded, setIsExpanded] = useState(initialExpanded);
+  const [inputValue, setInputValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { messages, isStreaming, sendMessage } = useChatMessages({
+    sessionId,
+    workspacePath,
+    agentService,
+    agentType,
+    onError: setError,
+    onSessionCreated,
+  });
+
+  // Notify parent when messages change
+  useEffect(() => {
+    onMessagesChange(messages);
+  }, [messages, onMessagesChange]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  const handleToggleExpand = useCallback(() => {
+    const newExpanded = !isExpanded;
+    setIsExpanded(newExpanded);
+    onExpandedChange(newExpanded);
+  }, [isExpanded, onExpandedChange]);
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || isStreaming) return;
+
+    const userMessage = inputValue.trim();
+    setInputValue('');
+    setError(null);
+
+    await sendMessage(userMessage);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const displayTitle = title || (isDraft ? 'New Chat' : `Chat ${sessionId?.slice(0, 8) || ''}`);
+
+  return (
+    <div
+      className={`agent-chat-node ${selected ? 'selected' : ''} ${isExpanded ? 'expanded' : 'collapsed'}`}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="chat-target"
+        className="agent-chat-handle"
+      />
+
+      {/* Header */}
+      <div className="agent-chat-header" onClick={handleToggleExpand}>
+        <div className="agent-chat-header-left">
+          <span className="agent-chat-expand-icon">{isExpanded ? '▼' : '▶'}</span>
+          <span className="agent-chat-title">{displayTitle}</span>
+        </div>
+        <div className="agent-chat-header-right">
+          <span className="agent-chat-agent-type">{agentType}</span>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <>
+          {/* Messages */}
+          <div className="agent-chat-messages">
+            {messages.length === 0 && (
+              <div className="agent-chat-empty">Start a conversation with Claude Code</div>
+            )}
+            {messages.map((msg) => (
+              <div key={msg.id} className={`agent-chat-message ${msg.role}`}>
+                <div className="agent-chat-message-role">
+                  {msg.role === 'user' ? 'You' : 'Claude'}
+                </div>
+                <div className="agent-chat-message-content">
+                  {msg.content}
+                  {isStreaming &&
+                    msg === messages[messages.length - 1] &&
+                    msg.role === 'assistant' && (
+                      <span className="agent-chat-streaming-cursor">▊</span>
+                    )}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Error */}
+          {error && <div className="agent-chat-error">{error}</div>}
+
+          {/* Input */}
+          <div className="agent-chat-input-area">
+            <button className="agent-chat-add-button" type="button" aria-label="Add">
+              <span className="agent-chat-add-icon">+</span>
+            </button>
+            <textarea
+              ref={inputRef}
+              className="agent-chat-input"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Add a follow up..."
+              disabled={isStreaming}
+              rows={1}
+            />
+            <button className="agent-chat-mic-button" type="button" aria-label="Voice input">
+              <span className="agent-chat-mic-icon">🎤</span>
+            </button>
+            <button
+              className="agent-chat-send-button"
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isStreaming}
+              type="button"
+              aria-label="Send"
+            >
+              <span className="agent-chat-send-icon">↑</span>
+            </button>
+          </div>
+        </>
+      )}
+
+      <Handle type="source" position={Position.Bottom} className="agent-chat-handle" />
+    </div>
+  );
+}

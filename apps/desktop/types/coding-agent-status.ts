@@ -1,133 +1,34 @@
 /**
  * CodingAgentStatusManager Type Definitions
  *
- * Unified status types derived from Claude Code and Cursor coding agents.
- * Designed for dependency injection with all implementations being swappable.
+ * Domain types are re-exported from @agent-orchestrator/shared.
+ * DI interfaces for desktop-specific implementations are defined locally.
  */
 
 // =============================================================================
-// Status Types
+// Re-export domain types from shared package
 // =============================================================================
 
-/**
- * All possible status states for a coding agent.
- * Unified from Claude Code (thinking, executing_tool, awaiting_input) and
- * Cursor (idle, running, streaming, paused, completed, error).
- */
-export type CodingAgentStatus =
-  | 'idle' // Waiting for user input
-  | 'running' // Actively processing a task
-  | 'thinking' // Deep reasoning/planning mode
-  | 'streaming' // Generating output in real-time
-  | 'executing_tool' // Running a tool (bash, read, write, etc.)
-  | 'awaiting_input' // Waiting for user response/permission
-  | 'paused' // Temporarily suspended
-  | 'completed' // Task finished
-  | 'error'; // Error occurred
+export type {
+  AgentType,
+  CodingAgentState,
+  CodingAgentStatus,
+  CodingAgentStatusInfo,
+  TitleConfig,
+  ToolType,
+} from '@agent-orchestrator/shared';
 
-/**
- * Categories of tools that can be executed by a coding agent.
- */
-export type ToolType =
-  | 'bash'
-  | 'read'
-  | 'write'
-  | 'edit'
-  | 'search'
-  | 'lsp'
-  | 'fetch'
-  | 'mcp'
-  | 'unknown';
-
-/**
- * Coding agent types (aligned with daemon's AgentType).
- */
-export type AgentType =
-  | 'claude_code'
-  | 'cursor'
-  | 'codex'
-  | 'windsurf'
-  | 'vscode'
-  | 'factory'
-  | 'other';
+// Import for use in local interfaces
+import type {
+  AgentType,
+  CodingAgentState,
+  CodingAgentStatus,
+  CodingAgentStatusInfo,
+  TitleConfig,
+} from '@agent-orchestrator/shared';
 
 // =============================================================================
-// Status Info
-// =============================================================================
-
-/**
- * Detailed status information with contextual data.
- */
-export interface CodingAgentStatusInfo {
-  /** Current status of the agent */
-  status: CodingAgentStatus;
-
-  /** Name of the tool being executed (when status is 'executing_tool') */
-  toolName?: string;
-
-  /** Category of the tool (when status is 'executing_tool') */
-  toolType?: ToolType;
-
-  /** Error message (when status is 'error') */
-  errorMessage?: string;
-
-  /** Name of subagent running (e.g., 'Plan Agent', 'Explore Agent') */
-  subagentName?: string;
-
-  /** Timestamp when this status was set */
-  startedAt: number;
-}
-
-// =============================================================================
-// Title Configuration
-// =============================================================================
-
-/**
- * Title configuration with manual/computed tracking.
- */
-export interface TitleConfig {
-  /** The title value */
-  value: string;
-
-  /** Whether the title was manually set by user */
-  isManuallySet: boolean;
-
-  /** First N user messages used for automatic computation (if not manual) */
-  computedFrom?: string[];
-}
-
-// =============================================================================
-// Full Agent State
-// =============================================================================
-
-/**
- * Complete state of a coding agent including status, title, and summary.
- */
-export interface CodingAgentState {
-  /** Unique identifier for the agent */
-  agentId: string;
-
-  /** Type of coding agent */
-  agentType: AgentType;
-
-  /** Current status with context */
-  statusInfo: CodingAgentStatusInfo;
-
-  /** Title configuration */
-  title: TitleConfig;
-
-  /** Short computed summary of the agent's task */
-  summary: string | null;
-
-  /** Timestamp when agent was registered */
-  createdAt: number;
-
-  /** Timestamp of last state update */
-  updatedAt: number;
-}
-
-// =============================================================================
-// Dependency Interfaces (for DI)
+// Dependency Interfaces (for DI - desktop-specific)
 // =============================================================================
 
 /**

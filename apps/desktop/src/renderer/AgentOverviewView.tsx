@@ -1,12 +1,13 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './AgentOverviewView.css';
 import type { CodingAgentStatus, CodingAgentStatusInfo } from '../../types/coding-agent-status';
-import type { AgentTitle, AgentProgress } from './types/agent-node';
 import type { EditorApp } from './main.d';
+import type { AgentProgress, AgentTitle } from './types/agent-node';
 import {
+  getTodoListCompletionPercent,
   isPercentageProgress,
   isTodoListProgress,
-  getTodoListCompletionPercent,
 } from './types/agent-node';
 
 interface AgentOverviewViewProps {
@@ -17,38 +18,37 @@ interface AgentOverviewViewProps {
   statusInfo?: CodingAgentStatusInfo;
   progress: AgentProgress | null;
   workspacePath?: string;
+  sessionId?: string;
   onTitleChange?: (newTitle: string) => void;
+  hideStatusIndicator?: boolean;
+  /** Most recent user message from the session */
+  mostRecentUserMessage?: string | null;
 }
 
-/**
- * Editor display names
- */
-const EDITOR_LABELS: Record<EditorApp, string> = {
-  vscode: 'VS Code',
-  cursor: 'Cursor',
-  zed: 'Zed',
-  sublime: 'Sublime Text',
-  atom: 'Atom',
-  webstorm: 'WebStorm',
-  finder: 'Finder',
-};
+// Editor display names - commented out, will be used when editor menu feature is re-enabled
+// const EDITOR_LABELS: Record<EditorApp, string> = {
+//   vscode: 'VS Code',
+//   cursor: 'Cursor',
+//   zed: 'Zed',
+//   sublime: 'Sublime Text',
+//   atom: 'Atom',
+//   webstorm: 'WebStorm',
+//   finder: 'Finder',
+// };
 
 /**
  * Status display configuration
  */
-const STATUS_CONFIG: Record<
-  CodingAgentStatus,
-  { label: string; color: string; icon: string }
-> = {
-  idle: { label: 'Idle', color: '#888888', icon: '○' },
-  running: { label: 'Running', color: '#4a9eff', icon: '●' },
-  thinking: { label: 'Thinking', color: '#f5a623', icon: '◐' },
-  streaming: { label: 'Streaming', color: '#7b61ff', icon: '◉' },
-  executing_tool: { label: 'Executing', color: '#0dbc79', icon: '⚡' },
-  awaiting_input: { label: 'Awaiting Input', color: '#e5e510', icon: '?' },
-  paused: { label: 'Paused', color: '#ff9800', icon: '⏸' },
-  completed: { label: 'Completed', color: '#4ade80', icon: '✓' },
-  error: { label: 'Error', color: '#ef4444', icon: '✕' },
+const STATUS_CONFIG: Record<CodingAgentStatus, { label: string; color: string; icon: string }> = {
+  idle: { label: 'Idle', color: '#888', icon: '○' },
+  running: { label: 'Running', color: '#888', icon: '●' },
+  thinking: { label: 'Thinking', color: '#888', icon: '◐' },
+  streaming: { label: 'Streaming', color: '#888', icon: '◉' },
+  executing_tool: { label: 'Executing', color: '#888', icon: '⚡' },
+  awaiting_input: { label: 'Awaiting Input', color: '#888', icon: '?' },
+  paused: { label: 'Paused', color: '#888', icon: '⏸' },
+  completed: { label: 'Completed', color: '#d4d4d4', icon: '✓' },
+  error: { label: 'Error', color: '#888', icon: '✕' },
 };
 
 /**
@@ -88,10 +88,7 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
     return (
       <div className="progress-percentage">
         <div className="progress-bar-container">
-          <div
-            className="progress-bar-fill"
-            style={{ width: `${progress.value}%` }}
-          />
+          <div className="progress-bar-fill" style={{ width: `${progress.value}%` }} />
         </div>
         <div className="progress-info">
           <span className="progress-value">{progress.value}%</span>
@@ -108,11 +105,8 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
         {progress.title && <div className="todolist-title">{progress.title}</div>}
         <div className="todolist-items">
           {progress.items.map((item) => (
-            <div
-              key={item.id}
-              className={`todolist-item ${item.completed ? 'completed' : ''}`}
-            >
-              <span className="todo-checkbox">{item.completed ? '☑' : '☐'}</span>
+            <div key={item.id} className={`todolist-item ${item.completed ? 'completed' : ''}`}>
+              <input type="checkbox" className="todo-checkbox" checked={item.completed} readOnly />
               <span className="todo-content">{item.content}</span>
             </div>
           ))}
@@ -135,14 +129,16 @@ function ProgressDisplay({ progress }: { progress: AgentProgress }) {
  * Delegates all business logic to parent via callbacks.
  */
 export default function AgentOverviewView({
-  agentId,
   title,
   summary,
   status,
   statusInfo,
   progress,
-  workspacePath,
+  workspacePath: _workspacePath,
+  sessionId: _sessionId,
   onTitleChange,
+  hideStatusIndicator = false,
+  mostRecentUserMessage,
 }: AgentOverviewViewProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title.value);
@@ -155,7 +151,8 @@ export default function AgentOverviewView({
   useEffect(() => {
     if (showEditorMenu && availableEditors.length === 0 && !isLoadingEditors) {
       setIsLoadingEditors(true);
-      window.shellAPI?.getAvailableEditors()
+      window.shellAPI
+        ?.getAvailableEditors()
         .then((editors) => {
           setAvailableEditors(editors);
         })
@@ -206,16 +203,16 @@ export default function AgentOverviewView({
     [handleTitleBlur, title.value]
   );
 
-  const handleOpenWithEditor = useCallback(async (editor: EditorApp) => {
-    if (!workspacePath) return;
-
-    try {
-      await window.shellAPI?.openWithEditor(workspacePath, editor);
-      setShowEditorMenu(false);
-    } catch (error) {
-      console.error('Failed to open with editor:', error);
-    }
-  }, [workspacePath]);
+  // handleOpenWithEditor - commented out, will be used when editor menu feature is re-enabled
+  // const handleOpenWithEditor = useCallback(async (editor: EditorApp) => {
+  //   if (!workspacePath) return;
+  //   try {
+  //     await window.shellAPI?.openWithEditor(workspacePath, editor);
+  //     setShowEditorMenu(false);
+  //   } catch (error) {
+  //     console.error('Failed to open with editor:', error);
+  //   }
+  // }, [workspacePath]);
 
   return (
     <div className="agent-overview">
@@ -229,27 +226,34 @@ export default function AgentOverviewView({
             onChange={(e) => setEditedTitle(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            autoFocus
+            placeholder="Add Title"
           />
         ) : (
           <h2
-            className="overview-title"
+            className={`overview-title ${!title.value || title.value.trim() === '' ? 'overview-title-placeholder' : ''}`}
             onDoubleClick={handleTitleDoubleClick}
             title="Double-click to edit"
           >
-            {title.value}
+            {title.value && title.value.trim() !== '' ? title.value : 'Add Title'}
           </h2>
         )}
-        {!title.isManuallySet && <span className="title-auto-badge">auto</span>}
       </div>
 
-      {/* Status Indicator */}
-      <StatusIndicator status={status} statusInfo={statusInfo} />
+      {/* Status Indicator - Hidden if moved to node header */}
+      {!hideStatusIndicator && <StatusIndicator status={status} statusInfo={statusInfo} />}
 
       {/* Summary */}
       {summary && (
         <div className="overview-summary">
-          <p>{summary}</p>
+          <p className="overview-summary-text">{summary}</p>
+        </div>
+      )}
+
+      {/* Most Recent User Message */}
+      {mostRecentUserMessage && (
+        <div className="overview-recent-message">
+          <span className="overview-recent-message-label">Latest:</span>
+          <p className="overview-recent-message-text">{mostRecentUserMessage}</p>
         </div>
       )}
 
@@ -261,7 +265,7 @@ export default function AgentOverviewView({
       )}
 
       {/* Actions */}
-      {workspacePath && (
+      {/* {workspacePath && (
         <div className="overview-actions">
           <div className="open-with-container" ref={menuRef}>
             <button
@@ -292,12 +296,14 @@ export default function AgentOverviewView({
             )}
           </div>
         </div>
-      )}
+      )} */}
 
-      {/* Footer */}
-      <div className="overview-footer">
-        <span className="agent-id-label">ID: {agentId}</span>
-      </div>
+      {/* Footer - Hidden */}
+      {/* {sessionId && (
+        <div className="overview-footer">
+          <span className="agent-session-label">Session: {sessionId}</span>
+        </div>
+      )} */}
     </div>
   );
 }

@@ -1,17 +1,22 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
-  ChatMessage,
   ChatHistory,
-  SessionMetadata,
-  ProjectInfo,
-  LoaderOptions,
+  ChatMessage,
   IChatHistoryLoader,
+  LoaderOptions,
+  ProjectInfo,
+  SessionMetadata,
 } from '@agent-orchestrator/shared';
 import { IDE_DATA_PATHS } from '@agent-orchestrator/shared';
 
 // Re-export types for backward compatibility
-export type { ChatMessage, ChatHistory, SessionMetadata, ProjectInfo } from '@agent-orchestrator/shared';
+export type {
+  ChatHistory,
+  ChatMessage,
+  ProjectInfo,
+  SessionMetadata,
+} from '@agent-orchestrator/shared';
 
 /**
  * Get the path to Factory's sessions directory
@@ -36,7 +41,7 @@ interface JsonlLine {
  */
 function extractProjectPathFromSystemReminder(content: string): string | null {
   const pwdMatch = content.match(/% pwd\n([^\n]+)/);
-  if (pwdMatch && pwdMatch[1]) {
+  if (pwdMatch?.[1]) {
     return pwdMatch[1].trim();
   }
   return null;
@@ -48,7 +53,10 @@ function extractProjectPathFromSystemReminder(content: string): string | null {
 function parseSessionFile(filePath: string): ChatHistory | null {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
+    const lines = content
+      .trim()
+      .split('\n')
+      .filter((line) => line.trim());
 
     if (lines.length === 0) return null;
 
@@ -81,7 +89,10 @@ function parseSessionFile(filePath: string): ChatHistory | null {
           if (Array.isArray(data.message.content)) {
             for (const contentPart of data.message.content) {
               if (role === 'user' && contentPart.type === 'text' && contentPart.text) {
-                if (contentPart.text.includes('<system-reminder>') && contentPart.text.includes('% pwd')) {
+                if (
+                  contentPart.text.includes('<system-reminder>') &&
+                  contentPart.text.includes('% pwd')
+                ) {
                   const extractedPath = extractProjectPathFromSystemReminder(contentPart.text);
                   if (extractedPath && !projectPath) {
                     projectPath = extractedPath;
@@ -98,15 +109,13 @@ function parseSessionFile(filePath: string): ChatHistory | null {
                   display: contentPart.text,
                   pastedContents: {},
                   role,
-                  timestamp
+                  timestamp,
                 });
               }
             }
           }
         }
-      } catch {
-        continue;
-      }
+      } catch {}
     }
 
     if (messages.length === 0) {
@@ -116,7 +125,7 @@ function parseSessionFile(filePath: string): ChatHistory | null {
     const projectName = projectPath ? path.basename(projectPath) : undefined;
 
     const metadata: SessionMetadata = {
-      source: 'factory'
+      source: 'factory',
     };
 
     if (projectPath) {
@@ -136,7 +145,7 @@ function parseSessionFile(filePath: string): ChatHistory | null {
       timestamp: lastTimestamp || firstTimestamp || new Date().toISOString(),
       messages,
       agent_type: 'factory',
-      metadata
+      metadata,
     };
   } catch (error) {
     console.error(`[Factory Reader] Error parsing session file ${filePath}:`, error);
@@ -147,7 +156,10 @@ function parseSessionFile(filePath: string): ChatHistory | null {
 /**
  * Read all Factory chat histories from ~/.factory/sessions
  */
-export function readFactoryHistories(lookbackDays?: number, sinceTimestamp?: number): ChatHistory[] {
+export function readFactoryHistories(
+  lookbackDays?: number,
+  sinceTimestamp?: number
+): ChatHistory[] {
   const histories: ChatHistory[] = [];
 
   try {
@@ -161,14 +173,16 @@ export function readFactoryHistories(lookbackDays?: number, sinceTimestamp?: num
     let cutoffDate: Date | null = null;
     if (sinceTimestamp && sinceTimestamp > 0) {
       cutoffDate = new Date(sinceTimestamp);
-      console.log(`[Factory Reader] Filtering files modified after ${cutoffDate.toISOString()} (incremental sync)`);
+      console.log(
+        `[Factory Reader] Filtering files modified after ${cutoffDate.toISOString()} (incremental sync)`
+      );
     } else if (lookbackDays && lookbackDays > 0) {
       cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
       console.log(`[Factory Reader] Filtering files modified after ${cutoffDate.toISOString()}`);
     }
 
-    const sessionFiles = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.jsonl'));
+    const sessionFiles = fs.readdirSync(sessionsDir).filter((f) => f.endsWith('.jsonl'));
 
     console.log(`[Factory Reader] Found ${sessionFiles.length} session files`);
 
@@ -200,15 +214,16 @@ export function readFactoryHistories(lookbackDays?: number, sinceTimestamp?: num
 /**
  * Extract project information from Factory chat histories
  */
-export function extractProjectsFromFactoryHistories(
-  histories: ChatHistory[]
-): ProjectInfo[] {
-  const projectsMap = new Map<string, {
-    name: string;
-    path: string;
-    sessionCount: number;
-    lastActivity: Date;
-  }>();
+export function extractProjectsFromFactoryHistories(histories: ChatHistory[]): ProjectInfo[] {
+  const projectsMap = new Map<
+    string,
+    {
+      name: string;
+      path: string;
+      sessionCount: number;
+      lastActivity: Date;
+    }
+  >();
 
   for (const history of histories) {
     const projectPath = history.metadata?.projectPath;
@@ -224,7 +239,7 @@ export function extractProjectsFromFactoryHistories(
         name: projectName,
         path: projectPath,
         sessionCount: 0,
-        lastActivity: new Date(history.timestamp)
+        lastActivity: new Date(history.timestamp),
       });
     }
 
@@ -237,12 +252,12 @@ export function extractProjectsFromFactoryHistories(
     }
   }
 
-  return Array.from(projectsMap.values()).map(project => ({
+  return Array.from(projectsMap.values()).map((project) => ({
     name: project.name,
     path: project.path,
     workspaceIds: [],
     factorySessionCount: project.sessionCount,
-    lastActivity: project.lastActivity.toISOString()
+    lastActivity: project.lastActivity.toISOString(),
   }));
 }
 

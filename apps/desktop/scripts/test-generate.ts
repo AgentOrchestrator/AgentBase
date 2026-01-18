@@ -3,9 +3,10 @@
  *
  * Run with: npx tsx scripts/test-generate.ts
  */
+
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { ClaudeCodeAgent } from '../src/main/services/coding-agent/implementations/ClaudeCodeAgent';
-import * as os from 'os';
-import * as path from 'path';
 
 async function main() {
   console.log('Testing agent.generate()...\n');

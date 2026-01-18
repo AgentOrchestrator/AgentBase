@@ -1,10 +1,10 @@
 import type {
-  Result,
   AgentError,
+  CodingAgentSessionContent,
+  Result,
+  SessionFilter,
   SessionIdentifier,
   SessionInfo,
-  SessionContent,
-  SessionFilter,
 } from '../types';
 
 /**
@@ -38,7 +38,7 @@ export interface ISessionManager {
    */
   getSession(
     identifier: SessionIdentifier
-  ): Promise<Result<SessionContent | null, AgentError>>;
+  ): Promise<Result<CodingAgentSessionContent | null, AgentError>>;
 
   /**
    * Delete a session
@@ -53,8 +53,5 @@ export interface ISessionManager {
    * @param identifier - Session to rename
    * @param newName - The new name
    */
-  renameSession(
-    identifier: SessionIdentifier,
-    newName: string
-  ): Promise<Result<void, AgentError>>;
+  renameSession(identifier: SessionIdentifier, newName: string): Promise<Result<void, AgentError>>;
 }

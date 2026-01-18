@@ -1,2 +1,2 @@
-export * from './KeychainApiKeyRepository';
 export * from './InMemoryApiKeyRepository';
+export * from './KeychainApiKeyRepository';

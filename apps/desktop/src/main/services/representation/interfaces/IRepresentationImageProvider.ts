@@ -1,11 +1,11 @@
-import type { IRepresentationProvider } from './IRepresentationProvider';
 import type {
-  RepresentationResult,
+  ImageFormat,
+  ImageRepresentationOutput,
   RepresentationError,
   RepresentationInput,
-  ImageRepresentationOutput,
-  ImageFormat,
+  RepresentationResult,
 } from '../types';
+import type { IRepresentationProvider } from './IRepresentationProvider';
 
 /**
  * Extended options for image transformation

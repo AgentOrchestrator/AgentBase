@@ -1,0 +1,80 @@
+.user-message-node {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  width: 100%;
+  height: 100%;
+  min-width: 300px;
+  min-height: 100px;
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.user-message-node.selected {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 2px rgba(212, 212, 212, 0.2);
+}
+
+/* Hide React Flow's default selection border/outline and resize handles */
+.react-flow__node.userMessage.react-flow__node-selected {
+  outline: none;
+  border: none;
+}
+
+.react-flow__node.userMessage .react-flow__resize-control {
+  display: none;
+}
+
+.user-message-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.user-message-label {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.user-message-content {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  padding-right: 8px;
+}
+
+/* Scrollbar styling - always visible */
+.user-message-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.user-message-content::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+  border-radius: 4px;
+}
+
+.user-message-content::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.user-message-content::-webkit-scrollbar-thumb:hover {
+  background: var(--color-bg-hover);
+}

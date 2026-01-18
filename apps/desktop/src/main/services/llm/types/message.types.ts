@@ -1,24 +1,18 @@
+import type { LlmChatMessage } from '@agent-orchestrator/shared';
 import type { VendorId } from './config.types';
 import type { ToolCall } from './tool.types';
 
 /**
  * A single message in a chat conversation
  */
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  /** For tool result messages */
-  toolCallId?: string;
-  /** For tool result messages */
-  toolName?: string;
-}
+export type { LlmChatMessage };
 
 /**
  * Request to generate a chat completion
  */
 export interface ChatRequest {
   /** Conversation messages */
-  messages: ChatMessage[];
+  messages: LlmChatMessage[];
   /** Override default vendor */
   vendor?: VendorId;
   /** Override default model */

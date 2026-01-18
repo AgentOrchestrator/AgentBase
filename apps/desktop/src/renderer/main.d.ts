@@ -1,25 +1,25 @@
+/**
+ * Type declarations for Electron IPC APIs on the Window object.
+ *
+ * Rule: *.d.ts files should only connect runtime objects to imported types,
+ * never define domain types inline. All types are imported from shared package
+ * or from the preload module.
+ */
+
 import type { CanvasState, CanvasMetadata } from '../main/types/database';
-import type {
-  CodingAgentType,
-  AgentCapabilities,
-  GenerateRequest,
-  GenerateResponse,
-  SessionIdentifier,
-  SessionInfo,
-  ForkOptions,
-  ContinueOptions,
-} from '../main/services/coding-agent';
+import type { CodingAgentAPI } from '../main/services/coding-agent';
 
-export interface ElectronAPI {
-  createTerminal: (terminalId: string) => void;
-  onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
-  onTerminalExit: (callback: (data: { terminalId: string; code: number; signal?: number }) => void) => void;
-  sendTerminalInput: (terminalId: string, data: string) => void;
-  sendTerminalResize: (terminalId: string, cols: number, rows: number) => void;
-  destroyTerminal: (terminalId: string) => void;
-  removeAllListeners: (channel: string) => void;
-}
+// Re-export types from shared for consumers that import from this file
+export type {
+  ElectronAPI,
+  EditorApp,
+  ShellAPI,
+  WorktreeAPI,
+  AgentStatusAPI,
+} from '@agent-orchestrator/shared';
 
+// Desktop-specific CanvasAPI that uses concrete types from database module
+// (Shared package uses Record<string, unknown> for flexibility)
 export interface CanvasAPI {
   saveCanvas: (canvasId: string, state: CanvasState) => Promise<void>;
   loadCanvas: (canvasId: string) => Promise<CanvasState | null>;
@@ -29,48 +29,13 @@ export interface CanvasAPI {
   setCurrentCanvasId: (canvasId: string) => Promise<void>;
 }
 
-export interface CodingAgentAPI {
-  /** Generate a one-off response */
-  generate: (
-    agentType: CodingAgentType,
-    request: GenerateRequest
-  ) => Promise<GenerateResponse>;
-
-  /** Continue an existing session */
-  continueSession: (
-    agentType: CodingAgentType,
-    identifier: SessionIdentifier,
-    prompt: string,
-    options?: ContinueOptions
-  ) => Promise<GenerateResponse>;
-
-  /** Fork an existing session */
-  forkSession: (
-    agentType: CodingAgentType,
-    parentIdentifier: SessionIdentifier,
-    options?: ForkOptions
-  ) => Promise<SessionInfo>;
-
-  /** Get list of available agent types */
-  getAvailableAgents: () => Promise<CodingAgentType[]>;
-
-  /** Get capabilities for a specific agent type */
-  getCapabilities: (agentType: CodingAgentType) => Promise<AgentCapabilities>;
-
-  /** Check if a specific agent is available */
-  isAgentAvailable: (agentType: CodingAgentType) => Promise<boolean>;
-}
-
-export type EditorApp = 'vscode' | 'cursor' | 'zed' | 'sublime' | 'atom' | 'webstorm' | 'finder';
-
-export interface ShellAPI {
-  /** Open a directory with a specific editor application */
-  openWithEditor: (directoryPath: string, editor: EditorApp) => Promise<void>;
-  /** Get list of available editors on this system */
-  getAvailableEditors: () => Promise<EditorApp[]>;
-  /** Open a path in the system file manager */
-  showInFolder: (path: string) => Promise<void>;
-}
+// Import types for Window interface declaration
+import type {
+  ElectronAPI,
+  ShellAPI,
+  WorktreeAPI,
+  AgentStatusAPI,
+} from '@agent-orchestrator/shared';
 
 declare global {
   interface Window {
@@ -78,7 +43,7 @@ declare global {
     canvasAPI?: CanvasAPI;
     codingAgentAPI?: CodingAgentAPI;
     shellAPI?: ShellAPI;
+    worktreeAPI?: WorktreeAPI;
+    agentStatusAPI?: AgentStatusAPI;
   }
 }
-
-export {};

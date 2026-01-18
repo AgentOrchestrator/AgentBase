@@ -1,0 +1,515 @@
+.new-agent-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.new-agent-modal-container {
+  width: 600px;
+  max-width: 90vw;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top Bar */
+.new-agent-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.new-agent-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+/* Folder wrapper - completely independent */
+.new-agent-modal-folder-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.new-agent-modal-folder-wrapper.keyboard-selected {
+  border-color: var(--color-text-primary);
+}
+
+/* Worktree wrapper - displayed above branch */
+.new-agent-modal-worktree-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.new-agent-modal-worktree-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-worktree-path {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-folder-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-folder-path {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-icon,
+.new-agent-modal-folder-wrapper:hover .new-agent-modal-folder-path,
+.new-agent-modal-folder-wrapper.keyboard-selected .new-agent-modal-folder-icon,
+.new-agent-modal-folder-wrapper.keyboard-selected .new-agent-modal-folder-path {
+  color: var(--color-text-primary);
+}
+
+/* Branch wrapper - completely independent */
+.new-agent-modal-branch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  position: relative;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.new-agent-modal-branch-wrapper.keyboard-selected {
+  border-color: var(--color-text-primary);
+}
+
+.new-agent-modal-branch-command-hint {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.7;
+  z-index: 10;
+}
+
+.new-agent-modal-branch-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-branch {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-branch-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  font-family: inherit;
+  padding: 0;
+  margin: 0;
+  width: 120px;
+  min-width: 80px;
+}
+
+.new-agent-modal-branch-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-icon,
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch,
+.new-agent-modal-branch-wrapper:hover .new-agent-modal-branch-input,
+.new-agent-modal-branch-wrapper.keyboard-selected .new-agent-modal-branch-icon,
+.new-agent-modal-branch-wrapper.keyboard-selected .new-agent-modal-branch,
+.new-agent-modal-branch-wrapper.keyboard-selected .new-agent-modal-branch-input {
+  color: var(--color-text-primary);
+}
+
+.new-agent-modal-branch-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 200px;
+  max-height: calc(5 * 36px + 8px); /* Approximately 5 items height + padding */
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.new-agent-modal-branch-dropdown-item {
+  padding: 8px 12px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.new-agent-modal-branch-dropdown-item:hover {
+  background: var(--color-bg-secondary);
+}
+
+.new-agent-modal-branch-dropdown-item.active,
+.new-agent-modal-branch-dropdown-item.selected {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.new-agent-modal-branch-dropdown-item.keyboard-selected {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.new-agent-modal-branch-dropdown-item-disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.new-agent-modal-branch-dropdown-item-disabled:hover {
+  background: transparent;
+}
+
+.new-agent-modal-command-hint {
+  float: right;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.new-agent-modal-branch-dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar-thumb {
+  background: var(--color-bg-hover);
+  border-radius: 4px;
+}
+
+.new-agent-modal-branch-dropdown::-webkit-scrollbar-thumb:hover {
+  background: var(--color-bg-hover-light);
+}
+
+.new-agent-modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-agent-modal-window-control {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.new-agent-modal-window-control:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.new-agent-modal-window-control svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Main Content */
+.new-agent-modal-content {
+  padding: 16px;
+}
+
+.new-agent-modal-description-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.new-agent-modal-description-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.new-agent-modal-description-input:focus {
+  outline: none;
+}
+
+/* Bottom Bar */
+.new-agent-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  background: var(--color-bg-primary);
+}
+
+.new-agent-modal-create-btn {
+  padding: 8px 16px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.new-agent-modal-create-btn:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+.new-agent-modal-create-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.new-agent-modal-create-btn:disabled:hover {
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
+}
+
+/* ============================================ */
+/* Fork Mode Styles                             */
+/* ============================================ */
+
+/* Modal title for fork mode */
+.new-agent-modal-title {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-right: 12px;
+}
+
+/* Fork input row - input + checkbox inline */
+.new-agent-modal-fork-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Fork input - minimal, no border */
+.new-agent-modal-fork-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  padding: 0;
+  min-height: auto;
+  resize: none;
+}
+
+.new-agent-modal-fork-input:focus {
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Worktree checkbox next to fork input */
+.new-agent-modal-fork-worktree-checkbox {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Proposed worktree path display */
+.new-agent-modal-fork-worktree-path {
+  margin-top: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary, #888);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-agent-modal-fork-worktree-label {
+  color: var(--color-text-tertiary, #666);
+  flex-shrink: 0;
+}
+
+.new-agent-modal-fork-worktree-value {
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
+  color: var(--color-text-secondary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-agent-modal-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.new-agent-modal-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--color-accent, #3b82f6);
+}
+
+.new-agent-modal-checkbox-text {
+  color: var(--color-text-secondary, #888);
+  font-size: 12px;
+}
+
+/* Message preview section */
+.new-agent-modal-preview-section {
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+.new-agent-modal-preview-toggle {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #888);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s ease;
+}
+
+.new-agent-modal-preview-toggle:hover {
+  color: var(--color-text-primary);
+}
+
+.new-agent-modal-preview-content {
+  margin-top: 12px;
+}
+
+.new-agent-modal-preview-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-secondary, #888);
+  font-size: 13px;
+}
+
+/* Fork mode footer with session info */
+.new-agent-modal-footer.fork-mode-footer {
+  justify-content: space-between;
+}
+
+.new-agent-modal-session-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.new-agent-modal-session-id {
+  font-size: 10px;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
+  color: var(--color-text-tertiary, #555);
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chin area for worktree path info */
+.new-agent-modal-chin {
+  padding: 6px 16px;
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border);
+}
