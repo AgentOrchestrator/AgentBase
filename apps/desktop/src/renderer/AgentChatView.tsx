@@ -62,6 +62,7 @@ export default function AgentChatView({
 }: AgentChatViewProps) {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showSessionInfo, setShowSessionInfo] = useState(false);
   // Track the initial input text for display (cleared after first message)
   const [attachedText, setAttachedText] = useState<string | undefined>(initialInputText);
   const hasSentFirstMessage = useRef(false);
@@ -584,6 +585,41 @@ export default function AgentChatView({
     <div className="agent-chat-view">
       {/* Forehead - covers everything above the top sticky user message */}
       {stickyUserMessageId && <div className="agent-chat-view-forehead" />}
+
+      {/* Session Info Button */}
+      <button
+        className="agent-chat-view-info-button"
+        onClick={() => setShowSessionInfo(!showSessionInfo)}
+        title="Session info"
+        type="button"
+        aria-label="Show session info"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+          <path d="M12 16V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="12" cy="8" r="1" fill="currentColor" />
+        </svg>
+      </button>
+
+      {/* Session Info Popup */}
+      {showSessionInfo && (
+        <div className="agent-chat-view-info-popup">
+          <div className="agent-chat-view-info-row">
+            <span className="agent-chat-view-info-label">Session ID</span>
+            <span className="agent-chat-view-info-value">{sessionId}</span>
+          </div>
+          <div className="agent-chat-view-info-row">
+            <span className="agent-chat-view-info-label">Workspace</span>
+            <span className="agent-chat-view-info-value">{workspacePath}</span>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div

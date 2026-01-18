@@ -511,6 +511,71 @@
   }
 }
 
+/* Session Info Button - small info icon in top-right corner */
+.agent-chat-view-info-button {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s, color 0.15s;
+}
+
+.agent-chat-view-info-button:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* Session Info Popup */
+.agent-chat-view-info-popup {
+  position: absolute;
+  top: 40px;
+  right: 12px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  z-index: 20;
+  min-width: 200px;
+  max-width: 350px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.agent-chat-view-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.agent-chat-view-info-row:last-child {
+  margin-bottom: 0;
+}
+
+.agent-chat-view-info-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.agent-chat-view-info-value {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  word-break: break-all;
+  font-family: "Monaco", "Menlo", "Courier New", monospace;
+}
+
 /* Plus button for messages - appears when text is selected, follows mouse */
 .conversation-message-plus-button {
   position: absolute;
