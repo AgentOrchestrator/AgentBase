@@ -23,6 +23,8 @@ export type {
 export type { INodeStore, NodesChangeListener } from './INodeStore';
 export { LinearStore } from './LinearStore';
 export { NodeStore } from './NodeStore';
+export type { AllModeChangeListener, PermissionModeListener } from './PermissionModeStore';
+export { PermissionModeStore } from './PermissionModeStore';
 
 import { AgentActionStore } from './AgentActionStore';
 import { ForkStore } from './ForkStore';
@@ -31,6 +33,7 @@ import type { ILinearStore } from './ILinearStore';
 import type { INodeStore } from './INodeStore';
 import { LinearStore } from './LinearStore';
 import { NodeStore } from './NodeStore';
+import { PermissionModeStore } from './PermissionModeStore';
 
 /**
  * Singleton fork store instance
@@ -55,3 +58,9 @@ export const agentActionStore = new AgentActionStore();
  * Manages Linear integration state
  */
 export const linearStore: ILinearStore = new LinearStore();
+
+/**
+ * Singleton permission mode store instance
+ * Manages permission mode cycling (Plan/Auto-Accept/Ask)
+ */
+export const permissionModeStore = new PermissionModeStore();

@@ -17,7 +17,12 @@ import { useAgentService, useTerminalService } from '../../context';
 import { useAgentViewMode, useSessionOverview } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import IssueDetailsModal from '../../IssueDetailsModal';
-import type { AgentNodeData, AgentNodeView, AgentProgress } from '../../types/agent-node';
+import type {
+  AgentNodeData,
+  AgentNodeView,
+  AgentProgress,
+  PermissionMode,
+} from '../../types/agent-node';
 import {
   createLinearIssueAttachment,
   isLinearIssueAttachment,
@@ -25,8 +30,26 @@ import {
 } from '../../types/attachments';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import '../../AgentNode.css';
+import { permissionModeStore } from '../../stores';
 import { AgentNodeChatHandle } from './AgentNodeChatHandle';
 import { AgentNodeForkHandle } from './AgentNodeForkHandle';
+
+/**
+ * Permission mode display configuration
+ */
+const PERMISSION_MODE_CONFIG: Record<
+  PermissionMode,
+  { label: string; icon: string; color: string; tooltip: string }
+> = {
+  plan: { label: 'Plan', icon: '📋', color: '#f59e0b', tooltip: 'Plan Mode - Restrictive' },
+  'auto-accept': {
+    label: 'Auto',
+    icon: '✓',
+    color: '#22c55e',
+    tooltip: 'Auto-Accept - Permissive',
+  },
+  ask: { label: 'Ask', icon: '?', color: '#3b82f6', tooltip: 'Ask Mode - Interactive' },
+};
 
 export interface AgentNodePresentationProps {
   /** Agent node data (single source of truth for workspace) */
@@ -79,6 +102,25 @@ export function AgentNodePresentation({
   const forking = data.forking ?? false;
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCheckingRef = useRef(false);
+
+  // Permission mode state - subscribes to global mode changes
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(() =>
+    permissionModeStore.getEffectiveMode(data.agentId)
+  );
+
+  // Subscribe to permission mode changes
+  useEffect(() => {
+    // Update when agent-specific mode changes
+    const unsubAgent = permissionModeStore.subscribe(data.agentId, setPermissionMode);
+    // Also update when global mode changes (in case agent has no override)
+    const unsubGlobal = permissionModeStore.subscribeGlobal(() => {
+      setPermissionMode(permissionModeStore.getEffectiveMode(data.agentId));
+    });
+    return () => {
+      unsubAgent();
+      unsubGlobal();
+    };
+  }, [data.agentId]);
 
   // Stop agent when node unmounts
   // Agent start is handled by AgentTerminalView when it mounts
@@ -561,6 +603,24 @@ export function AgentNodePresentation({
               </>
             )}
           </div>
+        </div>
+
+        {/* Permission Mode Indicator - Next to Status */}
+        <div
+          className="agent-node-permission-indicator"
+          title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Shift+Tab to cycle)`}
+        >
+          <span
+            className="permission-mode-badge"
+            style={
+              {
+                '--permission-color': PERMISSION_MODE_CONFIG[permissionMode].color,
+              } as React.CSSProperties
+            }
+          >
+            <span className="permission-icon">{PERMISSION_MODE_CONFIG[permissionMode].icon}</span>
+            <span className="permission-label">{PERMISSION_MODE_CONFIG[permissionMode].label}</span>
+          </span>
         </div>
 
         {/* View Switcher Buttons - Top Right */}

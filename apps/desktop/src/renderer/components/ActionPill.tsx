@@ -10,6 +10,13 @@ import './ActionPill.css';
 
 const DEFAULT_LABEL = 'Actions pending';
 
+// Expose ActionPill expanded state globally for keyboard handler coordination
+declare global {
+  interface Window {
+    __actionPillExpanded?: boolean;
+  }
+}
+
 export function ActionPill() {
   const [actions, setActions] = useState<AgentAction[]>(() => agentActionStore.getAllActions());
   const [isExpanded, setIsExpanded] = useState(false);
@@ -21,6 +28,11 @@ export function ActionPill() {
   const [submittingActions, setSubmittingActions] = useState<Set<string>>(new Set());
 
   useEffect(() => agentActionStore.subscribeAll(setActions), []);
+
+  // Sync expanded state to window for keyboard handler coordination
+  useEffect(() => {
+    window.__actionPillExpanded = isExpanded;
+  }, [isExpanded]);
 
   useEffect(() => {
     if (actions.length === 0) {

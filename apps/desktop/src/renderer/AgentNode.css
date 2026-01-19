@@ -133,6 +133,48 @@
   gap: 0;
 }
 
+/* Permission Mode Indicator - Position near status indicator */
+.agent-node-permission-indicator {
+  position: absolute;
+  top: 8px;
+  left: 160px;
+  z-index: 10;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.agent-node:hover .agent-node-permission-indicator {
+  opacity: 1;
+}
+
+.agent-node-permission-indicator .permission-mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--permission-color, #888);
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: default;
+}
+
+.agent-node-permission-indicator .permission-icon {
+  font-size: 12px;
+  color: var(--permission-color, #888);
+}
+
+.agent-node-permission-indicator .permission-label {
+  color: var(--permission-color, #888);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* View Switcher Buttons - Top Right */
 .agent-node-view-switcher {
   position: absolute;

@@ -10,6 +10,18 @@ import type { TerminalAttachment } from './attachments.js';
 import type { AgentType, CodingAgentStatus, CodingAgentStatusInfo } from './coding-agent.js';
 
 // =============================================================================
+// Permission Mode
+// =============================================================================
+
+/**
+ * Permission mode for agent operations
+ * - 'plan': Deny all operations (restrictive) - plan first, execute later
+ * - 'auto-accept': Allow all operations (permissive) - auto-approve tools
+ * - 'ask': Prompt for each operation (interactive) - ask before each tool
+ */
+export type PermissionMode = 'plan' | 'auto-accept' | 'ask';
+
+// =============================================================================
 // Progress Variants (Discriminated Union)
 // =============================================================================
 
@@ -173,6 +185,9 @@ export interface AgentNodeData {
 
   /** Whether the JSONL file exists (for forking capability) */
   forking?: boolean;
+
+  /** Permission mode for this agent (overrides global default) */
+  permissionMode?: PermissionMode;
 }
 
 // =============================================================================

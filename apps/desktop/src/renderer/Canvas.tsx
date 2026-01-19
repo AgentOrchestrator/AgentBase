@@ -45,7 +45,7 @@ import {
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
 import { forkService } from './services';
-import { forkStore, nodeStore } from './stores';
+import { forkStore, nodeStore, permissionModeStore } from './stores';
 import { createLinearIssueAttachment } from './types/attachments';
 import { getOptimalHandles, updateEdgesWithOptimalHandles } from './utils/edgeHandles';
 
@@ -1152,6 +1152,22 @@ function CanvasFlow() {
       if (modifierKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         canvasActions.addAgentNode();
+      }
+
+      // Shift+Tab to cycle permission mode (only when ActionPill is not expanded)
+      if (event.shiftKey && event.key === 'Tab' && !window.__actionPillExpanded) {
+        // Don't interfere if user is typing in an input/textarea
+        const target = event.target as HTMLElement;
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        event.preventDefault();
+        permissionModeStore.cycleGlobalMode();
+        return;
       }
 
       if (modifierKey && event.key === 'n') {
