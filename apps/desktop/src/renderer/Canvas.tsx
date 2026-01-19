@@ -45,7 +45,7 @@ import {
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
 import { forkService } from './services';
-import { forkStore, nodeStore } from './stores';
+import { agentActionStore, forkStore, nodeStore } from './stores';
 import { createLinearIssueAttachment } from './types/attachments';
 import { getOptimalHandles, updateEdgesWithOptimalHandles } from './utils/edgeHandles';
 
@@ -297,6 +297,62 @@ function CanvasFlow() {
         'action-pill:unhighlight-agent',
         handleUnhighlightAgent as EventListener
       );
+    };
+  }, [setNodes]);
+
+  // Auto-highlight agent nodes based on pending actions in the store (always active)
+  useEffect(() => {
+    const updateHighlights = () => {
+      const allActions = agentActionStore.getAllActions();
+      const agentIdsWithActions = new Set(
+        allActions.map((action) => action.agentId).filter((id): id is string => id !== null && id !== undefined)
+      );
+
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          if (node.type !== 'agent') return node;
+          const nodeData = node.data as Record<string, unknown>;
+          const nodeAgentId = nodeData?.agentId as string | undefined;
+          const currentStyle = node.style || {};
+
+          if (nodeAgentId && agentIdsWithActions.has(nodeAgentId)) {
+            // Add blue border and shadow to nodes with pending actions
+            return {
+              ...node,
+              style: {
+                ...currentStyle,
+                border: '2px solid #4a9eff',
+                borderRadius: '12px',
+                boxShadow: '0 0 32px 8px rgba(74, 158, 255, 0.6)',
+              },
+            };
+          } else {
+            // Remove highlight from nodes without pending actions
+            const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
+              string,
+              unknown
+            >;
+            // Only remove if it's our highlight
+            if (
+              (border as string)?.includes('#4a9eff') ||
+              (boxShadow as string)?.includes('rgba(74, 158, 255')
+            ) {
+              return { ...node, style: restStyle };
+            }
+            return node;
+          }
+        })
+      );
+    };
+
+    // Initial update
+    updateHighlights();
+
+    // Subscribe to changes
+    const unsubscribe = agentActionStore.subscribeAll(updateHighlights);
+
+    return () => {
+      unsubscribe();
     };
   }, [setNodes]);
 

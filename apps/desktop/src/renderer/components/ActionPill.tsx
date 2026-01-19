@@ -248,7 +248,7 @@ export function ActionPill() {
   return (
     <div
       onClick={!isSquare ? togglePill : undefined}
-      className={`issues-pill action-pill ${!isSquare ? 'cursor-pointer' : 'cursor-default'} ${
+      className={`issues-pill action-pill ${hasActions ? 'has-pending-actions' : ''} ${!isSquare ? 'cursor-pointer' : 'cursor-default'} ${
         isExpanded ? 'expanded' : ''
       } ${isSquare ? 'square' : ''}`}
       style={{

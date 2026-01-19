@@ -1304,6 +1304,12 @@
   height: 40px;
 }
 
+/* Blue border for pill when actions are pending (collapsed state only) */
+.issues-pill.has-pending-actions:not(.square) {
+  border: 2px solid #4a9eff;
+  box-shadow: 0 0 12px rgba(74, 158, 255, 0.4);
+}
+
 .issues-pill.expanded {
   width: 400px;
 }
