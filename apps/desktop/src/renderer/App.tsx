@@ -2,7 +2,11 @@ import { useEffect, useMemo } from 'react';
 import Canvas from './Canvas';
 import { TitleBar } from './components/TitleBar';
 import { NodeServicesRegistryProvider, ThemeProvider } from './context';
-import { createServiceFactories, sharedEventDispatcher } from './services';
+import {
+  createServiceFactories,
+  notificationSoundService,
+  sharedEventDispatcher,
+} from './services';
 import './App.css';
 
 function App() {
@@ -10,9 +14,14 @@ function App() {
   const factories = useMemo(() => createServiceFactories(), []);
 
   // Initialize shared event dispatcher (single IPC listener for all agent events)
+  // Initialize notification sound service (plays sound on new permission requests)
   useEffect(() => {
     sharedEventDispatcher.initialize();
-    return () => sharedEventDispatcher.dispose();
+    notificationSoundService.initialize();
+    return () => {
+      sharedEventDispatcher.dispose();
+      notificationSoundService.dispose();
+    };
   }, []);
 
   return (
