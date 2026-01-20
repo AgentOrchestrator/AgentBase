@@ -1,1 +1,4 @@
 npx biome check --staged --no-errors-on-unmatched --diagnostic-level=error
+
+# Check for silent return patterns (return undefined, return null)
+./scripts/lint-no-silent-returns.sh

@@ -19,6 +19,7 @@
 import type { GitInfo } from '@agent-orchestrator/shared';
 import { useReactFlow } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNodeActionsOptional } from '../../features/canvas/context';
 import { agentActionStore } from '../../stores';
 import type { AgentNodeData } from '../../types/agent-node';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
@@ -71,6 +72,9 @@ import type { AgentState, SessionReadiness, UseAgentStateInput, WorkspaceSource 
 export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): AgentState {
   // const { getNodes, getEdges } = useReactFlow(); // Commented - will be used when workspace inheritance is re-enabled
   useReactFlow(); // Keep hook call for potential future use
+
+  // Node actions context for direct updates (replaces event-based pattern)
+  const nodeActions = useNodeActionsOptional();
 
   // ---------------------------------------------------------------------------
   // Core State
@@ -278,32 +282,42 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // }, [nodeData.agentId, nodeId]);
 
   // ---------------------------------------------------------------------------
-  // Git Info Fetching - sync to node data
+  // Git Info Fetching - sync to node data via context (not events)
   // ---------------------------------------------------------------------------
+  const lastFetchedWorkspaceRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!workspacePath) {
       setGitInfo(null);
+      lastFetchedWorkspaceRef.current = null;
       return;
     }
 
+    // Skip if we've already fetched for this workspace path
+    if (lastFetchedWorkspaceRef.current === workspacePath) {
+      return;
+    }
+
+    lastFetchedWorkspaceRef.current = workspacePath;
     setIsLoadingGit(true);
     window.gitAPI
       ?.getInfo(workspacePath)
       .then((info) => {
         setGitInfo(info);
         setIsLoadingGit(false);
-        // Sync git info to node data for persistence
-        window.dispatchEvent(
-          new CustomEvent('update-node', {
-            detail: { nodeId, data: { ...nodeData, gitInfo: info, workspacePath } },
-          })
-        );
+        // Sync git info to node data for persistence via context
+        // IMPORTANT: Using context instead of events prevents infinite loops
+        // Only update if nodeActions is available (within provider)
+        if (nodeActions) {
+          nodeActions.updateGitInfo(nodeId, info, workspacePath);
+        }
       })
       .catch(() => {
         setGitInfo(null);
         setIsLoadingGit(false);
       });
-  }, [workspacePath, nodeId, nodeData]);
+    // NOTE: nodeActions excluded from deps - ref guards against re-fetching
+  }, [workspacePath, nodeId]);
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -313,28 +327,20 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
     (path: string) => {
       setManualWorkspacePath(path);
 
-      // Store workspace path directly in node data (single source of truth)
-      const updatedData = {
-        ...nodeData,
-        workspacePath: path,
-      };
-
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId, data: updatedData },
-        })
-      );
+      // Store workspace path directly in node data via context (not events)
+      if (nodeActions) {
+        nodeActions.updateWorkspacePath(nodeId, path);
+      }
     },
-    [nodeId, nodeData]
+    [nodeId, nodeActions]
   );
 
   const deleteNode = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent('delete-node', {
-        detail: { nodeId },
-      })
-    );
-  }, [nodeId]);
+    // Delete node via context (not events)
+    if (nodeActions) {
+      nodeActions.deleteNode(nodeId);
+    }
+  }, [nodeId, nodeActions]);
 
   // ---------------------------------------------------------------------------
   // Mark as initialized once workspace is resolved
