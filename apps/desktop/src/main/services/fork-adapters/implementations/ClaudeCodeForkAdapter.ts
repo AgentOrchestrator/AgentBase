@@ -125,23 +125,25 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
   }
 
   /**
-   * Extract the cwd (working directory) from JSONL content
-   * This is more reliable than using the passed sourceWorkingDir since it comes from the actual session
+   * Extract all unique cwds (working directories) from JSONL content
+   * Sessions that have been forked multiple times may contain multiple cwds
+   * from their history - we need to replace all of them
    */
-  private extractCwdFromContent(content: string): string | null {
+  private extractAllCwdsFromContent(content: string): string[] {
+    const cwds = new Set<string>();
     const lines = content.split('\n');
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
         const obj = JSON.parse(line);
         if (obj.cwd && typeof obj.cwd === 'string') {
-          return obj.cwd;
+          cwds.add(obj.cwd);
         }
       } catch {
         // Skip unparseable lines
       }
     }
-    return null;
+    return Array.from(cwds);
   }
 
   /**
@@ -295,16 +297,15 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
-      // Extract the actual source cwd from the JSONL content
-      // This is more reliable than the passed sourceWorkingDir which may be incorrect
-      const actualSourceCwd = this.extractCwdFromContent(sourceContent) ?? sourceWorkingDir;
+      // Extract all unique cwds from the JSONL content
+      // Sessions that have been forked multiple times contain multiple cwds from their history
+      const allSourceCwds = this.extractAllCwdsFromContent(sourceContent);
 
       console.log('[ClaudeCodeForkAdapter] Read source session file:', {
         sourceFilePath,
         sourceSessionId,
         targetSessionId,
-        actualSourceCwd,
-        passedSourceCwd: sourceWorkingDir,
+        allSourceCwds,
         filterOptions,
       });
 
@@ -321,17 +322,30 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
         });
       }
 
-      // Use JSONLFile to transform paths and optionally replace sessionId
-      // Use the actual source cwd extracted from the JSONL, not the passed value
-      const jsonlFile = new JSONLFile(contentToTransform);
+      // Replace all source cwds with target cwd
+      // This handles sessions that have been forked multiple times and contain multiple cwds
+      let transformedContent = contentToTransform;
       const needsSessionIdReplacement = sourceSessionId !== targetSessionId;
-      const transformed = jsonlFile.replaceFields({
-        cwd: { from: actualSourceCwd, to: resolvedTargetDir },
-        sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
-      });
+
+      for (const sourceCwd of allSourceCwds) {
+        const jsonlFile = new JSONLFile(transformedContent);
+        const transformed = jsonlFile.replaceFields({
+          cwd: { from: sourceCwd, to: resolvedTargetDir },
+          sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
+        });
+        transformedContent = transformed.toString();
+      }
+
+      // If no cwds were found, still do sessionId replacement if needed
+      if (allSourceCwds.length === 0 && needsSessionIdReplacement) {
+        const jsonlFile = new JSONLFile(transformedContent);
+        const transformed = jsonlFile.replaceFields({
+          sessionId: targetSessionId,
+        });
+        transformedContent = transformed.toString();
+      }
 
       // Write to target file
-      const transformedContent = transformed.toString();
       fs.writeFileSync(targetFilePath, transformedContent, 'utf-8');
 
       // Update sessions-index.json to register the forked session
