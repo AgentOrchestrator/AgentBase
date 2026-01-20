@@ -631,7 +631,10 @@ export class ClaudeCodeAgent
     const sourceSessionId = options.sessionId;
 
     const targetCwd = options.workspacePath ?? process.cwd();
-    const sourceCwd = process.cwd();
+    // Use sourceWorkspacePath if provided, otherwise fall back to process.cwd()
+    // sourceWorkspacePath is required for correct session lookup when the same session ID
+    // exists in multiple project folders (from previous forks)
+    const sourceCwd = options.sourceWorkspacePath ?? process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
     const createWorktree = options.createWorktree !== false; // Default to true for backward compatibility
 
@@ -649,38 +652,10 @@ export class ClaudeCodeAgent
       targetCwd,
     });
 
-    // Build fork options
-    const abortController = new AbortController();
-    const sdkOptions: Partial<Options> = {
-      abortController,
-      hooks: this.hookBridge.hooks,
-      canUseTool: this.canUseTool,
-      tools: { type: 'preset', preset: 'claude_code' },
-      systemPrompt: { type: 'preset', preset: 'claude_code' },
-    };
-
-    if (isCrossDirectory) {
-      // For cross-directory forks, use extraArgs to create new session
-      sdkOptions.extraArgs = { 'session-id': sourceSessionId };
-    } else if (!createWorktree) {
-      // For same-directory forks without worktree, use extraArgs with new session ID
-      sdkOptions.extraArgs = { 'session-id': targetSessionId };
-    } else {
-      // For same-directory forks with worktree (shouldn't happen normally), use SDK's built-in fork
-      sdkOptions.resume = sourceSessionId;
-      sdkOptions.forkSession = true;
-    }
-
-    // Trigger fork via empty prompt query (fire-and-forget style)
-    try {
-      await this.executeQuery('', sdkOptions);
-    } catch (error) {
-      console.error('[ClaudeCodeAgent] Failed to create new session', { error });
-    }
-
     // Handle forks that need JSONL file copying
     // - Cross-directory forks: copy to new project directory
     // - Same-directory forks without worktree: copy with new session ID
+    // IMPORTANT: Copy JSONL first, before any executeQuery, so the context is available
     if (isCrossDirectory || !createWorktree) {
       console.log('[ClaudeCodeAgent] Fork requires JSONL file copy', {
         isCrossDirectory,
@@ -709,8 +684,8 @@ export class ClaudeCodeAgent
           // If resolution fails, use original path
         }
 
-        // For same-directory forks, source and target cwd are the same
-        // but we use different session IDs
+        // Copy the JSONL file and update sessions-index.json
+        // This registers the session so Claude Code can discover and resume it
         const forkResult = await adapter.forkSessionFile(
           sourceSessionId,
           targetSessionId,
@@ -725,10 +700,33 @@ export class ClaudeCodeAgent
           });
           throw forkResult.error;
         }
+
+        // For cross-directory forks, we're done - the JSONL is copied and indexed
+        // The user can now resume the session with `claude --resume <sessionId>`
+        // No need to call executeQuery which would overwrite the copied context
+        console.log('[ClaudeCodeAgent] Fork complete - session file copied and indexed');
       } catch (error) {
         return err(
           agentError(AgentErrorCode.UNKNOWN_ERROR, `Failed to fork session file: ${error}`)
         );
+      }
+    } else {
+      // For same-directory forks with worktree, use SDK's built-in fork mechanism
+      const abortController = new AbortController();
+      const sdkOptions: Partial<Options> = {
+        abortController,
+        hooks: this.hookBridge.hooks,
+        canUseTool: this.canUseTool,
+        tools: { type: 'preset', preset: 'claude_code' },
+        systemPrompt: { type: 'preset', preset: 'claude_code' },
+        resume: sourceSessionId,
+        forkSession: true,
+      };
+
+      try {
+        await this.executeQuery('', sdkOptions);
+      } catch (error) {
+        console.error('[ClaudeCodeAgent] Failed to create forked session via SDK', { error });
       }
     }
 

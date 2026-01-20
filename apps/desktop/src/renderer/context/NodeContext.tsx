@@ -95,7 +95,7 @@ export function NodeContextProvider({
   agentType,
   sessionId,
   workspacePath,
-  initialPrompt,
+  initialPrompt: _initialPrompt,
   children,
 }: NodeContextProviderProps) {
   const registry = useNodeServicesRegistry();

@@ -10,6 +10,7 @@ import type {
   ToolInfo,
 } from './loaders/types.js';
 
+// biome-ignore lint/complexity/noBannedTypes: Empty object type is intentional for base config extensibility
 export type BaseConfig = {};
 
 /**

@@ -119,10 +119,14 @@ export class AgentActionStore {
     const agentActions = this.getActions(agentId);
     const agentListeners = this.listenersByAgent.get(agentId);
     if (agentListeners) {
-      agentListeners.forEach((listener) => listener(agentActions));
+      for (const listener of agentListeners) {
+        listener(agentActions);
+      }
     }
 
     const allActions = this.getAllActions();
-    this.allListeners.forEach((listener) => listener(allActions));
+    for (const listener of this.allListeners) {
+      listener(allActions);
+    }
   }
 }

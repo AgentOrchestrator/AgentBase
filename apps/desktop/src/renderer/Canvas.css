@@ -178,8 +178,7 @@
 
 .sidebar-section {
   margin-bottom: 24px;
-  flex-shrink: 0;
-  flex: 1;
+  flex: 1 0 auto;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;

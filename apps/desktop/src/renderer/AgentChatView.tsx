@@ -490,6 +490,7 @@ export default function AgentChatView({
         <div
           key={item.key}
           className="conversation-assistant-text-content"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown rendering requires innerHTML
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -572,6 +573,7 @@ export default function AgentChatView({
         <div className="conversation-assistant-content">
           <div
             className="conversation-assistant-text-content"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown rendering requires innerHTML
             dangerouslySetInnerHTML={{ __html: html }}
           />
           {showCursor && <span className="agent-chat-view-cursor">▊</span>}

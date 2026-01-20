@@ -26,9 +26,6 @@
   transition: transform 0.2s ease;
 }
 
-.agent-node:hover {
-}
-
 .agent-node.selected {
   border-color: var(--color-text-primary);
 }
