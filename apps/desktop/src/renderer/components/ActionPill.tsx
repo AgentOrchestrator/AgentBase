@@ -10,6 +10,57 @@ import './ActionPill.css';
 
 const DEFAULT_LABEL = 'Actions pending';
 
+/**
+ * Translate tool names to human-readable descriptions
+ * Based on translations used in AgentChatView
+ */
+function translateToolName(toolName: string): string {
+  const lowerName = toolName.toLowerCase();
+
+  // Shell/command execution
+  if (lowerName === 'bash' || lowerName === 'shell' || lowerName === 'terminal' || lowerName === 'exec') {
+    return 'Executing command';
+  }
+
+  // File read operations
+  if (lowerName === 'read' || lowerName === 'cat' || lowerName === 'head' || lowerName === 'tail') {
+    return 'Read file';
+  }
+
+  // File write operations
+  if (lowerName === 'write' || lowerName === 'write_file' || lowerName === 'edit' || lowerName === 'touch') {
+    return 'Write file';
+  }
+
+  // File search operations (from AgentChatView: "Scanning the code")
+  if (lowerName === 'grep' || lowerName === 'search') {
+    return 'Scan code';
+  }
+
+  // File gathering (from AgentChatView: "Gathering files")
+  if (lowerName === 'glob' || lowerName === 'find') {
+    return 'Gather files';
+  }
+
+  // Web operations
+  if (lowerName.includes('web') || lowerName.includes('fetch') || lowerName.includes('http')) {
+    return 'Fetch from web';
+  }
+
+  // Code intelligence
+  if (lowerName.includes('lsp') || lowerName === 'definition' || lowerName === 'reference') {
+    return 'Code analysis';
+  }
+
+  // MCP tools
+  if (lowerName.startsWith('mcp')) {
+    return 'External tool';
+  }
+
+  // Default: return original if no translation found
+  return toolName;
+}
+
 export function ActionPill() {
   const [actions, setActions] = useState<AgentAction[]>(() => agentActionStore.getAllActions());
   const [isExpanded, setIsExpanded] = useState(false);
@@ -249,10 +300,10 @@ export function ActionPill() {
     <div
       onClick={!isSquare ? togglePill : undefined}
       className={`issues-pill action-pill ${!isSquare ? 'cursor-pointer' : 'cursor-default'} ${
-        isExpanded ? 'expanded' : ''
-      } ${isSquare ? 'square' : ''}`}
+        isSquare ? 'square' : ''
+      }`}
       style={{
-        borderRadius: isSquare ? '24px' : '20px',
+        borderRadius: '24px',
       }}
     >
       {!isSquare ? (
@@ -330,7 +381,7 @@ export function ActionPill() {
                   <div className="action-pill-agent-label">{agentLabel}</div>
                   <div className="action-pill-card-body">
                     <div className="action-pill-summary">
-                      <span className="action-pill-tool">{approvalAction.toolName}</span>
+                      <span className="action-pill-tool">{translateToolName(approvalAction.toolName)}</span>
                       {approvalAction.command && (
                         <span className="action-pill-command">{approvalAction.command}</span>
                       )}

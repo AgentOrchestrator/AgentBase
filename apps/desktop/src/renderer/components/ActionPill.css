@@ -1,3 +1,47 @@
+/* Action Pill Container - Always expanded, light blue-gray, offset up */
+.action-pill {
+  width: 380px !important; /* 10% narrower than 400px */
+  bottom: 46px !important; /* Adjust this value to change Y position (higher = more up, lower = more down) */
+  background: #e2edee !important;
+  border-color: #d0dde0 !important;
+}
+
+.action-pill:not(.square) {
+  height: 60px !important;
+  display: flex !important;
+  align-items: flex-start !important; /* Align content to top */
+  justify-content: center !important; /* Center horizontally */
+  padding-top: 6px !important; /* Add padding from top */
+  }
+
+.action-pill.cursor-pointer:hover:not(.square) {
+  background: #d5e5e7 !important; /* Slightly darker on hover */
+  border-color: #c5d5d8 !important;
+  transform: translateX(-50%) scale(1.02);
+}
+
+.action-pill.square {
+  height: 500px !important;
+  background: var(--color-bg-primary) !important; /* Restore normal background when expanded */
+  border-color: var(--color-border) !important;
+}
+
+.action-pill .pill-text {
+  color: #358d9d !important;
+  font-weight: normal;
+  font-size: 13px !important;
+  font-family: "SF UI Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: auto !important; /* Don't stretch to full height */
+  padding-top: 0 !important; /* Remove padding since parent has it */
+  display: block !important; /* Change from flex to block so parent flex controls alignment */
+  align-items: unset !important; /* Remove flex alignment */
+  justify-content: unset !important; /* Remove flex justification */
+}
+
+.action-pill.square .pill-text {
+  color: var(--color-text-primary) !important; /* Restore normal text color when expanded */
+}
+
 .action-pill-list {
   position: absolute;
   top: 24px;
@@ -32,8 +76,8 @@
 }
 
 .action-pill-card.highlighted {
-  border: 2px solid #4a9eff;
-  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+  border: 2px solid #358d9d;
+  box-shadow: 0 0 0 2px rgba(53, 141, 157, 0.15);
 }
 
 .action-pill-card + .action-pill-card {
@@ -91,6 +135,7 @@
   border: none;
   color: #0b1020;
   font-weight: 600;
+  font-size: 13px;
   border-radius: 6px;
   padding: 6px 12px;
   cursor: pointer;
@@ -116,7 +161,7 @@
 .action-pill-command,
 .action-pill-path {
   font-family: "Monaco", "Menlo", "Courier New", monospace;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-secondary);
 }
 
@@ -131,6 +176,7 @@
   border-radius: 6px;
   padding: 6px 12px;
   font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
   border: 1px solid transparent;
 }

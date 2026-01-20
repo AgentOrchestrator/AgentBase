@@ -23,6 +23,7 @@ import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
 import { ActionPill } from './components/ActionPill';
+import { MessagePill } from './components/MessagePill';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -230,15 +231,15 @@ function CanvasFlow() {
           const nodeAgentId = nodeData?.agentId as string | undefined;
 
           if (nodeAgentId === agentId) {
-            // Add blue border and shadow to matching node (using command palette blue)
+            // Add turquoise border and shadow to matching node (lighter, more poppy turquoise)
             const currentStyle = node.style || {};
             return {
               ...node,
               style: {
                 ...currentStyle,
-                border: '2px solid #4a9eff',
+                border: '2px solid #4db8c9',
                 borderRadius: '12px',
-                boxShadow: '0 0 32px 8px rgba(74, 158, 255, 0.6)',
+                boxShadow: '0 0 32px 8px rgba(77, 184, 201, 0.5)',
               },
             };
           } else {
@@ -248,10 +249,10 @@ function CanvasFlow() {
               string,
               unknown
             >;
-            // Only remove if it's our highlight (check if it's the blue border/shadow)
+            // Only remove if it's our highlight (check if it's the turquoise border/shadow)
             if (
-              (border as string)?.includes('#4a9eff') ||
-              (boxShadow as string)?.includes('rgba(74, 158, 255')
+              (border as string)?.includes('#4db8c9') ||
+              (boxShadow as string)?.includes('rgba(77, 184, 201')
             ) {
               return { ...node, style: restStyle };
             }
@@ -2944,6 +2945,7 @@ function CanvasFlow() {
         )}
 
         <ActionPill />
+        <MessagePill />
 
         {/* Linear Issue Details Modal */}
         {selectedIssueId && (
