@@ -1,4 +1,77 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { create } from 'zustand';
+
+/**
+ * Pill State Store
+ *
+ * Manages the issues pill animation state:
+ *
+ * Animation sequence for expansion:
+ * 1. Set isPillExpanded true, isPillSquare true (simultaneously)
+ * 2. After 350ms, set showPillContent true
+ * 3. After 450ms (350 + 100), set isContentVisible true
+ *
+ * Animation sequence for collapse:
+ * 1. Set isContentVisible false, showPillContent false (immediately)
+ * 2. After 50ms, set isPillSquare false, isPillExpanded false
+ * 3. After 400ms (50 + 350), set isTextVisible true
+ */
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface PillState {
+  /** Whether the pill is expanded */
+  isPillExpanded: boolean;
+  /** Whether the pill is in square shape (intermediate animation state) */
+  isPillSquare: boolean;
+  /** Whether to show the pill content container */
+  showPillContent: boolean;
+  /** Whether the content inside is visible (for fade animation) */
+  isContentVisible: boolean;
+  /** Whether the collapsed text is visible */
+  isTextVisible: boolean;
+}
+
+interface PillActions {
+  /** Set isPillExpanded state */
+  setIsPillExpanded: (value: boolean) => void;
+  /** Set isPillSquare state */
+  setIsPillSquare: (value: boolean) => void;
+  /** Set showPillContent state */
+  setShowPillContent: (value: boolean) => void;
+  /** Set isContentVisible state */
+  setIsContentVisible: (value: boolean) => void;
+  /** Set isTextVisible state */
+  setIsTextVisible: (value: boolean) => void;
+}
+
+export type PillStore = PillState & PillActions;
+
+// =============================================================================
+// Store
+// =============================================================================
+
+export const usePillStore = create<PillStore>((set) => ({
+  // Initial state
+  isPillExpanded: false,
+  isPillSquare: false,
+  showPillContent: false,
+  isContentVisible: false,
+  isTextVisible: true,
+
+  // Actions
+  setIsPillExpanded: (value) => set({ isPillExpanded: value }),
+  setIsPillSquare: (value) => set({ isPillSquare: value }),
+  setShowPillContent: (value) => set({ showPillContent: value }),
+  setIsContentVisible: (value) => set({ isContentVisible: value }),
+  setIsTextVisible: (value) => set({ isTextVisible: value }),
+}));
+
+// =============================================================================
+// Wrapper Hook (with animation logic)
+// =============================================================================
 
 /**
  * Return type for the usePillState hook
@@ -23,24 +96,21 @@ export interface UsePillStateReturn {
 /**
  * Hook for managing the issues pill animation state
  *
- * Animation sequence for expansion:
- * 1. Set isPillExpanded true, isPillSquare true (simultaneously)
- * 2. After 350ms, set showPillContent true
- * 3. After 450ms (350 + 100), set isContentVisible true
- *
- * Animation sequence for collapse:
- * 1. Set isContentVisible false, showPillContent false (immediately)
- * 2. After 50ms, set isPillSquare false, isPillExpanded false
- * 3. After 400ms (50 + 350), set isTextVisible true
- *
  * @param onExpand - Optional callback to run when pill is expanded (e.g., fetch data)
  */
 export function usePillState(onExpand?: () => void): UsePillStateReturn {
-  const [isPillExpanded, setIsPillExpanded] = useState(false);
-  const [isPillSquare, setIsPillSquare] = useState(false);
-  const [showPillContent, setShowPillContent] = useState(false);
-  const [isContentVisible, setIsContentVisible] = useState(false);
-  const [isTextVisible, setIsTextVisible] = useState(true);
+  const {
+    isPillExpanded,
+    isPillSquare,
+    showPillContent,
+    isContentVisible,
+    isTextVisible,
+    setIsPillExpanded,
+    setIsPillSquare,
+    setShowPillContent,
+    setIsContentVisible,
+    setIsTextVisible,
+  } = usePillStore();
 
   const togglePill = useCallback(() => {
     if (!isPillExpanded) {
@@ -73,7 +143,15 @@ export function usePillState(onExpand?: () => void): UsePillStateReturn {
         setIsTextVisible(true);
       }, 350);
     }
-  }, [isPillExpanded, onExpand]);
+  }, [
+    isPillExpanded,
+    onExpand,
+    setIsTextVisible,
+    setIsPillExpanded,
+    setIsPillSquare,
+    setShowPillContent,
+    setIsContentVisible,
+  ]);
 
   const collapsePill = useCallback(() => {
     // First hide animations immediately
@@ -89,7 +167,13 @@ export function usePillState(onExpand?: () => void): UsePillStateReturn {
         setIsTextVisible(true);
       }, 350);
     }, 50);
-  }, []);
+  }, [
+    setIsContentVisible,
+    setShowPillContent,
+    setIsPillSquare,
+    setIsPillExpanded,
+    setIsTextVisible,
+  ]);
 
   return {
     isPillExpanded,

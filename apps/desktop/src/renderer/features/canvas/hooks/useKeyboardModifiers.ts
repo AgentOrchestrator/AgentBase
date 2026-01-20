@@ -1,13 +1,29 @@
-import { useCallback, useState } from 'react';
+import { create } from 'zustand';
 
 /**
- * Return type for the useKeyboardModifiers hook
+ * Keyboard Modifiers Store
+ *
+ * Tracks keyboard modifier states for canvas interactions:
+ * - Cmd/Ctrl key for enabling node dragging
+ * - Shift key for snap-to-edge behavior
+ *
+ * Note: This store does not add its own event listeners.
+ * The component should call enableNodeDrag/disableNodeDrag/setShiftPressed
+ * from its existing keyboard event handlers to avoid duplicate listeners.
  */
-export interface UseKeyboardModifiersReturn {
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface KeyboardModifiersState {
   /** Whether node drag is enabled (Cmd/Ctrl held) */
   isNodeDragEnabled: boolean;
   /** Whether shift key is pressed (for snap-to-edge) */
   isShiftPressed: boolean;
+}
+
+interface KeyboardModifiersActions {
   /** Enable node drag */
   enableNodeDrag: () => void;
   /** Disable node drag */
@@ -16,38 +32,24 @@ export interface UseKeyboardModifiersReturn {
   setShiftPressed: (pressed: boolean) => void;
 }
 
+export type KeyboardModifiersStore = KeyboardModifiersState & KeyboardModifiersActions;
+
 /**
- * Hook for tracking keyboard modifier states for canvas interactions
- *
- * Provides state and methods for:
- * - Cmd/Ctrl key for enabling node dragging
- * - Shift key for snap-to-edge behavior
- *
- * Note: This hook does not add its own event listeners.
- * The component should call enableNodeDrag/disableNodeDrag/setShiftPressed
- * from its existing keyboard event handlers to avoid duplicate listeners.
+ * Return type for the useKeyboardModifiers hook (backwards compatibility)
  */
-export function useKeyboardModifiers(): UseKeyboardModifiersReturn {
-  const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
-  const [isShiftPressed, setIsShiftPressed] = useState(false);
+export type UseKeyboardModifiersReturn = KeyboardModifiersStore;
 
-  const enableNodeDrag = useCallback(() => {
-    setIsNodeDragEnabled(true);
-  }, []);
+// =============================================================================
+// Store
+// =============================================================================
 
-  const disableNodeDrag = useCallback(() => {
-    setIsNodeDragEnabled(false);
-  }, []);
+export const useKeyboardModifiers = create<KeyboardModifiersStore>((set) => ({
+  // Initial state
+  isNodeDragEnabled: false,
+  isShiftPressed: false,
 
-  const setShiftPressed = useCallback((pressed: boolean) => {
-    setIsShiftPressed(pressed);
-  }, []);
-
-  return {
-    isNodeDragEnabled,
-    isShiftPressed,
-    enableNodeDrag,
-    disableNodeDrag,
-    setShiftPressed,
-  };
-}
+  // Actions
+  enableNodeDrag: () => set({ isNodeDragEnabled: true }),
+  disableNodeDrag: () => set({ isNodeDragEnabled: false }),
+  setShiftPressed: (pressed) => set({ isShiftPressed: pressed }),
+}));

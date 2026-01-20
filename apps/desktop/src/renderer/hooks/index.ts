@@ -26,6 +26,7 @@ export type {
   ForkConfirmError,
   ForkConfirmResult,
   ForkModalData,
+  MessagePreview,
   UseForkModalInput,
   UseForkModalReturn,
 } from '../features/canvas/hooks/useForkModal';
@@ -39,6 +40,48 @@ export {
   type UsePendingAgentReturn,
   usePendingAgent,
 } from '../features/canvas/hooks/usePendingAgent';
+export {
+  type PillStore,
+  type UsePillStateReturn,
+  usePillState,
+  usePillStore,
+} from '../features/issues-pill/usePillState';
+export type { UseLinearReturn } from '../features/linear/hooks/useLinear';
+// =============================================================================
+// Linear Integration Hook - Linear API and state management
+// =============================================================================
+export { useLinear } from '../features/linear/hooks/useLinear';
+// =============================================================================
+// Linear Panel Hook - Linear panel collapse and resize
+// =============================================================================
+export {
+  type LinearPanelStore,
+  type UseLinearPanelInput,
+  type UseLinearPanelReturn,
+  useLinearPanel,
+  useLinearPanelStore,
+} from '../features/linear/hooks/useLinearPanel';
+export {
+  type AgentHierarchy,
+  type AgentHierarchyEntry,
+  type UseAgentHierarchyReturn,
+  useAgentHierarchy,
+} from '../features/sidebar/hooks/useAgentHierarchy';
+export {
+  applyHighlightStylesToNodes,
+  type FolderHighlightStore,
+  type UseFolderHighlightReturn,
+  useFolderHighlight,
+  useFolderHighlightStore,
+} from '../features/sidebar/hooks/useFolderHighlight';
+export { type UseFolderLockReturn, useFolderLock } from '../features/sidebar/hooks/useFolderLock';
+export {
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  type SidebarStore,
+  type UseSidebarStateReturn,
+  useSidebarState,
+} from '../features/sidebar/hooks/useSidebarState';
 // =============================================================================
 // Re-export Linear types from the store for convenience
 // =============================================================================
@@ -51,12 +94,6 @@ export type {
   MilestoneOption as LinearMilestoneOption,
 } from '../stores/ILinearStore';
 export * from './canvasConverters';
-export {
-  type AgentHierarchy,
-  type AgentHierarchyEntry,
-  type UseAgentHierarchyReturn,
-  useAgentHierarchy,
-} from './useAgentHierarchy';
 // =============================================================================
 // useAgentState - THE SINGLE SOURCE OF TRUTH for agent state
 // =============================================================================
@@ -88,39 +125,17 @@ export type {
 // Chat Messages Hook - Unified message loading, file watching, and sending
 // =============================================================================
 export { useChatMessages } from './useChatMessages';
-export {
-  applyHighlightStylesToNodes,
-  type UseFolderHighlightReturn,
-  useFolderHighlight,
-} from './useFolderHighlight';
-export { type UseFolderLockReturn, useFolderLock } from './useFolderLock';
 // =============================================================================
 // GitHub User Hook - GitHub username fetching
 // =============================================================================
 export { type UseGithubUserReturn, useGithubUser } from './useGithubUser';
-export type { UseLinearReturn } from './useLinear';
-// =============================================================================
-// Linear Integration Hook - Linear API and state management
-// =============================================================================
-export { useLinear } from './useLinear';
-// =============================================================================
-// Linear Panel Hook - Linear panel collapse and resize
-// =============================================================================
-export {
-  type UseLinearPanelInput,
-  type UseLinearPanelReturn,
-  useLinearPanel,
-} from './useLinearPanel';
-export { type UsePillStateReturn, usePillState } from './usePillState';
 export { useSessionFileWatcher } from './useSessionFileWatcher';
 export type {
   SessionOverviewState,
   UseSessionOverviewOptions,
   UseSessionOverviewReturn,
 } from './useSessionOverview';
-
 // =============================================================================
 // Session Overview Hook - Unified session data management
 // =============================================================================
 export { useSessionOverview } from './useSessionOverview';
-export { type UseSidebarStateReturn, useSidebarState } from './useSidebarState';

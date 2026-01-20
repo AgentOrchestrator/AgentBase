@@ -276,4 +276,4 @@ export type {
   LinearProject,
   LinearWorkflowState,
   MilestoneOption,
-} from '../stores/ILinearStore';
+} from '../../../stores/ILinearStore';

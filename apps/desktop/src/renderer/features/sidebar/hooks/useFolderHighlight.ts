@@ -1,50 +1,78 @@
 import type { Node } from '@xyflow/react';
-import { useCallback, useState } from 'react';
+import { create } from 'zustand';
+
+/**
+ * Folder Highlight Store
+ *
+ * Manages folder highlight state in the canvas:
+ * - Assigns unique colors to each folder when highlighting is enabled
+ * - Provides color lookup for sidebar and node styling
+ * - Shuffles colors randomly for visual variety
+ */
+
+// =============================================================================
+// Constants
+// =============================================================================
 
 const HIGHLIGHT_COLORS = ['#F24F1F', '#FF7362', '#A259FF', '#1ABCFE', '#0ECF84', '#F5C348'];
 
-/**
- * Return type for the useFolderHighlight hook
- */
-export interface UseFolderHighlightReturn {
+// =============================================================================
+// Types
+// =============================================================================
+
+interface FolderHighlightState {
   /** Whether highlight-all mode is active */
   isHighlightAllActive: boolean;
   /** Map of folder paths to their assigned colors */
   folderColors: Map<string, string>;
   /** Set of currently highlighted folder paths */
   highlightedFolders: Set<string>;
-  /** Toggle highlight-all mode on/off */
-  toggleHighlightAll: () => void;
-  /** Get the highlight color for a specific folder path */
-  getHighlightColor: (folderPath: string | null | undefined) => string | null;
 }
 
-/**
- * Hook for managing folder highlight state in the canvas
- *
- * Features:
- * - Assigns unique colors to each folder when highlighting is enabled
- * - Provides color lookup for sidebar and node styling
- * - Shuffles colors randomly for visual variety
- *
- * @param folderPathMap - Map of folder names to their paths
- */
-export function useFolderHighlight(
-  folderPathMap: Record<string, string>
-): UseFolderHighlightReturn {
-  const [isHighlightAllActive, setIsHighlightAllActive] = useState(false);
-  const [highlightedFolders, setHighlightedFolders] = useState<Set<string>>(new Set());
-  const [folderColors, setFolderColors] = useState<Map<string, string>>(new Map());
+interface FolderHighlightActions {
+  /** Toggle highlight-all mode on/off */
+  toggleHighlightAll: (folderPathMap: Record<string, string>) => void;
+  /** Get the highlight color for a specific folder path */
+  getHighlightColor: (folderPath: string | null | undefined) => string | undefined;
+}
 
-  const toggleHighlightAll = useCallback(() => {
+export type FolderHighlightStore = FolderHighlightState & FolderHighlightActions;
+
+/**
+ * Return type for the useFolderHighlight wrapper hook (backwards compatibility)
+ * Note: toggleHighlightAll has no parameters in the wrapper since folderPathMap is bound
+ */
+export interface UseFolderHighlightReturn {
+  isHighlightAllActive: boolean;
+  folderColors: Map<string, string>;
+  highlightedFolders: Set<string>;
+  toggleHighlightAll: () => void;
+  getHighlightColor: (folderPath: string | null | undefined) => string | undefined;
+}
+
+// =============================================================================
+// Store
+// =============================================================================
+
+export const useFolderHighlightStore = create<FolderHighlightStore>((set, get) => ({
+  // Initial state
+  isHighlightAllActive: false,
+  folderColors: new Map<string, string>(),
+  highlightedFolders: new Set<string>(),
+
+  // Actions
+  toggleHighlightAll: (folderPathMap) => {
+    const { isHighlightAllActive } = get();
+
     if (isHighlightAllActive) {
       // Turn off: clear all highlights
-      setIsHighlightAllActive(false);
-      setHighlightedFolders(new Set());
-      setFolderColors(new Map());
+      set({
+        isHighlightAllActive: false,
+        highlightedFolders: new Set<string>(),
+        folderColors: new Map<string, string>(),
+      });
     } else {
       // Turn on: highlight all folders with unique colors
-      setIsHighlightAllActive(true);
       const allFolderPaths = Object.values(folderPathMap).filter(Boolean) as string[];
       const newHighlightedFolders = new Set<string>(allFolderPaths);
       const newFolderColors = new Map<string, string>();
@@ -55,27 +83,45 @@ export function useFolderHighlight(
         newFolderColors.set(folderPath, shuffledColors[index % HIGHLIGHT_COLORS.length]);
       });
 
-      setHighlightedFolders(newHighlightedFolders);
-      setFolderColors(newFolderColors);
+      set({
+        isHighlightAllActive: true,
+        highlightedFolders: newHighlightedFolders,
+        folderColors: newFolderColors,
+      });
     }
-  }, [isHighlightAllActive, folderPathMap]);
+  },
 
-  const getHighlightColor = useCallback(
-    (folderPath: string | null | undefined): string | null => {
-      if (!folderPath) return null;
-      return folderColors.get(folderPath) || null;
-    },
-    [folderColors]
-  );
+  getHighlightColor: (folderPath) => {
+    if (!folderPath) return undefined;
+    return get().folderColors.get(folderPath);
+  },
+}));
 
+// =============================================================================
+// Wrapper Hook (for backwards compatibility with parameter)
+// =============================================================================
+
+/**
+ * Hook for managing folder highlight state in the canvas
+ *
+ * @param folderPathMap - Map of folder names to their paths
+ * @deprecated Use useFolderHighlightStore directly and pass folderPathMap to toggleHighlightAll
+ */
+export function useFolderHighlight(
+  folderPathMap: Record<string, string>
+): UseFolderHighlightReturn {
+  const store = useFolderHighlightStore();
+
+  // Return store with bound toggleHighlightAll
   return {
-    isHighlightAllActive,
-    folderColors,
-    highlightedFolders,
-    toggleHighlightAll,
-    getHighlightColor,
+    ...store,
+    toggleHighlightAll: () => store.toggleHighlightAll(folderPathMap),
   };
 }
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
 
 /**
  * Utility function to apply highlight styles to nodes

@@ -1,9 +1,20 @@
-import { useCallback, useState } from 'react';
+import { create } from 'zustand';
 
 /**
- * Return type for the useCanvasUIState hook
+ * Canvas UI State Store
+ *
+ * Manages canvas UI state (modals and overlays):
+ * - Linear issue details modal (selectedIssueId)
+ * - Settings modal
+ * - Command palette
+ * - New agent modal
  */
-export interface UseCanvasUIStateReturn {
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface CanvasUIState {
   /** ID of the selected Linear issue (for details modal) */
   selectedIssueId: string | null;
   /** Whether the settings modal is open */
@@ -12,6 +23,9 @@ export interface UseCanvasUIStateReturn {
   isCommandPaletteOpen: boolean;
   /** Whether the new agent modal is open */
   isNewAgentModalOpen: boolean;
+}
+
+interface CanvasUIActions {
   /** Set the selected issue ID */
   setSelectedIssueId: (id: string | null) => void;
   /** Open settings modal */
@@ -34,71 +48,37 @@ export interface UseCanvasUIStateReturn {
   toggleNewAgentModal: () => void;
 }
 
+export type CanvasUIStore = CanvasUIState & CanvasUIActions;
+
 /**
- * Hook for managing canvas UI state (modals and overlays)
- *
- * Manages:
- * - Linear issue details modal (selectedIssueId)
- * - Settings modal
- * - Command palette
- * - New agent modal
+ * Return type for the useCanvasUIState hook (backwards compatibility)
  */
-export function useCanvasUIState(): UseCanvasUIStateReturn {
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
+export type UseCanvasUIStateReturn = CanvasUIStore;
 
-  const openSettings = useCallback(() => {
-    setIsSettingsOpen(true);
-  }, []);
+// =============================================================================
+// Store
+// =============================================================================
 
-  const closeSettings = useCallback(() => {
-    setIsSettingsOpen(false);
-  }, []);
+export const useCanvasUIState = create<CanvasUIStore>((set) => ({
+  // Initial state
+  selectedIssueId: null,
+  isSettingsOpen: false,
+  isCommandPaletteOpen: false,
+  isNewAgentModalOpen: false,
 
-  const toggleSettings = useCallback(() => {
-    setIsSettingsOpen((prev) => !prev);
-  }, []);
+  // Actions
+  setSelectedIssueId: (id) => set({ selectedIssueId: id }),
 
-  const openCommandPalette = useCallback(() => {
-    setIsCommandPaletteOpen(true);
-  }, []);
+  openSettings: () => set({ isSettingsOpen: true }),
+  closeSettings: () => set({ isSettingsOpen: false }),
+  toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
 
-  const closeCommandPalette = useCallback(() => {
-    setIsCommandPaletteOpen(false);
-  }, []);
+  openCommandPalette: () => set({ isCommandPaletteOpen: true }),
+  closeCommandPalette: () => set({ isCommandPaletteOpen: false }),
+  toggleCommandPalette: () =>
+    set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen })),
 
-  const toggleCommandPalette = useCallback(() => {
-    setIsCommandPaletteOpen((prev) => !prev);
-  }, []);
-
-  const openNewAgentModal = useCallback(() => {
-    setIsNewAgentModalOpen(true);
-  }, []);
-
-  const closeNewAgentModal = useCallback(() => {
-    setIsNewAgentModalOpen(false);
-  }, []);
-
-  const toggleNewAgentModal = useCallback(() => {
-    setIsNewAgentModalOpen((prev) => !prev);
-  }, []);
-
-  return {
-    selectedIssueId,
-    isSettingsOpen,
-    isCommandPaletteOpen,
-    isNewAgentModalOpen,
-    setSelectedIssueId,
-    openSettings,
-    closeSettings,
-    toggleSettings,
-    openCommandPalette,
-    closeCommandPalette,
-    toggleCommandPalette,
-    openNewAgentModal,
-    closeNewAgentModal,
-    toggleNewAgentModal,
-  };
-}
+  openNewAgentModal: () => set({ isNewAgentModalOpen: true }),
+  closeNewAgentModal: () => set({ isNewAgentModalOpen: false }),
+  toggleNewAgentModal: () => set((state) => ({ isNewAgentModalOpen: !state.isNewAgentModalOpen })),
+}));

@@ -5,7 +5,7 @@
  * Allows users to click any message to set it as the cutoff point.
  */
 
-import type { MessagePreview } from '../hooks/useForkModal';
+import type { MessagePreview } from '../hooks';
 import './MessagePreviewPanel.css';
 
 export interface MessagePreviewPanelProps {

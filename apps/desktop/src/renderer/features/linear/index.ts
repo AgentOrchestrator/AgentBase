@@ -5,9 +5,9 @@
  */
 
 // Re-export Linear types from the store for convenience
+// Note: LinearIssue is not re-exported here to avoid conflict with canvas/hooks/useCanvasDrop
 export type {
   LinearFilterState,
-  LinearIssue,
   LinearMilestone,
   LinearProject,
   LinearWorkflowState,

@@ -1,5 +1,58 @@
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { create } from 'zustand';
+import { useSidebarState } from '../../sidebar/hooks/useSidebarState';
+
+/**
+ * Linear Panel Store
+ *
+ * Manages Linear panel state:
+ * - Collapsed state for the Linear panel
+ * - Resize dragging state
+ *
+ * The resize functionality uses the sidebar width from useSidebarState.
+ */
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface LinearPanelState {
+  /** Whether the Linear panel is collapsed */
+  isCollapsed: boolean;
+  /** Whether a resize is in progress */
+  isResizing: boolean;
+}
+
+interface LinearPanelActions {
+  /** Toggle the collapsed state */
+  toggleCollapsed: () => void;
+  /** Set the collapsed state */
+  setCollapsed: (collapsed: boolean) => void;
+  /** Set the resizing state */
+  setResizing: (resizing: boolean) => void;
+}
+
+export type LinearPanelStore = LinearPanelState & LinearPanelActions;
+
+// =============================================================================
+// Store
+// =============================================================================
+
+export const useLinearPanelStore = create<LinearPanelStore>((set) => ({
+  // Initial state
+  isCollapsed: false,
+  isResizing: false,
+
+  // Actions
+  toggleCollapsed: () => set((state) => ({ isCollapsed: !state.isCollapsed })),
+  setCollapsed: (collapsed) => set({ isCollapsed: collapsed }),
+  setResizing: (resizing) => set({ isResizing: resizing }),
+}));
+
+// =============================================================================
+// Wrapper Hook (with resize handling)
+// =============================================================================
 
 /**
  * Return type for the useLinearPanel hook
@@ -18,7 +71,7 @@ export interface UseLinearPanelReturn {
 }
 
 /**
- * Input for the useLinearPanel hook
+ * Input for the useLinearPanel hook (backwards compatibility)
  */
 export interface UseLinearPanelInput {
   /** Current sidebar width (from useSidebarState) */
@@ -30,39 +83,34 @@ export interface UseLinearPanelInput {
 /**
  * Hook for managing Linear panel collapse and resize state
  *
- * Manages:
- * - Collapsed state for the Linear panel
- * - Resize dragging for the sidebar
- *
- * The resize functionality updates the sidebar width via the provided
- * setSidebarWidth function from useSidebarState.
+ * Can be called with or without parameters:
+ * - Without parameters: uses useSidebarState internally
+ * - With parameters: uses provided sidebarWidth/setSidebarWidth (backwards compatibility)
  */
-export function useLinearPanel(input: UseLinearPanelInput): UseLinearPanelReturn {
-  const { sidebarWidth, setSidebarWidth } = input;
+export function useLinearPanel(input?: UseLinearPanelInput): UseLinearPanelReturn {
+  // Get sidebar state - either from input or from store
+  const sidebarStore = useSidebarState();
+  const sidebarWidth = input?.sidebarWidth ?? sidebarStore.sidebarWidth;
+  const setSidebarWidth = input?.setSidebarWidth ?? sidebarStore.setSidebarWidth;
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
+  // Get panel state from store
+  const { isCollapsed, isResizing, toggleCollapsed, setCollapsed, setResizing } =
+    useLinearPanelStore();
+
+  // Refs for resize handling
   const resizeStartXRef = useRef<number>(0);
   const resizeStartWidthRef = useRef<number>(0);
-
-  const toggleCollapsed = useCallback(() => {
-    setIsCollapsed((prev) => !prev);
-  }, []);
-
-  const setCollapsed = useCallback((collapsed: boolean) => {
-    setIsCollapsed(collapsed);
-  }, []);
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      setIsResizing(true);
+      setResizing(true);
       resizeStartXRef.current = e.clientX;
       resizeStartWidthRef.current = sidebarWidth;
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
     },
-    [sidebarWidth]
+    [sidebarWidth, setResizing]
   );
 
   const handleResizeMove = useCallback(
@@ -76,10 +124,10 @@ export function useLinearPanel(input: UseLinearPanelInput): UseLinearPanelReturn
   );
 
   const handleResizeEnd = useCallback(() => {
-    setIsResizing(false);
+    setResizing(false);
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-  }, []);
+  }, [setResizing]);
 
   useEffect(() => {
     if (isResizing) {

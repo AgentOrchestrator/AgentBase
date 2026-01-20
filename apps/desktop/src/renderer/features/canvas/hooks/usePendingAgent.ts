@@ -1,5 +1,21 @@
-import { useCallback, useState } from 'react';
+import { create } from 'zustand';
 import type { LinearIssue } from './useCanvasDrop';
+
+/**
+ * Pending Agent Store
+ *
+ * Manages pending agent creation state:
+ * - Position where a new agent should be created
+ * - Linear issue to attach to the new agent
+ * - Whether to auto-create a worktree
+ *
+ * This state is used when the new agent modal is opened
+ * from various sources (context menu, drag & drop, keyboard shortcut).
+ */
+
+// =============================================================================
+// Types
+// =============================================================================
 
 /**
  * Position for a pending agent
@@ -9,16 +25,16 @@ export interface PendingAgentPosition {
   y: number;
 }
 
-/**
- * Return type for the usePendingAgent hook
- */
-export interface UsePendingAgentReturn {
+interface PendingAgentState {
   /** Position where the new agent should be created */
   pendingPosition: PendingAgentPosition | undefined;
   /** Linear issue to attach to the new agent */
   pendingLinearIssue: LinearIssue | undefined;
   /** Whether to auto-create a worktree for the new agent */
   autoCreateWorktree: boolean;
+}
+
+interface PendingAgentActions {
   /** Set pending agent data */
   setPending: (
     position: PendingAgentPosition | undefined,
@@ -31,55 +47,37 @@ export interface UsePendingAgentReturn {
   setAutoCreateWorktree: (value: boolean) => void;
 }
 
+export type PendingAgentStore = PendingAgentState & PendingAgentActions;
+
 /**
- * Hook for managing pending agent creation state
- *
- * Manages:
- * - Position where a new agent should be created
- * - Linear issue to attach to the new agent
- * - Whether to auto-create a worktree
- *
- * This state is used when the new agent modal is opened
- * from various sources (context menu, drag & drop, keyboard shortcut).
+ * Return type for the usePendingAgent hook (backwards compatibility)
  */
-export function usePendingAgent(): UsePendingAgentReturn {
-  const [pendingPosition, setPendingPosition] = useState<PendingAgentPosition | undefined>(
-    undefined
-  );
-  const [pendingLinearIssue, setPendingLinearIssue] = useState<LinearIssue | undefined>(undefined);
-  const [autoCreateWorktree, setAutoCreateWorktreeState] = useState(false);
+export type UsePendingAgentReturn = PendingAgentStore;
 
-  const setPending = useCallback(
-    (
-      position: PendingAgentPosition | undefined,
-      linearIssue?: LinearIssue,
-      createWorktree?: boolean
-    ) => {
-      setPendingPosition(position);
-      setPendingLinearIssue(linearIssue);
-      if (createWorktree !== undefined) {
-        setAutoCreateWorktreeState(createWorktree);
-      }
-    },
-    []
-  );
+// =============================================================================
+// Store
+// =============================================================================
 
-  const clearPending = useCallback(() => {
-    setPendingPosition(undefined);
-    setPendingLinearIssue(undefined);
-    setAutoCreateWorktreeState(false);
-  }, []);
+export const usePendingAgent = create<PendingAgentStore>((set) => ({
+  // Initial state
+  pendingPosition: undefined,
+  pendingLinearIssue: undefined,
+  autoCreateWorktree: false,
 
-  const setAutoCreateWorktree = useCallback((value: boolean) => {
-    setAutoCreateWorktreeState(value);
-  }, []);
+  // Actions
+  setPending: (position, linearIssue, createWorktree) =>
+    set((state) => ({
+      pendingPosition: position,
+      pendingLinearIssue: linearIssue,
+      autoCreateWorktree: createWorktree !== undefined ? createWorktree : state.autoCreateWorktree,
+    })),
 
-  return {
-    pendingPosition,
-    pendingLinearIssue,
-    autoCreateWorktree,
-    setPending,
-    clearPending,
-    setAutoCreateWorktree,
-  };
-}
+  clearPending: () =>
+    set({
+      pendingPosition: undefined,
+      pendingLinearIssue: undefined,
+      autoCreateWorktree: false,
+    }),
+
+  setAutoCreateWorktree: (value) => set({ autoCreateWorktree: value }),
+}));
