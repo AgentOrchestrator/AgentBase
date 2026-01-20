@@ -14,7 +14,7 @@ import {
   useUpdateNodeInternals,
 } from '@xyflow/react';
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import '@xyflow/react/dist/style.css';
 import { Dithering, MeshGradient } from '@paper-design/shaders-react';
 import ForkGhostNode from './ForkGhostNode';
@@ -33,13 +33,20 @@ import {
   applyHighlightStylesToNodes,
   type LinearIssue,
   useAgentHierarchy,
+  useAutoFork,
   useCanvasActions,
   useCanvasDrop,
   useCanvasPersistence,
+  useCanvasUIState,
+  useContextMenu,
   useFolderHighlight,
   useFolderLock,
   useForkModal,
+  useGithubUser,
+  useKeyboardModifiers,
   useLinear,
+  useLinearPanel,
+  usePendingAgent,
   usePillState,
   useSidebarState,
 } from './hooks';
@@ -60,11 +67,6 @@ const nodeTypes = {
 
 const defaultNodes: Node[] = [];
 const defaultEdges: Edge[] = [];
-
-type ContextMenu = {
-  x: number;
-  y: number;
-} | null;
 
 const sanitizeEdges = (edges: Edge[], nodes: Node[]) => {
   const nodeIds = new Set(nodes.map((node) => node.id));
@@ -100,12 +102,11 @@ function CanvasFlow() {
   // Theme hook
   const { theme, setTheme } = useTheme();
 
-  // GitHub username state
-  const [githubUsername, setGithubUsername] = useState<string | null>(null);
-  const [githubError, setGithubError] = useState<string | null>(null);
+  // GitHub username state (extracted to hook)
+  const githubUser = useGithubUser();
 
-  // Linear issue details modal state
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  // Canvas UI state (modals and overlays)
+  const canvasUI = useCanvasUIState();
 
   // Canvas persistence hook - centralized save/restore logic
   const {
@@ -125,27 +126,6 @@ function CanvasFlow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     initialEdges.length > 0 ? initialEdges : defaultEdges
   );
-
-  // Fetch GitHub username on mount
-  useEffect(() => {
-    const fetchGithubUsername = async () => {
-      try {
-        const result = await window.gitAPI?.getGithubUsername();
-        if (result?.success && result.username) {
-          setGithubUsername(result.username);
-          setGithubError(null);
-        } else {
-          setGithubError(result?.error || 'Failed to get GitHub username');
-          setGithubUsername(null);
-        }
-      } catch (error) {
-        const errorMessage = (error as Error).message || 'Unknown error';
-        setGithubError(errorMessage);
-        setGithubUsername(null);
-      }
-    };
-    fetchGithubUsername();
-  }, []);
 
   // Track if initial state has been applied
   const initialStateApplied = useRef(false);
@@ -183,13 +163,26 @@ function CanvasFlow() {
   }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
 
   // Persist nodes when they change
+  // Use a ref for persistNodes to avoid it being a dependency (prevents infinite loops)
+  const persistNodesRef = useRef(persistNodes);
+  persistNodesRef.current = persistNodes;
+
   const prevNodesRef = useRef<Node[]>(nodes);
+  const nodeChangeCountRef = useRef(0);
   useEffect(() => {
     if (!isCanvasLoading && nodes !== prevNodesRef.current) {
+      nodeChangeCountRef.current += 1;
+      // Log warning if nodes change too frequently (indicates potential infinite loop)
+      if (nodeChangeCountRef.current > 10) {
+        console.warn(
+          `[CanvasPersistence] WARNING: nodes changed ${nodeChangeCountRef.current} times - potential infinite loop`
+        );
+        console.trace('[CanvasPersistence] Stack trace for node change');
+      }
       prevNodesRef.current = nodes;
-      persistNodes(nodes);
+      persistNodesRef.current(nodes);
     }
-  }, [nodes, isCanvasLoading, persistNodes]);
+  }, [nodes, isCanvasLoading]);
 
   // Sanitize edges whenever they change to remove any "null" string handles
   useEffect(() => {
@@ -209,13 +202,17 @@ function CanvasFlow() {
   }, [edges, nodes, isCanvasLoading, setEdges]);
 
   // Persist edges when they change
+  // Use a ref for persistEdges to avoid it being a dependency (prevents infinite loops)
+  const persistEdgesRef = useRef(persistEdges);
+  persistEdgesRef.current = persistEdges;
+
   const prevEdgesRef = useRef<Edge[]>(edges);
   useEffect(() => {
     if (!isCanvasLoading && edges !== prevEdgesRef.current) {
       prevEdgesRef.current = edges;
-      persistEdges(edges);
+      persistEdgesRef.current(edges);
     }
-  }, [edges, isCanvasLoading, persistEdges]);
+  }, [edges, isCanvasLoading]);
 
   // Handle action pill highlighting events
   useEffect(() => {
@@ -300,36 +297,21 @@ function CanvasFlow() {
     };
   }, [setNodes]);
 
-  // Core UI state (kept in Canvas)
-  const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
+  // React Flow utilities
   const { screenToFlowPosition, getNodes, zoomIn, zoomOut } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
-  const [isNodeDragEnabled, setIsNodeDragEnabled] = useState(false);
-  const [_isShiftPressed, setIsShiftPressed] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isNewAgentModalOpen, setIsNewAgentModalOpen] = useState(false);
-  const [autoCreateWorktree, setAutoCreateWorktree] = useState(false);
 
-  // Auto-fork setting (default: true, persisted in localStorage)
-  const [autoFork, setAutoFork] = useState<boolean>(() => {
-    const stored = localStorage.getItem('auto-fork');
-    return stored !== null ? stored === 'true' : true;
-  });
+  // Context menu state (extracted to hook)
+  const contextMenuState = useContextMenu();
 
-  // Persist auto-fork setting
-  useEffect(() => {
-    localStorage.setItem('auto-fork', String(autoFork));
-  }, [autoFork]);
-  const [pendingAgentPosition, setPendingAgentPosition] = useState<
-    { x: number; y: number } | undefined
-  >(undefined);
-  const [pendingLinearIssue, setPendingLinearIssue] = useState<LinearIssue | undefined>(undefined);
-  const [isLinearCollapsed, setIsLinearCollapsed] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const resizeStartXRef = useRef<number>(0);
-  const resizeStartWidthRef = useRef<number>(0);
+  // Keyboard modifiers state (extracted to hook)
+  const keyboardModifiers = useKeyboardModifiers();
+
+  // Auto-fork setting (extracted to hook with localStorage persistence)
+  const autoForkState = useAutoFork();
+
+  // Pending agent state (extracted to hook)
+  const pendingAgent = usePendingAgent();
 
   // =============================================================================
   // Hook-based state management
@@ -340,6 +322,12 @@ function CanvasFlow() {
 
   // Sidebar collapse state
   const sidebar = useSidebarState();
+
+  // Linear panel state (extracted to hook)
+  const linearPanel = useLinearPanel({
+    sidebarWidth: sidebar.sidebarWidth,
+    setSidebarWidth: sidebar.setSidebarWidth,
+  });
 
   // Agent hierarchy computation
   const { hierarchy: agentHierarchy, folderPathMap } = useAgentHierarchy(nodes, edges);
@@ -374,21 +362,20 @@ function CanvasFlow() {
     isPillExpanded: pill.isPillExpanded,
     collapsePill: pill.collapsePill,
     onOpenAgentModal: (position, linearIssue) => {
-      setPendingAgentPosition(position);
-      setPendingLinearIssue(linearIssue);
-      setIsNewAgentModalOpen(true);
+      pendingAgent.setPending(position, linearIssue);
+      canvasUI.openNewAgentModal();
     },
   });
 
   // Canvas node creation actions
   const canvasActions = useCanvasActions({
     setNodes,
-    contextMenu,
-    closeContextMenu: () => setContextMenu(null),
+    contextMenu: contextMenuState.contextMenu,
+    closeContextMenu: contextMenuState.closeContextMenu,
     lockedFolderPath: folderLock.lockedFolderPath,
     onShowAgentModal: (pos) => {
-      setPendingAgentPosition(pos);
-      setIsNewAgentModalOpen(true);
+      pendingAgent.setPending(pos);
+      canvasUI.openNewAgentModal();
     },
   });
 
@@ -406,7 +393,7 @@ function CanvasFlow() {
         nodeId,
         selectedText: selectedText.slice(0, 50) + (selectedText.length > 50 ? '...' : ''),
         messageId,
-        autoFork,
+        autoFork: autoForkState.autoFork,
       });
 
       // Find the source node
@@ -425,7 +412,7 @@ function CanvasFlow() {
       };
 
       // If auto-fork is off, automatically create fork with random name (bypass modal)
-      if (!autoFork) {
+      if (!autoForkState.autoFork) {
         // Generate random 5-digit fork name
         const randomDigits = Math.floor(10000 + Math.random() * 90000); // 10000-99999
         const forkName = `fork-${randomDigits}`;
@@ -556,7 +543,7 @@ function CanvasFlow() {
 
     window.addEventListener('chat-message-fork', handleChatMessageFork);
     return () => window.removeEventListener('chat-message-fork', handleChatMessageFork);
-  }, [nodes, forkModal, autoFork, setNodes, setEdges]);
+  }, [nodes, forkModal, autoForkState.autoFork, setNodes, setEdges]);
 
   // Check if there are any agents
   const hasAgents = useMemo(() => {
@@ -564,15 +551,18 @@ function CanvasFlow() {
   }, [nodes]);
 
   // Apply highlight styles to nodes when highlighting changes
-  // Always run to clear styles when toggled off (empty collections)
+  // Only calls setNodes if styles actually need to change
   useEffect(() => {
-    setNodes((nds) =>
-      applyHighlightStylesToNodes(
+    setNodes((nds) => {
+      const result = applyHighlightStylesToNodes(
         nds,
         folderHighlight.highlightedFolders,
         folderHighlight.folderColors
-      )
-    );
+      );
+      // applyHighlightStylesToNodes returns the same array reference if nothing changed
+      // Returning the same reference tells React no update is needed
+      return result;
+    });
   }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, setNodes]);
 
   // =============================================================================
@@ -916,17 +906,7 @@ function CanvasFlow() {
     };
   }, [nodes, edges, setNodes, setEdges, updateNodeInternals, getNodes]);
 
-  const onPaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
-    event.preventDefault();
-    setContextMenu({
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
-
-  const onPaneClick = useCallback(() => {
-    setContextMenu(null);
-  }, []);
+  // Context menu handlers are provided by contextMenuState hook
 
   // =============================================================================
   // Fork modal confirmation handler
@@ -1052,24 +1032,7 @@ function CanvasFlow() {
     }
   }, [linear]);
 
-  // =============================================================================
-  // Context menu outside click handler
-  // =============================================================================
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as HTMLElement)) {
-        setContextMenu(null);
-      }
-    };
-
-    if (contextMenu) {
-      document.addEventListener('click', handleClickOutside);
-      return () => {
-        document.removeEventListener('click', handleClickOutside);
-      };
-    }
-  }, [contextMenu]);
+  // Context menu click-outside handler is in the useContextMenu hook
 
   // =============================================================================
   // Command palette commands
@@ -1123,16 +1086,15 @@ function CanvasFlow() {
 
       if (modifierKey && event.key === 'k') {
         event.preventDefault();
-        setIsCommandPaletteOpen((prev) => !prev);
+        canvasUI.toggleCommandPalette();
         return;
       }
 
       if (modifierKey && event.key === 't') {
         event.preventDefault();
-        if (isNewAgentModalOpen) {
-          setIsNewAgentModalOpen(false);
-          setPendingAgentPosition(undefined);
-          setPendingLinearIssue(undefined);
+        if (canvasUI.isNewAgentModalOpen) {
+          canvasUI.closeNewAgentModal();
+          pendingAgent.clearPending();
         } else {
           canvasActions.addAgentNode();
         }
@@ -1142,8 +1104,8 @@ function CanvasFlow() {
       // CMD+G / CTRL+G to open agent modal with new worktree
       if (modifierKey && event.key === 'g') {
         event.preventDefault(); // Prevent default browser behavior
-        if (!isNewAgentModalOpen) {
-          setAutoCreateWorktree(true);
+        if (!canvasUI.isNewAgentModalOpen) {
+          pendingAgent.setAutoCreateWorktree(true);
           canvasActions.addAgentNode();
         }
         return;
@@ -1160,25 +1122,25 @@ function CanvasFlow() {
       }
 
       if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
-        if (!isNodeDragEnabled) {
-          setIsNodeDragEnabled(true);
+        if (!keyboardModifiers.isNodeDragEnabled) {
+          keyboardModifiers.enableNodeDrag();
         }
       }
 
       // Track Shift key for snap-to-edge
       if (event.key === 'Shift') {
-        setIsShiftPressed(true);
+        keyboardModifiers.setShiftPressed(true);
       }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
       if ((isMac && event.key === 'Meta') || (!isMac && event.key === 'Control')) {
-        setIsNodeDragEnabled(false);
+        keyboardModifiers.disableNodeDrag();
       }
 
       // Track Shift key release
       if (event.key === 'Shift') {
-        setIsShiftPressed(false);
+        keyboardModifiers.setShiftPressed(false);
       }
     };
 
@@ -1188,7 +1150,15 @@ function CanvasFlow() {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [canvasActions, isNodeDragEnabled, isNewAgentModalOpen]);
+  }, [
+    canvasActions,
+    keyboardModifiers,
+    canvasUI.isNewAgentModalOpen,
+    canvasUI.closeNewAgentModal,
+    canvasUI.toggleCommandPalette,
+    pendingAgent.clearPending,
+    pendingAgent.setAutoCreateWorktree,
+  ]);
 
   // =============================================================================
   // Loading state
@@ -1305,7 +1275,7 @@ function CanvasFlow() {
   const onNodeDrag = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       // Only apply snapping if drag is enabled and not already snapping
-      if (!isNodeDragEnabled || isSnappingRef.current) {
+      if (!keyboardModifiers.isNodeDragEnabled || isSnappingRef.current) {
         return;
       }
 
@@ -1332,7 +1302,7 @@ function CanvasFlow() {
         }, 10);
       }
     },
-    [isNodeDragEnabled, getNodes, setNodes, applySnapping]
+    [keyboardModifiers.isNodeDragEnabled, getNodes, setNodes, applySnapping]
   );
 
   const onNodeDragStop = useCallback((_event: React.MouseEvent, _node: Node) => {
@@ -1344,7 +1314,7 @@ function CanvasFlow() {
   const handleNodesChange = useCallback(
     (changes: unknown[]) => {
       // If snapping is disabled or we're already snapping, just pass through
-      if (!isNodeDragEnabled || isSnappingRef.current) {
+      if (!keyboardModifiers.isNodeDragEnabled || isSnappingRef.current) {
         onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
         return;
       }
@@ -1420,51 +1390,10 @@ function CanvasFlow() {
         setEdges((currentEdges) => updateEdgesWithOptimalHandles(currentEdges, updatedNodes));
       }
     },
-    [onNodesChange, isNodeDragEnabled, getNodes, applySnapping, setEdges]
+    [onNodesChange, keyboardModifiers.isNodeDragEnabled, getNodes, applySnapping, setEdges]
   );
 
-  // =============================================================================
-  // Resize handlers
-  // =============================================================================
-
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsResizing(true);
-      resizeStartXRef.current = e.clientX;
-      resizeStartWidthRef.current = sidebar.sidebarWidth;
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    },
-    [sidebar.sidebarWidth]
-  );
-
-  const handleResizeMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isResizing) return;
-      const deltaX = e.clientX - resizeStartXRef.current;
-      const newWidth = resizeStartWidthRef.current + deltaX;
-      sidebar.setSidebarWidth(newWidth);
-    },
-    [isResizing, sidebar]
-  );
-
-  const handleResizeEnd = useCallback(() => {
-    setIsResizing(false);
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, []);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMove);
-      document.addEventListener('mouseup', handleResizeEnd);
-      return () => {
-        document.removeEventListener('mousemove', handleResizeMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-      };
-    }
-  }, [isResizing, handleResizeMove, handleResizeEnd]);
+  // Resize handlers are in the useLinearPanel hook
 
   // =============================================================================
   // Gradient configurations based on first letter of username
@@ -1725,11 +1654,11 @@ function CanvasFlow() {
   }, []);
 
   const selectedGradient = useMemo(() => {
-    if (!githubUsername) {
+    if (!githubUser.username) {
       return getGradientForLetter(null);
     }
 
-    const firstChar = githubUsername.charAt(0);
+    const firstChar = githubUser.username.charAt(0);
     // If it's a number (0-9), map to first 10 letter pairs (A-T)
     if (/[0-9]/.test(firstChar)) {
       const num = parseInt(firstChar, 10);
@@ -1740,7 +1669,7 @@ function CanvasFlow() {
 
     // Otherwise, use the first letter as-is
     return getGradientForLetter(firstChar);
-  }, [githubUsername, getGradientForLetter]);
+  }, [githubUser.username, getGradientForLetter]);
 
   // Helper to determine if overlay color is light (for text color adjustment)
   const isLightColor = useCallback((color: string): boolean => {
@@ -1777,24 +1706,22 @@ function CanvasFlow() {
 
   return (
     <div
-      className={`canvas-container ${isNodeDragEnabled ? 'drag-mode' : ''} ${isResizing ? 'resizing' : ''}`}
+      className={`canvas-container ${keyboardModifiers.isNodeDragEnabled ? 'drag-mode' : ''} ${linearPanel.isResizing ? 'resizing' : ''}`}
     >
       <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
+        isOpen={canvasUI.isCommandPaletteOpen}
+        onClose={canvasUI.closeCommandPalette}
         commands={commandActions}
       />
       <NewAgentModal
-        isOpen={isNewAgentModalOpen}
+        isOpen={canvasUI.isNewAgentModalOpen}
         onClose={() => {
-          setIsNewAgentModalOpen(false);
-          setPendingAgentPosition(undefined);
-          setPendingLinearIssue(undefined);
-          setAutoCreateWorktree(false);
+          canvasUI.closeNewAgentModal();
+          pendingAgent.clearPending();
         }}
         onCreate={(data) => {
           canvasActions.createAgentWithData({
-            position: pendingAgentPosition,
+            position: pendingAgent.pendingPosition,
             gitInfo: data.gitInfo,
             modalData: {
               title: data.title,
@@ -1802,58 +1729,56 @@ function CanvasFlow() {
               workspacePath: data.workspacePath,
             },
             lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
-            initialAttachments: pendingLinearIssue
+            initialAttachments: pendingAgent.pendingLinearIssue
               ? [
                   createLinearIssueAttachment({
-                    id: pendingLinearIssue.id,
-                    identifier: pendingLinearIssue.identifier,
-                    title: pendingLinearIssue.title,
+                    id: pendingAgent.pendingLinearIssue.id,
+                    identifier: pendingAgent.pendingLinearIssue.identifier,
+                    title: pendingAgent.pendingLinearIssue.title,
                     state: {
-                      name: pendingLinearIssue.state.name,
-                      color: pendingLinearIssue.state.color,
+                      name: pendingAgent.pendingLinearIssue.state.name,
+                      color: pendingAgent.pendingLinearIssue.state.color,
                     },
-                    assignee: pendingLinearIssue.assignee,
+                    assignee: pendingAgent.pendingLinearIssue.assignee,
                     // Priority is optional and LinearIssue has priority as number, not object
                     // So we omit it for now
                   }),
                 ]
               : undefined,
           });
-          setIsNewAgentModalOpen(false);
-          setPendingAgentPosition(undefined);
-          setPendingLinearIssue(undefined);
-          setAutoCreateWorktree(false);
+          canvasUI.closeNewAgentModal();
+          pendingAgent.clearPending();
         }}
-        initialPosition={pendingAgentPosition}
+        initialPosition={pendingAgent.pendingPosition}
         initialWorkspacePath={folderLock.lockedFolderPath}
-        autoCreateWorktree={autoCreateWorktree}
+        autoCreateWorktree={pendingAgent.autoCreateWorktree}
         initialDescription={
-          pendingLinearIssue
-            ? pendingLinearIssue.description
-              ? `${pendingLinearIssue.title}\n\n${pendingLinearIssue.description}`
-              : pendingLinearIssue.title
+          pendingAgent.pendingLinearIssue
+            ? pendingAgent.pendingLinearIssue.description
+              ? `${pendingAgent.pendingLinearIssue.title}\n\n${pendingAgent.pendingLinearIssue.description}`
+              : pendingAgent.pendingLinearIssue.title
             : undefined
         }
       />
 
       {/* Sidebar Panel */}
       <div
-        className={`canvas-sidebar ${sidebar.isSidebarCollapsed ? 'collapsed' : ''} ${isResizing ? 'resizing' : ''}`}
+        className={`canvas-sidebar ${sidebar.isSidebarCollapsed ? 'collapsed' : ''} ${linearPanel.isResizing ? 'resizing' : ''}`}
         style={{ width: sidebar.isSidebarCollapsed ? 0 : `${sidebar.sidebarWidth}px` }}
       >
         <div className="sidebar-header">
           <div style={{ flex: 1, minWidth: 0 }}>
-            {githubUsername ? (
+            {githubUser.username ? (
               <>
-                <h2 className="sidebar-title">{githubUsername.replace(/^@/, '')}'s</h2>
+                <h2 className="sidebar-title">{githubUser.username.replace(/^@/, '')}'s</h2>
                 <div className="sidebar-username">Agent Base</div>
               </>
             ) : (
               <h2 className="sidebar-title">Canvas</h2>
             )}
-            {githubError && (
-              <div className="sidebar-error" title={githubError}>
-                Error: {githubError}
+            {githubUser.error && (
+              <div className="sidebar-error" title={githubUser.error}>
+                Error: {githubUser.error}
               </div>
             )}
           </div>
@@ -2136,11 +2061,11 @@ function CanvasFlow() {
               <div className="sidebar-linear-issues-container">
                 <div
                   className="sidebar-linear-issues-header"
-                  onClick={() => setIsLinearCollapsed(!isLinearCollapsed)}
+                  onClick={linearPanel.toggleCollapsed}
                   style={{ cursor: 'pointer' }}
                 >
                   <span
-                    className={`sidebar-linear-issues-chevron ${isLinearCollapsed ? 'collapsed' : 'expanded'}`}
+                    className={`sidebar-linear-issues-chevron ${linearPanel.isCollapsed ? 'collapsed' : 'expanded'}`}
                   >
                     <svg
                       width="12"
@@ -2158,7 +2083,7 @@ function CanvasFlow() {
                   <h3 className="sidebar-linear-issues-title">Linear</h3>
                 </div>
 
-                {!isLinearCollapsed && (
+                {!linearPanel.isCollapsed && (
                   <>
                     <div className="sidebar-linear-issues-filters">
                       <div className="sidebar-linear-issues-filter">
@@ -2237,7 +2162,7 @@ function CanvasFlow() {
                               className="sidebar-issue-card"
                               draggable
                               onDragStart={(e) => canvasDrop.handleIssueDragStart(e, issue)}
-                              onClick={() => setSelectedIssueId(issue.id)}
+                              onClick={() => canvasUI.setSelectedIssueId(issue.id)}
                             >
                               <div className="sidebar-issue-header">
                                 <span className="sidebar-issue-identifier">{issue.identifier}</span>
@@ -2299,7 +2224,7 @@ function CanvasFlow() {
 
       {/* Resize Handle */}
       {!sidebar.isSidebarCollapsed && (
-        <div className="sidebar-resize-handle" onMouseDown={handleResizeStart} />
+        <div className="sidebar-resize-handle" onMouseDown={linearPanel.handleResizeStart} />
       )}
 
       {/* Canvas Content */}
@@ -2341,8 +2266,8 @@ function CanvasFlow() {
           onConnectEnd={onConnectEnd}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
-          onPaneContextMenu={onPaneContextMenu}
-          onPaneClick={onPaneClick}
+          onPaneContextMenu={contextMenuState.onPaneContextMenu}
+          onPaneClick={contextMenuState.onPaneClick}
           onDragOver={canvasDrop.handleCanvasDragOver}
           onDrop={canvasDrop.handleCanvasDrop}
           nodeTypes={nodeTypes}
@@ -2353,9 +2278,9 @@ function CanvasFlow() {
           maxZoom={4}
           panOnScroll={true}
           zoomOnScroll={true}
-          panOnDrag={isNodeDragEnabled}
+          panOnDrag={keyboardModifiers.isNodeDragEnabled}
           zoomOnPinch={true}
-          nodesDraggable={isNodeDragEnabled}
+          nodesDraggable={keyboardModifiers.isNodeDragEnabled}
           nodesConnectable={true}
           elementsSelectable={true}
           nodesFocusable={true}
@@ -2409,16 +2334,16 @@ function CanvasFlow() {
           </div>
         )}
 
-        {contextMenu && (
+        {contextMenuState.contextMenu && (
           <>
-            <div className="context-menu-overlay" onClick={() => setContextMenu(null)} />
+            <div className="context-menu-overlay" onClick={contextMenuState.closeContextMenu} />
             <div
-              ref={contextMenuRef}
+              ref={contextMenuState.contextMenuRef}
               className="context-menu"
               style={{
                 position: 'fixed',
-                top: contextMenu.y,
-                left: contextMenu.x,
+                top: contextMenuState.contextMenu.y,
+                left: contextMenuState.contextMenu.x,
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -2481,7 +2406,7 @@ function CanvasFlow() {
         {/* Settings FAB */}
         <button
           className="settings-fab"
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={canvasUI.openSettings}
           aria-label="Settings"
           title="Settings"
         >
@@ -2556,12 +2481,12 @@ function CanvasFlow() {
         </div>
 
         {/* Settings Modal */}
-        {isSettingsOpen && (
-          <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+        {canvasUI.isSettingsOpen && (
+          <div className="settings-modal-overlay" onClick={canvasUI.closeSettings}>
             <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
               <div className="settings-modal-header">
                 <h2>Settings</h2>
-                <button className="settings-close-button" onClick={() => setIsSettingsOpen(false)}>
+                <button className="settings-close-button" onClick={canvasUI.closeSettings}>
                   ✕
                 </button>
               </div>
@@ -2614,13 +2539,13 @@ function CanvasFlow() {
                         className="settings-mesh-overlay"
                         style={{ backgroundColor: selectedGradient.overlayColor }}
                       >
-                        {githubUsername && (
+                        {githubUser.username && (
                           <>
                             <div
                               className="settings-mesh-username"
                               style={{ color: overlayTextColor }}
                             >
-                              @{githubUsername}
+                              @{githubUser.username}
                             </div>
                             <div
                               className="settings-mesh-subtitle"
@@ -2759,8 +2684,8 @@ function CanvasFlow() {
                     <label className="settings-toggle-label">
                       <input
                         type="checkbox"
-                        checked={autoFork}
-                        onChange={(e) => setAutoFork(e.target.checked)}
+                        checked={autoForkState.autoFork}
+                        onChange={(e) => autoForkState.setAutoFork(e.target.checked)}
                         className="settings-toggle"
                       />
                       <span className="settings-toggle-text">Text Level Fork</span>
@@ -2946,8 +2871,11 @@ function CanvasFlow() {
         <ActionPill />
 
         {/* Linear Issue Details Modal */}
-        {selectedIssueId && (
-          <IssueDetailsModal issueId={selectedIssueId} onClose={() => setSelectedIssueId(null)} />
+        {canvasUI.selectedIssueId && (
+          <IssueDetailsModal
+            issueId={canvasUI.selectedIssueId}
+            onClose={() => canvasUI.setSelectedIssueId(null)}
+          />
         )}
       </div>
     </div>

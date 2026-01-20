@@ -47,8 +47,13 @@ function debounce<T extends (...args: unknown[]) => void>(
 
   const debounced = (...args: Parameters<T>) => {
     pendingFunc = () => func(...args);
-    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutId) {
+      console.log(`[CanvasPersistence] Debounce: rescheduling (had pending timeout)`);
+      clearTimeout(timeoutId);
+    }
+    console.log(`[CanvasPersistence] Debounce: scheduling save in ${wait}ms`);
     timeoutId = setTimeout(() => {
+      console.log(`[CanvasPersistence] Debounce: executing scheduled save`);
       if (pendingFunc) pendingFunc();
       timeoutId = null;
       pendingFunc = null;
@@ -57,6 +62,7 @@ function debounce<T extends (...args: unknown[]) => void>(
 
   debounced.cancel = () => {
     if (timeoutId) {
+      console.log(`[CanvasPersistence] Debounce: cancelled pending save`);
       clearTimeout(timeoutId);
       timeoutId = null;
       pendingFunc = null;
@@ -65,6 +71,7 @@ function debounce<T extends (...args: unknown[]) => void>(
 
   debounced.flush = () => {
     if (timeoutId && pendingFunc) {
+      console.log(`[CanvasPersistence] Debounce: flushing - executing immediately`);
       clearTimeout(timeoutId);
       pendingFunc();
       timeoutId = null;
@@ -97,6 +104,7 @@ export function useCanvasPersistence(
   const currentEdgesRef = useRef<Edge[]>([]);
   const currentViewportRef = useRef<Viewport | undefined>(undefined);
   const canvasIdRef = useRef<string | null>(null);
+  const restoreAttemptedRef = useRef(false);
 
   // Keep canvasIdRef in sync
   useEffect(() => {
@@ -106,25 +114,54 @@ export function useCanvasPersistence(
   // Save function
   const saveCanvas = useCallback(async () => {
     const id = canvasIdRef.current;
-    if (!id || !window.canvasAPI) return;
+    console.log(`[CanvasPersistence] saveCanvas: starting`, {
+      canvasId: id,
+      hasCanvasAPI: !!window.canvasAPI,
+    });
+
+    if (!id || !window.canvasAPI) {
+      console.log(`[CanvasPersistence] saveCanvas: aborting - missing canvasId or canvasAPI`);
+      return;
+    }
 
     setIsSaving(true);
     try {
+      const convertedNodes = nodesToCanvasNodes(currentNodesRef.current);
+      const convertedEdges = edgesToCanvasEdges(currentEdgesRef.current);
+      const convertedViewport = currentViewportRef.current
+        ? viewportToDbViewport(currentViewportRef.current)
+        : undefined;
+
+      console.log(`[CanvasPersistence] saveCanvas: preparing state`, {
+        inputNodeCount: currentNodesRef.current.length,
+        convertedNodeCount: convertedNodes.length,
+        edgeCount: convertedEdges.length,
+        viewport: convertedViewport,
+      });
+
+      // Log each converted node for debugging
+      convertedNodes.forEach((node) => {
+        console.log(`[CanvasPersistence] saveCanvas: converted node`, {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+        });
+      });
+
       const state: CanvasState = {
         id,
-        nodes: nodesToCanvasNodes(currentNodesRef.current),
-        edges: edgesToCanvasEdges(currentEdgesRef.current),
-        viewport: currentViewportRef.current
-          ? viewportToDbViewport(currentViewportRef.current)
-          : undefined,
+        nodes: convertedNodes,
+        edges: convertedEdges,
+        viewport: convertedViewport,
       };
 
       await window.canvasAPI.saveCanvas(id, state);
+      console.log(`[CanvasPersistence] saveCanvas: SUCCESS - saved ${convertedNodes.length} nodes`);
       setLastSavedAt(new Date());
       setError(null);
     } catch (err) {
+      console.error(`[CanvasPersistence] saveCanvas: FAILED`, err);
       setError(err instanceof Error ? err.message : 'Failed to save canvas');
-      console.error('Canvas save error:', err);
     } finally {
       setIsSaving(false);
     }
@@ -135,6 +172,12 @@ export function useCanvasPersistence(
 
   // Auto-restore on mount
   useEffect(() => {
+    // Guard against multiple restore attempts (e.g., React StrictMode double-mount)
+    if (restoreAttemptedRef.current) {
+      return;
+    }
+    restoreAttemptedRef.current = true;
+
     if (!autoRestore) {
       setIsLoading(false);
       return;
@@ -213,9 +256,20 @@ export function useCanvasPersistence(
   // Change handlers that trigger auto-save
   const persistNodes = useCallback(
     (nodes: Node[]) => {
+      console.log(`[CanvasPersistence] persistNodes: received ${nodes.length} nodes`, {
+        nodeIds: nodes.map((n) => n.id),
+        autoSave,
+        canvasId: canvasIdRef.current,
+      });
       currentNodesRef.current = nodes;
       if (autoSave && canvasIdRef.current) {
+        console.log(`[CanvasPersistence] persistNodes: triggering debounced save`);
         debouncedSave();
+      } else {
+        console.log(`[CanvasPersistence] persistNodes: skipping save`, {
+          autoSave,
+          hasCanvasId: !!canvasIdRef.current,
+        });
       }
     },
     [autoSave, debouncedSave]

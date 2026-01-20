@@ -15,38 +15,70 @@ import { nodeRegistry } from '../nodes/registry';
  * 2. Validate node data against schemas
  */
 export function nodesToCanvasNodes(nodes: Node[]): CanvasNode[] {
-  return nodes
-    .filter((node) => {
-      const nodeType = node.type || 'custom';
-      if (!nodeRegistry.isPersistedType(nodeType)) {
-        console.log(`[canvasConverters] Skipping non-persistent node: ${nodeType}`);
-        return false;
-      }
-      return true;
-    })
-    .map((node) => {
-      const nodeType = node.type || 'custom';
+  console.log(
+    `[CanvasPersistence] nodesToCanvasNodes: START - processing ${nodes.length} input nodes`
+  );
 
-      // Validate against schema if available
-      const validation = nodeRegistry.validateNodeData(nodeType, node.data);
-      if (!validation.success) {
-        console.warn(
-          `[canvasConverters] Invalid data for ${nodeType} node ${JSON.stringify(node)}:`,
-          validation.error
-        );
-      }
-
-      return {
-        id: node.id,
-        type: nodeType as CanvasNode['type'],
-        position: {
-          x: node.position.x,
-          y: node.position.y,
-        },
-        data: node.data as NodeData,
-        style: node.style as { width?: number; height?: number } | undefined,
-      };
+  const filteredNodes = nodes.filter((node) => {
+    const nodeType = node.type || 'custom';
+    console.log(`[CanvasPersistence] nodesToCanvasNodes: checking node`, {
+      id: node.id,
+      type: nodeType,
     });
+
+    if (!nodeRegistry.isPersistedType(nodeType)) {
+      console.log(`[CanvasPersistence] nodesToCanvasNodes: FILTERED OUT - non-persistent node`, {
+        id: node.id,
+        type: nodeType,
+      });
+      return false;
+    }
+    return true;
+  });
+
+  console.log(
+    `[CanvasPersistence] nodesToCanvasNodes: after filter - ${filteredNodes.length} of ${nodes.length} nodes are persistent`
+  );
+
+  const result = filteredNodes.map((node) => {
+    const nodeType = node.type || 'custom';
+
+    // Validate against schema if available
+    const validation = nodeRegistry.validateNodeData(nodeType, node.data);
+    if (!validation.success) {
+      console.warn(`[CanvasPersistence] nodesToCanvasNodes: VALIDATION FAILED`, {
+        id: node.id,
+        type: nodeType,
+        fullNode: JSON.stringify(node),
+        error: validation.error,
+      });
+    }
+
+    const canvasNode = {
+      id: node.id,
+      type: nodeType as CanvasNode['type'],
+      position: {
+        x: node.position.x,
+        y: node.position.y,
+      },
+      data: node.data as NodeData,
+      style: node.style as { width?: number; height?: number } | undefined,
+    };
+
+    console.log(`[CanvasPersistence] nodesToCanvasNodes: converted node`, {
+      id: canvasNode.id,
+      type: canvasNode.type,
+      position: canvasNode.position,
+    });
+
+    return canvasNode;
+  });
+
+  console.log(
+    `[CanvasPersistence] nodesToCanvasNodes: END - returning ${result.length} canvas nodes`
+  );
+
+  return result;
 }
 
 /**

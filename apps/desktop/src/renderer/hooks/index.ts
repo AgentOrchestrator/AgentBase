@@ -18,8 +18,48 @@ export {
   type WorkspaceSource,
   type WorkspaceState,
 } from './useAgentState';
+// =============================================================================
+// Auto-Fork Hook - LocalStorage-persisted auto-fork setting
+// =============================================================================
+export { type UseAutoForkReturn, useAutoFork } from './useAutoFork';
 export { useAutoTitleFromSession } from './useAutoTitleFromSession';
 export { useCanvasPersistence } from './useCanvasPersistence';
+// =============================================================================
+// Canvas UI State Hook - Modal and overlay states
+// =============================================================================
+export { type UseCanvasUIStateReturn, useCanvasUIState } from './useCanvasUIState';
+// =============================================================================
+// Context Menu Hook - Right-click menu state
+// =============================================================================
+export {
+  type ContextMenuPosition,
+  type UseContextMenuReturn,
+  useContextMenu,
+} from './useContextMenu';
+// =============================================================================
+// GitHub User Hook - GitHub username fetching
+// =============================================================================
+export { type UseGithubUserReturn, useGithubUser } from './useGithubUser';
+// =============================================================================
+// Keyboard Modifiers Hook - Drag/shift key tracking
+// =============================================================================
+export { type UseKeyboardModifiersReturn, useKeyboardModifiers } from './useKeyboardModifiers';
+// =============================================================================
+// Linear Panel Hook - Linear panel collapse and resize
+// =============================================================================
+export {
+  type UseLinearPanelInput,
+  type UseLinearPanelReturn,
+  useLinearPanel,
+} from './useLinearPanel';
+// =============================================================================
+// Pending Agent Hook - Pending agent creation state
+// =============================================================================
+export {
+  type PendingAgentPosition,
+  type UsePendingAgentReturn,
+  usePendingAgent,
+} from './usePendingAgent';
 export { useSessionFileWatcher } from './useSessionFileWatcher';
 
 // =============================================================================
