@@ -92,8 +92,8 @@ export const useFolderHighlightStore = create<FolderHighlightStore>((set, get) =
   },
 
   getHighlightColor: (folderPath) => {
-    if (!folderPath) return undefined;
-    return get().folderColors.get(folderPath);
+    // Map.get() returns undefined for missing keys, including null/undefined lookups
+    return folderPath ? get().folderColors.get(folderPath) : undefined;
   },
 }));
 
