@@ -51,15 +51,37 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
   }
 
   /**
-   * Find the session file for a given session ID
+   * Find the session file for a given session ID within a specific source working directory
+   *
+   * IMPORTANT: The sourceWorkingDir is required because the same session ID can exist
+   * across multiple project folders (from previous forks). We must look in the correct
+   * project folder based on the source workspace path.
    */
-  private findSessionFile(sessionId: string): string | null {
+  private findSessionFile(sessionId: string, sourceWorkingDir: string): string | null {
     const projectsDir = this.getProjectsDir();
 
     if (!fs.existsSync(projectsDir)) {
       return null;
     }
 
+    // Resolve real path to handle symlinks (e.g., /tmp -> /private/tmp on macOS)
+    const resolvedSourceDir = this.resolveRealPath(sourceWorkingDir);
+
+    // Convert source path to directory name format used by Claude Code
+    // e.g., /Users/foo/project -> -Users-foo-project
+    const projectDirName = resolvedSourceDir.replace(/\//g, '-').replace(/ /g, '-');
+    const expectedProjectDir = path.join(projectsDir, projectDirName);
+
+    // First, try the expected project directory based on sourceWorkingDir
+    if (fs.existsSync(expectedProjectDir)) {
+      const sessionFilePath = path.join(expectedProjectDir, `${sessionId}.jsonl`);
+      if (fs.existsSync(sessionFilePath)) {
+        return sessionFilePath;
+      }
+    }
+
+    // Fallback: search all project directories (for backwards compatibility)
+    // This handles cases where the sourceWorkingDir might not exactly match
     const projectDirs = fs.readdirSync(projectsDir);
 
     for (const projectDir of projectDirs) {
@@ -271,8 +293,8 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
     filterOptions?: JsonlFilterOptions
   ): Promise<Result<void, AgentError>> {
     try {
-      // Find source session file
-      const sourceFilePath = this.findSessionFile(sourceSessionId);
+      // Find source session file in the correct project folder
+      const sourceFilePath = this.findSessionFile(sourceSessionId, sourceWorkingDir);
       if (!sourceFilePath) {
         return err(
           agentError(
