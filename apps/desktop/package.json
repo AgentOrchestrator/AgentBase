@@ -1,9 +1,13 @@
 {
   "name": "desktop",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "AgentBase Desktop App",
   "license": "MIT",
   "author": "Hai Dang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentOrchestrator/AgentBase.git"
+  },
   "type": "commonjs",
   "main": "dist/main/src/main/main.js",
   "scripts": {

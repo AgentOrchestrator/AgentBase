@@ -1,9 +1,13 @@
 {
   "name": "agent-orchestrator",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Agent Orchestrator - A multi-agent orchestration system",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentOrchestrator/AgentBase.git"
+  },
   "overrides": {
     "@types/react": "^19",
     "@types/react-dom": "^19"
