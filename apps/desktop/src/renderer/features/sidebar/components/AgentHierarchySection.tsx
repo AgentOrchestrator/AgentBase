@@ -37,7 +37,8 @@ export function AgentHierarchySection({
         const isLocked = folderLock.lockedFolderPath === projectPath;
         const isHovered = folderLock.hoveredFolderPath === projectPath;
         const showLock = isLocked || (isHovered && !isLocked);
-        const highlightColor = folderHighlight.getHighlightColor(projectPath);
+        // No highlight when project has no folder path (valid UI state)
+        const highlightColor = projectPath ? folderHighlight.getHighlightColor(projectPath) : null;
 
         return (
           <div

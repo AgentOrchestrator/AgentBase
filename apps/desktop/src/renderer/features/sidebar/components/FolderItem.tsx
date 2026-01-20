@@ -9,7 +9,8 @@ export interface FolderItemProps {
   isCollapsed: boolean;
   isLocked: boolean;
   showLock: boolean;
-  highlightColor: string | undefined;
+  /** Highlight color, or null if no highlight (explicit no-color state) */
+  highlightColor: string | null;
   folderPath: string | undefined;
   onToggle: () => void;
   onLockToggle: () => void;
@@ -47,7 +48,7 @@ export function FolderItem({
         ) : (
           <FolderOpenIcon color={highlightColor} />
         )}
-        <span className="sidebar-folder-name" style={{ color: highlightColor || undefined }}>
+        <span className="sidebar-folder-name" style={{ color: highlightColor ?? undefined }}>
           {name}
         </span>
       </button>
@@ -73,7 +74,7 @@ export function FolderItem({
   );
 }
 
-function FolderClosedIcon({ color }: { color?: string }) {
+function FolderClosedIcon({ color }: { color: string | null }) {
   return (
     <svg
       className="sidebar-folder-svg"
@@ -82,7 +83,7 @@ function FolderClosedIcon({ color }: { color?: string }) {
       viewBox="0 0 800 800"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      style={{ color: color || undefined }}
+      style={{ color: color ?? undefined }}
     >
       <path
         d="M100 304L100.001 187.5C100.001 170.924 106.586 155.027 118.307 143.306C130.028 131.585 145.925 125 162.501 125H281.079C293.42 125 305.484 128.654 315.751 135.5L359.251 164.5C369.519 171.346 381.583 175 393.923 175H637.501C654.077 175 669.974 181.585 681.695 193.306C693.417 205.027 700.001 220.924 700.001 237.5V304"
@@ -102,7 +103,7 @@ function FolderClosedIcon({ color }: { color?: string }) {
   );
 }
 
-function FolderOpenIcon({ color }: { color?: string }) {
+function FolderOpenIcon({ color }: { color: string | null }) {
   return (
     <svg
       className="sidebar-folder-svg"
@@ -110,7 +111,7 @@ function FolderOpenIcon({ color }: { color?: string }) {
       height="14"
       viewBox="0 0 512 512"
       xmlns="http://www.w3.org/2000/svg"
-      style={{ color: color || undefined }}
+      style={{ color: color ?? undefined }}
     >
       <path
         d="M64,192V120a40,40,0,0,1,40-40h75.89a40,40,0,0,1,22.19,6.72l27.84,18.56A40,40,0,0,0,252.11,112H408a40,40,0,0,1,40,40v40"

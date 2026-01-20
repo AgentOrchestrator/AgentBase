@@ -32,8 +32,8 @@ interface FolderHighlightState {
 interface FolderHighlightActions {
   /** Toggle highlight-all mode on/off */
   toggleHighlightAll: (folderPathMap: Record<string, string>) => void;
-  /** Get the highlight color for a specific folder path */
-  getHighlightColor: (folderPath: string | null | undefined) => string | undefined;
+  /** Get the highlight color for a specific folder path. Caller must filter null/undefined. */
+  getHighlightColor: (folderPath: string) => string | undefined;
 }
 
 export type FolderHighlightStore = FolderHighlightState & FolderHighlightActions;
@@ -47,7 +47,8 @@ export interface UseFolderHighlightReturn {
   folderColors: Map<string, string>;
   highlightedFolders: Set<string>;
   toggleHighlightAll: () => void;
-  getHighlightColor: (folderPath: string | null | undefined) => string | undefined;
+  /** Get the highlight color for a specific folder path. Caller must filter null/undefined. */
+  getHighlightColor: (folderPath: string) => string | undefined;
 }
 
 // =============================================================================
@@ -91,10 +92,7 @@ export const useFolderHighlightStore = create<FolderHighlightStore>((set, get) =
     }
   },
 
-  getHighlightColor: (folderPath) => {
-    // Map.get() returns undefined for missing keys, including null/undefined lookups
-    return folderPath ? get().folderColors.get(folderPath) : undefined;
-  },
+  getHighlightColor: (folderPath) => get().folderColors.get(folderPath),
 }));
 
 // =============================================================================
