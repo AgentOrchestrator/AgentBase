@@ -125,6 +125,26 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
   }
 
   /**
+   * Extract the cwd (working directory) from JSONL content
+   * This is more reliable than using the passed sourceWorkingDir since it comes from the actual session
+   */
+  private extractCwdFromContent(content: string): string | null {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.cwd && typeof obj.cwd === 'string') {
+          return obj.cwd;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    return null;
+  }
+
+  /**
    * Extract the first user prompt from JSONL content for the session index
    */
   private extractFirstPrompt(content: string): string {
@@ -275,10 +295,16 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
+      // Extract the actual source cwd from the JSONL content
+      // This is more reliable than the passed sourceWorkingDir which may be incorrect
+      const actualSourceCwd = this.extractCwdFromContent(sourceContent) ?? sourceWorkingDir;
+
       console.log('[ClaudeCodeForkAdapter] Read source session file:', {
         sourceFilePath,
         sourceSessionId,
         targetSessionId,
+        actualSourceCwd,
+        passedSourceCwd: sourceWorkingDir,
         filterOptions,
       });
 
@@ -296,10 +322,11 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       }
 
       // Use JSONLFile to transform paths and optionally replace sessionId
+      // Use the actual source cwd extracted from the JSONL, not the passed value
       const jsonlFile = new JSONLFile(contentToTransform);
       const needsSessionIdReplacement = sourceSessionId !== targetSessionId;
       const transformed = jsonlFile.replaceFields({
-        cwd: { from: sourceWorkingDir, to: resolvedTargetDir },
+        cwd: { from: actualSourceCwd, to: resolvedTargetDir },
         sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
       });
 
