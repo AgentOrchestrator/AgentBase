@@ -1,7 +1,7 @@
 import type { Edge, Node, Viewport } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CanvasState } from '../../main/types/database';
-import '../main.d'; // Import type declarations for Window.canvasAPI
+import type { CanvasState } from '../../../../main/types/database';
+import '../../../main.d'; // Import type declarations for Window.canvasAPI
 import {
   canvasEdgesToEdges,
   canvasNodesToNodes,
@@ -10,7 +10,7 @@ import {
   generateCanvasId,
   nodesToCanvasNodes,
   viewportToDbViewport,
-} from './canvasConverters';
+} from '../../../hooks/canvasConverters';
 
 interface UseCanvasPersistenceOptions {
   debounceMs?: number;

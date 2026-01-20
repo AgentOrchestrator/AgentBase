@@ -8,7 +8,7 @@
 import type { Node } from '@xyflow/react';
 import { useReactFlow } from '@xyflow/react';
 import { useCallback } from 'react';
-import { type CreateAgentOptions, canvasNodeService } from '../services/CanvasNodeService';
+import { type CreateAgentOptions, canvasNodeService } from '../../../services/CanvasNodeService';
 
 // =============================================================================
 // Types

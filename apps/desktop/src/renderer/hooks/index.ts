@@ -1,3 +1,55 @@
+export type {
+  UseCanvasActionsInput,
+  UseCanvasActionsReturn,
+} from '../features/canvas/hooks/useCanvasActions';
+export { useCanvasActions } from '../features/canvas/hooks/useCanvasActions';
+export {
+  type LinearIssue,
+  type UseCanvasDropOptions,
+  type UseCanvasDropReturn,
+  useCanvasDrop,
+} from '../features/canvas/hooks/useCanvasDrop';
+// =============================================================================
+// Canvas Hooks - Re-exported from features/canvas/hooks
+// =============================================================================
+export { useCanvasPersistence } from '../features/canvas/hooks/useCanvasPersistence';
+export {
+  type UseCanvasUIStateReturn,
+  useCanvasUIState,
+} from '../features/canvas/hooks/useCanvasUIState';
+export {
+  type ContextMenuPosition,
+  type UseContextMenuReturn,
+  useContextMenu,
+} from '../features/canvas/hooks/useContextMenu';
+export type {
+  ForkConfirmError,
+  ForkConfirmResult,
+  ForkModalData,
+  UseForkModalInput,
+  UseForkModalReturn,
+} from '../features/canvas/hooks/useForkModal';
+export { useForkModal } from '../features/canvas/hooks/useForkModal';
+export {
+  type UseKeyboardModifiersReturn,
+  useKeyboardModifiers,
+} from '../features/canvas/hooks/useKeyboardModifiers';
+export {
+  type PendingAgentPosition,
+  type UsePendingAgentReturn,
+  usePendingAgent,
+} from '../features/canvas/hooks/usePendingAgent';
+// =============================================================================
+// Re-export Linear types from the store for convenience
+// =============================================================================
+export type {
+  LinearFilterState,
+  LinearIssue as LinearIssueType,
+  LinearMilestone as LinearMilestoneType,
+  LinearProject as LinearProjectType,
+  LinearWorkflowState as LinearWorkflowStateType,
+  MilestoneOption as LinearMilestoneOption,
+} from '../stores/ILinearStore';
 export * from './canvasConverters';
 export {
   type AgentHierarchy,
@@ -18,79 +70,16 @@ export {
   type WorkspaceSource,
   type WorkspaceState,
 } from './useAgentState';
-// =============================================================================
-// Auto-Fork Hook - LocalStorage-persisted auto-fork setting
-// =============================================================================
-export { type UseAutoForkReturn, useAutoFork } from './useAutoFork';
-export { useAutoTitleFromSession } from './useAutoTitleFromSession';
-export { useCanvasPersistence } from './useCanvasPersistence';
-// =============================================================================
-// Canvas UI State Hook - Modal and overlay states
-// =============================================================================
-export { type UseCanvasUIStateReturn, useCanvasUIState } from './useCanvasUIState';
-// =============================================================================
-// Context Menu Hook - Right-click menu state
-// =============================================================================
-export {
-  type ContextMenuPosition,
-  type UseContextMenuReturn,
-  useContextMenu,
-} from './useContextMenu';
-// =============================================================================
-// GitHub User Hook - GitHub username fetching
-// =============================================================================
-export { type UseGithubUserReturn, useGithubUser } from './useGithubUser';
-// =============================================================================
-// Keyboard Modifiers Hook - Drag/shift key tracking
-// =============================================================================
-export { type UseKeyboardModifiersReturn, useKeyboardModifiers } from './useKeyboardModifiers';
-// =============================================================================
-// Linear Panel Hook - Linear panel collapse and resize
-// =============================================================================
-export {
-  type UseLinearPanelInput,
-  type UseLinearPanelReturn,
-  useLinearPanel,
-} from './useLinearPanel';
-// =============================================================================
-// Pending Agent Hook - Pending agent creation state
-// =============================================================================
-export {
-  type PendingAgentPosition,
-  type UsePendingAgentReturn,
-  usePendingAgent,
-} from './usePendingAgent';
-export { useSessionFileWatcher } from './useSessionFileWatcher';
-
-// =============================================================================
-// Canvas UI State Hooks
-// =============================================================================
-
-// Re-export Linear types from the store for convenience
-export type {
-  LinearFilterState,
-  LinearIssue as LinearIssueType,
-  LinearMilestone as LinearMilestoneType,
-  LinearProject as LinearProjectType,
-  LinearWorkflowState as LinearWorkflowStateType,
-  MilestoneOption as LinearMilestoneOption,
-} from '../stores/ILinearStore';
 export type { UseAgentViewModeInput, UseAgentViewModeReturn } from './useAgentViewMode';
 // =============================================================================
 // View Mode Hook - Terminal/Chat view coordination
 // =============================================================================
 export { useAgentViewMode } from './useAgentViewMode';
-export type { UseCanvasActionsInput, UseCanvasActionsReturn } from './useCanvasActions';
 // =============================================================================
-// Canvas Actions Hook - Node creation actions for canvas
+// Auto-Fork Hook - LocalStorage-persisted auto-fork setting
 // =============================================================================
-export { useCanvasActions } from './useCanvasActions';
-export {
-  type LinearIssue,
-  type UseCanvasDropOptions,
-  type UseCanvasDropReturn,
-  useCanvasDrop,
-} from './useCanvasDrop';
+export { type UseAutoForkReturn, useAutoFork } from './useAutoFork';
+export { useAutoTitleFromSession } from './useAutoTitleFromSession';
 export type {
   UseChatMessagesOptions,
   UseChatMessagesReturn,
@@ -105,23 +94,25 @@ export {
   useFolderHighlight,
 } from './useFolderHighlight';
 export { type UseFolderLockReturn, useFolderLock } from './useFolderLock';
-export type {
-  ForkConfirmError,
-  ForkConfirmResult,
-  ForkModalData,
-  UseForkModalInput,
-  UseForkModalReturn,
-} from './useForkModal';
 // =============================================================================
-// Fork Modal Hook - Manages fork modal UI state and operations
+// GitHub User Hook - GitHub username fetching
 // =============================================================================
-export { useForkModal } from './useForkModal';
+export { type UseGithubUserReturn, useGithubUser } from './useGithubUser';
 export type { UseLinearReturn } from './useLinear';
 // =============================================================================
 // Linear Integration Hook - Linear API and state management
 // =============================================================================
 export { useLinear } from './useLinear';
+// =============================================================================
+// Linear Panel Hook - Linear panel collapse and resize
+// =============================================================================
+export {
+  type UseLinearPanelInput,
+  type UseLinearPanelReturn,
+  useLinearPanel,
+} from './useLinearPanel';
 export { type UsePillStateReturn, usePillState } from './usePillState';
+export { useSessionFileWatcher } from './useSessionFileWatcher';
 export type {
   SessionOverviewState,
   UseSessionOverviewOptions,
