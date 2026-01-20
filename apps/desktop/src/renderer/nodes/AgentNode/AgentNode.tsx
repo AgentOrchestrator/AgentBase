@@ -9,6 +9,7 @@ import { type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WorkspaceSelectionModal } from '../../components/WorkspaceSelectionModal';
 import { NodeContextProvider } from '../../context';
+import { useNodeActions } from '../../features/canvas/context';
 import { useAgentState } from '../../hooks/useAgentState';
 import type { AgentNodeData } from '../../types/agent-node';
 import { AgentNodePresentation } from './AgentNodePresentation';
@@ -23,6 +24,7 @@ import { AgentNodePresentation } from './AgentNodePresentation';
  */
 function AgentNode({ data, id, selected }: NodeProps) {
   const updateNodeInternals = useUpdateNodeInternals();
+  const nodeActions = useNodeActions();
 
   // Capture initial data only once to prevent re-renders from unstable references
   const initialDataRef = useRef<AgentNodeData | null>(null);
@@ -86,14 +88,10 @@ function AgentNode({ data, id, selected }: NodeProps) {
 
   const handleDataChange = useCallback(
     (updates: Partial<AgentNodeData>) => {
-      // Dispatch update directly to Canvas for node data changes
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: { ...agent.nodeData, ...updates } },
-        })
-      );
+      // Update node data via context (not events) to prevent infinite loops
+      nodeActions.mergeNodeData(id, updates as Record<string, unknown>);
     },
-    [id, agent.nodeData]
+    [id, nodeActions]
   );
 
   // ---------------------------------------------------------------------------

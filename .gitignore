@@ -13,6 +13,9 @@ __pycache__/
 .env*.local
 lenv
 
+# Act secrets (for local workflow testing)
+.secrets
+
 # Build outputs
 dist/
 build/

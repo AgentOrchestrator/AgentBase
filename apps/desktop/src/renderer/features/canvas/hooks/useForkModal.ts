@@ -7,9 +7,9 @@
 
 import type { Edge, Node } from '@xyflow/react';
 import { useCallback, useState } from 'react';
-import { forkService } from '../services';
-import { type AgentNodeData, createDefaultAgentTitle } from '../types/agent-node';
-import { getOptimalHandles } from '../utils/edgeHandles';
+import { forkService } from '../../../services';
+import { type AgentNodeData, createDefaultAgentTitle } from '../../../types/agent-node';
+import { getOptimalHandles } from '../../../utils/edgeHandles';
 
 // =============================================================================
 // Types

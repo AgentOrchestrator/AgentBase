@@ -1,7 +1,7 @@
 import type { Node } from '@xyflow/react';
 import { useCallback } from 'react';
-import { createDefaultAgentTitle } from '../types/agent-node';
-import { createLinearIssueAttachment } from '../types/attachments';
+import { createDefaultAgentTitle } from '../../../types/agent-node';
+import { createLinearIssueAttachment } from '../../../types/attachments';
 
 /**
  * Linear issue data structure (from Linear API)
