@@ -34,6 +34,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ github.ref_name }}
         run: |
+          # Fetch main branch ref for comparison
+          git fetch origin main:main
+
           # Get the first commit message headline (most descriptive)
           FIRST_COMMIT_MSG=$(git log main..HEAD --format="%s" --reverse | head -1)
 
@@ -43,7 +46,7 @@ jobs:
             TYPE="${BASH_REMATCH[1]}"
             DESCRIPTION="${BASH_REMATCH[2]}"
             # Replace dashes/underscores with spaces for readability
-            DESCRIPTION=$(echo "$DESCRIPTION" | tr '-_' ' ')
+            DESCRIPTION=$(echo "$DESCRIPTION" | tr -- '-_' ' ')
             PR_TITLE="${TYPE}: ${DESCRIPTION}"
           elif [[ -n "$FIRST_COMMIT_MSG" ]]; then
             # Use first commit message if branch name isn't descriptive
