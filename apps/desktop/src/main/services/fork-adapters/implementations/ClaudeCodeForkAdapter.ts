@@ -248,7 +248,9 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
         index = JSON.parse(existing) as SessionsIndex;
       } catch {
         // If parsing fails, start with empty index
-        console.warn('[ClaudeCodeForkAdapter] Failed to parse existing sessions-index.json, creating new one');
+        console.warn(
+          '[ClaudeCodeForkAdapter] Failed to parse existing sessions-index.json, creating new one'
+        );
       }
     }
 

@@ -19,7 +19,7 @@ import type { UseAgentViewModeInput, UseAgentViewModeReturn } from './types';
 
 export function useAgentViewMode({
   terminalService,
-  agentService,
+  agentService: _agentService,
   initialView = 'overview',
   onViewChange,
 }: UseAgentViewModeInput): UseAgentViewModeReturn {

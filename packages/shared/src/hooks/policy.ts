@@ -354,31 +354,38 @@ export function mergePolicies(...policies: PermissionPolicy[]): PermissionPolicy
 
     if (policy.tools) {
       if (policy.tools.allowed) {
-        merged.tools!.allowed = [...new Set([...merged.tools?.allowed!, ...policy.tools.allowed])];
+        merged.tools!.allowed = [
+          ...new Set([...(merged.tools?.allowed ?? []), ...policy.tools.allowed]),
+        ];
       }
       if (policy.tools.denied) {
-        merged.tools!.denied = [...new Set([...merged.tools?.denied!, ...policy.tools.denied])];
+        merged.tools!.denied = [
+          ...new Set([...(merged.tools?.denied ?? []), ...policy.tools.denied]),
+        ];
       }
     }
 
     if (policy.commands) {
       if (policy.commands.allowed) {
-        merged.commands!.allowed = [...merged.commands?.allowed!, ...policy.commands.allowed];
+        merged.commands!.allowed = [
+          ...(merged.commands?.allowed ?? []),
+          ...policy.commands.allowed,
+        ];
       }
       if (policy.commands.denied) {
-        merged.commands!.denied = [...merged.commands?.denied!, ...policy.commands.denied];
+        merged.commands!.denied = [...(merged.commands?.denied ?? []), ...policy.commands.denied];
       }
     }
 
     if (policy.paths) {
       if (policy.paths.writable) {
         merged.paths!.writable = [
-          ...new Set([...merged.paths?.writable!, ...policy.paths.writable]),
+          ...new Set([...(merged.paths?.writable ?? []), ...policy.paths.writable]),
         ];
       }
       if (policy.paths.protected) {
         merged.paths!.protected = [
-          ...new Set([...merged.paths?.protected!, ...policy.paths.protected]),
+          ...new Set([...(merged.paths?.protected ?? []), ...policy.paths.protected]),
         ];
       }
     }
