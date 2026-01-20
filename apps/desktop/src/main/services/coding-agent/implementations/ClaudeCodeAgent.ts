@@ -671,9 +671,19 @@ export class ClaudeCodeAgent
       sdkOptions.forkSession = true;
     }
 
-    // Trigger fork via empty prompt query (fire-and-forget style)
+    // Build fork initialization message
+    // Using a meaningful message instead of empty string prevents malformed session entries
+    // (empty text blocks cause "cache_control cannot be set for empty text blocks" API errors)
+    const filterInfo = options.filterOptions?.targetMessageId
+      ? ` (filtered up to message ${options.filterOptions.targetMessageId})`
+      : options.filterOptions?.targetTimestamp
+        ? ` (filtered up to ${options.filterOptions.targetTimestamp})`
+        : '';
+    const forkInitMessage = `This session has been forked from conversation ${sourceSessionId}${filterInfo}. The context from the parent session has been loaded. Please acknowledge by responding only with "Context loaded." and wait for the user's next message.`;
+
+    // Trigger fork via initialization message (creates proper session entry in Claude Code's index)
     try {
-      await this.executeQuery('', sdkOptions);
+      await this.executeQuery(forkInitMessage, sdkOptions);
     } catch (error) {
       console.error('[ClaudeCodeAgent] Failed to create new session', { error });
     }
