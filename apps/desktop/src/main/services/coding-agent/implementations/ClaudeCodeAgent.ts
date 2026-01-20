@@ -631,7 +631,10 @@ export class ClaudeCodeAgent
     const sourceSessionId = options.sessionId;
 
     const targetCwd = options.workspacePath ?? process.cwd();
-    const sourceCwd = process.cwd();
+    // Use sourceWorkspacePath if provided, otherwise fall back to process.cwd()
+    // sourceWorkspacePath is required for correct session lookup when the same session ID
+    // exists in multiple project folders (from previous forks)
+    const sourceCwd = options.sourceWorkspacePath ?? process.cwd();
     const isCrossDirectory = targetCwd !== sourceCwd;
     const createWorktree = options.createWorktree !== false; // Default to true for backward compatibility
 
