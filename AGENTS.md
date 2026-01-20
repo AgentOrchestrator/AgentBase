@@ -74,6 +74,24 @@ connect a runtime object to a real imported type.
 
 Rule: Avoid using the spread operator; use explicit replacement instead as much as possible, because the spread operator hides what is being replaced.
 
+Rule: Never use defensive defaults. Let the code fail explicitly or ask for user input during implementation. Defensive defaults hide missing configuration and create silent failures.
+
+Correct pattern:
+
+```typescript
+// ❌ Wrong: Defensive default hides missing config
+const apiUrl = config.apiUrl || 'http://localhost:3000';
+
+// ✅ Correct: Fail explicitly
+if (!config.apiUrl) {
+  throw new Error('config.apiUrl is required');
+}
+const apiUrl = config.apiUrl;
+
+// ✅ Also correct: Ask user during implementation
+const apiUrl = config.apiUrl; // Will fail at runtime if missing, prompting proper setup
+```
+
 Correct pattern:
 
 // global.d.ts
