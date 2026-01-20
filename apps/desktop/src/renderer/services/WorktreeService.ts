@@ -6,6 +6,9 @@
  */
 
 import type {
+  BranchInfo,
+  OpenExistingBranchOptions,
+  OpenExistingBranchResult,
   WorktreeInfo,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
@@ -64,6 +67,26 @@ export interface IWorktreeService {
    * @returns List of worktree infos
    */
   listWorktrees(repoPath?: string): Promise<WorktreeInfo[]>;
+
+  /**
+   * List all branches in a repository with checkout status
+   * @param repoPath - Path to the git repository
+   * @returns List of branches with checkout status
+   */
+  listBranches(repoPath: string): Promise<BranchInfo[]>;
+
+  /**
+   * Open an existing branch in a worktree
+   * @param repoPath - Path to the git repository
+   * @param branchName - Name of the existing branch
+   * @param options - Options including worktreePath and reuseExisting
+   * @returns Result with worktree info and reuse indicator
+   */
+  openExistingBranch(
+    repoPath: string,
+    branchName: string,
+    options: OpenExistingBranchOptions
+  ): Promise<OpenExistingBranchResult>;
 }
 
 /**
@@ -141,6 +164,37 @@ export class WorktreeService implements IWorktreeService {
     }
 
     return window.worktreeAPI.list(repoPath);
+  }
+
+  /**
+   * List all branches in a repository via IPC
+   */
+  async listBranches(repoPath: string): Promise<BranchInfo[]> {
+    if (!window.worktreeAPI) {
+      throw new Error('Worktree API not available');
+    }
+
+    return window.worktreeAPI.listBranches(repoPath);
+  }
+
+  /**
+   * Open an existing branch in a worktree via IPC
+   */
+  async openExistingBranch(
+    repoPath: string,
+    branchName: string,
+    options: OpenExistingBranchOptions
+  ): Promise<OpenExistingBranchResult> {
+    console.log('[WorktreeService] Opening existing branch:', { repoPath, branchName, options });
+
+    if (!window.worktreeAPI) {
+      throw new Error('Worktree API not available');
+    }
+
+    const result = await window.worktreeAPI.openExistingBranch(repoPath, branchName, options);
+    console.log('[WorktreeService] Opened existing branch:', result);
+
+    return result;
   }
 }
 

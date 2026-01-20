@@ -84,3 +84,66 @@ export interface WorktreeManagerConfig {
   /** Base directory where all worktrees will be created */
   baseWorktreeDirectory: string;
 }
+
+// =============================================================================
+// Branch Information (for opening existing branches)
+// =============================================================================
+
+/**
+ * Information about a git branch including checkout status
+ */
+export interface BranchInfo {
+  /** Branch name */
+  name: string;
+  /** Is this branch the current HEAD in the main worktree */
+  isCurrent: boolean;
+  /** Is this branch checked out in any worktree */
+  isCheckedOut: boolean;
+  /** Path where this branch is checked out (if any) */
+  worktreePath?: string;
+}
+
+/**
+ * Options for opening an existing branch in a worktree
+ */
+export interface OpenExistingBranchOptions {
+  /** Agent ID to associate with this worktree */
+  agentId?: string;
+  /** Full path where the worktree should be created (required) */
+  worktreePath: string;
+  /** Return existing worktree if branch already has one (default: true) */
+  reuseExisting?: boolean;
+}
+
+/**
+ * Result of opening an existing branch in a worktree
+ */
+export interface OpenExistingBranchResult {
+  /** The worktree information */
+  worktree: WorktreeInfo;
+  /** Whether an existing worktree was reused */
+  reusedExisting: boolean;
+}
+
+/**
+ * Error codes for openExistingBranch operation
+ */
+export type OpenExistingBranchErrorCode =
+  | 'BRANCH_NOT_FOUND'
+  | 'BRANCH_CHECKED_OUT_IN_MAIN'
+  | 'BRANCH_HAS_WORKTREE'
+  | 'INVALID_REPOSITORY'
+  | 'WORKTREE_PATH_EXISTS';
+
+/**
+ * Error thrown when opening an existing branch fails
+ */
+export class OpenExistingBranchError extends Error {
+  constructor(
+    public readonly code: OpenExistingBranchErrorCode,
+    message: string
+  ) {
+    super(message);
+    this.name = 'OpenExistingBranchError';
+  }
+}

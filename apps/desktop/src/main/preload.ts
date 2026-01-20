@@ -47,6 +47,9 @@ import type {
 } from './services/representation';
 import type { CanvasMetadata, CanvasState } from './types/database';
 import type {
+  BranchInfo,
+  OpenExistingBranchOptions,
+  OpenExistingBranchResult,
   WorktreeInfo,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
@@ -86,6 +89,12 @@ export interface WorktreeAPI {
   release: (worktreeId: string, options?: WorktreeReleaseOptions) => Promise<void>;
   get: (worktreeId: string) => Promise<WorktreeInfo | null>;
   list: (repoPath?: string) => Promise<WorktreeInfo[]>;
+  listBranches: (repoPath: string) => Promise<BranchInfo[]>;
+  openExistingBranch: (
+    repoPath: string,
+    branchName: string,
+    options: OpenExistingBranchOptions
+  ) => Promise<OpenExistingBranchResult>;
 }
 
 // Type definitions for the agent status API
@@ -270,6 +279,12 @@ contextBridge.exposeInMainWorld('worktreeAPI', {
     unwrapResponse<WorktreeInfo | null>(ipcRenderer.invoke('worktree:get', worktreeId)),
   list: (repoPath?: string) =>
     unwrapResponse<WorktreeInfo[]>(ipcRenderer.invoke('worktree:list', repoPath)),
+  listBranches: (repoPath: string) =>
+    unwrapResponse<BranchInfo[]>(ipcRenderer.invoke('worktree:list-branches', repoPath)),
+  openExistingBranch: (repoPath: string, branchName: string, options: OpenExistingBranchOptions) =>
+    unwrapResponse<OpenExistingBranchResult>(
+      ipcRenderer.invoke('worktree:open-existing-branch', repoPath, branchName, options)
+    ),
 } as WorktreeAPI);
 
 // Expose agent status API

@@ -9,6 +9,9 @@ import type { AgentType } from './loaders/types.js';
 import type { CodingAgentState } from './types/coding-agent.js';
 import type { AddWorkspaceOptions, RecentWorkspace } from './types/workspace.js';
 import type {
+  BranchInfo,
+  OpenExistingBranchOptions,
+  OpenExistingBranchResult,
   WorktreeInfo,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
@@ -152,6 +155,14 @@ export interface WorktreeAPI {
   get: (worktreeId: string) => Promise<WorktreeInfo | null>;
   /** List worktrees, optionally filtered by repo */
   list: (repoPath?: string) => Promise<WorktreeInfo[]>;
+  /** List all branches in a repository with checkout status */
+  listBranches: (repoPath: string) => Promise<BranchInfo[]>;
+  /** Open an existing branch in a worktree */
+  openExistingBranch: (
+    repoPath: string,
+    branchName: string,
+    options: OpenExistingBranchOptions
+  ) => Promise<OpenExistingBranchResult>;
 }
 
 // =============================================================================

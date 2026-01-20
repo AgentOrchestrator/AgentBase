@@ -1,5 +1,9 @@
 import { ipcMain } from 'electron';
-import type { WorktreeProvisionOptions, WorktreeReleaseOptions } from '../types/worktree';
+import type {
+  OpenExistingBranchOptions,
+  WorktreeProvisionOptions,
+  WorktreeReleaseOptions,
+} from '../types/worktree';
 import { WorktreeManagerFactory } from './WorktreeManagerFactory';
 
 /**
@@ -66,4 +70,39 @@ export function registerWorktreeIpcHandlers(): void {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  ipcMain.handle('worktree:list-branches', async (_event, repoPath: string) => {
+    try {
+      const manager = await WorktreeManagerFactory.getManager();
+      const branches = await manager.listBranches(repoPath);
+      console.log('[Main] Listed branches', { count: branches.length });
+      return { success: true, data: branches };
+    } catch (error) {
+      console.error('[Main] Error listing branches', { repoPath, error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle(
+    'worktree:open-existing-branch',
+    async (_event, repoPath: string, branchName: string, options: OpenExistingBranchOptions) => {
+      try {
+        const manager = await WorktreeManagerFactory.getManager();
+        const result = await manager.openExistingBranch(repoPath, branchName, options);
+        console.log('[Main] Opened existing branch in worktree', {
+          id: result.worktree.id,
+          path: result.worktree.worktreePath,
+          reusedExisting: result.reusedExisting,
+        });
+        return { success: true, data: result };
+      } catch (error) {
+        console.error('[Main] Error opening existing branch', {
+          repoPath,
+          branchName,
+          error,
+        });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
 }

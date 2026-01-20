@@ -1,11 +1,15 @@
 import * as path from 'node:path';
 import type {
+  BranchInfo,
+  OpenExistingBranchOptions,
+  OpenExistingBranchResult,
   WorktreeInfo,
   WorktreeManagerConfig,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
   WorktreeRow,
 } from '../types/worktree';
+import { OpenExistingBranchError } from '../types/worktree';
 import type { IFilesystem } from './dependencies/IFilesystem';
 import type { IGitExecutor } from './dependencies/IGitExecutor';
 import type { IIdGenerator } from './dependencies/IIdGenerator';
@@ -183,6 +187,164 @@ export class WorktreeManager implements IWorktreeManager {
 
   close(): void {
     this.store.close();
+  }
+
+  async listBranches(repoPath: string): Promise<BranchInfo[]> {
+    await this.validateRepository(repoPath);
+
+    // Get all branch names using the safe git executor (uses execFile internally)
+    const branchOutput = await this.git.exec(repoPath, ['branch', '--format=%(refname:short)']);
+    const branchNames = branchOutput
+      .trim()
+      .split('\n')
+      .filter((name) => name.length > 0);
+
+    if (branchNames.length === 0) {
+      return [];
+    }
+
+    // Get current branch (HEAD in main worktree)
+    let currentBranch = '';
+    try {
+      const headOutput = await this.git.exec(repoPath, ['symbolic-ref', '--short', 'HEAD']);
+      currentBranch = headOutput.trim();
+    } catch {
+      // Detached HEAD state - no current branch
+    }
+
+    // Get all worktrees to determine checkout status
+    const worktrees = await this.git.listWorktrees(repoPath);
+    const branchToWorktree = new Map<string, string>();
+    for (const wt of worktrees) {
+      if (wt.branch) {
+        branchToWorktree.set(wt.branch, wt.path);
+      }
+    }
+
+    // Build branch info list
+    return branchNames.map((name) => {
+      const worktreePath = branchToWorktree.get(name);
+      return {
+        name,
+        isCurrent: name === currentBranch,
+        isCheckedOut: worktreePath !== undefined,
+        worktreePath,
+      };
+    });
+  }
+
+  async openExistingBranch(
+    repoPath: string,
+    branchName: string,
+    options: OpenExistingBranchOptions
+  ): Promise<OpenExistingBranchResult> {
+    const { worktreePath, reuseExisting = true, agentId } = options;
+
+    // 1. Validate repository
+    const isRepo = await this.git.isRepository(repoPath);
+    if (!isRepo) {
+      throw new OpenExistingBranchError(
+        'INVALID_REPOSITORY',
+        `Invalid git repository: ${repoPath}`
+      );
+    }
+
+    // 2. Check branch exists
+    const branchExists = await this.branchExists(repoPath, branchName);
+    if (!branchExists) {
+      throw new OpenExistingBranchError(
+        'BRANCH_NOT_FOUND',
+        `Branch "${branchName}" does not exist in repository`
+      );
+    }
+
+    // 3. Get worktree info to check if branch is checked out
+    const worktrees = await this.git.listWorktrees(repoPath);
+
+    // Check if branch is HEAD in main worktree
+    const mainWorktree = worktrees.find((wt) => wt.isMain);
+    if (mainWorktree?.branch === branchName) {
+      throw new OpenExistingBranchError(
+        'BRANCH_CHECKED_OUT_IN_MAIN',
+        `Branch "${branchName}" is currently checked out in the main worktree`
+      );
+    }
+
+    // 4. Check if branch has existing worktree
+    const existingWorktree = worktrees.find((wt) => wt.branch === branchName && !wt.isMain);
+    if (existingWorktree) {
+      if (reuseExisting) {
+        // Return the existing worktree from our store
+        const storeEntry = await this.store.getByRepoBranch(repoPath, branchName);
+        if (storeEntry && storeEntry.status === 'active') {
+          return {
+            worktree: this.rowToWorktreeInfo(storeEntry),
+            reusedExisting: true,
+          };
+        }
+      }
+      throw new OpenExistingBranchError(
+        'BRANCH_HAS_WORKTREE',
+        `Branch "${branchName}" already has a worktree at ${existingWorktree.path}`
+      );
+    }
+
+    // 5. Check worktreePath doesn't already exist
+    const pathExists = await this.fs.exists(worktreePath);
+    if (pathExists) {
+      throw new OpenExistingBranchError(
+        'WORKTREE_PATH_EXISTS',
+        `Target path already exists: ${worktreePath}`
+      );
+    }
+
+    // 6. Create the worktree (branch already exists, just add worktree)
+    const worktreeId = this.idGenerator.generate();
+    const now = new Date().toISOString();
+
+    await this.store.insert({
+      id: worktreeId,
+      repo_path: repoPath,
+      worktree_path: worktreePath,
+      branch_name: branchName,
+      status: 'provisioning',
+      provisioned_at: now,
+      last_activity_at: now,
+      agent_id: agentId ?? null,
+      error_message: null,
+    });
+
+    try {
+      await this.addWorktree(repoPath, worktreePath, branchName);
+      await this.store.updateStatus(worktreeId, 'active');
+
+      this.logger.info('Opened existing branch in worktree', {
+        id: worktreeId,
+        path: worktreePath,
+        branch: branchName,
+      });
+
+      return {
+        worktree: {
+          id: worktreeId,
+          repoPath,
+          worktreePath,
+          branchName,
+          status: 'active',
+          provisionedAt: now,
+          lastActivityAt: now,
+          agentId,
+        },
+        reusedExisting: false,
+      };
+    } catch (error) {
+      await this.store.updateStatus(worktreeId, 'error', (error as Error).message);
+      this.logger.error('Failed to open existing branch in worktree', {
+        id: worktreeId,
+        error: (error as Error).message,
+      });
+      throw error;
+    }
   }
 
   // ==================== Private Methods ====================

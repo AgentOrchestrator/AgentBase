@@ -8,12 +8,18 @@
  */
 
 export type {
+  BranchInfo,
+  OpenExistingBranchErrorCode,
+  OpenExistingBranchOptions,
+  OpenExistingBranchResult,
   WorktreeInfo,
   WorktreeManagerConfig,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
   WorktreeStatus,
 } from '@agent-orchestrator/shared';
+
+export { OpenExistingBranchError } from '@agent-orchestrator/shared';
 
 import type { WorktreeStatus } from '@agent-orchestrator/shared';
 

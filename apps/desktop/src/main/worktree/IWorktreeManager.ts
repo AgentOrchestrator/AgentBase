@@ -1,4 +1,7 @@
 import type {
+  BranchInfo,
+  OpenExistingBranchOptions,
+  OpenExistingBranchResult,
   WorktreeInfo,
   WorktreeProvisionOptions,
   WorktreeReleaseOptions,
@@ -47,6 +50,27 @@ export interface IWorktreeManager {
    * @returns Array of WorktreeInfo
    */
   list(repoPath?: string): Promise<WorktreeInfo[]>;
+
+  /**
+   * List all branches in a repository with checkout status
+   * @param repoPath - Absolute path to the git repository
+   * @returns Array of BranchInfo with checkout status
+   */
+  listBranches(repoPath: string): Promise<BranchInfo[]>;
+
+  /**
+   * Open an existing branch in a worktree
+   * @param repoPath - Absolute path to the git repository
+   * @param branchName - Name of the existing branch to open
+   * @param options - Configuration including worktreePath and reuseExisting
+   * @returns OpenExistingBranchResult with worktree info and reuse indicator
+   * @throws OpenExistingBranchError if branch doesn't exist or is already checked out
+   */
+  openExistingBranch(
+    repoPath: string,
+    branchName: string,
+    options: OpenExistingBranchOptions
+  ): Promise<OpenExistingBranchResult>;
 
   /**
    * Close the manager and cleanup resources
