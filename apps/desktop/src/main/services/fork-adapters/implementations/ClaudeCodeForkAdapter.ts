@@ -9,6 +9,30 @@ import { filterJsonl } from '../filter';
 import type { IForkAdapter } from '../interfaces/IForkAdapter';
 
 /**
+ * Structure of a session entry in sessions-index.json
+ */
+interface SessionIndexEntry {
+  sessionId: string;
+  fullPath: string;
+  fileMtime: number;
+  firstPrompt: string;
+  messageCount: number;
+  created: string;
+  modified: string;
+  gitBranch?: string;
+  projectPath: string;
+  isSidechain: boolean;
+}
+
+/**
+ * Structure of sessions-index.json
+ */
+interface SessionsIndex {
+  version: number;
+  entries: SessionIndexEntry[];
+}
+
+/**
  * Fork adapter for Claude Code sessions
  *
  * Handles copying .jsonl session files from ~/.claude/projects and
@@ -100,6 +124,125 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
     return agentType === 'claude_code';
   }
 
+  /**
+   * Extract the first user prompt from JSONL content for the session index
+   */
+  private extractFirstPrompt(content: string): string {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user' && obj.message?.content) {
+          const contentBlocks = obj.message.content;
+          for (const block of contentBlocks) {
+            if (block.type === 'text' && block.text) {
+              // Truncate to reasonable length for index
+              return block.text.slice(0, 200) + (block.text.length > 200 ? '…' : '');
+            }
+          }
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Count messages in JSONL content
+   */
+  private countMessages(content: string): number {
+    let count = 0;
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user' || obj.type === 'assistant') {
+          count++;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Get current git branch for the target directory
+   */
+  private getGitBranch(targetDir: string): string | undefined {
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['branch', '--show-current'], {
+        cwd: targetDir,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      return branch || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Update or create sessions-index.json to register the forked session
+   */
+  private updateSessionsIndex(
+    targetProjectDir: string,
+    targetSessionId: string,
+    targetFilePath: string,
+    targetWorkingDir: string,
+    content: string
+  ): void {
+    const indexPath = path.join(targetProjectDir, 'sessions-index.json');
+
+    // Read existing index or create new one
+    let index: SessionsIndex = { version: 1, entries: [] };
+    if (fs.existsSync(indexPath)) {
+      try {
+        const existing = fs.readFileSync(indexPath, 'utf-8');
+        index = JSON.parse(existing) as SessionsIndex;
+      } catch {
+        // If parsing fails, start with empty index
+        console.warn('[ClaudeCodeForkAdapter] Failed to parse existing sessions-index.json, creating new one');
+      }
+    }
+
+    // Remove any existing entry with same session ID
+    index.entries = index.entries.filter((e) => e.sessionId !== targetSessionId);
+
+    // Get file stats for mtime
+    const stats = fs.statSync(targetFilePath);
+    const now = new Date().toISOString();
+
+    // Create new entry
+    const newEntry: SessionIndexEntry = {
+      sessionId: targetSessionId,
+      fullPath: targetFilePath,
+      fileMtime: stats.mtimeMs,
+      firstPrompt: this.extractFirstPrompt(content),
+      messageCount: this.countMessages(content),
+      created: now,
+      modified: now,
+      gitBranch: this.getGitBranch(targetWorkingDir),
+      projectPath: targetWorkingDir,
+      isSidechain: false,
+    };
+
+    index.entries.push(newEntry);
+
+    // Write updated index
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf-8');
+
+    console.log('[ClaudeCodeForkAdapter] Updated sessions-index.json:', {
+      indexPath,
+      sessionId: targetSessionId,
+      messageCount: newEntry.messageCount,
+    });
+  }
+
   async forkSessionFile(
     sourceSessionId: string,
     targetSessionId: string,
@@ -161,7 +304,18 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       });
 
       // Write to target file
-      fs.writeFileSync(targetFilePath, transformed.toString(), 'utf-8');
+      const transformedContent = transformed.toString();
+      fs.writeFileSync(targetFilePath, transformedContent, 'utf-8');
+
+      // Update sessions-index.json to register the forked session
+      // This allows Claude Code to discover and resume the session
+      this.updateSessionsIndex(
+        targetProjectDir,
+        targetSessionId,
+        targetFilePath,
+        resolvedTargetDir,
+        transformedContent
+      );
 
       console.log('[ClaudeCodeForkAdapter] Session file forked:', {
         source: sourceFilePath,
