@@ -125,25 +125,23 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
   }
 
   /**
-   * Extract all unique cwds (working directories) from JSONL content
-   * Sessions that have been forked multiple times may contain multiple cwds
-   * from their history - we need to replace all of them
+   * Extract the cwd (working directory) from JSONL content
+   * This is the actual workspace path where the session was created
    */
-  private extractAllCwdsFromContent(content: string): string[] {
-    const cwds = new Set<string>();
+  private extractCwdFromContent(content: string): string | null {
     const lines = content.split('\n');
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
         const obj = JSON.parse(line);
         if (obj.cwd && typeof obj.cwd === 'string') {
-          cwds.add(obj.cwd);
+          return obj.cwd;
         }
       } catch {
         // Skip unparseable lines
       }
     }
-    return Array.from(cwds);
+    return null;
   }
 
   /**
@@ -297,15 +295,16 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
-      // Extract all unique cwds from the JSONL content
-      // Sessions that have been forked multiple times contain multiple cwds from their history
-      const allSourceCwds = this.extractAllCwdsFromContent(sourceContent);
+      // Extract the actual source cwd from the JSONL content
+      // This is more reliable than the passed sourceWorkingDir which may be incorrect
+      const actualSourceCwd = this.extractCwdFromContent(sourceContent) ?? sourceWorkingDir;
 
       console.log('[ClaudeCodeForkAdapter] Read source session file:', {
         sourceFilePath,
         sourceSessionId,
         targetSessionId,
-        allSourceCwds,
+        actualSourceCwd,
+        passedSourceCwd: sourceWorkingDir,
         filterOptions,
       });
 
@@ -322,28 +321,14 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
         });
       }
 
-      // Replace all source cwds with target cwd
-      // This handles sessions that have been forked multiple times and contain multiple cwds
-      let transformedContent = contentToTransform;
+      // Use JSONLFile to transform paths and optionally replace sessionId
+      const jsonlFile = new JSONLFile(contentToTransform);
       const needsSessionIdReplacement = sourceSessionId !== targetSessionId;
-
-      for (const sourceCwd of allSourceCwds) {
-        const jsonlFile = new JSONLFile(transformedContent);
-        const transformed = jsonlFile.replaceFields({
-          cwd: { from: sourceCwd, to: resolvedTargetDir },
-          sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
-        });
-        transformedContent = transformed.toString();
-      }
-
-      // If no cwds were found, still do sessionId replacement if needed
-      if (allSourceCwds.length === 0 && needsSessionIdReplacement) {
-        const jsonlFile = new JSONLFile(transformedContent);
-        const transformed = jsonlFile.replaceFields({
-          sessionId: targetSessionId,
-        });
-        transformedContent = transformed.toString();
-      }
+      const transformed = jsonlFile.replaceFields({
+        cwd: { from: actualSourceCwd, to: resolvedTargetDir },
+        sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
+      });
+      const transformedContent = transformed.toString();
 
       // Write to target file
       fs.writeFileSync(targetFilePath, transformedContent, 'utf-8');
