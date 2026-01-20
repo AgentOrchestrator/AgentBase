@@ -102,6 +102,7 @@ import {
   disposeSessionWatcher,
   registerSessionWatcherIpcHandlers,
 } from './services/session-watcher';
+import { getTerminalActionDetectorManager } from './services/user-action-request';
 
 // Map to store terminal instances by ID
 const terminalProcesses = new Map<string, pty.IPty>();
@@ -347,6 +348,10 @@ const createWindow = (): void => {
       terminalBuffers.set(terminalId, []);
     }
 
+    // Attach terminal action detector for permission prompt detection
+    const detectorManager = getTerminalActionDetectorManager();
+    detectorManager.attach(terminalId, 'claude_code', (data) => ptyProcess.write(data));
+
     // Handle shell data - send to renderer via IPC with terminal ID
     ptyProcess.onData((data: string) => {
       // Buffer the output for restoration after refresh
@@ -365,6 +370,9 @@ const createWindow = (): void => {
       if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
         win.webContents.send('terminal-data', { terminalId, data });
       }
+
+      // Process terminal output for permission prompt detection
+      detectorManager.processOutput(terminalId, data);
     });
 
     // Handle shell exit
@@ -385,6 +393,8 @@ const createWindow = (): void => {
       // Clean up buffer and session state
       terminalBuffers.delete(terminalId);
       terminalSessionStates.delete(terminalId);
+      // Detach terminal action detector
+      detectorManager.detach(terminalId);
     });
   });
 
@@ -452,6 +462,8 @@ const createWindow = (): void => {
       // Clean up buffer and session state
       terminalBuffers.delete(terminalId);
       terminalSessionStates.delete(terminalId);
+      // Detach terminal action detector
+      getTerminalActionDetectorManager().detach(terminalId);
     } else {
       console.log('[Main] ⚠️ Terminal destroy requested but process not found', { terminalId });
     }
