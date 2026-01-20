@@ -12,7 +12,10 @@ export {
 // =============================================================================
 // Canvas Hooks - Re-exported from features/canvas/hooks
 // =============================================================================
-export { useCanvasPersistence } from '../features/canvas/hooks/useCanvasPersistence';
+export {
+  type CanvasPersistenceStore,
+  useCanvasPersistenceStore,
+} from '../features/canvas/hooks/useCanvasPersistenceStore';
 export {
   type UseCanvasUIStateReturn,
   useCanvasUIState,
@@ -35,6 +38,9 @@ export {
   type UseKeyboardModifiersReturn,
   useKeyboardModifiers,
 } from '../features/canvas/hooks/useKeyboardModifiers';
+// NOTE: useNodeOperations is no longer exported publicly.
+// It's used internally by Canvas.tsx for operations like highlighting.
+// Child components should use useNodeActions() from NodeActionsContext instead.
 export {
   type PendingAgentPosition,
   type UsePendingAgentReturn,

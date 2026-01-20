@@ -47,13 +47,14 @@ import {
   SidebarExpandButton,
   ZoomControls,
 } from './features';
+import { NodeActionsProvider } from './features/canvas/context';
+import { useNodeOperations } from './features/canvas/hooks/useNodeOperations';
 import {
-  applyHighlightStylesToNodes,
   useAgentHierarchy,
   useAutoFork,
   useCanvasActions,
   useCanvasDrop,
-  useCanvasPersistence,
+  useCanvasPersistenceStore,
   useCanvasUIState,
   useContextMenu,
   useFolderHighlight,
@@ -119,15 +120,31 @@ function CanvasFlow() {
   const githubUser = useGithubUser();
   const canvasUI = useCanvasUIState();
 
-  const {
-    isLoading: isCanvasLoading,
-    isSaving,
-    lastSavedAt,
-    initialNodes,
-    initialEdges,
-    persistNodes,
-    persistEdges,
-  } = useCanvasPersistence({ debounceMs: 1000 });
+  // Canvas Persistence Store (Zustand)
+  const isCanvasLoading = useCanvasPersistenceStore((s) => s.isLoading);
+  const isSaving = useCanvasPersistenceStore((s) => s.isSaving);
+  const lastSavedAt = useCanvasPersistenceStore((s) => s.lastSavedAt);
+  const initialNodes = useCanvasPersistenceStore((s) => s.initialNodes);
+  const initialEdges = useCanvasPersistenceStore((s) => s.initialEdges);
+
+  // Explicit initialization: restore canvas state on mount
+  useEffect(() => {
+    const { configure, restore } = useCanvasPersistenceStore.getState();
+    configure({ debounceMs: 1000 });
+    restore();
+  }, []);
+
+  // Explicit cleanup: flush pending saves on window close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      useCanvasPersistenceStore.getState().flush();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      useCanvasPersistenceStore.getState().flush();
+    };
+  }, []);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(
     initialNodes.length > 0 ? initialNodes : defaultNodes
@@ -137,15 +154,26 @@ function CanvasFlow() {
   );
 
   // =============================================================================
-  // Persistence and State Restoration
+  // Node Operations (declarative methods replacing setNodes)
   // =============================================================================
 
-  const initialStateApplied = useRef(false);
+  const nodeOps = useNodeOperations({
+    setNodes,
+    onUserChange: (updatedNodes) => {
+      useCanvasPersistenceStore.getState().persistNodes(updatedNodes);
+    },
+  });
+
+  // =============================================================================
+  // State Restoration
+  // =============================================================================
+
   const restoreEdgesFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isCanvasLoading) {
-      if (!initialStateApplied.current && (initialNodes.length > 0 || initialEdges.length > 0)) {
+    if (!isCanvasLoading && !nodeOps.isInitialStateApplied()) {
+      if (initialNodes.length > 0 || initialEdges.length > 0) {
+        // Restore saved state - strip highlight styles that may have been persisted
         console.log('[Canvas] Restoring nodes from persistence:', initialNodes.length);
         const cleanedNodes = initialNodes.map((node) => {
           if (node.type !== 'agent' || !node.style) return node;
@@ -153,34 +181,18 @@ function CanvasFlow() {
           return { ...node, style: restStyle };
         });
         const cleanedEdges = sanitizeEdges(initialEdges, cleanedNodes);
-        setNodes(cleanedNodes);
+        nodeOps.restoreNodes(cleanedNodes);
         if (restoreEdgesFrameRef.current !== null) {
           cancelAnimationFrame(restoreEdgesFrameRef.current);
         }
         restoreEdgesFrameRef.current = requestAnimationFrame(() => {
           setEdges(cleanedEdges);
         });
-        initialStateApplied.current = true;
       }
+      // Mark as applied whether or not there was data to restore
+      nodeOps.markInitialStateApplied();
     }
-  }, [isCanvasLoading, initialNodes, initialEdges, setNodes, setEdges]);
-
-  // Persist nodes when they change
-  const persistNodesRef = useRef(persistNodes);
-  persistNodesRef.current = persistNodes;
-  const prevNodesRef = useRef<Node[]>(nodes);
-  const nodeChangeCountRef = useRef(0);
-
-  useEffect(() => {
-    if (!isCanvasLoading && nodes !== prevNodesRef.current) {
-      nodeChangeCountRef.current += 1;
-      if (nodeChangeCountRef.current > 10) {
-        console.warn('[Canvas] WARNING: nodes changed too frequently');
-      }
-      prevNodesRef.current = nodes;
-      persistNodesRef.current(nodes);
-    }
-  }, [nodes, isCanvasLoading]);
+  }, [isCanvasLoading, initialNodes, initialEdges, nodeOps, setEdges]);
 
   // Sanitize edges on change
   useEffect(() => {
@@ -198,17 +210,21 @@ function CanvasFlow() {
     }
   }, [edges, nodes, isCanvasLoading, setEdges]);
 
-  // Persist edges when they change
-  const persistEdgesRef = useRef(persistEdges);
-  persistEdgesRef.current = persistEdges;
+  // Persist edges when they change (only after initial state is applied)
   const prevEdgesRef = useRef<Edge[]>(edges);
 
   useEffect(() => {
-    if (!isCanvasLoading && edges !== prevEdgesRef.current) {
-      prevEdgesRef.current = edges;
-      persistEdgesRef.current(edges);
+    // Skip persistence until initial state is applied
+    if (!nodeOps.isInitialStateApplied()) {
+      return;
     }
-  }, [edges, isCanvasLoading]);
+    // Skip if edges reference hasn't changed
+    if (edges === prevEdgesRef.current) {
+      return;
+    }
+    prevEdgesRef.current = edges;
+    useCanvasPersistenceStore.getState().persistEdges(edges);
+  }, [edges, nodeOps]);
 
   // =============================================================================
   // Action Pill Highlighting
@@ -218,60 +234,11 @@ function CanvasFlow() {
     const handleHighlightAgent = (event: Event) => {
       const customEvent = event as CustomEvent<{ agentId: string }>;
       const { agentId } = customEvent.detail;
-
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
-          if (node.type !== 'agent') return node;
-          const nodeData = node.data as Record<string, unknown>;
-          const nodeAgentId = nodeData?.agentId as string | undefined;
-
-          if (nodeAgentId === agentId) {
-            const currentStyle = node.style || {};
-            return {
-              ...node,
-              style: {
-                ...currentStyle,
-                border: '2px solid #4a9eff',
-                borderRadius: '12px',
-                boxShadow: '0 0 32px 8px rgba(74, 158, 255, 0.6)',
-              },
-            };
-          } else {
-            const currentStyle = node.style || {};
-            const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
-              string,
-              unknown
-            >;
-            if (
-              (border as string)?.includes('#4a9eff') ||
-              (boxShadow as string)?.includes('rgba(74, 158, 255')
-            ) {
-              return { ...node, style: restStyle };
-            }
-            return node;
-          }
-        })
-      );
+      nodeOps.highlightAgentNode(agentId);
     };
 
     const handleUnhighlightAgent = () => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
-          if (node.type !== 'agent') return node;
-          const currentStyle = node.style || {};
-          const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
-            string,
-            unknown
-          >;
-          if (
-            (border as string)?.includes('#4a9eff') ||
-            (boxShadow as string)?.includes('rgba(74, 158, 255')
-          ) {
-            return { ...node, style: restStyle };
-          }
-          return node;
-        })
-      );
+      nodeOps.unhighlightAllAgentNodes();
     };
 
     window.addEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
@@ -290,7 +257,7 @@ function CanvasFlow() {
         handleUnhighlightAgent as EventListener
       );
     };
-  }, [setNodes]);
+  }, [nodeOps.highlightAgentNode, nodeOps.unhighlightAllAgentNodes]);
 
   // =============================================================================
   // React Flow Utilities and Feature Hooks
@@ -322,9 +289,10 @@ function CanvasFlow() {
   const forkModal = useForkModal({
     nodes,
     onNodeUpdate: (nodeId, data) => {
-      setNodes((nds) =>
-        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n))
-      );
+      // Fork modal only updates sessionId during auto-detection
+      if (data.sessionId !== undefined) {
+        nodeOps.updateNodeSessionId(nodeId, data.sessionId as string);
+      }
     },
   });
 
@@ -358,15 +326,8 @@ function CanvasFlow() {
 
   // Apply highlight styles to nodes
   useEffect(() => {
-    setNodes((nds) => {
-      const result = applyHighlightStylesToNodes(
-        nds,
-        folderHighlight.highlightedFolders,
-        folderHighlight.folderColors
-      );
-      return result;
-    });
-  }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, setNodes]);
+    nodeOps.applyFolderHighlights(folderHighlight.highlightedFolders, folderHighlight.folderColors);
+  }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, nodeOps]);
 
   // =============================================================================
   // Node Store Sync
@@ -376,28 +337,9 @@ function CanvasFlow() {
     nodeStore.setNodes(nodes);
   }, [nodes]);
 
-  useEffect(() => {
-    const handleUpdateNode = (event: CustomEvent) => {
-      const { nodeId, data } = event.detail;
-      nodeStore.updateNode(nodeId, data as Record<string, unknown>);
-      setNodes((nds) =>
-        nds.map((node) => (node.id === nodeId ? { ...node, data: { ...data } } : node))
-      );
-    };
-
-    const handleDeleteNode = (event: CustomEvent) => {
-      const { nodeId } = event.detail;
-      nodeStore.deleteNode(nodeId);
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    };
-
-    window.addEventListener('update-node', handleUpdateNode as EventListener);
-    window.addEventListener('delete-node', handleDeleteNode as EventListener);
-    return () => {
-      window.removeEventListener('update-node', handleUpdateNode as EventListener);
-      window.removeEventListener('delete-node', handleDeleteNode as EventListener);
-    };
-  }, [setNodes]);
+  // NOTE: update-node and delete-node event listeners have been removed.
+  // Node updates are now handled via NodeActionsContext to prevent infinite loops.
+  // Components should use useNodeActions() hook instead of dispatching events.
 
   // =============================================================================
   // Starter Node Handling
@@ -418,7 +360,7 @@ function CanvasFlow() {
       const sessionId = crypto.randomUUID();
       const createdAt = Date.now();
 
-      const agentNode = {
+      const agentNode: Node = {
         id: `node-${createdAt}`,
         type: 'agent',
         position: { x: starterNode.position.x, y: starterNode.position.y + 150 },
@@ -441,14 +383,14 @@ function CanvasFlow() {
         style: { width: 600 },
       };
 
-      setNodes((nds) => [...nds.filter((n) => n.id !== nodeId), agentNode]);
+      nodeOps.replaceNode(nodeId, agentNode);
     };
 
     window.addEventListener('starter-node-submit', handleStarterSubmit as EventListener);
     return () => {
       window.removeEventListener('starter-node-submit', handleStarterSubmit as EventListener);
     };
-  }, [nodes, setNodes]);
+  }, [nodes, nodeOps]);
 
   // =============================================================================
   // ReactFlow Event Handlers
@@ -610,7 +552,7 @@ function CanvasFlow() {
             style: { stroke: '#4a5568', strokeWidth: 2 },
           };
 
-          setNodes((nds) => [...nds, forkedNode]);
+          nodeOps.addNode(forkedNode);
           setEdges((eds) => [...eds, newEdge]);
         } catch (err) {
           console.error('[Canvas] Auto-fork error:', err);
@@ -622,7 +564,7 @@ function CanvasFlow() {
 
     window.addEventListener('chat-message-fork', handleChatMessageFork);
     return () => window.removeEventListener('chat-message-fork', handleChatMessageFork);
-  }, [nodes, forkModal, autoForkState.autoFork, setNodes, setEdges]);
+  }, [nodes, forkModal, autoForkState.autoFork, nodeOps, setEdges]);
 
   // =============================================================================
   // Create Chat Node Event Handler
@@ -651,7 +593,7 @@ function CanvasFlow() {
         const edgeToRemove = edges.find(
           (e) => e.source === nodeId && e.target === existingChatNode.id
         );
-        setNodes((nds) => nds.filter((n) => n.id !== existingChatNode.id));
+        nodeOps.removeNode(existingChatNode.id);
         if (edgeToRemove) {
           setEdges((eds) => eds.filter((e) => e.id !== edgeToRemove.id));
         }
@@ -702,7 +644,7 @@ function CanvasFlow() {
         style: { stroke: borderColor, strokeWidth: 2, strokeDasharray: '5, 5' },
       };
 
-      setNodes((nds) => [...nds, chatNode]);
+      nodeOps.addNode(chatNode);
 
       requestAnimationFrame(() => {
         updateNodeInternals(chatNodeId);
@@ -724,7 +666,7 @@ function CanvasFlow() {
         handleCreateChatNode as EventListener
       );
     };
-  }, [nodes, edges, setNodes, setEdges, updateNodeInternals, getNodes]);
+  }, [nodes, edges, nodeOps, setEdges, updateNodeInternals, getNodes]);
 
   // =============================================================================
   // Fork Modal Confirmation Handler
@@ -740,7 +682,7 @@ function CanvasFlow() {
     }) => {
       const result = await forkModal.confirm(data);
       if (result.success) {
-        setNodes((nds) => [...nds, result.forkedNode]);
+        nodeOps.addNode(result.forkedNode);
         requestAnimationFrame(() => {
           updateNodeInternals(result.forkedNode.id);
           updateNodeInternals(result.newEdge.source);
@@ -754,7 +696,7 @@ function CanvasFlow() {
         });
       }
     },
-    [forkModal, setNodes, setEdges, updateNodeInternals, getNodes]
+    [forkModal, nodeOps, setEdges, updateNodeInternals, getNodes]
   );
 
   // =============================================================================
@@ -1060,15 +1002,13 @@ function CanvasFlow() {
 
       if (snappedPosition) {
         isSnappingRef.current = true;
-        setNodes((nds) =>
-          nds.map((n) => (n.id === node.id ? { ...n, position: snappedPosition } : n))
-        );
+        nodeOps.updateNodePosition(node.id, snappedPosition);
         setTimeout(() => {
           isSnappingRef.current = false;
         }, 10);
       }
     },
-    [keyboardModifiers.isNodeDragEnabled, getNodes, setNodes, applySnapping]
+    [keyboardModifiers.isNodeDragEnabled, getNodes, nodeOps, applySnapping]
   );
 
   const onNodeDragStop = useCallback(() => {
@@ -1139,6 +1079,17 @@ function CanvasFlow() {
   );
 
   // =============================================================================
+  // Node Actions Callback (for context persistence)
+  // =============================================================================
+
+  const handleNodeActionsChange = useCallback((updatedNodes: Node[]) => {
+    // Sync to nodeStore for compatibility
+    nodeStore.setNodes(updatedNodes);
+    // Trigger persistence
+    useCanvasPersistenceStore.getState().persistNodes(updatedNodes);
+  }, []);
+
+  // =============================================================================
   // Loading State
   // =============================================================================
 
@@ -1158,190 +1109,192 @@ function CanvasFlow() {
   // =============================================================================
 
   return (
-    <div
-      className={`canvas-container ${keyboardModifiers.isNodeDragEnabled ? 'drag-mode' : ''} ${linearPanel.isResizing ? 'resizing' : ''}`}
-    >
-      {/* Command Palette */}
-      <CommandPalette
-        isOpen={canvasUI.isCommandPaletteOpen}
-        onClose={canvasUI.closeCommandPalette}
-        commands={commandActions}
-      />
-
-      {/* New Agent Modal */}
-      <NewAgentModal
-        isOpen={canvasUI.isNewAgentModalOpen}
-        onClose={() => {
-          canvasUI.closeNewAgentModal();
-          pendingAgent.clearPending();
-        }}
-        onCreate={(data) => {
-          canvasActions.createAgentWithData({
-            position: pendingAgent.pendingPosition,
-            gitInfo: data.gitInfo,
-            modalData: {
-              title: data.title,
-              description: data.description,
-              workspacePath: data.workspacePath,
-            },
-            lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
-            initialAttachments: pendingAgent.pendingLinearIssue
-              ? [
-                  createLinearIssueAttachment({
-                    id: pendingAgent.pendingLinearIssue.id,
-                    identifier: pendingAgent.pendingLinearIssue.identifier,
-                    title: pendingAgent.pendingLinearIssue.title,
-                    state: {
-                      name: pendingAgent.pendingLinearIssue.state.name,
-                      color: pendingAgent.pendingLinearIssue.state.color,
-                    },
-                    assignee: pendingAgent.pendingLinearIssue.assignee,
-                  }),
-                ]
-              : undefined,
-          });
-          canvasUI.closeNewAgentModal();
-          pendingAgent.clearPending();
-        }}
-        initialPosition={pendingAgent.pendingPosition}
-        initialWorkspacePath={folderLock.lockedFolderPath}
-        autoCreateWorktree={pendingAgent.autoCreateWorktree}
-        initialDescription={
-          pendingAgent.pendingLinearIssue
-            ? pendingAgent.pendingLinearIssue.description
-              ? `${pendingAgent.pendingLinearIssue.title}\n\n${pendingAgent.pendingLinearIssue.description}`
-              : pendingAgent.pendingLinearIssue.title
-            : undefined
-        }
-      />
-
-      {/* Sidebar Feature Component */}
-      <Sidebar
-        sidebar={sidebar}
-        githubUser={githubUser}
-        agentHierarchy={agentHierarchy}
-        folderPathMap={folderPathMap}
-        folderLock={folderLock}
-        folderHighlight={folderHighlight}
-        linear={linear}
-        linearPanel={linearPanel}
-        hasAgents={hasAgents}
-        onIssueDragStart={canvasDrop.handleIssueDragStart}
-        onIssueClick={(issueId) => canvasUI.setSelectedIssueId(issueId)}
-      />
-
-      {/* Canvas Content */}
-      <div className={`canvas-content ${sidebar.isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        {/* Expand button when sidebar is collapsed */}
-        {sidebar.isSidebarCollapsed && <SidebarExpandButton onClick={sidebar.toggleSidebar} />}
-
-        {/* Save status indicator */}
-        <SaveIndicator isSaving={isSaving} lastSavedAt={lastSavedAt} />
-
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onConnectStart={onConnectStart}
-          onConnectEnd={onConnectEnd}
-          onNodeDrag={onNodeDrag}
-          onNodeDragStop={onNodeDragStop}
-          onPaneContextMenu={contextMenuState.onPaneContextMenu}
-          onPaneClick={contextMenuState.onPaneClick}
-          onDragOver={canvasDrop.handleCanvasDragOver}
-          onDrop={canvasDrop.handleCanvasDrop}
-          nodeTypes={nodeTypes}
-          fitView
-          style={{ backgroundColor: 'var(--color-bg-canvas)' }}
-          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-          minZoom={0.1}
-          maxZoom={4}
-          panOnScroll={true}
-          zoomOnScroll={true}
-          panOnDrag={keyboardModifiers.isNodeDragEnabled}
-          zoomOnPinch={true}
-          nodesDraggable={keyboardModifiers.isNodeDragEnabled}
-          nodesConnectable={true}
-          elementsSelectable={true}
-          nodesFocusable={true}
-        >
-          <Background
-            variant={BackgroundVariant.Lines}
-            gap={24}
-            size={2}
-            color={theme === 'light-web' ? '#F5F6F8' : theme === 'dark' ? '#171717' : '#3a3a3a'}
-          />
-          <ForkGhostNode />
-        </ReactFlow>
-
-        {/* Fork Session Modal */}
-        {forkModal.isOpen && forkModal.modalData && (
-          <NewAgentModal
-            isOpen={true}
-            onClose={forkModal.cancel}
-            onCreate={() => {}}
-            initialWorkspacePath={forkModal.modalData.workspacePath}
-            isForkMode={true}
-            forkData={{
-              parentSessionId: forkModal.modalData.sessionId,
-              parentBranch: forkModal.modalData.parentBranch,
-              targetMessageId: forkModal.modalData.targetMessageId,
-              originalTargetMessageId: forkModal.modalData.originalTargetMessageId,
-              createWorktree: forkModal.modalData.createWorktree,
-            }}
-            messages={forkModal.messages}
-            isLoadingMessages={forkModal.isLoadingMessages}
-            onLoadMessages={forkModal.loadMessages}
-            cutoffMessageId={forkModal.cutoffMessageId}
-            onCutoffChange={forkModal.setCutoffMessageId}
-            onForkConfirm={handleForkConfirm}
-          />
-        )}
-
-        {/* Fork Error Toast */}
-        <ForkErrorToast
-          error={forkModal.error}
-          isModalOpen={forkModal.isOpen}
-          onDismiss={forkModal.clearError}
+    <NodeActionsProvider onNodesChange={handleNodeActionsChange}>
+      <div
+        className={`canvas-container ${keyboardModifiers.isNodeDragEnabled ? 'drag-mode' : ''} ${linearPanel.isResizing ? 'resizing' : ''}`}
+      >
+        {/* Command Palette */}
+        <CommandPalette
+          isOpen={canvasUI.isCommandPaletteOpen}
+          onClose={canvasUI.closeCommandPalette}
+          commands={commandActions}
         />
 
-        {/* Context Menu */}
-        <ContextMenu contextMenuState={contextMenuState} canvasActions={canvasActions} />
+        {/* New Agent Modal */}
+        <NewAgentModal
+          isOpen={canvasUI.isNewAgentModalOpen}
+          onClose={() => {
+            canvasUI.closeNewAgentModal();
+            pendingAgent.clearPending();
+          }}
+          onCreate={(data) => {
+            canvasActions.createAgentWithData({
+              position: pendingAgent.pendingPosition,
+              gitInfo: data.gitInfo,
+              modalData: {
+                title: data.title,
+                description: data.description,
+                workspacePath: data.workspacePath,
+              },
+              lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
+              initialAttachments: pendingAgent.pendingLinearIssue
+                ? [
+                    createLinearIssueAttachment({
+                      id: pendingAgent.pendingLinearIssue.id,
+                      identifier: pendingAgent.pendingLinearIssue.identifier,
+                      title: pendingAgent.pendingLinearIssue.title,
+                      state: {
+                        name: pendingAgent.pendingLinearIssue.state.name,
+                        color: pendingAgent.pendingLinearIssue.state.color,
+                      },
+                      assignee: pendingAgent.pendingLinearIssue.assignee,
+                    }),
+                  ]
+                : undefined,
+            });
+            canvasUI.closeNewAgentModal();
+            pendingAgent.clearPending();
+          }}
+          initialPosition={pendingAgent.pendingPosition}
+          initialWorkspacePath={folderLock.lockedFolderPath}
+          autoCreateWorktree={pendingAgent.autoCreateWorktree}
+          initialDescription={
+            pendingAgent.pendingLinearIssue
+              ? pendingAgent.pendingLinearIssue.description
+                ? `${pendingAgent.pendingLinearIssue.title}\n\n${pendingAgent.pendingLinearIssue.description}`
+                : pendingAgent.pendingLinearIssue.title
+              : undefined
+          }
+        />
 
-        {/* Floating Action Buttons (Highlight All, Settings) */}
-        <FloatingActionButtons
+        {/* Sidebar Feature Component */}
+        <Sidebar
+          sidebar={sidebar}
+          githubUser={githubUser}
+          agentHierarchy={agentHierarchy}
+          folderPathMap={folderPathMap}
+          folderLock={folderLock}
           folderHighlight={folderHighlight}
-          onOpenSettings={canvasUI.openSettings}
-        />
-
-        {/* Zoom Controls */}
-        <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
-
-        {/* Settings Modal */}
-        <SettingsModal
-          isOpen={canvasUI.isSettingsOpen}
-          onClose={canvasUI.closeSettings}
-          githubUsername={githubUser.username}
-          theme={theme}
-          onThemeChange={setTheme}
           linear={linear}
-          autoForkState={autoForkState}
+          linearPanel={linearPanel}
+          hasAgents={hasAgents}
+          onIssueDragStart={canvasDrop.handleIssueDragStart}
+          onIssueClick={(issueId) => canvasUI.setSelectedIssueId(issueId)}
         />
 
-        {/* Action Pill */}
-        <ActionPill />
+        {/* Canvas Content */}
+        <div className={`canvas-content ${sidebar.isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          {/* Expand button when sidebar is collapsed */}
+          {sidebar.isSidebarCollapsed && <SidebarExpandButton onClick={sidebar.toggleSidebar} />}
 
-        {/* Linear Issue Details Modal */}
-        {canvasUI.selectedIssueId && (
-          <IssueDetailsModal
-            issueId={canvasUI.selectedIssueId}
-            onClose={() => canvasUI.setSelectedIssueId(null)}
+          {/* Save status indicator */}
+          <SaveIndicator isSaving={isSaving} lastSavedAt={lastSavedAt} />
+
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
+            onNodeDrag={onNodeDrag}
+            onNodeDragStop={onNodeDragStop}
+            onPaneContextMenu={contextMenuState.onPaneContextMenu}
+            onPaneClick={contextMenuState.onPaneClick}
+            onDragOver={canvasDrop.handleCanvasDragOver}
+            onDrop={canvasDrop.handleCanvasDrop}
+            nodeTypes={nodeTypes}
+            fitView
+            style={{ backgroundColor: 'var(--color-bg-canvas)' }}
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            minZoom={0.1}
+            maxZoom={4}
+            panOnScroll={true}
+            zoomOnScroll={true}
+            panOnDrag={keyboardModifiers.isNodeDragEnabled}
+            zoomOnPinch={true}
+            nodesDraggable={keyboardModifiers.isNodeDragEnabled}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            nodesFocusable={true}
+          >
+            <Background
+              variant={BackgroundVariant.Lines}
+              gap={24}
+              size={2}
+              color={theme === 'light-web' ? '#F5F6F8' : theme === 'dark' ? '#171717' : '#3a3a3a'}
+            />
+            <ForkGhostNode />
+          </ReactFlow>
+
+          {/* Fork Session Modal */}
+          {forkModal.isOpen && forkModal.modalData && (
+            <NewAgentModal
+              isOpen={true}
+              onClose={forkModal.cancel}
+              onCreate={() => {}}
+              initialWorkspacePath={forkModal.modalData.workspacePath}
+              isForkMode={true}
+              forkData={{
+                parentSessionId: forkModal.modalData.sessionId,
+                parentBranch: forkModal.modalData.parentBranch,
+                targetMessageId: forkModal.modalData.targetMessageId,
+                originalTargetMessageId: forkModal.modalData.originalTargetMessageId,
+                createWorktree: forkModal.modalData.createWorktree,
+              }}
+              messages={forkModal.messages}
+              isLoadingMessages={forkModal.isLoadingMessages}
+              onLoadMessages={forkModal.loadMessages}
+              cutoffMessageId={forkModal.cutoffMessageId}
+              onCutoffChange={forkModal.setCutoffMessageId}
+              onForkConfirm={handleForkConfirm}
+            />
+          )}
+
+          {/* Fork Error Toast */}
+          <ForkErrorToast
+            error={forkModal.error}
+            isModalOpen={forkModal.isOpen}
+            onDismiss={forkModal.clearError}
           />
-        )}
+
+          {/* Context Menu */}
+          <ContextMenu contextMenuState={contextMenuState} canvasActions={canvasActions} />
+
+          {/* Floating Action Buttons (Highlight All, Settings) */}
+          <FloatingActionButtons
+            folderHighlight={folderHighlight}
+            onOpenSettings={canvasUI.openSettings}
+          />
+
+          {/* Zoom Controls */}
+          <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
+
+          {/* Settings Modal */}
+          <SettingsModal
+            isOpen={canvasUI.isSettingsOpen}
+            onClose={canvasUI.closeSettings}
+            githubUsername={githubUser.username}
+            theme={theme}
+            onThemeChange={setTheme}
+            linear={linear}
+            autoForkState={autoForkState}
+          />
+
+          {/* Action Pill */}
+          <ActionPill />
+
+          {/* Linear Issue Details Modal */}
+          {canvasUI.selectedIssueId && (
+            <IssueDetailsModal
+              issueId={canvasUI.selectedIssueId}
+              onClose={() => canvasUI.setSelectedIssueId(null)}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </NodeActionsProvider>
   );
 }
 

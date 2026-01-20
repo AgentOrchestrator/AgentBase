@@ -15,7 +15,10 @@ export {
   type UseCanvasDropReturn,
   useCanvasDrop,
 } from './useCanvasDrop';
-export { useCanvasPersistence } from './useCanvasPersistence';
+export {
+  type CanvasPersistenceStore,
+  useCanvasPersistenceStore,
+} from './useCanvasPersistenceStore';
 export {
   type CanvasUIStore,
   type UseCanvasUIStateReturn,
@@ -41,6 +44,9 @@ export {
   type UseKeyboardModifiersReturn,
   useKeyboardModifiers,
 } from './useKeyboardModifiers';
+// NOTE: useNodeOperations is no longer exported publicly.
+// It's used internally by Canvas.tsx for operations like highlighting.
+// Child components should use useNodeActions() from NodeActionsContext instead.
 export {
   type PendingAgentPosition,
   type PendingAgentStore,

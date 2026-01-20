@@ -3,7 +3,8 @@
  *
  * Contains canvas-specific UI components like context menu,
  * zoom controls, floating action buttons, and utility components.
- * Also includes hooks for canvas state management, actions, and interactions.
+ * Also includes hooks for canvas state management, actions, and interactions,
+ * and the NodeActionsContext for direct node updates (replacing event-based pattern).
  */
 
 // Components
@@ -20,6 +21,15 @@ export {
 } from './components/SidebarExpandButton';
 export { ZoomControls, type ZoomControlsProps } from './components/ZoomControls';
 
+// Context
+export {
+  type NodeActionsContextValue,
+  NodeActionsProvider,
+  type NodeActionsProviderProps,
+  useNodeActions,
+  useNodeActionsOptional,
+} from './context';
+
 // Hooks
 export {
   type UseCanvasActionsInput,
@@ -32,7 +42,10 @@ export {
   type UseCanvasDropReturn,
   useCanvasDrop,
 } from './hooks/useCanvasDrop';
-export { useCanvasPersistence } from './hooks/useCanvasPersistence';
+export {
+  type CanvasPersistenceStore,
+  useCanvasPersistenceStore,
+} from './hooks/useCanvasPersistenceStore';
 export { type UseCanvasUIStateReturn, useCanvasUIState } from './hooks/useCanvasUIState';
 export {
   type ContextMenuPosition,

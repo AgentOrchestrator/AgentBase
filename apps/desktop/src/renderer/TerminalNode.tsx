@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
 import AttachmentHeader from './AttachmentHeader';
+import { useNodeActions } from './features/canvas/context';
 import IssueDetailsModal from './IssueDetailsModal';
 import {
   createLinearIssueAttachment,
@@ -28,6 +29,7 @@ interface TerminalNodeData {
 }
 
 function TerminalNode({ data, id, selected }: NodeProps) {
+  const nodeActions = useNodeActions();
   const nodeData = data as unknown as TerminalNodeData;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -979,12 +981,8 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const currentAttachments = nodeData.attachments || [];
       const updatedAttachments = [...currentAttachments, newAttachment];
 
-      // Trigger a re-render by updating the node
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: { ...nodeData, attachments: updatedAttachments } },
-        })
-      );
+      // Update attachments via context (not events) to prevent infinite loops
+      nodeActions.updateAttachments(id, updatedAttachments);
     } catch (error) {
       console.error('Error handling drop on terminal:', error);
     }
