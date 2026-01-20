@@ -1661,6 +1661,32 @@
   min-width: 0;
 }
 
+.sidebar-linear-add-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-linear-add-button:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-linear-add-button:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .sidebar-linear-issues-workspace {
   color: var(--color-text-secondary);
   font-size: 11px;
