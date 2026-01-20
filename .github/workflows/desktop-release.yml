@@ -62,10 +62,23 @@ jobs:
       - name: Build shared package
         run: npm run build --workspace=@agent-orchestrator/shared
 
+      - name: Prepare Apple API Key
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p ~/private_keys
+          echo "$APPLE_API_KEY_CONTENT" > ~/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          echo "APPLE_API_KEY=$HOME/private_keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8" >> $GITHUB_ENV
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+
       - name: Build desktop app
         run: npm run dist --workspace=desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2

@@ -53,10 +53,18 @@ module.exports = {
   ],
 
   mac: {
-    target: ['dmg'],
+    target: ['dmg', 'zip'],
     category: 'public.app-category.developer-tools',
-    identity: null,
+    // Use environment variable to control signing:
+    // - Set CSC_LINK to enable real signing (CI/release builds)
+    // - Unset or set to empty for ad-hoc signing (local development)
+    hardenedRuntime: true,
+    gatekeeperAssess: false,
+    entitlements: 'build-resources/entitlements.mac.plist',
+    entitlementsInherit: 'build-resources/entitlements.mac.plist',
   },
+
+  afterSign: 'scripts/notarize.js',
 
   dmg: {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: electron-builder template syntax

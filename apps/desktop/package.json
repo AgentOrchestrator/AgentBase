@@ -26,6 +26,7 @@
     "dist:full": "node scripts/build-dist.js"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@electron/rebuild": "^3.7.1",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
@@ -33,6 +34,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/coverage-v8": "^4.0.17",
     "concurrently": "^8.2.2",
+    "create-dmg": "^7.1.0",
     "electron": "^39.0.0",
     "electron-builder": "^26.4.0",
     "husky": "^9.1.7",
