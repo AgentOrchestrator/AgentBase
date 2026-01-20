@@ -9,6 +9,30 @@ import { filterJsonl } from '../filter';
 import type { IForkAdapter } from '../interfaces/IForkAdapter';
 
 /**
+ * Structure of a session entry in sessions-index.json
+ */
+interface SessionIndexEntry {
+  sessionId: string;
+  fullPath: string;
+  fileMtime: number;
+  firstPrompt: string;
+  messageCount: number;
+  created: string;
+  modified: string;
+  gitBranch?: string;
+  projectPath: string;
+  isSidechain: boolean;
+}
+
+/**
+ * Structure of sessions-index.json
+ */
+interface SessionsIndex {
+  version: number;
+  entries: SessionIndexEntry[];
+}
+
+/**
  * Fork adapter for Claude Code sessions
  *
  * Handles copying .jsonl session files from ~/.claude/projects and
@@ -27,15 +51,37 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
   }
 
   /**
-   * Find the session file for a given session ID
+   * Find the session file for a given session ID within a specific source working directory
+   *
+   * IMPORTANT: The sourceWorkingDir is required because the same session ID can exist
+   * across multiple project folders (from previous forks). We must look in the correct
+   * project folder based on the source workspace path.
    */
-  private findSessionFile(sessionId: string): string | null {
+  private findSessionFile(sessionId: string, sourceWorkingDir: string): string | null {
     const projectsDir = this.getProjectsDir();
 
     if (!fs.existsSync(projectsDir)) {
       return null;
     }
 
+    // Resolve real path to handle symlinks (e.g., /tmp -> /private/tmp on macOS)
+    const resolvedSourceDir = this.resolveRealPath(sourceWorkingDir);
+
+    // Convert source path to directory name format used by Claude Code
+    // e.g., /Users/foo/project -> -Users-foo-project
+    const projectDirName = resolvedSourceDir.replace(/\//g, '-').replace(/ /g, '-');
+    const expectedProjectDir = path.join(projectsDir, projectDirName);
+
+    // First, try the expected project directory based on sourceWorkingDir
+    if (fs.existsSync(expectedProjectDir)) {
+      const sessionFilePath = path.join(expectedProjectDir, `${sessionId}.jsonl`);
+      if (fs.existsSync(sessionFilePath)) {
+        return sessionFilePath;
+      }
+    }
+
+    // Fallback: search all project directories (for backwards compatibility)
+    // This handles cases where the sourceWorkingDir might not exactly match
     const projectDirs = fs.readdirSync(projectsDir);
 
     for (const projectDir of projectDirs) {
@@ -100,6 +146,147 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
     return agentType === 'claude_code';
   }
 
+  /**
+   * Extract the cwd (working directory) from JSONL content
+   * This is the actual workspace path where the session was created
+   */
+  private extractCwdFromContent(content: string): string | null {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.cwd && typeof obj.cwd === 'string') {
+          return obj.cwd;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extract the first user prompt from JSONL content for the session index
+   */
+  private extractFirstPrompt(content: string): string {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user' && obj.message?.content) {
+          const contentBlocks = obj.message.content;
+          for (const block of contentBlocks) {
+            if (block.type === 'text' && block.text) {
+              // Truncate to reasonable length for index
+              return block.text.slice(0, 200) + (block.text.length > 200 ? '…' : '');
+            }
+          }
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Count messages in JSONL content
+   */
+  private countMessages(content: string): number {
+    let count = 0;
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user' || obj.type === 'assistant') {
+          count++;
+        }
+      } catch {
+        // Skip unparseable lines
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Get current git branch for the target directory
+   */
+  private getGitBranch(targetDir: string): string | undefined {
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['branch', '--show-current'], {
+        cwd: targetDir,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      return branch || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Update or create sessions-index.json to register the forked session
+   */
+  private updateSessionsIndex(
+    targetProjectDir: string,
+    targetSessionId: string,
+    targetFilePath: string,
+    targetWorkingDir: string,
+    content: string
+  ): void {
+    const indexPath = path.join(targetProjectDir, 'sessions-index.json');
+
+    // Read existing index or create new one
+    let index: SessionsIndex = { version: 1, entries: [] };
+    if (fs.existsSync(indexPath)) {
+      try {
+        const existing = fs.readFileSync(indexPath, 'utf-8');
+        index = JSON.parse(existing) as SessionsIndex;
+      } catch {
+        // If parsing fails, start with empty index
+        console.warn(
+          '[ClaudeCodeForkAdapter] Failed to parse existing sessions-index.json, creating new one'
+        );
+      }
+    }
+
+    // Remove any existing entry with same session ID
+    index.entries = index.entries.filter((e) => e.sessionId !== targetSessionId);
+
+    // Get file stats for mtime
+    const stats = fs.statSync(targetFilePath);
+    const now = new Date().toISOString();
+
+    // Create new entry
+    const newEntry: SessionIndexEntry = {
+      sessionId: targetSessionId,
+      fullPath: targetFilePath,
+      fileMtime: stats.mtimeMs,
+      firstPrompt: this.extractFirstPrompt(content),
+      messageCount: this.countMessages(content),
+      created: now,
+      modified: now,
+      gitBranch: this.getGitBranch(targetWorkingDir),
+      projectPath: targetWorkingDir,
+      isSidechain: false,
+    };
+
+    index.entries.push(newEntry);
+
+    // Write updated index
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf-8');
+
+    console.log('[ClaudeCodeForkAdapter] Updated sessions-index.json:', {
+      indexPath,
+      sessionId: targetSessionId,
+      messageCount: newEntry.messageCount,
+    });
+  }
+
   async forkSessionFile(
     sourceSessionId: string,
     targetSessionId: string,
@@ -108,8 +295,8 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
     filterOptions?: JsonlFilterOptions
   ): Promise<Result<void, AgentError>> {
     try {
-      // Find source session file
-      const sourceFilePath = this.findSessionFile(sourceSessionId);
+      // Find source session file in the correct project folder
+      const sourceFilePath = this.findSessionFile(sourceSessionId, sourceWorkingDir);
       if (!sourceFilePath) {
         return err(
           agentError(
@@ -132,10 +319,16 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       // Read source file
       const sourceContent = fs.readFileSync(sourceFilePath, 'utf-8');
 
+      // Extract the actual source cwd from the JSONL content
+      // This is more reliable than the passed sourceWorkingDir which may be incorrect
+      const actualSourceCwd = this.extractCwdFromContent(sourceContent) ?? sourceWorkingDir;
+
       console.log('[ClaudeCodeForkAdapter] Read source session file:', {
         sourceFilePath,
         sourceSessionId,
         targetSessionId,
+        actualSourceCwd,
+        passedSourceCwd: sourceWorkingDir,
         filterOptions,
       });
 
@@ -156,12 +349,23 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       const jsonlFile = new JSONLFile(contentToTransform);
       const needsSessionIdReplacement = sourceSessionId !== targetSessionId;
       const transformed = jsonlFile.replaceFields({
-        cwd: { from: sourceWorkingDir, to: resolvedTargetDir },
+        cwd: { from: actualSourceCwd, to: resolvedTargetDir },
         sessionId: needsSessionIdReplacement ? targetSessionId : undefined,
       });
+      const transformedContent = transformed.toString();
 
       // Write to target file
-      fs.writeFileSync(targetFilePath, transformed.toString(), 'utf-8');
+      fs.writeFileSync(targetFilePath, transformedContent, 'utf-8');
+
+      // Update sessions-index.json to register the forked session
+      // This allows Claude Code to discover and resume the session
+      this.updateSessionsIndex(
+        targetProjectDir,
+        targetSessionId,
+        targetFilePath,
+        resolvedTargetDir,
+        transformedContent
+      );
 
       console.log('[ClaudeCodeForkAdapter] Session file forked:', {
         source: sourceFilePath,

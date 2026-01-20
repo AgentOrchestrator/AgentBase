@@ -341,6 +341,7 @@ function ConversationNode({ data, id, selected }: NodeProps) {
         <div
           key={item.key}
           className="conversation-assistant-text-content"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown rendering requires innerHTML
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );

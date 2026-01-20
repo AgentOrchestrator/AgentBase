@@ -298,6 +298,7 @@ export class ForkService implements IForkService {
       sessionId: request.sessionId,
       newSessionName: request.forkTitle,
       workspacePath: worktreeInfo.worktreePath,
+      sourceWorkspacePath: request.repoPath, // Source workspace for correct session lookup
       filterOptions: request.filterOptions,
       createWorktree: true,
     };
@@ -349,6 +350,7 @@ export class ForkService implements IForkService {
       sessionId: request.sessionId,
       newSessionName: request.forkTitle,
       workspacePath: request.repoPath, // Stay in same workspace
+      sourceWorkspacePath: request.repoPath, // Source workspace for correct session lookup
       filterOptions: request.filterOptions,
       createWorktree: false,
     };

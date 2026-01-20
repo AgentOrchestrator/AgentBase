@@ -127,6 +127,12 @@ export interface ForkOptions {
   newSessionName?: string;
   /** Workspace path for the new session (defaults to current workspace) */
   workspacePath?: string;
+  /**
+   * Source workspace path where the session was created.
+   * Required for correct session lookup when the same session ID exists
+   * in multiple project folders (from previous forks).
+   */
+  sourceWorkspacePath?: string;
   /** Filter options for partial context fork (include messages up to a specific point) */
   filterOptions?: JsonlFilterOptions;
   /**

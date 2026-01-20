@@ -128,7 +128,9 @@ export class RepresentationService implements IRepresentationService {
 
     await Promise.all(disposePromises);
     this.providers.clear();
-    this.providersByType.forEach((set) => set.clear());
+    for (const set of this.providersByType.values()) {
+      set.clear();
+    }
     this.isInitialized = false;
 
     this.deps.logger.info('RepresentationService disposed');
