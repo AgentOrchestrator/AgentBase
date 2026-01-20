@@ -19,7 +19,7 @@
 import type { GitInfo } from '@agent-orchestrator/shared';
 import { useReactFlow } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { agentActionStore } from '../../stores';
+import { useActionPillStore } from '../../features/action-pill';
 import type { AgentNodeData } from '../../types/agent-node';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type { AgentState, SessionReadiness, UseAgentStateInput, WorkspaceSource } from './types';
@@ -130,7 +130,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
 
   // Clear actions when agent/session changes
   useEffect(() => {
-    agentActionStore.clearAgent(nodeData.agentId);
+    useActionPillStore.getState().clearAgent(nodeData.agentId);
   }, [nodeData.agentId]);
 
   // ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
-import { ActionPill } from './components/ActionPill';
+import { ActionPill, useActionPillHighlight } from './features/action-pill';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -217,88 +217,46 @@ function CanvasFlow() {
     }
   }, [edges, isCanvasLoading, persistEdges]);
 
-  // Handle action pill highlighting events
+  // Handle action pill highlighting via Zustand store (replaces window events)
+  const { highlightedAgentId } = useActionPillHighlight();
+
   useEffect(() => {
-    const handleHighlightAgent = (event: Event) => {
-      const customEvent = event as CustomEvent<{ agentId: string }>;
-      const { agentId } = customEvent.detail;
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        if (node.type !== 'agent') return node;
+        const nodeData = node.data as Record<string, unknown>;
+        const nodeAgentId = nodeData?.agentId as string | undefined;
+        const currentStyle = node.style || {};
 
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
-          if (node.type !== 'agent') return node;
-          const nodeData = node.data as Record<string, unknown>;
-          const nodeAgentId = nodeData?.agentId as string | undefined;
+        if (highlightedAgentId && nodeAgentId === highlightedAgentId) {
+          // Add blue border and shadow to matching node
+          return {
+            ...node,
+            style: {
+              ...currentStyle,
+              border: '2px solid #4a9eff',
+              borderRadius: '12px',
+              boxShadow: '0 0 32px 8px rgba(74, 158, 255, 0.6)',
+            },
+          };
+        }
 
-          if (nodeAgentId === agentId) {
-            // Add blue border and shadow to matching node (using command palette blue)
-            const currentStyle = node.style || {};
-            return {
-              ...node,
-              style: {
-                ...currentStyle,
-                border: '2px solid #4a9eff',
-                borderRadius: '12px',
-                boxShadow: '0 0 32px 8px rgba(74, 158, 255, 0.6)',
-              },
-            };
-          } else {
-            // Remove highlight from other nodes (preserve other styles)
-            const currentStyle = node.style || {};
-            const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
-              string,
-              unknown
-            >;
-            // Only remove if it's our highlight (check if it's the blue border/shadow)
-            if (
-              (border as string)?.includes('#4a9eff') ||
-              (boxShadow as string)?.includes('rgba(74, 158, 255')
-            ) {
-              return { ...node, style: restStyle };
-            }
-            return node;
-          }
-        })
-      );
-    };
-
-    const handleUnhighlightAgent = () => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
-          if (node.type !== 'agent') return node;
-          const currentStyle = node.style || {};
-          const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
-            string,
-            unknown
-          >;
-          // Only remove if it's our highlight (check if it's the blue border/shadow)
-          if (
-            (border as string)?.includes('#4a9eff') ||
-            (boxShadow as string)?.includes('rgba(74, 158, 255')
-          ) {
-            return { ...node, style: restStyle };
-          }
-          return node;
-        })
-      );
-    };
-
-    window.addEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
-    window.addEventListener(
-      'action-pill:unhighlight-agent',
-      handleUnhighlightAgent as EventListener
+        // Remove highlight from nodes that shouldn't be highlighted
+        const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
+          string,
+          unknown
+        >;
+        // Only remove if it's our highlight (check if it's the blue border/shadow)
+        if (
+          (border as string)?.includes('#4a9eff') ||
+          (boxShadow as string)?.includes('rgba(74, 158, 255')
+        ) {
+          return { ...node, style: restStyle };
+        }
+        return node;
+      })
     );
-
-    return () => {
-      window.removeEventListener(
-        'action-pill:highlight-agent',
-        handleHighlightAgent as EventListener
-      );
-      window.removeEventListener(
-        'action-pill:unhighlight-agent',
-        handleUnhighlightAgent as EventListener
-      );
-    };
-  }, [setNodes]);
+  }, [highlightedAgentId, setNodes]);
 
   // Core UI state (kept in Canvas)
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
