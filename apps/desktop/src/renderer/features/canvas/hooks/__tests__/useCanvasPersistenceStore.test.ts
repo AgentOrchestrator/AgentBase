@@ -1,10 +1,17 @@
 /**
  * Tests for useCanvasPersistenceStore (Zustand)
  *
- * Tests the canvas persistence store with explicit initialization pattern:
- * - Store holds state and actions
- * - Component explicitly calls restore() to initialize
- * - Component explicitly sets up beforeunload listener with flush()
+ * Tests the canvas persistence store's ORCHESTRATION logic:
+ * - State management (canvasId, loading, saving states)
+ * - Canvas restoration flow
+ * - Debounced persistence
+ * - Flush behavior for beforeunload
+ *
+ * NOTE: Canvas converter logic is tested separately in canvasConverters.test.ts.
+ * This file uses REAL converters to ensure proper integration, only mocking:
+ * - canvasAPI (external IPC boundary to main process)
+ * - nodeRegistry (React component dependencies)
+ * - generateCanvasId (for deterministic test IDs)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,7 +21,7 @@ import type { CanvasState } from '../../../../../main/types/database';
 // Mock Setup
 // =============================================================================
 
-// Mock canvasAPI
+// Mock canvasAPI - external boundary (IPC to main process)
 const mockCanvasAPI = {
   saveCanvas: vi.fn(),
   loadCanvas: vi.fn(),
@@ -24,16 +31,24 @@ const mockCanvasAPI = {
   deleteCanvas: vi.fn(),
 };
 
-// Mock canvasConverters
-vi.mock('../../../../hooks/canvasConverters', () => ({
-  nodesToCanvasNodes: vi.fn((nodes) => nodes),
-  canvasNodesToNodes: vi.fn((nodes) => nodes),
-  edgesToCanvasEdges: vi.fn((edges) => edges),
-  canvasEdgesToEdges: vi.fn((edges) => edges),
-  viewportToDbViewport: vi.fn((viewport) => viewport),
-  dbViewportToViewport: vi.fn((viewport) => viewport),
-  generateCanvasId: vi.fn(() => 'generated-canvas-id'),
+// Mock nodeRegistry - React component dependency in converters
+// This allows real converter logic to run while avoiding React component issues
+vi.mock('../../../../nodes/registry', () => ({
+  nodeRegistry: {
+    isPersistedType: vi.fn((type: string) => type !== 'starter'),
+    validateNodeData: vi.fn(() => ({ success: true })),
+  },
 }));
+
+// Mock only generateCanvasId for deterministic test IDs
+// All other converters use REAL implementations
+vi.mock('../../../../hooks/canvasConverters', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../hooks/canvasConverters')>();
+  return {
+    ...actual,
+    generateCanvasId: vi.fn(() => 'generated-canvas-id'),
+  };
+});
 
 // Set up window.canvasAPI before importing the store
 beforeEach(() => {

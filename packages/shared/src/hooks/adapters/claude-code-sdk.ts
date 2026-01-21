@@ -512,3 +512,23 @@ export const SDK_HOOK_EVENTS: HookEvent[] = [
   'PermissionRequest',
   'Notification',
 ];
+
+/**
+ * Exported pure functions for direct testing.
+ * These functions transform SDK-specific inputs to vendor-agnostic payloads.
+ */
+export {
+  buildToolBeginPayload,
+  buildToolCompletePayload,
+  buildToolErrorPayload,
+  buildUserInputPayload,
+  buildSessionStartPayload,
+  buildSessionEndPayload,
+  buildStopPayload,
+  buildDelegationStartPayload,
+  buildDelegationEndPayload,
+  buildContextPayload,
+  buildPermissionPayload,
+  buildSystemPayload,
+  categorizeToolName,
+};
