@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2025-01-15T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"What is this code doing?"},{"type":"text","text":"Here is the code snippet"}]}}
+{"type":"assistant","timestamp":"2025-01-15T10:01:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"This code is a function that processes user input."}]}}

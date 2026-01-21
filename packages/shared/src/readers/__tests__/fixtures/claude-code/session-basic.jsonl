@@ -1,0 +1,4 @@
+{"type":"user","timestamp":"2025-01-15T10:00:00.000Z","message":{"role":"user","content":"Hello, can you help me with a bug?"}}
+{"type":"assistant","timestamp":"2025-01-15T10:01:00.000Z","message":{"role":"assistant","content":"Of course! I'd be happy to help you debug. Could you describe the bug you're encountering?"}}
+{"type":"user","timestamp":"2025-01-15T10:02:00.000Z","message":{"role":"user","content":"The app crashes on startup"}}
+{"type":"assistant","timestamp":"2025-01-15T10:03:00.000Z","message":{"role":"assistant","content":"Let me look into that. Can you share the error message?"}}
