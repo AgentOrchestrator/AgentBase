@@ -20,8 +20,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * - Session Validation: Checking session existence
  * - Events: Event registry access
  * - Error Handling: Structured errors
+ *
+ * Note: We use a MockQueryExecutor to test ClaudeCodeAgent without SDK dependency.
+ * This ensures tests verify the contract without depending on SDK internals.
  */
 
+import { ClaudeCodeAgent } from '../ClaudeCodeAgent';
 // Import from the main index (tests the public API)
 import type {
   AgentError,
@@ -37,8 +41,101 @@ import type {
   StreamCallback,
   StructuredStreamCallback,
 } from '../index';
-
 import { type AgentErrorCode, createCodingAgent } from '../index';
+import type {
+  QueryExecutor,
+  QueryMessageUnion,
+  QueryOptions,
+  QueryResultMessage,
+} from '../query-executor';
+
+/**
+ * MockQueryExecutor - Test implementation of QueryExecutor
+ *
+ * Yields predefined messages for controlled testing of ClaudeCodeAgent.
+ * This isolates our tests from the SDK, making them fast and deterministic.
+ */
+class MockQueryExecutor implements QueryExecutor {
+  private responses: QueryMessageUnion[];
+
+  constructor(responses?: QueryMessageUnion[]) {
+    this.responses = responses ?? MockQueryExecutor.defaultResponses();
+  }
+
+  async *execute(_prompt: string, _options: QueryOptions): AsyncIterable<QueryMessageUnion> {
+    for (const msg of this.responses) {
+      yield msg;
+    }
+  }
+
+  /**
+   * Default mock responses that simulate a successful query
+   */
+  static defaultResponses(): QueryMessageUnion[] {
+    return [
+      {
+        type: 'assistant',
+        data: { content: 'Mock response' },
+      },
+      {
+        type: 'result',
+        data: {
+          isError: false,
+          subtype: 'success',
+          content: 'Mock response',
+          sessionId: 'mock-session-id',
+          uuid: 'mock-message-id',
+          usage: { inputTokens: 10, outputTokens: 20 },
+        },
+      } as QueryResultMessage,
+    ];
+  }
+
+  /**
+   * Create responses for streaming tests
+   */
+  static streamingResponses(): QueryMessageUnion[] {
+    return [
+      {
+        type: 'stream_event',
+        data: { textChunk: 'Mock ', structuredChunk: undefined },
+      },
+      {
+        type: 'stream_event',
+        data: { textChunk: 'streaming ', structuredChunk: undefined },
+      },
+      {
+        type: 'stream_event',
+        data: { textChunk: 'response', structuredChunk: undefined },
+      },
+      {
+        type: 'assistant',
+        data: { content: 'Mock streaming response' },
+      },
+      {
+        type: 'result',
+        data: {
+          isError: false,
+          subtype: 'success',
+          content: 'Mock streaming response',
+          sessionId: 'mock-session-id',
+          uuid: 'mock-message-id',
+          usage: { inputTokens: 10, outputTokens: 20 },
+        },
+      } as QueryResultMessage,
+    ];
+  }
+}
+
+/**
+ * Create a ClaudeCodeAgent with MockQueryExecutor for testing
+ */
+function createTestAgent(responses?: QueryMessageUnion[]): CodingAgent {
+  return new ClaudeCodeAgent({
+    type: 'claude_code',
+    queryExecutor: new MockQueryExecutor(responses),
+  });
+}
 
 describe('CodingAgent Interface', () => {
   /**
@@ -584,6 +681,155 @@ describe('CodingAgent Interface', () => {
       expect(typeof agent.getEventRegistry).toBe('function');
 
       await agent.dispose();
+    });
+  });
+});
+
+/**
+ * ==========================================
+ * ClaudeCodeAgent with MockQueryExecutor Tests
+ * ==========================================
+ * These tests verify that ClaudeCodeAgent works correctly
+ * with an injected QueryExecutor, enabling SDK-agnostic testing.
+ */
+describe('ClaudeCodeAgent with MockQueryExecutor', () => {
+  describe('Generation with mock executor', () => {
+    it('generate() returns response from mock executor', async () => {
+      const agent = createTestAgent();
+      await agent.initialize();
+
+      const result = await agent.generate({
+        prompt: 'Hello, world!',
+        workingDirectory: '/tmp',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.content).toBe('Mock response');
+        expect(result.data.sessionId).toBe('mock-session-id');
+        expect(result.data.messageId).toBe('mock-message-id');
+      }
+
+      await agent.dispose();
+    });
+
+    it('generateStreaming() calls onChunk with mock chunks', async () => {
+      const agent = createTestAgent(MockQueryExecutor.streamingResponses());
+      await agent.initialize();
+
+      const chunks: string[] = [];
+      const result = await agent.generateStreaming({ prompt: 'Hello, world!' }, (chunk) =>
+        chunks.push(chunk)
+      );
+
+      expect(result.success).toBe(true);
+      expect(chunks).toEqual(['Mock ', 'streaming ', 'response']);
+
+      await agent.dispose();
+    });
+
+    it('handles error responses from mock executor', async () => {
+      const errorResponses: QueryMessageUnion[] = [
+        {
+          type: 'result',
+          data: {
+            isError: true,
+            subtype: 'error_during_execution',
+            errors: ['Something went wrong'],
+            sessionId: 'error-session-id',
+            uuid: 'error-uuid',
+          },
+        } as QueryResultMessage,
+      ];
+
+      const agent = createTestAgent(errorResponses);
+      await agent.initialize();
+
+      const result = await agent.generate({ prompt: 'Hello' });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.message).toContain('Something went wrong');
+      }
+
+      await agent.dispose();
+    });
+  });
+
+  describe('Session continuation with mock executor', () => {
+    it('continueSession() works with mock executor', async () => {
+      const agent = createTestAgent();
+      await agent.initialize();
+
+      const result = await agent.continueSession(
+        { type: 'id', value: 'test-session-id' },
+        'Continue from here'
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.content).toBe('Mock response');
+      }
+
+      await agent.dispose();
+    });
+
+    it('continueSession with latest identifier works', async () => {
+      const agent = createTestAgent();
+      await agent.initialize();
+
+      const result = await agent.continueSession({ type: 'latest' }, 'Continue from latest');
+
+      expect(result.success).toBe(true);
+
+      await agent.dispose();
+    });
+  });
+
+  describe('Lifecycle with mock executor', () => {
+    it('initialize() succeeds', async () => {
+      const agent = createTestAgent();
+
+      const result = await agent.initialize();
+
+      expect(result.success).toBe(true);
+
+      await agent.dispose();
+    });
+
+    it('dispose() cleans up resources', async () => {
+      const agent = createTestAgent();
+      await agent.initialize();
+
+      await expect(agent.dispose()).resolves.not.toThrow();
+    });
+
+    it('cancelAll() does not throw', async () => {
+      const agent = createTestAgent();
+      await agent.initialize();
+
+      await expect(agent.cancelAll()).resolves.not.toThrow();
+
+      await agent.dispose();
+    });
+  });
+
+  describe('Capabilities with mock executor', () => {
+    it('getCapabilities() returns correct capabilities', () => {
+      const agent = createTestAgent();
+
+      const capabilities = agent.getCapabilities();
+
+      expect(capabilities.canGenerate).toBe(true);
+      expect(capabilities.canResumeSession).toBe(true);
+      expect(capabilities.canForkSession).toBe(true);
+      expect(capabilities.supportsStreaming).toBe(true);
+    });
+
+    it('agentType is claude_code', () => {
+      const agent = createTestAgent();
+
+      expect(agent.agentType).toBe('claude_code');
     });
   });
 });

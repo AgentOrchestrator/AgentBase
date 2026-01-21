@@ -284,7 +284,7 @@ export async function createCodingAgent(
 
   // For skipCliVerification, create a fresh uninitialized instance
   if (skipCliVerification) {
-    return createAgentInstance(type, config);
+    return await createAgentInstance(type, config);
   }
 
   // Return cached instance if available
@@ -294,7 +294,7 @@ export async function createCodingAgent(
   }
 
   // Create and initialize new instance
-  const createResult = createAgentInstance(type, config);
+  const createResult = await createAgentInstance(type, config);
   if (!createResult.success) {
     return createResult;
   }
@@ -314,11 +314,12 @@ export async function createCodingAgent(
 
 /**
  * Create an agent instance without initialization.
+ * Uses dynamic import() for ESM compatibility with test runners like Vitest.
  */
-function createAgentInstance(
+async function createAgentInstance(
   type: CodingAgentType,
   config?: Partial<Omit<AgentConfig, 'type'>>
-): Result<CodingAgent, AgentError> {
+): Promise<Result<CodingAgent, AgentError>> {
   const fullConfig: AgentConfig = {
     type,
     ...config,
@@ -326,8 +327,8 @@ function createAgentInstance(
 
   switch (type) {
     case 'claude_code': {
-      // Import dynamically to avoid circular dependency
-      const { ClaudeCodeAgent } = require('./ClaudeCodeAgent');
+      // Use dynamic import for ESM compatibility (required for Vitest)
+      const { ClaudeCodeAgent } = await import('./ClaudeCodeAgent');
       return ok(new ClaudeCodeAgent(fullConfig) as CodingAgent);
     }
 

@@ -6,6 +6,7 @@
 
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { AbortError } from '@anthropic-ai/claude-agent-sdk';
+import type { QueryResultMessage } from '../query-executor';
 import type { AgentError } from '../types';
 import { AgentErrorCode, agentError } from '../types';
 
@@ -79,6 +80,56 @@ export function mapSdkResultError(result: SDKResultMessage): AgentError {
   };
 
   switch (errorResult.subtype) {
+    case 'error_max_turns':
+      return agentError(
+        AgentErrorCode.PROCESS_TIMEOUT,
+        `Maximum conversation turns exceeded: ${errorMessages}`,
+        details
+      );
+
+    case 'error_max_budget_usd':
+      return agentError(
+        AgentErrorCode.PROCESS_TIMEOUT,
+        `Budget limit exceeded: ${errorMessages}`,
+        details
+      );
+
+    case 'error_during_execution':
+      return agentError(
+        AgentErrorCode.PROCESS_SPAWN_FAILED,
+        `Execution error: ${errorMessages}`,
+        details
+      );
+
+    case 'error_max_structured_output_retries':
+      return agentError(
+        AgentErrorCode.PROCESS_OUTPUT_PARSE_ERROR,
+        `Structured output failed: ${errorMessages}`,
+        details
+      );
+
+    default:
+      return agentError(AgentErrorCode.UNKNOWN_ERROR, errorMessages, details);
+  }
+}
+
+/**
+ * Map normalized QueryResultMessage error to AgentError
+ *
+ * Called when QueryResultMessage.data.isError is true
+ */
+export function mapQueryResultError(result: QueryResultMessage): AgentError {
+  const { subtype, errors, sessionId, uuid } = result.data;
+
+  const errorMessages = errors?.join(', ') ?? 'Unknown error';
+  const details = {
+    subtype,
+    errors,
+    sessionId,
+    uuid,
+  };
+
+  switch (subtype) {
     case 'error_max_turns':
       return agentError(
         AgentErrorCode.PROCESS_TIMEOUT,
