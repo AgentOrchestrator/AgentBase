@@ -454,9 +454,9 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     unwrapResponse<{ id: string; updatedAt: string } | null>(
       ipcRenderer.invoke('coding-agent:get-latest-session', agentType, workspacePath)
     ),
-  checkSessionActive: (agentType: CodingAgentType, sessionId: string, workspacePath: string) =>
+  sessionFileExists: (agentType: CodingAgentType, sessionId: string, workspacePath: string) =>
     unwrapResponse<boolean>(
-      ipcRenderer.invoke('coding-agent:check-session-active', agentType, sessionId, workspacePath)
+      ipcRenderer.invoke('coding-agent:session-file-exists', agentType, sessionId, workspacePath)
     ),
 } as CodingAgentAPI);
 

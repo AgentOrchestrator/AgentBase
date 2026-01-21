@@ -702,18 +702,18 @@ export class AgentServiceImpl implements IAgentService {
       filter,
     });
 
-    const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);
+    const result = await adapter.getSession(sessionId, filterWithWorkspace);
     return this.unwrapResult(result);
   }
 
   /**
-   * Check if a session is active (file exists).
+   * Check if a session file exists on disk.
    * @param sessionId - Session ID to check
    * @param workspacePath - Working directory to scope session lookup
    */
   async isSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
     const adapter = this.requireAdapter();
-    return adapter.checkSessionActive(sessionId, workspacePath);
+    return adapter.sessionFileExists(sessionId, workspacePath);
   }
 
   /**

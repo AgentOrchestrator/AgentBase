@@ -227,7 +227,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   // Session Management
   // ============================================
 
-  async getFilteredSession(
+  async getSession(
     sessionId: string,
     filter?: MessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
@@ -246,13 +246,13 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
   }
 
-  async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
+  async sessionFileExists(sessionId: string, workspacePath: string): Promise<boolean> {
     if (!this.api) {
       return false;
     }
 
     try {
-      return await this.api.checkSessionActive(this.agentType, sessionId, workspacePath);
+      return await this.api.sessionFileExists(this.agentType, sessionId, workspacePath);
     } catch {
       return false;
     }
