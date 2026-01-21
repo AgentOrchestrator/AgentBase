@@ -316,8 +316,7 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
         setGitInfo(null);
         setIsLoadingGit(false);
       });
-    // NOTE: nodeActions excluded from deps - ref guards against re-fetching
-  }, [workspacePath, nodeId]);
+  }, [workspacePath, nodeId, nodeActions]);
 
   // ---------------------------------------------------------------------------
   // Actions
