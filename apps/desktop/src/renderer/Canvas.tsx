@@ -27,7 +27,6 @@ import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
-import { ActionPill, useActionPillHighlight } from './features/action-pill';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -47,6 +46,7 @@ import {
   SidebarExpandButton,
   ZoomControls,
 } from './features';
+import { ActionPill, useActionPillHighlight } from './features/action-pill';
 import { NodeActionsProvider } from './features/canvas/context';
 import { useNodeOperations } from './features/canvas/hooks/useNodeOperations';
 import {

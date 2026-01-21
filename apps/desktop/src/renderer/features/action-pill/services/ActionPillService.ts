@@ -5,10 +5,7 @@
  * Separates API calls and store mutations from UI components.
  */
 
-import type {
-  ClarifyingQuestionAction,
-  ToolApprovalAction,
-} from '@agent-orchestrator/shared';
+import type { ClarifyingQuestionAction, ToolApprovalAction } from '@agent-orchestrator/shared';
 import { useActionPillStore } from '../store';
 import type { IActionPillService } from './IActionPillService';
 
@@ -19,10 +16,7 @@ import type { IActionPillService } from './IActionPillService';
  * It can be used as a singleton or instantiated per-use.
  */
 class ActionPillServiceImpl implements IActionPillService {
-  async submitToolApproval(
-    action: ToolApprovalAction,
-    decision: 'allow' | 'deny'
-  ): Promise<void> {
+  async submitToolApproval(action: ToolApprovalAction, decision: 'allow' | 'deny'): Promise<void> {
     const store = useActionPillStore.getState();
     const isDummyAction = action.id.startsWith('dummy-action-') || action.id.startsWith('debug-');
 
