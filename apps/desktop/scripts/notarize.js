@@ -47,21 +47,21 @@ exports.default = async function notarizing(context) {
     // Build notarization config
     const notarizeConfig = {
       appPath,
-      teamId: appleTeamId,
     };
 
-    // Use API Key method (preferred)
+    // Use API Key method (preferred) - teamId not needed, issuer identifies the team
     if (hasApiKeyAuth) {
       console.log('Using App Store Connect API Key for notarization');
       notarizeConfig.appleApiKey = appleApiKey;
       notarizeConfig.appleApiKeyId = appleApiKeyId;
       notarizeConfig.appleApiIssuer = appleApiIssuer;
     }
-    // Fall back to Apple ID method
+    // Fall back to Apple ID method - requires teamId
     else {
       console.log('Using Apple ID for notarization (consider upgrading to API Key method)');
       notarizeConfig.appleId = appleId;
       notarizeConfig.appleIdPassword = appleIdPassword;
+      notarizeConfig.teamId = appleTeamId;
     }
 
     await notarize(notarizeConfig);
