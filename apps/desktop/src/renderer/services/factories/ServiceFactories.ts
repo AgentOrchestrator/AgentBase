@@ -12,6 +12,7 @@ import { AgentServiceImpl } from '../impl/AgentServiceImpl';
 import { ConversationServiceImpl } from '../impl/ConversationServiceImpl';
 import { TerminalServiceImpl } from '../impl/TerminalServiceImpl';
 import { WorkspaceServiceImpl } from '../impl/WorkspaceServiceImpl';
+import { useActionFlowLogger } from '../../features/action-pill/store/actionFlowLogger';
 
 /**
  * Create production service factories
@@ -35,7 +36,30 @@ export function createServiceFactories(): ServiceFactories {
       // Create stateless adapter based on agent type
       // Adapter is required for agent to function - throw if creation fails
       const adapter = createCodingAgentAdapter(agentType);
-      return new AgentServiceImpl(nodeId, agentId, agentType, terminalService, adapter);
+      const service = new AgentServiceImpl(nodeId, agentId, agentType, terminalService, adapter);
+
+      // Log agent service creation
+      console.log('[ServiceFactories] Creating agent service with agentId:', agentId, 'nodeId:', nodeId);
+      try {
+        useActionFlowLogger.getState().addLog(
+          'Agent Service Created',
+          `Agent service created for node "${nodeId}" with agentId: ${agentId}`,
+          'success',
+          {
+            agentId,
+            nodeId,
+            details: {
+              agentType,
+              terminalId: terminalService.terminalId,
+            },
+          }
+        );
+        console.log('[ServiceFactories] Logged agent service creation successfully');
+      } catch (err) {
+        console.error('[ServiceFactories] Failed to log agent service creation:', err);
+      }
+
+      return service;
     },
 
     createConversationService: (nodeId: string, sessionId: string, agentType: string) => {

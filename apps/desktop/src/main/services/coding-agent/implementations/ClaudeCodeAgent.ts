@@ -111,23 +111,97 @@ export class ClaudeCodeAgent
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
-  private readonly queryContexts = new WeakMap<
-    AbortSignal,
-    { agentId?: string; sessionId?: string; workspacePath?: string }
+  // Store context by sessionId - each agent has a unique sessionId
+  private readonly sessionContexts = new Map<
+    string,
+    { agentId: string; sessionId: string; workspacePath?: string }
   >();
+  // Temporary storage for 'latest' case where sessionId isn't known yet
+  private pendingLatestContext?: { agentId: string; workspacePath?: string };
   private readonly canUseTool: CanUseTool = async (
     toolName: string,
     input: Record<string, unknown>,
     options
   ): Promise<PermissionResult> => {
-    const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
-    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
-    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    // STEP 12: Log when permission is requested
+    console.log('[STEP 12 - ClaudeCodeAgent] Permission requested (canUseTool called)', {
+      toolName,
+      currentSessionId: this.currentSessionId,
+      sessionContextsSize: this.sessionContexts.size,
+      availableSessionIds: Array.from(this.sessionContexts.keys()),
+    });
+
+    // CRITICAL: sessionId MUST be available - no fallbacks
+    if (!this.currentSessionId) {
+      console.error(
+        '╔═══════════════════════════════════════════════════════════════════════════════╗',
+        '║                                                                               ║',
+        '║                    ⚠️  CRITICAL ERROR: MISSING sessionId  ⚠️                   ║',
+        '║                                                                               ║',
+        '║  Cannot retrieve agentId without sessionId!                                   ║',
+        '║                                                                               ║',
+        '║  currentSessionId: ' + (this.currentSessionId || 'NULL').padEnd(60) + '║',
+        '║  toolName: ' + toolName.padEnd(68) + '║',
+        '║                                                                               ║',
+        '║  The sessionId MUST be set before canUseTool is called.                      ║',
+        '║                                                                               ║',
+        '╚═══════════════════════════════════════════════════════════════════════════════╝'
+      );
+      throw new Error(
+        `CRITICAL: Cannot retrieve agentId - currentSessionId is missing. This must be set before canUseTool is called.`
+      );
+    }
+
+    // Look up context by sessionId - no fallbacks
+    const context = this.sessionContexts.get(this.currentSessionId);
+    
+    if (!context) {
+      console.error(
+        '╔═══════════════════════════════════════════════════════════════════════════════╗',
+        '║                                                                               ║',
+        '║                    ⚠️  CRITICAL ERROR: CONTEXT NOT FOUND  ⚠️                   ║',
+        '║                                                                               ║',
+        '║  Cannot find context for sessionId!                                           ║',
+        '║                                                                               ║',
+        '║  sessionId: ' + this.currentSessionId.padEnd(68) + '║',
+        '║  toolName: ' + toolName.padEnd(68) + '║',
+        '║  Available sessionIds: ' + Array.from(this.sessionContexts.keys()).join(', ').padEnd(48) + '║',
+        '║                                                                               ║',
+        '║  The context MUST be stored in buildQueryOptions before canUseTool is called. ║',
+        '║                                                                               ║',
+        '╚═══════════════════════════════════════════════════════════════════════════════╝'
+      );
+      throw new Error(
+        `CRITICAL: Cannot find context for sessionId "${this.currentSessionId}". Context must be stored in buildQueryOptions.`
+      );
+    }
+
+    const workspacePath = context.workspacePath;
+    const sessionId = context.sessionId;
+    const agentId = context.agentId;
+
+    // STEP 13: Log context retrieved
+    console.log('[STEP 13 - ClaudeCodeAgent] Context retrieved', {
+      agentId: agentId || 'MISSING FROM CONTEXT!',
+      toolName,
+      sessionId,
+      workspacePath,
+      hasContext: !!context,
+      contextAgentId: context?.agentId,
+    });
+
+    // STEP 14: Log event creation
+    console.log('[STEP 14 - ClaudeCodeAgent] Creating permission event', {
+      eventAgentId: agentId || 'MISSING!',
+      toolName,
+      sessionId,
+    });
+
     const event: AgentEvent<PermissionPayload> = {
       id: crypto.randomUUID(),
       type: 'permission:request',
       agent: 'claude_code',
-      agentId: context?.agentId,
+      agentId,
       sessionId,
       workspacePath,
       timestamp: new Date().toISOString(),
@@ -199,6 +273,23 @@ export class ClaudeCodeAgent
     delete this.hookBridge.hooks.PermissionRequest;
     this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
       this.currentSessionId = event.payload.sessionId;
+      
+      // For 'latest' case: if we have a pending context without sessionId, move it to the actual sessionId
+      // This handles the case where continue: true was used and we didn't know the sessionId ahead of time
+      const pendingContext = this.pendingLatestContext;
+      if (pendingContext && !this.sessionContexts.has(event.payload.sessionId)) {
+        this.sessionContexts.set(event.payload.sessionId, {
+          agentId: pendingContext.agentId,
+          sessionId: event.payload.sessionId,
+          workspacePath: pendingContext.workspacePath,
+        });
+        this.pendingLatestContext = undefined;
+        console.log('[ClaudeCodeAgent] Moved pending context to sessionId', {
+          sessionId: event.payload.sessionId,
+          agentId: pendingContext.agentId,
+        });
+      }
+      
       return { action: 'continue' };
     });
     this.eventRegistry.on<SessionPayload>('session:end', async () => {
@@ -388,6 +479,11 @@ export class ClaudeCodeAgent
     // Extract sessionId from extraArgs if present (for fallback scenario)
     const sessionId = baseOptions.extraArgs?.['session-id'] as string | undefined;
 
+    // CRITICAL: Set currentSessionId so canUseTool can look up context
+    if (sessionId) {
+      this.currentSessionId = sessionId;
+    }
+
     // If we have a sessionId, try resume first
     if (sessionId) {
       const resumeOptions: Partial<Options> = {
@@ -477,7 +573,25 @@ export class ClaudeCodeAgent
       return { success: false, error: initCheck.error };
     }
 
-    const options = this.buildQueryOptions(request, new AbortController(), true);
+    // STEP 9: Log when generateStreamingStructured is called
+    console.log('[STEP 9 - ClaudeCodeAgent] generateStreamingStructured called', {
+      requestAgentId: request.agentId || 'MISSING IN REQUEST!',
+      requestKeys: Object.keys(request),
+      request: JSON.stringify(request),
+    });
+
+    const abortController = new AbortController();
+
+    const options = this.buildQueryOptions(request, abortController, true);
+    
+    // Verify the context was stored by sessionId
+    const storedContext = request.sessionId ? this.sessionContexts.get(request.sessionId) : undefined;
+    console.log('[ClaudeCodeAgent] After buildQueryOptions, context check', {
+      sessionId: request.sessionId,
+      contextStored: !!storedContext,
+      storedAgentId: storedContext?.agentId || 'NOT STORED!',
+    });
+
     // Pass undefined for plain text callback, use structured callback
     return this.runQuery(request.prompt, options, undefined, onChunk);
   }
@@ -517,15 +631,74 @@ export class ClaudeCodeAgent
       options.systemPrompt = { type: 'preset', preset: 'claude_code' };
     }
 
-    // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
-    if (request.sessionId) {
-      options.extraArgs = { 'session-id': request.sessionId };
+    // CRITICAL: sessionId MUST be provided - no fallbacks
+    if (!request.sessionId) {
+      console.error(
+        '╔═══════════════════════════════════════════════════════════════════════════════╗',
+        '║                                                                               ║',
+        '║                    ⚠️  CRITICAL ERROR: MISSING sessionId  ⚠️                   ║',
+        '║                                                                               ║',
+        '║  Cannot store context without sessionId!                                    ║',
+        '║                                                                               ║',
+        '║  request.sessionId: ' + (request.sessionId || 'MISSING').padEnd(60) + '║',
+        '║  request.agentId: ' + (request.agentId || 'MISSING').padEnd(63) + '║',
+        '║                                                                               ║',
+        '║  The sessionId MUST be provided in the GenerateRequest.                     ║',
+        '║                                                                               ║',
+        '╚═══════════════════════════════════════════════════════════════════════════════╝'
+      );
+      throw new Error(
+        `CRITICAL: Cannot store context - request.sessionId is missing. This must be provided in the GenerateRequest.`
+      );
     }
 
-    this.queryContexts.set(abortController.signal, {
+    // CRITICAL: agentId MUST be provided - no fallbacks
+    if (!request.agentId) {
+      console.error(
+        '╔═══════════════════════════════════════════════════════════════════════════════╗',
+        '║                                                                               ║',
+        '║                    ⚠️  CRITICAL ERROR: MISSING agentId  ⚠️                    ║',
+        '║                                                                               ║',
+        '║  Cannot store context without agentId!                                        ║',
+        '║                                                                               ║',
+        '║  request.agentId: ' + (request.agentId || 'MISSING').padEnd(63) + '║',
+        '║  request.sessionId: ' + (request.sessionId || 'MISSING').padEnd(60) + '║',
+        '║                                                                               ║',
+        '║  The agentId MUST be provided in the GenerateRequest.                       ║',
+        '║                                                                               ║',
+        '╚═══════════════════════════════════════════════════════════════════════════════╝'
+      );
+      throw new Error(
+        `CRITICAL: Cannot store context - request.agentId is missing. This must be provided in the GenerateRequest.`
+      );
+    }
+
+    // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
+    options.extraArgs = { 'session-id': request.sessionId };
+    
+    // STEP 10: Log BEFORE storing context
+    console.log('[STEP 10 - ClaudeCodeAgent] About to store query context', {
+      requestAgentId: request.agentId,
+      sessionId: request.sessionId,
+      workspacePath: options.cwd ?? undefined,
+      requestKeys: Object.keys(request),
+    });
+
+    // Store context by sessionId - each agent has a unique sessionId
+    this.sessionContexts.set(request.sessionId, {
       agentId: request.agentId,
       sessionId: request.sessionId,
       workspacePath: options.cwd ?? undefined,
+    });
+
+    // STEP 11: Log AFTER storing context and verify it was stored
+    const storedContext = this.sessionContexts.get(request.sessionId);
+    console.log('[STEP 11 - ClaudeCodeAgent] Query context stored and verified', {
+      agentId: request.agentId,
+      storedAgentId: storedContext?.agentId || 'NOT STORED!',
+      sessionId: request.sessionId,
+      workspacePath: options.cwd ?? undefined,
+      contextStored: !!storedContext,
     });
 
     // Enable streaming partial messages
@@ -591,24 +764,50 @@ export class ClaudeCodeAgent
     };
     this.currentWorkspacePath = options.cwd ?? null;
 
+    // CRITICAL: agentId MUST be provided - no fallbacks
+    if (!continueOptions?.agentId) {
+      console.error(
+        '╔═══════════════════════════════════════════════════════════════════════════════╗',
+        '║                                                                               ║',
+        '║                    ⚠️  CRITICAL ERROR: MISSING agentId  ⚠️                    ║',
+        '║                                                                               ║',
+        '║  Cannot store context without agentId!                                        ║',
+        '║                                                                               ║',
+        '║  continueOptions?.agentId: ' + (continueOptions?.agentId || 'MISSING').padEnd(50) + '║',
+        '║  identifier.type: ' + identifier.type.padEnd(63) + '║',
+        '║                                                                               ║',
+        '║  The agentId MUST be provided in ContinueOptions.                           ║',
+        '║                                                                               ║',
+        '╚═══════════════════════════════════════════════════════════════════════════════╝'
+      );
+      throw new Error(
+        `CRITICAL: Cannot store context - continueOptions.agentId is missing. This must be provided in ContinueOptions.`
+      );
+    }
+
     // Map SessionIdentifier to SDK options
     switch (identifier.type) {
       case 'latest':
-        // 'latest' uses continue: true (no session ID)
+        // 'latest' uses continue: true (no session ID yet - will be set when session:start fires)
         options.continue = true;
+        // Store temporarily - will be moved to sessionContexts when session:start fires
+        this.pendingLatestContext = {
+          agentId: continueOptions.agentId,
+          workspacePath: options.cwd ?? undefined,
+        };
         break;
       case 'id':
       case 'name':
         // Use extraArgs - runQuery() handles resume fallback
         options.extraArgs = { 'session-id': identifier.value };
+        // Store context by sessionId - each agent has a unique sessionId
+        this.sessionContexts.set(identifier.value, {
+          agentId: continueOptions.agentId,
+          sessionId: identifier.value,
+          workspacePath: options.cwd ?? undefined,
+        });
         break;
     }
-
-    this.queryContexts.set(abortController.signal, {
-      agentId: continueOptions?.agentId,
-      sessionId: identifier.type === 'id' ? identifier.value : undefined,
-      workspacePath: options.cwd ?? undefined,
-    });
 
     if (streaming) {
       options.includePartialMessages = true;

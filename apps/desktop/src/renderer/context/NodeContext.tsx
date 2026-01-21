@@ -107,16 +107,39 @@ export function NodeContextProvider({
   // Memoize service config to prevent infinite re-renders
   // Without useMemo, config object is recreated on every render with a new reference,
   // causing the useEffect below to re-run infinitely
-  const config = useMemo<NodeServiceConfig>(
-    () => ({
+  const config = useMemo<NodeServiceConfig>(() => {
+    // CRITICAL: For agent nodes, agentId MUST come from node data - no fallbacks allowed
+    if (nodeType === 'agent') {
+      if (!agentId) {
+        console.error(
+          '╔═══════════════════════════════════════════════════════════════════════════════╗',
+          '║                                                                               ║',
+          '║                    ⚠️  CRITICAL ERROR: MISSING agentId  ⚠️                    ║',
+          '║                                                                               ║',
+          '║  Agent node is missing agentId! This should NEVER happen.                     ║',
+          '║                                                                               ║',
+          '║  Node ID: ' + nodeId.padEnd(67) + '║',
+          '║  Node Type: ' + nodeType.padEnd(64) + '║',
+          '║                                                                               ║',
+          '║  The agentId MUST come from node.data.agentId.                                ║',
+          '║  Check that AgentNode is passing agent.config.agentId correctly.             ║',
+          '║                                                                               ║',
+          '╚═══════════════════════════════════════════════════════════════════════════════╝'
+        );
+        throw new Error(
+          `CRITICAL: Agent node ${nodeId} is missing agentId. This must come from node.data.agentId. No fallbacks allowed.`
+        );
+      }
+    }
+
+    return {
       terminalId: terminalId || `terminal-${nodeId}`,
-      agentId: agentId || `agent-${nodeId}`,
+      agentId, // No fallback - must be provided for agent nodes
       agentType: (agentType as AgentType) || 'claude_code',
       sessionId,
       workspacePath,
-    }),
-    [terminalId, nodeId, agentId, agentType, sessionId, workspacePath]
-  );
+    };
+  }, [terminalId, nodeId, agentId, agentType, sessionId, workspacePath, nodeType]);
 
   // Track the previous workspace path to detect changes
   const prevWorkspacePathRef = useRef<string | undefined>(undefined);

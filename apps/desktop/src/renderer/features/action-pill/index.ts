@@ -21,3 +21,7 @@ export {
   selectTopmostAction,
   useActionPillStore,
 } from './store';
+// Logger
+export { useActionFlowLogger } from './store/actionFlowLogger';
+// Log Viewer
+export { ActionFlowLogViewer } from './ActionFlowLogViewer';

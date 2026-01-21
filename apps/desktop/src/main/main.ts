@@ -1352,9 +1352,13 @@ function registerIpcHandlers(): void {
       const startTime = Date.now();
       let chunksSent = 0;
 
-      console.log('[Main] Starting structured streaming generation', {
+      // STEP 8: Log when request arrives in main process
+      console.log('[STEP 8 - Main Process] Request received via IPC', {
         requestId,
         agentType,
+        requestAgentId: request.agentId || 'MISSING IN REQUEST!',
+        requestKeys: Object.keys(request),
+        request: JSON.stringify(request),
         promptPreview: request.prompt.slice(0, 100),
         promptLength: request.prompt.length,
         workingDirectory: request.workingDirectory,

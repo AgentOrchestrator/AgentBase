@@ -325,6 +325,13 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     request: GenerateRequest,
     onChunk: (chunk: StreamingChunk) => void
   ) => {
+    // STEP 6: Log in preload before IPC invoke
+    console.log('[STEP 6 - Preload] About to invoke IPC', {
+      requestAgentId: request.agentId || 'MISSING IN REQUEST!',
+      requestKeys: Object.keys(request),
+      request: JSON.stringify(request),
+    });
+
     const requestId = globalThis.crypto.randomUUID();
 
     // Set up structured chunk listener
@@ -339,6 +346,13 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     ipcRenderer.on('coding-agent:stream-chunk-structured', handler);
 
     try {
+      // STEP 7: Log right before IPC invoke
+      console.log('[STEP 7 - Preload] Invoking IPC with request', {
+        requestAgentId: request.agentId || 'MISSING!',
+        requestId,
+        agentType,
+      });
+
       return await unwrapResponse<GenerateResponse>(
         ipcRenderer.invoke(
           'coding-agent:generate-streaming-structured',

@@ -16,6 +16,7 @@ import type {
 } from '@agent-orchestrator/shared';
 import type { AgentAdapterEvent } from '../context/node-services/coding-agent-adapter';
 import { useActionPillStore } from '../features/action-pill';
+import { useActionFlowLogger } from '../features/action-pill/store/actionFlowLogger';
 
 type EventCallback<T = AgentAdapterEvent> = (event: T) => void;
 
@@ -84,6 +85,36 @@ class SharedEventDispatcher {
 
     // Handle permission requests directly → ActionPill store
     if (event.type === 'permission:request') {
+      // STEP 16: Log event received in renderer
+      console.log('[STEP 16 - Renderer] Permission event received', {
+        eventAgentId: event.agentId || 'MISSING IN EVENT!',
+        eventKeys: Object.keys(event),
+        event: JSON.stringify(event),
+        eventId,
+        sessionId: event.sessionId,
+        toolName: event.payload.toolName,
+      });
+
+      // Log event received
+      try {
+        useActionFlowLogger.getState().addLog(
+          'STEP 16: Permission Event Received',
+          `Permission request event received from main process. agentId: ${event.agentId || 'MISSING!'}`,
+          event.agentId ? 'info' : 'error',
+          {
+            agentId: event.agentId,
+            details: {
+              eventId,
+              sessionId: event.sessionId,
+              toolName: event.payload.toolName,
+              eventAgentId: event.agentId,
+            },
+          }
+        );
+      } catch (err) {
+        console.error('[SharedEventDispatcher] Failed to log event:', err);
+      }
+
       const action = this.buildActionFromPermissionEvent(event);
       if (action) {
         useActionPillStore.getState().addAction(action);
@@ -140,9 +171,17 @@ class SharedEventDispatcher {
       } as ClarifyingQuestionAction;
     }
 
+    // STEP 17: Log before creating action
+    console.log('[STEP 17 - Renderer] About to create action', {
+      eventAgentId: agentId || 'MISSING FROM EVENT!',
+      eventId,
+      toolName: payload.toolName,
+    });
+
     // Tool approval
-    return {
-      id: eventId ?? `${agentId}-${toolUseId ?? Date.now()}`,
+    const actionId = eventId ?? `${agentId}-${toolUseId ?? Date.now()}`;
+    const action = {
+      id: actionId,
       type: 'tool_approval',
       agentId,
       sessionId,
@@ -154,6 +193,36 @@ class SharedEventDispatcher {
       reason: payload.reason,
       toolUseId,
     } as ToolApprovalAction;
+
+    // STEP 18: Log action creation
+    console.log('[STEP 18 - Renderer] Action created', {
+      actionId,
+      actionAgentId: action.agentId || 'MISSING IN ACTION!',
+      action: JSON.stringify(action),
+    });
+
+    try {
+      useActionFlowLogger.getState().addLog(
+        'STEP 18: Action Created',
+        `Action "${actionId}" created with agentId: ${agentId || 'MISSING!'}`,
+        agentId ? 'success' : 'error',
+        {
+          agentId,
+          actionId,
+          details: {
+            type: 'tool_approval',
+            toolName: payload.toolName,
+            command: payload.command,
+            filePath: payload.filePath,
+            actionAgentId: action.agentId,
+          },
+        }
+      );
+    } catch (err) {
+      console.error('[SharedEventDispatcher] Failed to log action creation:', err);
+    }
+
+    return action;
   }
 
   /**

@@ -29,6 +29,7 @@ import type {
   StreamCallback,
   StructuredStreamCallback,
 } from '../../context/node-services/coding-agent-adapter';
+import { useActionFlowLogger } from '../../features/action-pill/store/actionFlowLogger';
 
 /**
  * Agent service implementation using adapter pattern
@@ -644,16 +645,71 @@ export class AgentServiceImpl implements IAgentService {
 
     this.updateStatus('running');
 
+    // STEP 1: Log message send with agentId
+    const requestAgentId = this.agentId;
+    console.log('[STEP 1 - AgentServiceImpl] About to send message', {
+      agentId: requestAgentId,
+      nodeId: this.nodeId,
+      sessionId,
+      workspacePath,
+    });
+
     try {
-      const result = await adapter.generateStreamingStructured(
+      useActionFlowLogger.getState().addLog(
+        'STEP 1: Message Sent',
+        `Agent "${requestAgentId}" sent a message. Request will include agentId: ${requestAgentId}`,
+        'info',
         {
-          prompt,
-          workingDirectory: workspacePath,
-          sessionId,
-          agentId: this.agentId,
-        },
-        onChunk
+          agentId: requestAgentId,
+          nodeId: this.nodeId,
+          details: {
+            sessionId,
+            workspacePath,
+            promptLength: prompt.length,
+            requestWillIncludeAgentId: requestAgentId,
+          },
+        }
       );
+    } catch (err) {
+      console.error('[AgentServiceImpl] Failed to log message send:', err);
+    }
+
+    // STEP 2: Create request object and log it
+    const request = {
+      prompt,
+      workingDirectory: workspacePath,
+      sessionId,
+      agentId: requestAgentId,
+    };
+    console.log('[STEP 2 - AgentServiceImpl] Request object created', {
+      requestAgentId: request.agentId,
+      requestKeys: Object.keys(request),
+      request: JSON.stringify(request),
+    });
+
+    try {
+      useActionFlowLogger.getState().addLog(
+        'STEP 2: Request Object Created',
+        `Request object created with agentId: ${request.agentId || 'MISSING!'}`,
+        request.agentId ? 'success' : 'error',
+        {
+          agentId: request.agentId,
+          details: {
+            requestKeys: Object.keys(request),
+            requestAgentId: request.agentId,
+          },
+        }
+      );
+    } catch (err) {
+      console.error('[AgentServiceImpl] Failed to log request creation:', err);
+    }
+
+    try {
+      // STEP 3: Call adapter and log
+      console.log('[STEP 3 - AgentServiceImpl] Calling adapter.generateStreamingStructured', {
+        requestAgentId: request.agentId,
+      });
+      const result = await adapter.generateStreamingStructured(request, onChunk);
 
       const response = this.unwrapResult(result);
 

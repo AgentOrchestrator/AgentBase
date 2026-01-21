@@ -9,6 +9,7 @@
 import type { GitInfo, TerminalAttachment } from '@agent-orchestrator/shared';
 import type { Node } from '@xyflow/react';
 import { type AgentNodeData, type AgentTitle, createDefaultAgentTitle } from '../types/agent-node';
+import { useActionFlowLogger } from '../features/action-pill/store/actionFlowLogger';
 
 // =============================================================================
 // Types
@@ -151,8 +152,32 @@ export class CanvasNodeService {
       initialPrompt,
     };
 
+    const nodeId = `node-${createdAt}`;
+
+    // Log node creation
+    console.log('[CanvasNodeService] Creating node with agentId:', agentId, 'nodeId:', nodeId);
+    try {
+      useActionFlowLogger.getState().addLog(
+        'Node Created',
+        `Agent node "${nodeId}" was created with agentId: ${agentId}`,
+        'success',
+        {
+          agentId,
+          nodeId,
+          details: {
+            terminalId,
+            sessionId,
+            workspacePath: selectedWorkspacePath,
+          },
+        }
+      );
+      console.log('[CanvasNodeService] Logged node creation successfully');
+    } catch (err) {
+      console.error('[CanvasNodeService] Failed to log node creation:', err);
+    }
+
     return {
-      id: `node-${createdAt}`,
+      id: nodeId,
       type: 'agent',
       position: nodePosition,
       data: data as unknown as Record<string, unknown>,

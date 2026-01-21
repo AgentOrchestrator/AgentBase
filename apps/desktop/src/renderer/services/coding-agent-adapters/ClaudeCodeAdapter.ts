@@ -149,6 +149,34 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     request: GenerateRequest,
     onChunk: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>> {
+    // STEP 4: Log request received in adapter
+    console.log('[STEP 4 - ClaudeCodeAdapter] generateStreamingStructured called', {
+      requestAgentId: request.agentId || 'MISSING IN REQUEST!',
+      requestKeys: Object.keys(request),
+      request: JSON.stringify(request),
+    });
+
+    setTimeout(() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { useActionFlowLogger } = require('../../features/action-pill/store/actionFlowLogger');
+        useActionFlowLogger.getState().addLog(
+          'STEP 4: Adapter Received Request',
+          `Adapter received request with agentId: ${request.agentId || 'MISSING!'}`,
+          request.agentId ? 'success' : 'error',
+          {
+            agentId: request.agentId,
+            details: {
+              requestKeys: Object.keys(request),
+              requestAgentId: request.agentId,
+            },
+          }
+        );
+      } catch (err) {
+        console.error('[ClaudeCodeAdapter] Failed to log:', err);
+      }
+    }, 0);
+
     const apiError = this.checkApiAvailable();
     if (apiError) {
       return err(apiError);
@@ -165,6 +193,33 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
     }
 
     try {
+      // STEP 5: Log before calling IPC
+      console.log('[STEP 5 - ClaudeCodeAdapter] About to call IPC generateStreamingStructured', {
+        requestAgentId: request.agentId || 'MISSING!',
+        agentType: this.agentType,
+      });
+
+      setTimeout(() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { useActionFlowLogger } = require('../../features/action-pill/store/actionFlowLogger');
+          useActionFlowLogger.getState().addLog(
+            'STEP 5: Calling IPC',
+            `About to send request via IPC with agentId: ${request.agentId || 'MISSING!'}`,
+            request.agentId ? 'info' : 'error',
+            {
+              agentId: request.agentId,
+              details: {
+                requestAgentId: request.agentId,
+                agentType: this.agentType,
+              },
+            }
+          );
+        } catch (err) {
+          console.error('[ClaudeCodeAdapter] Failed to log:', err);
+        }
+      }, 0);
+
       const response = await this.api?.generateStreamingStructured(
         this.agentType,
         request,

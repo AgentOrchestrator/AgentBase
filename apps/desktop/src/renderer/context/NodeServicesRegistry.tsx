@@ -141,8 +141,30 @@ export function NodeServicesRegistryProvider({
         }
 
         case 'agent': {
+          // CRITICAL: agentId MUST be provided - no fallbacks allowed
+          if (!config.agentId) {
+            console.error(
+              '╔═══════════════════════════════════════════════════════════════════════════════╗',
+              '║                                                                               ║',
+              '║                    ⚠️  CRITICAL ERROR: MISSING agentId  ⚠️                    ║',
+              '║                                                                               ║',
+              '║  Cannot create agent service without agentId!                                 ║',
+              '║                                                                               ║',
+              '║  Node ID: ' + nodeId.padEnd(67) + '║',
+              '║  Config: ' + JSON.stringify(config).padEnd(67) + '║',
+              '║                                                                               ║',
+              '║  The agentId MUST come from node.data.agentId.                                ║',
+              '║  Check NodeContextProvider config creation.                                  ║',
+              '║                                                                               ║',
+              '╚═══════════════════════════════════════════════════════════════════════════════╝'
+            );
+            throw new Error(
+              `CRITICAL: Cannot create agent service for node ${nodeId} without agentId. This must come from node.data.agentId. No fallbacks allowed.`
+            );
+          }
+
           const terminalId = config.terminalId || `terminal-${nodeId}`;
-          const agentId = config.agentId || `agent-${nodeId}`;
+          const agentId = config.agentId; // No fallback - already validated above
           const agentType = config.agentType || 'claude_code';
 
           const terminal = factories.createTerminalService(nodeId, terminalId);

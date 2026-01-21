@@ -140,24 +140,45 @@ export function useAgentState({ nodeId, initialNodeData }: UseAgentStateInput): 
   // ---------------------------------------------------------------------------
   // Config (immutable)
   // ---------------------------------------------------------------------------
-  const config = useMemo(
-    () => ({
+  const config = useMemo(() => {
+    // CRITICAL: agentId MUST be present in node data - no fallbacks allowed
+    if (!nodeData.agentId) {
+      console.error(
+        '╔═══════════════════════════════════════════════════════════════════════════════╗',
+        '║                                                                               ║',
+        '║                    ⚠️  CRITICAL ERROR: MISSING agentId  ⚠️                    ║',
+        '║                                                                               ║',
+        '║  Agent node data is missing agentId! This should NEVER happen.                 ║',
+        '║                                                                               ║',
+        '║  Node ID: ' + nodeId.padEnd(67) + '║',
+        '║  Node Data: ' + JSON.stringify(nodeData, null, 2).split('\n').join('\n  ').padEnd(67) + '║',
+        '║                                                                               ║',
+        '║  The agentId MUST be set when the node is created (CanvasNodeService).        ║',
+        '║  Check that node.data.agentId is properly initialized.                          ║',
+        '║                                                                               ║',
+        '╚═══════════════════════════════════════════════════════════════════════════════╝'
+      );
+      throw new Error(
+        `CRITICAL: Agent node ${nodeId} has no agentId in node data. This must be set when the node is created. No fallbacks allowed.`
+      );
+    }
+
+    return {
       nodeId,
       agentId: nodeData.agentId,
       terminalId: nodeData.terminalId,
       agentType: nodeData.agentType,
       createdAt: nodeData.createdAt,
       initialPrompt: nodeData.initialPrompt,
-    }),
-    [
-      nodeId,
-      nodeData.agentId,
-      nodeData.terminalId,
-      nodeData.agentType,
-      nodeData.createdAt,
-      nodeData.initialPrompt,
-    ]
-  );
+    };
+  }, [
+    nodeId,
+    nodeData.agentId,
+    nodeData.terminalId,
+    nodeData.agentType,
+    nodeData.createdAt,
+    nodeData.initialPrompt,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Workspace Path Resolution

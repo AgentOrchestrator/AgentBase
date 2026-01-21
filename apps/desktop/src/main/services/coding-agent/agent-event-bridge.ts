@@ -10,9 +10,21 @@ interface PendingAction {
 const pendingActions = new Map<string, PendingAction>();
 
 export function emitAgentEvent(event: AgentEvent): void {
+  // STEP 15: Log before sending event to renderer
+  console.log('[STEP 15 - Main Process] About to send event to renderer', {
+    eventType: event.type,
+    eventAgentId: (event as { agentId?: string }).agentId || 'MISSING IN EVENT!',
+    eventKeys: Object.keys(event),
+    event: JSON.stringify(event),
+  });
+
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send('coding-agent:event', event);
   }
+
+  console.log('[STEP 15 - Main Process] Event sent to renderer', {
+    eventAgentId: (event as { agentId?: string }).agentId || 'MISSING!',
+  });
 }
 
 export function awaitAgentActionResponse(

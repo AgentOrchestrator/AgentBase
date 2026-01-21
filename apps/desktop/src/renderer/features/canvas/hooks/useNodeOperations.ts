@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/react';
 import { useCallback, useRef } from 'react';
 import { applyHighlightStylesToNodes } from '../../sidebar/hooks/useFolderHighlight';
+import { useActionFlowLogger } from '../../../features/action-pill/store/actionFlowLogger';
 
 /**
  * Node Operations Hook
@@ -104,13 +105,56 @@ export function useNodeOperations({
 
   const highlightAgentNode = useCallback(
     (agentId: string) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
+      setNodes((currentNodes) => {
+        // Log highlighting attempt
+        try {
+          const agentNodes = currentNodes.filter((n) => n.type === 'agent');
+          const nodeAgentIds = agentNodes.map((n) => {
+            const nodeData = n.data as Record<string, unknown>;
+            return {
+              nodeId: n.id,
+              agentId: nodeData?.agentId as string | undefined,
+            };
+          });
+
+          useActionFlowLogger.getState().addLog(
+            'Highlighting Attempt',
+            `Attempting to highlight node with agentId: ${agentId}`,
+            'info',
+            {
+              agentId,
+              details: {
+                searchingFor: agentId,
+                availableNodes: nodeAgentIds,
+                matchFound: nodeAgentIds.some((n) => n.agentId === agentId),
+              },
+            }
+          );
+        } catch (err) {
+          console.error('[useNodeOperations] Failed to log highlighting attempt:', err);
+        }
+
+        return currentNodes.map((node) => {
           if (node.type !== 'agent') return node;
           const nodeData = node.data as Record<string, unknown>;
           const nodeAgentId = nodeData?.agentId as string | undefined;
 
           if (nodeAgentId === agentId) {
+            // Log successful match
+            try {
+              useActionFlowLogger.getState().addLog(
+                'Node Highlighted',
+                `Node "${node.id}" highlighted - agentId match: ${agentId}`,
+                'success',
+                {
+                  agentId,
+                  nodeId: node.id,
+                }
+              );
+            } catch (err) {
+              console.error('[useNodeOperations] Failed to log node highlighted:', err);
+            }
+
             const currentStyle = node.style || {};
             return {
               ...node,
@@ -123,8 +167,8 @@ export function useNodeOperations({
             };
           }
           return node;
-        })
-      );
+        });
+      });
     },
     [setNodes]
   );

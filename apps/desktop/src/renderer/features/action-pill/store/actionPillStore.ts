@@ -8,6 +8,7 @@
 import type { AgentAction } from '@agent-orchestrator/shared';
 import { create } from 'zustand';
 import type { ActionPillState, PillAnimationState } from './types';
+import { useActionFlowLogger } from './actionFlowLogger';
 
 const initialAnimationState: PillAnimationState = {
   isSquare: false,
@@ -46,6 +47,34 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
         return state;
       }
       const newActions = [...state.actions, action];
+
+      // STEP 19: Log action added to store
+      console.log('[STEP 19 - ActionPillStore] Action added to store', {
+        actionId: action.id,
+        actionAgentId: action.agentId || 'MISSING IN ACTION!',
+        action: JSON.stringify(action),
+        totalActions: newActions.length,
+      });
+
+      try {
+        useActionFlowLogger.getState().addLog(
+          'STEP 19: Action Added to Store',
+          `Action "${action.id}" added to action pill store. agentId: ${action.agentId || 'MISSING!'}`,
+          action.agentId ? 'success' : 'error',
+          {
+            agentId: action.agentId,
+            actionId: action.id,
+            details: {
+              type: action.type,
+              totalActions: newActions.length,
+              actionAgentId: action.agentId,
+            },
+          }
+        );
+      } catch (err) {
+        console.error('[ActionPillStore] Failed to log action added:', err);
+      }
+
       return {
         actions: newActions,
         hasNewActions: true,
