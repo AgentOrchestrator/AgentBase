@@ -1,5 +1,5 @@
 /**
- * ProviderRegistry - manages IChatHistoryProvider instances
+ * ProviderRegistry - manages CodingAgent instances
  *
  * Provides centralized access to chat history providers with:
  * - Registration and lookup by agent type
@@ -19,7 +19,7 @@
  * ```
  */
 
-import type { IChatHistoryProvider } from '../interfaces';
+import type { CodingAgent } from '../CodingAgent';
 import type {
   AgentError,
   CodingAgentSessionContent,
@@ -48,7 +48,7 @@ export interface ProviderMessageFilterOptions extends MessageFilterOptions {
 }
 
 export class ProviderRegistry {
-  private providers = new Map<CodingAgentType, IChatHistoryProvider>();
+  private providers = new Map<CodingAgentType, CodingAgent>();
 
   // ============================================
   // Registration
@@ -58,7 +58,7 @@ export class ProviderRegistry {
    * Register a provider for an agent type
    * Replaces any existing provider for the same type
    */
-  register(agentType: CodingAgentType, provider: IChatHistoryProvider): void {
+  register(agentType: CodingAgentType, provider: CodingAgent): void {
     this.providers.set(agentType, provider);
   }
 
@@ -77,14 +77,14 @@ export class ProviderRegistry {
   /**
    * Get a specific provider by agent type
    */
-  getProvider(agentType: CodingAgentType): IChatHistoryProvider | undefined {
+  getProvider(agentType: CodingAgentType): CodingAgent | undefined {
     return this.providers.get(agentType);
   }
 
   /**
    * Get all registered providers
    */
-  getAll(): IChatHistoryProvider[] {
+  getAll(): CodingAgent[] {
     return Array.from(this.providers.values());
   }
 
