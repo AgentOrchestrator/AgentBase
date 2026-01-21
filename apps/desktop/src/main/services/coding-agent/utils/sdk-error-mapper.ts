@@ -6,8 +6,8 @@
 
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { AbortError } from '@anthropic-ai/claude-agent-sdk';
-import type { AgentError } from '../types/result.types';
-import { AgentErrorCode, agentError } from '../types/result.types';
+import type { AgentError } from '../types';
+import { AgentErrorCode, agentError } from '../types';
 
 /**
  * Map any SDK error to AgentError
