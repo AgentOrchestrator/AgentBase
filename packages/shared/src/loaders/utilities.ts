@@ -86,7 +86,7 @@ export function extractProjectNameFromPath(folderPath: string): string | undefin
   // Split by / and filter empty segments
   const parts = cleanPath.split('/').filter((p) => p.trim() !== '');
   if (parts.length === 0) {
-    return undefined;
+    return;
   }
 
   // Common project root indicators (in priority order)
@@ -112,7 +112,7 @@ export function extractProjectNameFromPath(folderPath: string): string | undefin
   // Go up until we find what looks like a project root
   const lastPart = parts[parts.length - 1];
   if (!lastPart) {
-    return undefined;
+    return;
   }
 
   const hasExtension = lastPart.includes('.');

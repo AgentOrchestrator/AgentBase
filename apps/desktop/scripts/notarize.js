@@ -1,5 +1,5 @@
 const { notarize } = require('@electron/notarize');
-const path = require('path');
+const path = require('node:path');
 
 /**
  * Notarize the macOS application with Apple
@@ -68,7 +68,7 @@ exports.default = async function notarizing(context) {
     console.log('Notarization complete!');
   } catch (error) {
     // Check if this is a stapling error (happens when Apple hasn't finished processing)
-    if (error.message && error.message.includes('staple')) {
+    if (error.message?.includes('staple')) {
       console.warn('⚠️  Stapling failed - Apple may still be processing the notarization');
       console.warn('   The app was successfully submitted for notarization.');
       console.warn('   Stapling will happen automatically when users download the app.');

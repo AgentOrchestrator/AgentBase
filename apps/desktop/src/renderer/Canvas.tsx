@@ -27,7 +27,6 @@ import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
-import { ActionPill } from './components/ActionPill';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -47,6 +46,7 @@ import {
   SidebarExpandButton,
   ZoomControls,
 } from './features';
+import { ActionPill, useActionPillHighlight } from './features/action-pill';
 import { NodeActionsProvider } from './features/canvas/context';
 import { useNodeOperations } from './features/canvas/hooks/useNodeOperations';
 import {
@@ -213,6 +213,7 @@ function CanvasFlow() {
   // Persist edges when they change (only after initial state is applied)
   const prevEdgesRef = useRef<Edge[]>(edges);
 
+  // Edge persistence - persist edges when they change (only after initial state is applied)
   useEffect(() => {
     // Skip persistence until initial state is applied
     if (!nodeOps.isInitialStateApplied()) {
@@ -227,37 +228,18 @@ function CanvasFlow() {
   }, [edges, nodeOps]);
 
   // =============================================================================
-  // Action Pill Highlighting
+  // Action Pill Highlighting (via Zustand store - no window events)
   // =============================================================================
 
+  const { highlightedAgentId } = useActionPillHighlight();
+
   useEffect(() => {
-    const handleHighlightAgent = (event: Event) => {
-      const customEvent = event as CustomEvent<{ agentId: string }>;
-      const { agentId } = customEvent.detail;
-      nodeOps.highlightAgentNode(agentId);
-    };
-
-    const handleUnhighlightAgent = () => {
+    if (highlightedAgentId) {
+      nodeOps.highlightAgentNode(highlightedAgentId);
+    } else {
       nodeOps.unhighlightAllAgentNodes();
-    };
-
-    window.addEventListener('action-pill:highlight-agent', handleHighlightAgent as EventListener);
-    window.addEventListener(
-      'action-pill:unhighlight-agent',
-      handleUnhighlightAgent as EventListener
-    );
-
-    return () => {
-      window.removeEventListener(
-        'action-pill:highlight-agent',
-        handleHighlightAgent as EventListener
-      );
-      window.removeEventListener(
-        'action-pill:unhighlight-agent',
-        handleUnhighlightAgent as EventListener
-      );
-    };
-  }, [nodeOps.highlightAgentNode, nodeOps.unhighlightAllAgentNodes]);
+    }
+  }, [highlightedAgentId, nodeOps]);
 
   // =============================================================================
   // React Flow Utilities and Feature Hooks

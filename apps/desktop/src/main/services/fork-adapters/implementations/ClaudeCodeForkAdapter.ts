@@ -224,7 +224,7 @@ export class ClaudeCodeForkAdapter implements IForkAdapter {
       }).trim();
       return branch || undefined;
     } catch {
-      return undefined;
+      return;
     }
   }
 

@@ -115,7 +115,7 @@ function isValidStatus(value: unknown): value is 'pending' | 'in_progress' | 'co
  * Normalize timestamp to ISO string format
  */
 function normalizeTimestamp(ts: string | number | undefined): string | undefined {
-  if (!ts) return undefined;
+  if (!ts) return;
   if (typeof ts === 'number') {
     return new Date(ts).toISOString();
   }
