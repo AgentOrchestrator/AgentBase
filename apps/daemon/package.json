@@ -10,7 +10,7 @@
     "start": "node --env-file=../../.env dist/index.js",
     "start:tray": "npm run build && electron .",
     "status": "node --env-file=../../.env --import tsx/esm src/cli-status.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No tests configured\""
   },
   "keywords": [],
   "author": "",
