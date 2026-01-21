@@ -15,7 +15,7 @@ import type {
   ToolApprovalAction,
 } from '@agent-orchestrator/shared';
 import type { AgentAdapterEvent } from '../context/node-services/coding-agent-adapter';
-import { agentActionStore } from '../stores';
+import { useActionPillStore } from '../features/action-pill';
 
 type EventCallback<T = AgentAdapterEvent> = (event: T) => void;
 
@@ -82,11 +82,11 @@ class SharedEventDispatcher {
       }
     }
 
-    // Handle permission requests directly → agentActionStore
+    // Handle permission requests directly → ActionPill store
     if (event.type === 'permission:request') {
       const action = this.buildActionFromPermissionEvent(event);
       if (action) {
-        agentActionStore.addAction(action);
+        useActionPillStore.getState().addAction(action);
       }
     }
 

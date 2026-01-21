@@ -1,0 +1,185 @@
+/**
+ * MessagePill Styles
+ *
+ * Styles for the message input pill component.
+ */
+
+/* =============================================================================
+ * Message Pill Container
+ * ============================================================================= */
+
+.message-pill {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
+  border-radius: 30px;
+  width: 400px;
+  height: 60px;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+}
+
+.message-pill.has-target {
+  border-color: #358d9d;
+  box-shadow: 0 0 12px rgba(53, 141, 157, 0.3);
+}
+
+.message-pill.sending {
+  opacity: 0.8;
+}
+
+/* =============================================================================
+ * Input Area
+ * ============================================================================= */
+
+.message-pill-input-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 100%;
+  background: transparent;
+}
+
+.message-pill-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 10px 16px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  resize: none;
+  min-height: 20px;
+  max-height: 100px;
+  font-family: inherit;
+}
+
+.message-pill-input:focus {
+  outline: none;
+}
+
+.message-pill-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-pill-input::placeholder {
+  color: var(--text-muted, #888);
+}
+
+/* =============================================================================
+ * Buttons
+ * ============================================================================= */
+
+.message-pill-mic-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.message-pill-mic-button:hover {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.message-pill-mic-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  color: inherit;
+}
+
+.message-pill-send-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #000000;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.message-pill-send-button:hover:not(:disabled) {
+  background: #000000;
+  opacity: 0.8;
+}
+
+.message-pill-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message-pill-send-icon {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.message-pill-send-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: message-pill-spin 0.8s linear infinite;
+}
+
+@keyframes message-pill-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =============================================================================
+ * Target Indicator
+ * ============================================================================= */
+
+.message-pill-target-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+}
+
+.message-pill-target-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #358d9d;
+  animation: message-pill-pulse 2s ease-in-out infinite;
+}
+
+@keyframes message-pill-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+}

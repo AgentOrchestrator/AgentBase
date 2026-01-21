@@ -9,6 +9,7 @@ import { Handle, type NodeProps, NodeResizer, Position } from '@xyflow/react';
 import { useCallback, useRef } from 'react';
 import AgentChatView from '../../AgentChatView';
 import { NodeContextProvider } from '../../context';
+import { useNodeActions } from '../../features/canvas/context';
 import { useAgentState } from '../../hooks/useAgentState';
 import type { AgentNodeData } from '../../types/agent-node';
 import '../../AgentNode.css';
@@ -22,6 +23,8 @@ import '../../AgentNode.css';
  * 3. Renders AgentChatView for chat functionality
  */
 function AgentChatNode({ data, id, selected }: NodeProps) {
+  const nodeActions = useNodeActions();
+
   // Capture initial data only once to prevent re-renders from unstable references
   const initialDataRef = useRef<AgentNodeData | null>(null);
   if (!initialDataRef.current) {
@@ -51,13 +54,10 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
   // ---------------------------------------------------------------------------
   const handleDataChange = useCallback(
     (updates: Partial<AgentNodeData>) => {
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: { ...agent.nodeData, ...updates } },
-        })
-      );
+      // Update node data via context (not events) to prevent infinite loops
+      nodeActions.mergeNodeData(id, updates as Record<string, unknown>);
     },
-    [id, agent.nodeData]
+    [id, nodeActions]
   );
 
   // If no workspace, show message

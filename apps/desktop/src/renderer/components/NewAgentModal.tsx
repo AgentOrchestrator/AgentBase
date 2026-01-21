@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './NewAgentModal.css';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { WorktreeInfo } from '../../main/types/worktree';
-import type { MessagePreview } from '../hooks/useForkModal';
+import type { MessagePreview } from '../hooks';
 import { worktreeService } from '../services/WorktreeService';
 import { BranchSwitchWarningDialog } from './BranchSwitchWarningDialog';
 import { MessagePreviewPanel } from './MessagePreviewPanel';

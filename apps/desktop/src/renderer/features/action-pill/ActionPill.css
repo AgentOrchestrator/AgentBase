@@ -1,0 +1,242 @@
+/**
+ * ActionPill Feature Styles
+ *
+ * Styles for the action pill component and its contents.
+ */
+
+/* =============================================================================
+ * Action Pill Container - Light blue-gray theme
+ * ============================================================================= */
+
+.action-pill {
+  width: 380px !important;
+  bottom: 46px !important;
+  background: #e2edee !important;
+  border-color: #d0dde0 !important;
+}
+
+.action-pill:not(.square) {
+  height: 60px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: 6px !important;
+}
+
+.action-pill.cursor-pointer:hover:not(.square) {
+  background: #d5e5e7 !important;
+  border-color: #c5d5d8 !important;
+  transform: translateX(-50%) scale(1.02);
+}
+
+.action-pill.square {
+  height: 500px !important;
+  background: var(--color-bg-primary) !important;
+  border-color: var(--color-border) !important;
+}
+
+.action-pill .pill-text {
+  color: #358d9d !important;
+  font-weight: normal;
+  font-size: 13px !important;
+  font-family: "SF UI Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: auto !important;
+  padding-top: 0 !important;
+  display: block !important;
+  align-items: unset !important;
+  justify-content: unset !important;
+}
+
+.action-pill.square .pill-text {
+  color: var(--color-text-primary) !important;
+}
+
+/* =============================================================================
+ * New Actions Highlight (Blue glow when permission requests arrive)
+ * ============================================================================= */
+
+.action-pill.has-new-actions {
+  animation: pill-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes pill-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px 2px rgba(74, 158, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px 4px rgba(74, 158, 255, 0.7);
+  }
+}
+
+/* =============================================================================
+ * Action List
+ * ============================================================================= */
+
+.action-pill-list {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+  transition:
+    opacity 1s ease-out,
+    filter 1s ease-out;
+  opacity: 0;
+  filter: blur(4px);
+}
+
+.action-pill-list.visible {
+  opacity: 1;
+  filter: blur(0);
+}
+
+/* =============================================================================
+ * Action Card
+ * ============================================================================= */
+
+.action-pill-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.action-pill-card.highlighted {
+  border: 2px solid #358d9d;
+  box-shadow: 0 0 0 2px rgba(53, 141, 157, 0.15);
+}
+
+.action-pill-card + .action-pill-card {
+  margin-top: 12px;
+}
+
+.action-pill-agent-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin-bottom: 4px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.action-pill-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* =============================================================================
+ * Clarifying Question Form
+ * ============================================================================= */
+
+.action-pill-question {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.action-pill-question-title {
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.action-pill-question-input {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.action-pill-question-input:focus {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
+}
+
+.action-pill-submit {
+  align-self: flex-start;
+  background: #4a9eff;
+  border: none;
+  color: #0b1020;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.action-pill-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+ * Tool Approval
+ * ============================================================================= */
+
+.action-pill-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.action-pill-tool {
+  font-weight: 600;
+}
+
+.action-pill-command,
+.action-pill-path {
+  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.action-pill-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.action-pill-approve,
+.action-pill-deny {
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.action-pill-approve {
+  background: #000000;
+  color: #ffffff;
+}
+
+.action-pill-deny {
+  background: #ffffff;
+  border-color: #000000;
+  color: #000000;
+}
+
+.action-pill-approve:disabled,
+.action-pill-deny:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

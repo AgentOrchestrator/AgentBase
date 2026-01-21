@@ -25,7 +25,7 @@ function generateId(): string {
 
 /**
  * Fire a permission request (tool approval) event
- * Adds a tool_approval action directly to the agentActionStore
+ * Adds a tool_approval action directly to the ActionPill store
  */
 export function firePermissionRequest(options?: {
   toolName?: string;
@@ -36,7 +36,7 @@ export function firePermissionRequest(options?: {
   agentId?: string;
   sessionId?: string;
 }): void {
-  import('../stores').then(({ agentActionStore }) => {
+  import('../features/action-pill').then(({ useActionPillStore }) => {
     const action = {
       id: generateId(),
       type: 'tool_approval' as const,
@@ -50,7 +50,7 @@ export function firePermissionRequest(options?: {
       createdAt: new Date().toISOString(),
     };
 
-    agentActionStore.addAction(action);
+    useActionPillStore.getState().addAction(action);
     console.log('[ActionPill Debug] Fired permission request (tool_approval):', action);
   });
 }
@@ -72,7 +72,7 @@ export function fireClarifyingQuestion(options?: {
 }): void {
   // Import the store directly for clarifying questions
   // as they may not go through the same IPC channel
-  import('../stores').then(({ agentActionStore }) => {
+  import('../features/action-pill').then(({ useActionPillStore }) => {
     const action = {
       id: generateId(),
       type: 'clarifying_question' as const,
@@ -92,7 +92,7 @@ export function fireClarifyingQuestion(options?: {
       createdAt: new Date().toISOString(),
     };
 
-    agentActionStore.addAction(action);
+    useActionPillStore.getState().addAction(action);
     console.log('[ActionPill Debug] Fired clarifying question:', action);
   });
 }
@@ -170,10 +170,11 @@ export function fireMultipleActions(): void {
  * Clear all pending actions
  */
 export function clearAllActions(): void {
-  import('../stores').then(({ agentActionStore }) => {
-    const actions = agentActionStore.getAllActions();
+  import('../features/action-pill').then(({ useActionPillStore }) => {
+    const state = useActionPillStore.getState();
+    const actions = state.actions;
     for (const action of actions) {
-      agentActionStore.removeAction(action.id);
+      state.removeAction(action.id);
     }
     console.log('[ActionPill Debug] Cleared all actions');
   });
@@ -183,8 +184,8 @@ export function clearAllActions(): void {
  * Get current pending actions
  */
 export function getActions(): void {
-  import('../stores').then(({ agentActionStore }) => {
-    const actions = agentActionStore.getAllActions();
+  import('../features/action-pill').then(({ useActionPillStore }) => {
+    const actions = useActionPillStore.getState().actions;
     console.log('[ActionPill Debug] Current actions:', actions);
     console.table(
       actions.map((a) => ({

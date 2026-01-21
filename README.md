@@ -38,6 +38,7 @@ Agent Base is local-first — everything runs on your machine.
 [![Last Commit](https://img.shields.io/github/last-commit/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/commits/main)
 [![Commit Activity](https://img.shields.io/github/commit-activity/m/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/graphs/commit-activity)
 [![Issues](https://img.shields.io/github/issues/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/issues)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AgentOrchestrator/AgentBase)
 
 [Installation](#-installation) • [Commands](#-available-commands) • [Preview](#-preview) • [Features](#-features) • [Integrations](#-integrations)
 </div>

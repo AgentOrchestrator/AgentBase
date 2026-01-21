@@ -1,0 +1,17 @@
+# Act configuration for testing GitHub Actions workflows locally
+# https://github.com/nektos/act
+
+# Use medium-sized Ubuntu image for macOS simulation
+-P macos-latest=catthehacker/ubuntu:act-latest
+
+# Enable verbose output for debugging
+--verbose
+
+# Bind local directory for workspace persistence
+--bind
+
+# Use .secrets file for environment variables
+--secret-file .secrets
+
+# Don't use host Docker network (more isolated testing)
+--container-architecture linux/amd64

@@ -8,6 +8,7 @@
 import type { NodeProps } from '@xyflow/react';
 import { useCallback } from 'react';
 import { NodeContextProvider } from '../../context';
+import { useNodeActions } from '../../features/canvas/context';
 import type { ConversationNodeData } from '../schemas';
 import { ConversationNodePresentation } from './ConversationNodePresentation';
 
@@ -20,6 +21,7 @@ import { ConversationNodePresentation } from './ConversationNodePresentation';
  * 3. Renders ConversationNodePresentation
  */
 function ConversationNode({ data, id, selected }: NodeProps) {
+  const nodeActions = useNodeActions();
   const nodeData = data as unknown as ConversationNodeData;
   const {
     sessionId,
@@ -31,17 +33,12 @@ function ConversationNode({ data, id, selected }: NodeProps) {
     isExpanded: initialExpanded,
   } = nodeData;
 
-  // Dispatch node update for persistence
+  // Update node data via context (not events) to prevent infinite loops
   const dispatchNodeUpdate = useCallback(
     (updates: Partial<ConversationNodeData>) => {
-      const updatedData = { ...nodeData, ...updates };
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: updatedData },
-        })
-      );
+      nodeActions.mergeNodeData(id, updates as Record<string, unknown>);
     },
-    [id, nodeData]
+    [id, nodeActions]
   );
 
   // Handle expanded state change
