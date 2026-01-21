@@ -6,7 +6,13 @@
 
 // Main component
 export { ActionPill } from './ActionPill';
-
+export type { ActionPillHighlightState } from './hooks';
+// Hooks
+export { useActionPillHighlight } from './hooks';
+export type { IActionPillService } from './services';
+// Services
+export { actionPillService } from './services';
+export type { ActionPillState, PillAnimationState } from './store';
 // Store
 export {
   selectActionCount,
@@ -15,12 +21,3 @@ export {
   selectTopmostAction,
   useActionPillStore,
 } from './store';
-export type { ActionPillState, PillAnimationState } from './store';
-
-// Hooks
-export { useActionPillHighlight } from './hooks';
-export type { ActionPillHighlightState } from './hooks';
-
-// Services
-export { actionPillService } from './services';
-export type { IActionPillService } from './services';

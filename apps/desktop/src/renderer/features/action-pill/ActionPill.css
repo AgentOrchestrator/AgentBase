@@ -13,7 +13,8 @@
 }
 
 @keyframes pill-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 8px 2px rgba(74, 158, 255, 0.4);
   }
   50% {

@@ -10,10 +10,7 @@ export interface IActionPillService {
   /**
    * Submit a tool approval decision (allow/deny)
    */
-  submitToolApproval(
-    action: ToolApprovalAction,
-    decision: 'allow' | 'deny'
-  ): Promise<void>;
+  submitToolApproval(action: ToolApprovalAction, decision: 'allow' | 'deny'): Promise<void>;
 
   /**
    * Submit answers to clarifying questions

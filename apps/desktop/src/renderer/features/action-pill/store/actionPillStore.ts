@@ -19,17 +19,12 @@ const initialAnimationState: PillAnimationState = {
 /**
  * Helper to compute the highlighted agent ID from current state
  */
-function computeHighlightedAgentId(
-  isExpanded: boolean,
-  actions: AgentAction[]
-): string | null {
+function computeHighlightedAgentId(isExpanded: boolean, actions: AgentAction[]): string | null {
   if (!isExpanded || actions.length === 0) {
     return null;
   }
   // Sort by createdAt and get the topmost (earliest) action's agentId
-  const sorted = [...actions].sort((a, b) =>
-    a.createdAt.localeCompare(b.createdAt)
-  );
+  const sorted = [...actions].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return sorted[0]?.agentId ?? null;
 }
 

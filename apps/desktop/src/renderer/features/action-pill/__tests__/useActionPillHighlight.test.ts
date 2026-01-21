@@ -100,8 +100,14 @@ describe('useActionPillHighlight behavior', () => {
 
     it('should update to next action when current topmost is removed', () => {
       // Add actions with explicit timestamps (earlier timestamp = topmost)
-      const action1 = { ...createMockToolApproval('action-1', 'agent-1'), createdAt: '2024-01-01T00:00:00Z' };
-      const action2 = { ...createMockToolApproval('action-2', 'agent-2'), createdAt: '2024-01-01T00:01:00Z' };
+      const action1 = {
+        ...createMockToolApproval('action-1', 'agent-1'),
+        createdAt: '2024-01-01T00:00:00Z',
+      };
+      const action2 = {
+        ...createMockToolApproval('action-2', 'agent-2'),
+        createdAt: '2024-01-01T00:01:00Z',
+      };
 
       useActionPillStore.getState().addAction(action1);
       useActionPillStore.getState().addAction(action2);
