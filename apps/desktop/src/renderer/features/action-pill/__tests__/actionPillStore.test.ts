@@ -2,10 +2,7 @@
  * ActionPill Store Tests
  */
 
-import type {
-  ClarifyingQuestionAction,
-  ToolApprovalAction,
-} from '@agent-orchestrator/shared';
+import type { ToolApprovalAction } from '@agent-orchestrator/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useActionPillStore } from '../store/actionPillStore';
 
@@ -19,17 +16,6 @@ function createMockToolApproval(id: string, agentId: string): ToolApprovalAction
     createdAt: new Date().toISOString(),
     toolName: 'Bash',
     command: 'ls -la',
-  };
-}
-
-function createMockClarifyingQuestion(id: string, agentId: string): ClarifyingQuestionAction {
-  return {
-    id,
-    type: 'clarifying_question',
-    agentId,
-    sessionId: 'session-1',
-    createdAt: new Date().toISOString(),
-    questions: [{ question: 'Which option?', options: [{ label: 'A' }, { label: 'B' }] }],
   };
 }
 
