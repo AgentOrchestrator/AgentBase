@@ -3,7 +3,7 @@
  *
  * This module provides:
  * 1. A single `CodingAgent` interface combining all capabilities
- * 2. A `createCodingAgent` factory function for creating agents
+ * 2. A `getCodingAgent` factory function for obtaining agents
  *
  * The interface consolidates 7 previous interfaces:
  * - ICodingAgentProvider (generation)
@@ -16,7 +16,7 @@
  *
  * @example
  * ```typescript
- * const result = await createCodingAgent('claude_code');
+ * const result = await getCodingAgent('claude_code');
  * if (result.success) {
  *   const agent = result.data;
  *   await agent.initialize();
@@ -203,9 +203,9 @@ export interface CodingAgent extends EventEmitter {
   ): Promise<Result<SessionSummary[], AgentError>>;
 
   /**
-   * Get full session content with optional message filtering.
+   * Get session content with optional message filtering.
    */
-  getFilteredSession(
+  getSession(
     sessionId: string,
     filter?: MessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>>;
@@ -227,9 +227,10 @@ export interface CodingAgent extends EventEmitter {
   // ============================================
 
   /**
-   * Check if a session file exists (session is "active").
+   * Check if a session file exists on disk.
+   * This verifies file existence, not runtime session state.
    */
-  checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean>;
+  sessionFileExists(sessionId: string, workspacePath: string): Promise<boolean>;
 
   // ============================================
   // Events
@@ -242,9 +243,9 @@ export interface CodingAgent extends EventEmitter {
 }
 
 /**
- * Options for creating a coding agent.
+ * Options for obtaining a coding agent.
  */
-export interface CreateCodingAgentOptions {
+export interface GetCodingAgentOptions {
   /** Configuration overrides */
   config?: Partial<Omit<AgentConfig, 'type'>>;
   /**
@@ -258,27 +259,27 @@ export interface CreateCodingAgentOptions {
 const agentInstances = new Map<CodingAgentType, CodingAgent>();
 
 /**
- * Create a coding agent instance.
+ * Get a coding agent instance.
  *
- * Returns a singleton instance for each agent type (unless skipCliVerification is true).
+ * Returns a cached singleton instance for each agent type (unless skipCliVerification is true).
  * The agent is automatically initialized unless skipCliVerification is set.
  *
- * @param type - The type of agent to create ('claude_code', etc.)
+ * @param type - The type of agent to get ('claude_code', etc.)
  * @param options - Optional configuration
  * @returns Result with the agent or an error
  *
  * @example
  * ```typescript
- * const result = await createCodingAgent('claude_code');
+ * const result = await getCodingAgent('claude_code');
  * if (result.success) {
  *   const agent = result.data;
  *   // Use agent...
  * }
  * ```
  */
-export async function createCodingAgent(
+export async function getCodingAgent(
   type: CodingAgentType,
-  options?: CreateCodingAgentOptions
+  options?: GetCodingAgentOptions
 ): Promise<Result<CodingAgent, AgentError>> {
   const { config, skipCliVerification } = options ?? {};
 

@@ -41,7 +41,7 @@ import type {
   StreamCallback,
   StructuredStreamCallback,
 } from '../index';
-import { type AgentErrorCode, createCodingAgent } from '../index';
+import { type AgentErrorCode, getCodingAgent } from '../index';
 import type {
   QueryExecutor,
   QueryMessageUnion,
@@ -146,8 +146,8 @@ describe('CodingAgent Interface', () => {
    * It returns a Result type for explicit error handling.
    */
   describe('Factory Function', () => {
-    it('createCodingAgent returns a Result with CodingAgent on success', async () => {
-      const result = await createCodingAgent('claude_code');
+    it('getCodingAgent returns a Result with CodingAgent on success', async () => {
+      const result = await getCodingAgent('claude_code');
 
       expect(result).toBeDefined();
       expect(result).toHaveProperty('success');
@@ -158,8 +158,8 @@ describe('CodingAgent Interface', () => {
       }
     });
 
-    it('createCodingAgent returns an error for unsupported agent types', async () => {
-      const result = await createCodingAgent('unsupported_agent' as CodingAgentType);
+    it('getCodingAgent returns an error for unsupported agent types', async () => {
+      const result = await getCodingAgent('unsupported_agent' as CodingAgentType);
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -168,16 +168,16 @@ describe('CodingAgent Interface', () => {
       }
     });
 
-    it('createCodingAgent accepts optional config', async () => {
-      const result = await createCodingAgent('claude_code', {
+    it('getCodingAgent accepts optional config', async () => {
+      const result = await getCodingAgent('claude_code', {
         config: { timeout: 60000 },
       });
 
       expect(result).toHaveProperty('success');
     });
 
-    it('createCodingAgent accepts skipCliVerification option', async () => {
-      const result = await createCodingAgent('claude_code', {
+    it('getCodingAgent accepts skipCliVerification option', async () => {
+      const result = await getCodingAgent('claude_code', {
         skipCliVerification: true,
       });
 
@@ -195,7 +195,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
       }
@@ -231,7 +231,7 @@ describe('CodingAgent Interface', () => {
 
     it('dispose() returns void promise', async () => {
       // Create a new agent to dispose without affecting other tests
-      const tempResult = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const tempResult = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (tempResult.success) {
         const result = tempResult.data.dispose();
         expect(result).toBeInstanceOf(Promise);
@@ -250,7 +250,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
       }
@@ -295,7 +295,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
         await agent.initialize();
@@ -364,7 +364,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
         await agent.initialize();
@@ -420,7 +420,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
         await agent.initialize();
@@ -462,7 +462,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
       }
@@ -492,11 +492,11 @@ describe('CodingAgent Interface', () => {
       }
     });
 
-    it('getFilteredSession() returns Result<CodingAgentSessionContent | null, AgentError>', async () => {
+    it('getSession() returns Result<CodingAgentSessionContent | null, AgentError>', async () => {
       const sessionId = 'test-session-id';
       const filter: MessageFilterOptions = { roles: ['user', 'assistant'] };
 
-      const result = await agent.getFilteredSession(sessionId, filter);
+      const result = await agent.getSession(sessionId, filter);
 
       expect(result).toHaveProperty('success');
       if (result.success) {
@@ -541,7 +541,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
       }
@@ -553,11 +553,11 @@ describe('CodingAgent Interface', () => {
       }
     });
 
-    it('checkSessionActive() returns boolean', async () => {
+    it('sessionFileExists() returns boolean', async () => {
       const sessionId = 'test-session-id';
       const workspacePath = '/tmp/test-project';
 
-      const result = await agent.checkSessionActive(sessionId, workspacePath);
+      const result = await agent.sessionFileExists(sessionId, workspacePath);
 
       expect(typeof result).toBe('boolean');
     });
@@ -573,7 +573,7 @@ describe('CodingAgent Interface', () => {
     let agent: CodingAgent;
 
     beforeAll(async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (result.success) {
         agent = result.data;
       }
@@ -656,7 +656,7 @@ describe('CodingAgent Interface', () => {
    */
   describe('Type Compatibility', () => {
     it('CodingAgent interface has all required methods', async () => {
-      const result = await createCodingAgent('claude_code', { skipCliVerification: true });
+      const result = await getCodingAgent('claude_code', { skipCliVerification: true });
       if (!result.success) return;
 
       const agent = result.data;
@@ -674,10 +674,10 @@ describe('CodingAgent Interface', () => {
       expect(typeof agent.continueSessionStreaming).toBe('function');
       expect(typeof agent.forkSession).toBe('function');
       expect(typeof agent.listSessionSummaries).toBe('function');
-      expect(typeof agent.getFilteredSession).toBe('function');
+      expect(typeof agent.getSession).toBe('function');
       expect(typeof agent.getSessionModificationTimes).toBe('function');
       expect(typeof agent.getDataPaths).toBe('function');
-      expect(typeof agent.checkSessionActive).toBe('function');
+      expect(typeof agent.sessionFileExists).toBe('function');
       expect(typeof agent.getEventRegistry).toBe('function');
 
       await agent.dispose();

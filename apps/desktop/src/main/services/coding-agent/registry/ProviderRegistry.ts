@@ -176,7 +176,7 @@ export class ProviderRegistry {
   }
 
   /**
-   * Get a filtered session by ID
+   * Get session content by ID
    *
    * If agent is specified, queries only that provider.
    * Otherwise, searches all providers until found.
@@ -185,7 +185,7 @@ export class ProviderRegistry {
    * @param filter - Optional filter with agent hint
    * @returns Session content or null if not found
    */
-  async getFilteredSession(
+  async getSession(
     sessionId: string,
     filter?: ProviderMessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
@@ -200,13 +200,13 @@ export class ProviderRegistry {
           )
         );
       }
-      return provider.getFilteredSession(sessionId, filter);
+      return provider.getSession(sessionId, filter);
     }
 
     // Search all providers
     for (const [agentType, provider] of this.providers) {
       try {
-        const result = await provider.getFilteredSession(sessionId, filter);
+        const result = await provider.getSession(sessionId, filter);
         if (result.success && result.data !== null) {
           return result;
         }

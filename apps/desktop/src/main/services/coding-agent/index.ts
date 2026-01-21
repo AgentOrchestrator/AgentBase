@@ -5,10 +5,10 @@
  *
  * Usage:
  * ```typescript
- * import { createCodingAgent, sessionById } from './services/coding-agent';
+ * import { getCodingAgent } from './services/coding-agent';
  *
- * // Create an agent
- * const result = await createCodingAgent('claude_code');
+ * // Get an agent (returns cached singleton)
+ * const result = await getCodingAgent('claude_code');
  * if (!result.success) {
  *   console.error(result.error);
  *   return;
@@ -19,8 +19,8 @@
  * // Generate a response
  * const response = await agent.generate({ prompt: 'Hello, world!' });
  *
- * // Continue a session
- * await agent.continueSession(sessionById('abc123'), 'Follow up prompt');
+ * // Continue a session by ID
+ * await agent.continueSession({ type: 'id', value: 'abc123' }, 'Follow up prompt');
  *
  * // Clean up
  * await agent.dispose();
@@ -31,11 +31,11 @@
 export { ClaudeCodeAgent, type ClaudeCodeAgentConfig } from './ClaudeCodeAgent';
 
 // Unified interface and factory
-export type { CodingAgent, CreateCodingAgentOptions } from './CodingAgent';
+export type { CodingAgent, GetCodingAgentOptions } from './CodingAgent';
 export {
-  createCodingAgent,
   disposeAllCodingAgents,
   disposeCodingAgent,
+  getCodingAgent,
   resetCodingAgentFactory,
 } from './CodingAgent';
 
@@ -55,7 +55,6 @@ export type {
   MessageFilterOptions,
   Result,
   SessionContent,
-  SessionFilter,
   SessionFilterOptions,
   SessionIdentifier,
   SessionInfo,
@@ -68,13 +67,4 @@ export type {
 } from './types';
 
 // Error codes and helpers
-export {
-  AgentErrorCode,
-  agentError,
-  DEFAULT_AGENT_CONFIG,
-  err,
-  latestSession,
-  ok,
-  sessionById,
-  sessionByName,
-} from './types';
+export { AgentErrorCode, agentError, DEFAULT_AGENT_CONFIG, err, ok } from './types';

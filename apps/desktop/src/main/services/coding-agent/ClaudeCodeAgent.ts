@@ -764,20 +764,20 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
 
   /**
    * Check if a session file exists for the given session ID and workspace path.
-   * A session is considered "active" if its JSONL file exists on disk.
+   * This verifies file existence on disk, not runtime session state.
    */
-  async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
+  async sessionFileExists(sessionId: string, workspacePath: string): Promise<boolean> {
     const encodedPath = this.encodeWorkspacePath(workspacePath);
     const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
-    const res = fs.existsSync(sessionFilePath);
+    const exists = fs.existsSync(sessionFilePath);
 
-    console.log('[ClaudeCodeAgent] Checking session active', {
+    console.log('[ClaudeCodeAgent] Checking session file exists', {
       sessionId,
       workspacePath,
       sessionFilePath,
-      res,
+      exists,
     });
-    return res;
+    return exists;
   }
 
   async getSessionModificationTimes(
@@ -942,7 +942,7 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     }
   }
 
-  async getFilteredSession(
+  async getSession(
     sessionId: string,
     filter?: MessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {

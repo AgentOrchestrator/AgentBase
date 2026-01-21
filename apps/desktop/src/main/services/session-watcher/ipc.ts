@@ -1,6 +1,6 @@
 import type { CodingAgentType, SessionFileChangeEvent } from '@agent-orchestrator/shared';
 import { type BrowserWindow, ipcMain } from 'electron';
-import { createCodingAgent } from '../coding-agent';
+import { getCodingAgent } from '../coding-agent';
 import { SessionFileWatcher } from './SessionFileWatcher';
 
 /**
@@ -54,7 +54,7 @@ export function registerSessionWatcherIpcHandlers(win: BrowserWindow): void {
         }
 
         // Get data paths from the agent's chat history provider
-        const agentResult = await createCodingAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
 

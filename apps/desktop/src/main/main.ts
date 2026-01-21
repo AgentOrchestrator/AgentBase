@@ -75,7 +75,7 @@ import type {
   SessionIdentifier,
   StreamingChunk,
 } from './services/coding-agent';
-import { createCodingAgent, disposeAllCodingAgents } from './services/coding-agent';
+import { disposeAllCodingAgents, getCodingAgent } from './services/coding-agent';
 import {
   awaitAgentActionResponse,
   emitAgentEvent,
@@ -861,7 +861,7 @@ function registerIpcHandlers(): void {
     'coding-agent:generate',
     async (_event, agentType: CodingAgentType, request: GenerateRequest) => {
       try {
-        const agentResult = await createCodingAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent', {
             agentType,
@@ -899,7 +899,7 @@ function registerIpcHandlers(): void {
       options?: ContinueOptions
     ) => {
       try {
-        const agentResult = await createCodingAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
@@ -947,7 +947,7 @@ function registerIpcHandlers(): void {
       });
 
       try {
-        const agentResult = await createCodingAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent', {
             requestId,
@@ -1023,7 +1023,7 @@ function registerIpcHandlers(): void {
     'coding-agent:fork-session',
     async (_event, agentType: CodingAgentType, options: ForkOptions) => {
       try {
-        const agentResult = await createCodingAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
@@ -1055,7 +1055,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('coding-agent:get-capabilities', async (_event, agentType: CodingAgentType) => {
     try {
-      const agentResult = await createCodingAgent(agentType);
+      const agentResult = await getCodingAgent(agentType);
       if (agentResult.success === false) {
         return { success: false, error: agentResult.error.message };
       }
@@ -1071,7 +1071,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('coding-agent:is-available', async (_event, agentType: CodingAgentType) => {
     try {
-      const result = await createCodingAgent(agentType);
+      const result = await getCodingAgent(agentType);
       return { success: true, data: result.success };
     } catch (error) {
       console.error('[Main] Error checking agent availability', { agentType, error });
@@ -1084,7 +1084,7 @@ function registerIpcHandlers(): void {
     async (_event, agentType: CodingAgentType, filter?: SessionFilterOptions) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await createCodingAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1121,7 +1121,7 @@ function registerIpcHandlers(): void {
     ) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await createCodingAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1130,7 +1130,7 @@ function registerIpcHandlers(): void {
 
         const agent = agentResult.data;
 
-        const result = await agent.getFilteredSession(sessionId, filter);
+        const result = await agent.getSession(sessionId, filter);
         if (result.success === false) {
           console.error('[Main] Error getting session', {
             agentType,
@@ -1159,7 +1159,7 @@ function registerIpcHandlers(): void {
     async (_event, agentType: CodingAgentType, workspacePath: string) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await createCodingAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1196,12 +1196,12 @@ function registerIpcHandlers(): void {
     }
   );
 
-  // Check if a session file exists (session is active)
+  // Check if a session file exists on disk
   ipcMain.handle(
-    'coding-agent:check-session-active',
+    'coding-agent:session-file-exists',
     async (_event, agentType: CodingAgentType, sessionId: string, workspacePath: string) => {
       try {
-        const agentResult = await createCodingAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1210,10 +1210,10 @@ function registerIpcHandlers(): void {
 
         const agent = agentResult.data;
 
-        const isActive = await agent.checkSessionActive(sessionId, workspacePath);
-        return { success: true, data: isActive };
+        const exists = await agent.sessionFileExists(sessionId, workspacePath);
+        return { success: true, data: exists };
       } catch (error) {
-        console.error('[Main] Error checking session active', {
+        console.error('[Main] Error checking session file exists', {
           agentType,
           sessionId,
           workspacePath,
@@ -1242,7 +1242,7 @@ function registerIpcHandlers(): void {
       });
 
       try {
-        const agentResult = await createCodingAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent', {
             requestId,
@@ -1330,7 +1330,7 @@ function registerIpcHandlers(): void {
       });
 
       try {
-        const agentResult = await createCodingAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent for structured streaming', {
             requestId,

@@ -200,16 +200,6 @@ export interface SessionSummary extends SessionInfo {
 }
 
 /**
- * Filter options for listing sessions
- */
-export interface SessionFilter {
-  projectPath?: string;
-  afterDate?: Date;
-  beforeDate?: Date;
-  limit?: number;
-}
-
-/**
  * Options for continuing a session
  */
 export interface ContinueOptions {
@@ -217,45 +207,6 @@ export interface ContinueOptions {
   agentId?: string;
   workingDirectory?: string;
   timeout?: number;
-}
-
-/**
- * Options for checking whether a session can be forked
- */
-export interface SessionForkCheckOptions {
-  /** Workspace/project path used to locate session storage */
-  workspacePath?: string;
-}
-
-/**
- * Result of checking whether a session can be forked
- */
-export interface SessionForkability {
-  /** Whether the session is eligible for forking */
-  forkable: boolean;
-  /** Optional reason when forking is not allowed */
-  reason?: string;
-}
-
-/**
- * Helper to create a session identifier by ID
- */
-export function sessionById(id: string): SessionIdentifier {
-  return { type: 'id', value: id };
-}
-
-/**
- * Helper to create a session identifier by name
- */
-export function sessionByName(name: string): SessionIdentifier {
-  return { type: 'name', value: name };
-}
-
-/**
- * Helper to get the latest session
- */
-export function latestSession(): SessionIdentifier {
-  return { type: 'latest' };
 }
 
 // ============================================
@@ -466,8 +417,8 @@ export interface CodingAgentAPI {
     workspacePath: string
   ) => Promise<{ id: string; updatedAt: string } | null>;
 
-  /** Check if a session file exists (session is active) */
-  checkSessionActive: (
+  /** Check if a session file exists on disk */
+  sessionFileExists: (
     agentType: CodingAgentType,
     sessionId: string,
     workspacePath: string
