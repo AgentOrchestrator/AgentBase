@@ -28,7 +28,7 @@ import type {
   SessionInfo,
   StreamCallback,
   StructuredStreamCallback,
-} from '../../context/node-services/coding-agent-adapter';
+} from '../coding-agent';
 
 /**
  * Agent service implementation using adapter pattern

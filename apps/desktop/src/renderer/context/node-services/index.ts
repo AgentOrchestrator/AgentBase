@@ -4,12 +4,11 @@
  * Re-exports all node service types and interfaces.
  */
 
-// Coding Agent Adapter types
+// Coding Agent Adapter types - re-exported from new module location
 export type {
   AgentAdapterEvent,
   AgentAdapterEventType,
   AgentError,
-  AgentErrorCode,
   AgentEventHandler,
   CodingAgentMessage,
   CodingAgentSessionContent,
@@ -29,9 +28,9 @@ export type {
   SessionSummary,
   StatusPayload,
   StreamCallback,
-} from './coding-agent-adapter';
-// Result helpers
-export { agentError, err, ok } from './coding-agent-adapter';
+} from '../../services/coding-agent';
+// Result helpers and enum
+export { AgentErrorCode, agentError, err, ok } from '../../services/coding-agent';
 // Conversation service
 export type {
   ErrorListener,

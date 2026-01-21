@@ -9,7 +9,7 @@ import type {
   ISummaryComputer,
   ITitleComputer,
 } from '../../../../types/coding-agent-status';
-import { CodingAgentStatusManager } from '../CodingAgentStatusManager';
+import { CodingAgentStatusManager } from '../coding-agent';
 
 // =============================================================================
 // Mock Implementations

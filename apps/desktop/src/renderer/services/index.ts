@@ -8,7 +8,8 @@ export type {
 } from './CanvasNodeService';
 // Canvas node service
 export { CanvasNodeService, canvasNodeService } from './CanvasNodeService';
-export { CodingAgentStatusManager } from './CodingAgentStatusManager';
+// Shared event dispatcher (single IPC listener for agent events)
+export { CodingAgentStatusManager, sharedEventDispatcher } from './coding-agent';
 export * from './defaults';
 export type {
   ForkError,
@@ -36,6 +37,3 @@ export { linearService } from './LinearService';
 export type { ISessionProvider, SessionInfo, SessionStartCallback } from './SessionProvider';
 // Session provider (abstraction for hooks system integration)
 export { FileBasedSessionProvider, sessionProvider } from './SessionProvider';
-
-// Shared event dispatcher (single IPC listener for agent events)
-export { sharedEventDispatcher } from './SharedEventDispatcher';
