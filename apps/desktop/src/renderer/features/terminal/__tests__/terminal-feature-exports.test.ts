@@ -7,7 +7,93 @@
  * TDD: These tests are written BEFORE implementation and should FAIL initially.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Mock xterm.js and related addons (browser-only dependencies)
+// vi.mock calls are hoisted to top of file by vitest
+vi.mock('@xterm/xterm', () => ({
+  Terminal: vi.fn().mockImplementation(() => ({
+    loadAddon: vi.fn(),
+    open: vi.fn(),
+    focus: vi.fn(),
+    dispose: vi.fn(),
+    onData: vi.fn(),
+    onSelectionChange: vi.fn(),
+    write: vi.fn(),
+    writeln: vi.fn(),
+    getSelection: vi.fn(() => ''),
+    hasSelection: vi.fn(() => false),
+    clearSelection: vi.fn(),
+    buffer: { active: { baseY: 0, length: 0, cursorX: 0, cursorY: 0 } },
+  })),
+}));
+
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: vi.fn().mockImplementation(() => ({
+    fit: vi.fn(),
+    proposeDimensions: vi.fn(() => ({ cols: 80, rows: 24 })),
+  })),
+}));
+
+vi.mock('@xterm/addon-webgl', () => ({
+  WebglAddon: vi.fn().mockImplementation(() => ({
+    dispose: vi.fn(),
+  })),
+}));
+
+vi.mock('@xyflow/react', () => ({
+  NodeResizer: vi.fn(() => null),
+}));
+
+// Mock context hooks
+vi.mock('../../../context', () => ({
+  useAgentService: vi.fn(() => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+  })),
+  useNodeInitialized: vi.fn(() => true),
+  useTerminalService: vi.fn(() => ({
+    create: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn(),
+    sendUserInput: vi.fn(),
+    onData: vi.fn(() => vi.fn()),
+    onExit: vi.fn(() => vi.fn()),
+    resize: vi.fn(),
+    getBuffer: vi.fn().mockResolvedValue(null),
+    terminalId: 'test-terminal',
+  })),
+}));
+
+// Mock other dependencies
+vi.mock('../../canvas/context', () => ({
+  useNodeActions: vi.fn(() => ({
+    updateAttachments: vi.fn(),
+  })),
+}));
+
+vi.mock('../../../AttachmentHeader', () => ({
+  default: vi.fn(() => null),
+}));
+
+vi.mock('../../../IssueDetailsModal', () => ({
+  default: vi.fn(() => null),
+}));
+
+vi.mock('../../../types/attachments', () => ({
+  createLinearIssueAttachment: vi.fn(),
+  isLinearIssueAttachment: vi.fn(() => false),
+}));
+
+// Mock the shared package
+vi.mock('@agent-orchestrator/shared', () => ({
+  createLinearIssueAttachment: vi.fn(),
+  isLinearIssueAttachment: vi.fn(() => false),
+  createWorkspaceMetadataAttachment: vi.fn(),
+  isWorkspaceMetadataAttachment: vi.fn(() => false),
+}));
+
+// Mock the xterm CSS import
+vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
 describe('Terminal Feature Exports', () => {
   describe('Main feature index exports', () => {

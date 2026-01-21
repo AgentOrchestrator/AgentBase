@@ -7,7 +7,59 @@
  * TDD: These tests are written BEFORE implementation and should FAIL initially.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Mock xterm.js and related addons (browser-only dependencies)
+// Required because the main index exports components that import xterm.js
+// vi.mock calls are hoisted to top of file by vitest
+vi.mock('@xterm/xterm', () => ({
+  Terminal: vi.fn(),
+}));
+
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: vi.fn(),
+}));
+
+vi.mock('@xterm/addon-webgl', () => ({
+  WebglAddon: vi.fn(),
+}));
+
+vi.mock('@xyflow/react', () => ({
+  NodeResizer: vi.fn(() => null),
+}));
+
+vi.mock('../../../context', () => ({
+  useAgentService: vi.fn(),
+  useNodeInitialized: vi.fn(() => true),
+  useTerminalService: vi.fn(),
+}));
+
+vi.mock('../../canvas/context', () => ({
+  useNodeActions: vi.fn(() => ({})),
+}));
+
+vi.mock('../../../AttachmentHeader', () => ({
+  default: vi.fn(() => null),
+}));
+
+vi.mock('../../../IssueDetailsModal', () => ({
+  default: vi.fn(() => null),
+}));
+
+vi.mock('../../../types/attachments', () => ({
+  createLinearIssueAttachment: vi.fn(),
+  isLinearIssueAttachment: vi.fn(() => false),
+}));
+
+// Mock the shared package
+vi.mock('@agent-orchestrator/shared', () => ({
+  createLinearIssueAttachment: vi.fn(),
+  isLinearIssueAttachment: vi.fn(() => false),
+  createWorkspaceMetadataAttachment: vi.fn(),
+  isWorkspaceMetadataAttachment: vi.fn(() => false),
+}));
+
+vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
 describe('Terminal Types', () => {
   describe('TerminalNodeData type', () => {

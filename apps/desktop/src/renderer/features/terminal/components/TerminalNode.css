@@ -1,0 +1,257 @@
+.terminal-node {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  min-width: 400px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.terminal-node.selected {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+}
+
+/* Hide React Flow's default selection border/outline */
+.react-flow__node-terminal.selected {
+  outline: none;
+}
+
+/* Show resize handles only when selected */
+.react-flow__node-terminal.selected .react-flow__resize-control {
+  display: block;
+}
+
+.react-flow__node-terminal:not(.selected) .react-flow__resize-control {
+  display: none;
+}
+
+.terminal-node.drag-over {
+  box-shadow:
+    0 0 0 3px rgba(74, 158, 255, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  transform: scale(1.02);
+}
+
+.terminal-node-header {
+  background: var(--color-bg-primary);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-bg-hover);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.terminal-node-header .issue-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  flex: 1;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  padding: 4px;
+  border-radius: 4px;
+  margin: -4px;
+}
+
+.terminal-node-header .issue-link:hover {
+  opacity: 0.8;
+  background: rgba(74, 158, 255, 0.1);
+}
+
+.terminal-node-header .issue-external-link-icon {
+  color: #4a9eff;
+  text-decoration: none;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terminal-node-header .issue-external-link-icon:hover {
+  background: rgba(74, 158, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.terminal-node-header .issue-id {
+  color: #888;
+  font-family: "Menlo", "Monaco", monospace;
+  font-weight: 600;
+  font-size: 11px;
+  background: var(--color-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.terminal-node-header .issue-title {
+  color: var(--color-text-primary);
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-node-title {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.terminal-node-id {
+  color: #888;
+  font-family: "Menlo", "Monaco", monospace;
+}
+
+.terminal-node-content {
+  flex: 1;
+  padding: 0;
+  min-height: 250px;
+  /* Prevent text selection on the wrapper and all children by default */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  overflow: hidden;
+}
+
+/* When terminal is not active, dim it slightly to indicate it's not interactive */
+.terminal-node-content:not(.active) {
+  opacity: 0.85;
+}
+
+.terminal-node-content.active {
+  opacity: 1;
+}
+
+/* Re-enable text selection only inside the xterm terminal where text is rendered */
+.terminal-node-content .xterm {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+.terminal-node-content .xterm * {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Terminal handle styles */
+.terminal-node .react-flow__handle {
+  background: var(--handle-color, transparent);
+  width: 10px;
+  height: 10px;
+  border: none;
+}
+
+.terminal-node .react-flow__handle-top {
+  top: -5px;
+}
+
+.terminal-node .react-flow__handle-bottom {
+  bottom: -5px;
+}
+
+/* Workspace metadata header styles */
+.terminal-node-header.workspace-header {
+  background: var(--color-bg-primary);
+}
+
+.terminal-node-header .workspace-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.terminal-node-header .workspace-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.terminal-node-header .workspace-name {
+  color: var(--color-text-primary);
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-node-header .git-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #888;
+  font-family: "Menlo", "Monaco", monospace;
+  font-size: 11px;
+  background: var(--color-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.terminal-node-header .git-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.terminal-node-header .project-type-badge {
+  color: #4a9eff;
+  font-family: "Menlo", "Monaco", monospace;
+  font-size: 10px;
+  background: rgba(74, 158, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.terminal-node-header.unknown-attachment {
+  background: #3a1e1e;
+  color: #ff6b6b;
+}
+
+/* Resize handles */
+.terminal-node .react-flow__resize-control {
+  background: transparent;
+  border: none;
+}
+
+.terminal-node .react-flow__resize-control.line {
+  border-color: transparent;
+}
+
+.terminal-node .react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  visibility: visible;
+  pointer-events: auto;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+
+.terminal-node .react-flow__resize-control.handle:hover {
+  opacity: 0;
+  transform: none;
+}

@@ -15,7 +15,7 @@ import type {
   CodingAgentStatusInfo,
   StatusChangeListener,
 } from '../../../../types/coding-agent-status';
-import type { IAgentService, ITerminalService } from '../../context/node-services';
+import type { IAgentService } from '../../context/node-services';
 import type {
   AgentAdapterEventType,
   AgentError,
@@ -29,6 +29,7 @@ import type {
   StreamCallback,
   StructuredStreamCallback,
 } from '../../context/node-services/coding-agent-adapter';
+import type { ITerminalService } from '../../features/terminal';
 
 /**
  * Agent service implementation using adapter pattern

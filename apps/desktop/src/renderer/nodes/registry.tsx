@@ -13,7 +13,7 @@ import type { ComponentType } from 'react';
 import type { z } from 'zod';
 
 // Import node components
-import TerminalNode from '../TerminalNode';
+import { TerminalNode } from '../features/terminal';
 import AgentChatNode from './AgentChatNode';
 import { AgentNode } from './AgentNode';
 import BrowserNode from './BrowserNode';

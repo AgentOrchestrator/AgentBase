@@ -6,11 +6,10 @@
 
 import type { AgentType } from '../../../../types/coding-agent-status';
 import type { ServiceFactories } from '../../context/NodeServicesRegistry';
-import type { ITerminalService } from '../../context/node-services';
+import { TerminalServiceImpl } from '../../features/terminal';
 import { createCodingAgentAdapter } from '../coding-agent-adapters';
 import { AgentServiceImpl } from '../impl/AgentServiceImpl';
 import { ConversationServiceImpl } from '../impl/ConversationServiceImpl';
-import { TerminalServiceImpl } from '../impl/TerminalServiceImpl';
 import { WorkspaceServiceImpl } from '../impl/WorkspaceServiceImpl';
 
 /**
