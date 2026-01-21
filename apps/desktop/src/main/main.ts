@@ -75,13 +75,7 @@ import type {
   SessionIdentifier,
   StreamingChunk,
 } from './services/coding-agent';
-import {
-  CodingAgentFactory,
-  isChatHistoryProvider,
-  isSessionForkable,
-  isSessionResumable,
-  isSessionValidator,
-} from './services/coding-agent';
+import { CodingAgentFactory } from './services/coding-agent';
 import {
   awaitAgentActionResponse,
   emitAgentEvent,
@@ -912,9 +906,6 @@ function registerIpcHandlers(): void {
 
         const agent = agentResult.data;
         ensureAgentEventBridge(agent);
-        if (!isSessionResumable(agent)) {
-          return { success: false, error: `${agentType} does not support session resumption` };
-        }
 
         const result = await agent.continueSession(identifier, prompt, options);
         if (result.success === false) {
@@ -968,9 +959,6 @@ function registerIpcHandlers(): void {
 
         const agent = agentResult.data;
         ensureAgentEventBridge(agent);
-        if (!isSessionResumable(agent)) {
-          return { success: false, error: `${agentType} does not support session resumption` };
-        }
 
         const result = await agent.continueSessionStreaming(
           identifier,
@@ -1042,9 +1030,6 @@ function registerIpcHandlers(): void {
 
         const agent = agentResult.data;
         ensureAgentEventBridge(agent);
-        if (!isSessionForkable(agent)) {
-          return { success: false, error: `${agentType} does not support session forking` };
-        }
 
         const result = await agent.forkSession(options);
         if (result.success === false) {
@@ -1111,9 +1096,6 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return { success: false, error: `${agentType} does not support chat history retrieval` };
-        }
 
         const result = await agent.listSessionSummaries(filter);
         if (result.success === false) {
@@ -1151,9 +1133,6 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return { success: false, error: `${agentType} does not support chat history retrieval` };
-        }
 
         const result = await agent.getFilteredSession(sessionId, filter);
         if (result.success === false) {
@@ -1192,9 +1171,6 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return { success: false, error: `${agentType} does not support chat history retrieval` };
-        }
 
         const result = await agent.listSessionSummaries({ projectPath: workspacePath });
         if (result.success === false) {
@@ -1237,9 +1213,6 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isSessionValidator(agent)) {
-          return { success: false, error: `${agentType} does not support session validation` };
-        }
 
         const isActive = await agent.checkSessionActive(sessionId, workspacePath);
         return { success: true, data: isActive };

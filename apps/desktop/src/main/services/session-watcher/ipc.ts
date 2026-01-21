@@ -1,6 +1,6 @@
 import type { CodingAgentType, SessionFileChangeEvent } from '@agent-orchestrator/shared';
 import { type BrowserWindow, ipcMain } from 'electron';
-import { CodingAgentFactory, isChatHistoryProvider } from '../coding-agent';
+import { CodingAgentFactory } from '../coding-agent';
 import { SessionFileWatcher } from './SessionFileWatcher';
 
 /**
@@ -63,9 +63,6 @@ export function registerSessionWatcherIpcHandlers(win: BrowserWindow): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return errorResponse(`${agentType} does not support chat history`);
-        }
 
         const dataPaths = agent.getDataPaths();
         sessionFileWatcher.watchAgent(agentType, dataPaths);
