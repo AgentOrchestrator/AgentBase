@@ -14,6 +14,36 @@ import { applyHighlightStylesToNodes } from '../../sidebar/hooks/useFolderHighli
  */
 
 // =============================================================================
+// Pure Functions (testable logic, no React state)
+// =============================================================================
+
+/**
+ * Removes highlight styles (border, boxShadow, borderRadius) from all agent nodes.
+ * Returns the same array reference if no changes are needed to prevent unnecessary re-renders.
+ */
+export function removeHighlightStylesFromNodes(nodes: Node[]): Node[] {
+  if (nodes.length === 0) return nodes;
+
+  const needsUpdate = nodes.some((node) => {
+    if (node.type !== 'agent') return false;
+    const style = node.style as Record<string, unknown> | undefined;
+    return !!(style?.border || style?.boxShadow || style?.borderRadius);
+  });
+
+  if (!needsUpdate) return nodes;
+
+  return nodes.map((node) => {
+    if (node.type !== 'agent') return node;
+    const currentStyle = node.style || {};
+    const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
+      string,
+      unknown
+    >;
+    return { ...node, style: restStyle };
+  });
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -130,17 +160,7 @@ export function useNodeOperations({
   );
 
   const unhighlightAllAgentNodes = useCallback(() => {
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        if (node.type !== 'agent') return node;
-        const currentStyle = node.style || {};
-        const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
-          string,
-          unknown
-        >;
-        return { ...node, style: restStyle };
-      })
-    );
+    setNodes(removeHighlightStylesFromNodes);
   }, [setNodes]);
 
   const applyFolderHighlights = useCallback(
