@@ -50,6 +50,11 @@ import { ActionPill, useActionPillHighlight } from './features/action-pill';
 import { NodeActionsProvider } from './features/canvas/context';
 import { useNodeOperations } from './features/canvas/hooks/useNodeOperations';
 import {
+  hasPositionChanges,
+  hasRemoveChanges,
+  type NodeChangeForDetection,
+} from './features/canvas/utils/nodeChangeUtils';
+import {
   useAgentHierarchy,
   useAutoFork,
   useCanvasActions,
@@ -999,32 +1004,35 @@ function CanvasFlow() {
 
   const handleNodesChange = useCallback(
     (changes: unknown[]) => {
+      const typedChanges = changes as NodeChangeForDetection[];
+      const needsPersistenceForRemoval = hasRemoveChanges(typedChanges);
+
       if (!keyboardModifiers.isNodeDragEnabled || isSnappingRef.current) {
         onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
+        // Persist if nodes were removed via keyboard delete
+        if (needsPersistenceForRemoval) {
+          const updatedNodes = getNodes();
+          useCanvasPersistenceStore.getState().persistNodes(updatedNodes);
+        }
         return;
       }
 
       const allNodes = getNodes();
-      const modifiedChanges = changes.map((change) => {
-        const posChange = change as {
-          type?: string;
-          position?: { x: number; y: number };
-          id?: string;
-        };
-        if (posChange.type === 'position' && posChange.position) {
-          const node = allNodes.find((n) => n.id === posChange.id);
+      const modifiedChanges = typedChanges.map((change) => {
+        if (change.type === 'position' && change.position) {
+          const node = allNodes.find((n) => n.id === change.id);
           if (node) {
-            const tempNode = { ...node, position: posChange.position };
+            const tempNode = { ...node, position: change.position };
             const snappedPosition = applySnapping(tempNode, allNodes);
             if (snappedPosition) {
-              return { ...posChange, position: snappedPosition };
+              return { ...change, position: snappedPosition };
             }
           }
         }
         return change;
       });
 
-      const hasSnapping = modifiedChanges.some((change, index) => change !== changes[index]);
+      const hasSnapping = modifiedChanges.some((change, index) => change !== typedChanges[index]);
 
       if (hasSnapping) {
         isSnappingRef.current = true;
@@ -1036,17 +1044,9 @@ function CanvasFlow() {
         onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
       }
 
-      const hasPositionChanges = changes.some((change) => {
-        const posChange = change as { type?: string };
-        return posChange.type === 'position';
-      });
-
-      if (hasPositionChanges) {
+      if (hasPositionChanges(typedChanges)) {
         const updatedNodes = allNodes.map((node) => {
-          const change = modifiedChanges.find((c) => {
-            const posChange = c as { id?: string; position?: { x: number; y: number } };
-            return posChange.id === node.id && posChange.position;
-          }) as { id?: string; position?: { x: number; y: number } } | undefined;
+          const change = modifiedChanges.find((c) => c.id === node.id && c.position);
 
           if (change?.position) {
             return { ...node, position: change.position };
@@ -1055,6 +1055,12 @@ function CanvasFlow() {
         });
 
         setEdges((currentEdges) => updateEdgesWithOptimalHandles(currentEdges, updatedNodes));
+      }
+
+      // Persist if nodes were removed via keyboard delete
+      if (needsPersistenceForRemoval) {
+        const updatedNodes = getNodes();
+        useCanvasPersistenceStore.getState().persistNodes(updatedNodes);
       }
     },
     [onNodesChange, keyboardModifiers.isNodeDragEnabled, getNodes, applySnapping, setEdges]
