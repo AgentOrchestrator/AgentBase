@@ -1,14 +1,15 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   type CursorConversation,
   CursorLoader,
   convertToStandardFormat,
+  type DatabaseOpener,
   detectStorageFormat,
   extractProjectsFromHistories,
+  type IDatabase,
   parseComposerData,
   parseCopilotData,
   readCursorHistories,
@@ -17,84 +18,53 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, 'fixtures', 'cursor');
 
-// Helper to create test SQLite database
-function createTestDatabase(dbPath: string, format: 'cursorDiskKV' | 'ItemTable'): void {
-  const db = new Database(dbPath);
+/**
+ * Create a mock database for testing
+ * This avoids requiring the better-sqlite3 native module in CI
+ */
+function createMockDatabase(
+  tables: string[],
+  data: Array<{ key: string; value: string }> = []
+): IDatabase {
+  return {
+    prepare: (sql: string) => ({
+      get: () => {
+        // Handle table existence checks - find matching table or return nothing
+        const matchedTable = tables.find((table) => sql.includes(`name='${table}'`));
+        return matchedTable ? { name: matchedTable } : null;
+      },
+      all: () => {
+        // Handle data queries
+        if (sql.includes('SELECT key, value FROM')) {
+          return data;
+        }
+        return [];
+      },
+    }),
+    close: () => {},
+  };
+}
 
-  if (format === 'cursorDiskKV') {
-    db.exec(`CREATE TABLE IF NOT EXISTS cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)`);
-
-    // Insert test composer data
-    const composerData = {
-      _v: 1,
-      composerId: 'composer-123',
-      conversation: [
-        {
-          bubbleId: 'bubble-1',
-          type: 1, // user
-          text: 'Help me with this code',
-          createdAt: '2025-01-15T10:00:00.000Z',
-        },
-        {
-          bubbleId: 'bubble-2',
-          type: 2, // assistant
-          text: 'I can help you with that code.',
-          createdAt: '2025-01-15T10:01:00.000Z',
-          modelInfo: { modelName: 'gpt-4' },
-        },
-      ],
-      createdAt: '2025-01-15T09:00:00.000Z',
-      lastUpdatedAt: '2025-01-15T10:01:00.000Z',
-      workspace: '/Users/dev/cursor-project',
-      name: 'Code help session',
-    };
-
-    db.prepare('INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)').run(
-      'composerData:composer-123',
-      JSON.stringify(composerData)
-    );
-
-    // Insert composer IDs list
-    db.prepare('INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)').run(
-      'composer.composerIds',
-      JSON.stringify(['composer-123'])
-    );
-  } else {
-    db.exec(`CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value TEXT)`);
-
-    // Insert test composer data (ItemTable format)
-    const composerData = {
-      _v: 1,
-      composerId: 'composer-456',
-      conversation: [
-        {
-          bubbleId: 'bubble-1',
-          type: 1,
-          text: 'What is this function doing?',
-          createdAt: '2025-01-15T10:00:00.000Z',
-        },
-        {
-          bubbleId: 'bubble-2',
-          type: 2,
-          text: 'This function processes input data.',
-          createdAt: '2025-01-15T10:01:00.000Z',
-        },
-      ],
-      workspace: '/Users/dev/item-project',
-    };
-
-    db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)').run(
-      'composerData:composer-456',
-      JSON.stringify(composerData)
-    );
-  }
-
-  db.close();
+/**
+ * Create a mock database opener for testing
+ */
+function createMockDatabaseOpener(
+  tables: string[],
+  data: Array<{ key: string; value: string }> = []
+): DatabaseOpener {
+  return () => createMockDatabase(tables, data);
 }
 
 describe('cursor-reader', () => {
   describe('detectStorageFormat', () => {
     const testDbPath = path.join(fixturesDir, 'test-format.vscdb');
+
+    beforeAll(() => {
+      // Create fixtures directory for file existence checks
+      fs.mkdirSync(fixturesDir, { recursive: true });
+      // Create an empty file to pass fs.existsSync checks
+      fs.writeFileSync(testDbPath, '');
+    });
 
     afterAll(() => {
       if (fs.existsSync(testDbPath)) {
@@ -103,17 +73,14 @@ describe('cursor-reader', () => {
     });
 
     it('should detect cursorDiskKV format', () => {
-      createTestDatabase(testDbPath, 'cursorDiskKV');
-      const result = detectStorageFormat(testDbPath);
+      const mockOpener = createMockDatabaseOpener(['cursorDiskKV']);
+      const result = detectStorageFormat(testDbPath, mockOpener);
       expect(result).toBe('cursorDiskKV');
     });
 
     it('should detect ItemTable format', () => {
-      if (fs.existsSync(testDbPath)) {
-        fs.unlinkSync(testDbPath);
-      }
-      createTestDatabase(testDbPath, 'ItemTable');
-      const result = detectStorageFormat(testDbPath);
+      const mockOpener = createMockDatabaseOpener(['ItemTable']);
+      const result = detectStorageFormat(testDbPath, mockOpener);
       expect(result).toBe('ItemTable');
     });
 
@@ -269,9 +236,37 @@ describe('cursor-reader', () => {
   describe('readCursorHistories', () => {
     const testDbPath = path.join(fixturesDir, 'test-state.vscdb');
 
+    // Test data for mock database
+    const composerData = {
+      _v: 1,
+      composerId: 'composer-123',
+      conversation: [
+        {
+          bubbleId: 'bubble-1',
+          type: 1,
+          text: 'Help me with this code',
+          createdAt: '2025-01-15T10:00:00.000Z',
+        },
+        {
+          bubbleId: 'bubble-2',
+          type: 2,
+          text: 'I can help you with that code.',
+          createdAt: '2025-01-15T10:01:00.000Z',
+          modelInfo: { modelName: 'gpt-4' },
+        },
+      ],
+      createdAt: '2025-01-15T09:00:00.000Z',
+      lastUpdatedAt: '2025-01-15T10:01:00.000Z',
+      workspace: '/Users/dev/cursor-project',
+      name: 'Code help session',
+    };
+
+    const mockData = [{ key: 'composerData:composer-123', value: JSON.stringify(composerData) }];
+
     beforeAll(() => {
       fs.mkdirSync(fixturesDir, { recursive: true });
-      createTestDatabase(testDbPath, 'cursorDiskKV');
+      // Create an empty file to pass fs.existsSync checks
+      fs.writeFileSync(testDbPath, '');
     });
 
     afterAll(() => {
@@ -281,7 +276,8 @@ describe('cursor-reader', () => {
     });
 
     it('should read histories from Cursor database', async () => {
-      const result = await readCursorHistories(testDbPath);
+      const mockOpener = createMockDatabaseOpener(['cursorDiskKV'], mockData);
+      const result = await readCursorHistories(testDbPath, { databaseOpener: mockOpener });
 
       expect(result.length).toBeGreaterThanOrEqual(1);
       expect(result[0]?.conversationType).toBe('composer');
@@ -293,13 +289,21 @@ describe('cursor-reader', () => {
     });
 
     it('should respect lookbackDays filter', async () => {
-      const result = await readCursorHistories(testDbPath, { lookbackDays: 1 });
+      const mockOpener = createMockDatabaseOpener(['cursorDiskKV'], mockData);
+      const result = await readCursorHistories(testDbPath, {
+        lookbackDays: 1,
+        databaseOpener: mockOpener,
+      });
       expect(Array.isArray(result)).toBe(true);
     });
 
     it('should respect sinceTimestamp filter', async () => {
+      const mockOpener = createMockDatabaseOpener(['cursorDiskKV'], mockData);
       const futureTimestamp = Date.now() + 1000 * 60 * 60 * 24;
-      const result = await readCursorHistories(testDbPath, { sinceTimestamp: futureTimestamp });
+      const result = await readCursorHistories(testDbPath, {
+        sinceTimestamp: futureTimestamp,
+        databaseOpener: mockOpener,
+      });
       expect(result).toHaveLength(0);
     });
   });

@@ -79,6 +79,27 @@ interface CopilotData {
 }
 
 /**
+ * Minimal database interface for dependency injection
+ * Allows mocking in tests without requiring native better-sqlite3 module
+ */
+export interface IDatabase {
+  prepare(sql: string): { get(): unknown; all(): unknown[] };
+  close(): void;
+}
+
+/**
+ * Factory function type for creating database instances
+ * Enables dependency injection for testability
+ */
+export type DatabaseOpener = (path: string, options?: { readonly?: boolean }) => IDatabase;
+
+/**
+ * Default database opener using better-sqlite3
+ */
+const defaultDatabaseOpener: DatabaseOpener = (dbPath, options) =>
+  new Database(dbPath, options) as unknown as IDatabase;
+
+/**
  * Get the path to Cursor's state database
  */
 function getCursorStatePath(): string {
@@ -88,14 +109,19 @@ function getCursorStatePath(): string {
 
 /**
  * Detect the storage format used by Cursor
+ * @param dbPath - Path to the database file
+ * @param databaseOpener - Optional factory for creating database instances (for testing)
  */
-export function detectStorageFormat(dbPath: string): 'cursorDiskKV' | 'ItemTable' | null {
+export function detectStorageFormat(
+  dbPath: string,
+  databaseOpener: DatabaseOpener = defaultDatabaseOpener
+): 'cursorDiskKV' | 'ItemTable' | null {
   if (!fs.existsSync(dbPath)) {
     return null;
   }
 
   try {
-    const db = new Database(dbPath, { readonly: true });
+    const db = databaseOpener(dbPath, { readonly: true });
 
     try {
       // Check for cursorDiskKV table
@@ -238,7 +264,7 @@ export function parseCopilotData(data: CopilotData): CursorConversation | null {
  * Read composer conversations from Cursor database
  */
 function readComposerConversations(
-  db: Database.Database,
+  db: IDatabase,
   format: 'cursorDiskKV' | 'ItemTable',
   cutoffDate: Date | null
 ): CursorConversation[] {
@@ -279,16 +305,17 @@ function readComposerConversations(
 /**
  * Read all Cursor chat histories from the database
  * @param dbPath - Path to the database file (defaults to system default)
- * @param options - Optional filtering options
+ * @param options - Optional filtering options including databaseOpener for testing
  */
 export async function readCursorHistories(
   dbPath?: string,
-  options?: LoaderOptions
+  options?: LoaderOptions & { databaseOpener?: DatabaseOpener }
 ): Promise<CursorConversation[]> {
   const conversations: CursorConversation[] = [];
-  const path = dbPath || getCursorStatePath();
+  const resolvedPath = dbPath || getCursorStatePath();
+  const databaseOpener = options?.databaseOpener ?? defaultDatabaseOpener;
 
-  const format = detectStorageFormat(path);
+  const format = detectStorageFormat(resolvedPath, databaseOpener);
   if (!format) {
     return conversations;
   }
@@ -302,7 +329,7 @@ export async function readCursorHistories(
   }
 
   try {
-    const db = new Database(path, { readonly: true });
+    const db = databaseOpener(resolvedPath, { readonly: true });
 
     try {
       const composerConversations = readComposerConversations(db, format, cutoffDate);
@@ -408,13 +435,18 @@ export class CursorLoader implements IDatabaseLoader {
   readonly agentType = 'cursor' as const;
   readonly name = 'Cursor';
   readonly databasePath: string;
+  private readonly databaseOpener: DatabaseOpener;
 
-  constructor() {
+  constructor(databaseOpener: DatabaseOpener = defaultDatabaseOpener) {
     this.databasePath = getCursorStatePath();
+    this.databaseOpener = databaseOpener;
   }
 
   async readHistories(options?: LoaderOptions): Promise<ChatHistory[]> {
-    const conversations = await readCursorHistories(undefined, options);
+    const conversations = await readCursorHistories(undefined, {
+      ...options,
+      databaseOpener: this.databaseOpener,
+    });
     return convertToStandardFormat(conversations);
   }
 
@@ -446,7 +478,7 @@ export class CursorLoader implements IDatabaseLoader {
       return false;
     }
     try {
-      const db = new Database(this.databasePath, { readonly: true });
+      const db = this.databaseOpener(this.databasePath, { readonly: true });
       db.close();
       return true;
     } catch {
