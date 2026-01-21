@@ -1,29 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IChatHistoryLoader } from '../loaders/interfaces.js';
 import type {
   ChatHistory,
   ChatMessage,
-  IChatHistoryLoader,
   LoaderOptions,
   ProjectInfo,
   SessionMetadata,
-} from '@agent-orchestrator/shared';
-import { IDE_DATA_PATHS } from '@agent-orchestrator/shared';
-
-// Re-export types for backward compatibility
-export type {
-  ChatHistory,
-  ChatMessage,
-  ProjectInfo,
-  SessionMetadata,
-} from '@agent-orchestrator/shared';
-
-/**
- * Get the path to Codex's sessions directory
- */
-export function getCodexSessionsPath(): string {
-  return IDE_DATA_PATHS.codex();
-}
+} from '../loaders/types.js';
+import { IDE_DATA_PATHS } from '../loaders/utilities.js';
 
 interface JsonlLine {
   timestamp?: string;
@@ -52,7 +37,7 @@ interface JsonlLine {
 /**
  * Extract the actual user request from Codex message content
  */
-function extractUserRequest(text: string): string | null {
+export function extractUserRequest(text: string): string | null {
   if (text.includes('<environment_context>')) {
     return null;
   }
@@ -73,9 +58,30 @@ function extractUserRequest(text: string): string | null {
 }
 
 /**
+ * Calculate date folders to scan based on lookback period
+ */
+export function calculateDateFoldersToScan(lookbackDays: number): string[] {
+  const folders: string[] = [];
+  const today = new Date();
+
+  for (let i = 0; i < lookbackDays; i++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    folders.push(`${year}/${month}/${day}`);
+  }
+
+  return folders;
+}
+
+/**
  * Parse a single .jsonl session file
  */
-function parseSessionFile(filePath: string): ChatHistory | null {
+export function parseSessionFile(filePath: string): ChatHistory | null {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content
@@ -152,18 +158,13 @@ function parseSessionFile(filePath: string): ChatHistory | null {
             }
           }
         }
-      } catch {}
+      } catch {
+        // Skip malformed lines
+      }
     }
 
     if (messages.length === 0) {
       return null;
-    }
-
-    const hasAssistant = messages.some((m) => m.role === 'assistant');
-    if (!hasAssistant) {
-      console.log(
-        `[Codex Reader] User-only session detected: ${path.basename(filePath)} (${messages.length} user messages, no assistant responses)`
-      );
     }
 
     const finalSessionId = sessionId || path.basename(filePath, '.jsonl');
@@ -196,66 +197,35 @@ function parseSessionFile(filePath: string): ChatHistory | null {
       agent_type: 'codex',
       metadata,
     };
-  } catch (error) {
-    console.error(`[Codex Reader] Error parsing session file ${filePath}:`, error);
+  } catch {
     return null;
   }
 }
 
 /**
- * Calculate date folders to scan based on lookback period
+ * Read all Codex chat histories from a sessions directory
+ * @param sessionsDir - Path to the sessions directory (defaults to ~/.codex/sessions)
+ * @param options - Optional filtering options
  */
-function calculateDateFoldersToScan(lookbackDays: number): string[] {
-  const folders: string[] = [];
-  const today = new Date();
-
-  for (let i = 0; i < lookbackDays; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    folders.push(`${year}/${month}/${day}`);
-  }
-
-  return folders;
-}
-
-/**
- * Read all Codex chat histories from ~/.codex/sessions
- */
-export function readCodexHistories(lookbackDays?: number, sinceTimestamp?: number): ChatHistory[] {
+export function readCodexHistories(sessionsDir?: string, options?: LoaderOptions): ChatHistory[] {
   const histories: ChatHistory[] = [];
+  const dir = sessionsDir || IDE_DATA_PATHS.codex();
 
   try {
-    const sessionsDir = getCodexSessionsPath();
-
-    if (!fs.existsSync(sessionsDir)) {
-      console.log('[Codex Reader] No ~/.codex/sessions directory found');
+    if (!fs.existsSync(dir)) {
       return histories;
     }
 
-    const effectiveLookbackDays = lookbackDays || 7;
+    const effectiveLookbackDays = options?.lookbackDays || 7;
     const dateFolders = calculateDateFoldersToScan(effectiveLookbackDays);
 
-    console.log(
-      `[Codex Reader] Scanning ${dateFolders.length} date folders (${effectiveLookbackDays} day lookback)`
-    );
-
     let cutoffDate: Date | null = null;
-    if (sinceTimestamp && sinceTimestamp > 0) {
-      cutoffDate = new Date(sinceTimestamp);
-      console.log(
-        `[Codex Reader] Filtering files modified after ${cutoffDate.toISOString()} (incremental sync)`
-      );
+    if (options?.sinceTimestamp && options.sinceTimestamp > 0) {
+      cutoffDate = new Date(options.sinceTimestamp);
     }
 
-    let totalFilesScanned = 0;
-
     for (const dateFolder of dateFolders) {
-      const dateFolderPath = path.join(sessionsDir, dateFolder);
+      const dateFolderPath = path.join(dir, dateFolder);
 
       if (!fs.existsSync(dateFolderPath)) {
         continue;
@@ -263,7 +233,6 @@ export function readCodexHistories(lookbackDays?: number, sinceTimestamp?: numbe
 
       try {
         const sessionFiles = fs.readdirSync(dateFolderPath).filter((f) => f.endsWith('.jsonl'));
-        totalFilesScanned += sessionFiles.length;
 
         for (const sessionFile of sessionFiles) {
           const sessionFilePath = path.join(dateFolderPath, sessionFile);
@@ -281,16 +250,12 @@ export function readCodexHistories(lookbackDays?: number, sinceTimestamp?: numbe
             histories.push(history);
           }
         }
-      } catch (error) {
-        console.warn(`[Codex Reader] Could not read folder ${dateFolder}:`, error);
+      } catch {
+        // Continue to next folder on error
       }
     }
-
-    console.log(
-      `[Codex Reader] ✓ Scanned ${totalFilesScanned} files, parsed ${histories.length} Codex sessions with messages`
-    );
-  } catch (error) {
-    console.error('[Codex Reader] Error reading Codex histories:', error);
+  } catch {
+    // Return empty array on error
   }
 
   return histories;
@@ -299,7 +264,7 @@ export function readCodexHistories(lookbackDays?: number, sinceTimestamp?: numbe
 /**
  * Extract project information from Codex chat histories
  */
-export function extractProjectsFromCodexHistories(histories: ChatHistory[]): ProjectInfo[] {
+export function extractProjectsFromHistories(histories: ChatHistory[]): ProjectInfo[] {
   const projectsMap = new Map<
     string,
     {
@@ -354,11 +319,11 @@ export class CodexLoader implements IChatHistoryLoader {
   readonly name = 'Codex';
 
   readHistories(options?: LoaderOptions): ChatHistory[] {
-    return readCodexHistories(options?.lookbackDays, options?.sinceTimestamp);
+    return readCodexHistories(undefined, options);
   }
 
   extractProjects(histories: ChatHistory[]): ProjectInfo[] {
-    return extractProjectsFromCodexHistories(histories);
+    return extractProjectsFromHistories(histories);
   }
 
   isAvailable(): boolean {
@@ -367,4 +332,5 @@ export class CodexLoader implements IChatHistoryLoader {
   }
 }
 
+// Default instance for convenience
 export const codexLoader = new CodexLoader();

@@ -12,10 +12,9 @@ Monorepo using **npm workspaces** and **Turborepo**.
 
 ```
 apps/
-  daemon/           # Background sync service (Node.js + SQLite)
   desktop/          # Electron app (Vite + React + xterm.js)
 packages/
-  shared/           # Shared TypeScript types
+  shared/           # Shared TypeScript types and readers
 supabase/
   migrations/       # Database migrations
 ```
@@ -45,8 +44,7 @@ cp /path/to/main-worktree/.env .env
 
 ```bash
 npm install                 # Install all dependencies
-npm run dev                 # Run all apps
-npm run dev:daemon          # Run daemon only
+npm run dev                 # Run the desktop app
 npm run dev:desktop         # Run desktop only
 npm run build               # Build all apps
 ```
@@ -56,11 +54,11 @@ npm run build               # Build all apps
 ```
 IDE files (~/.claude/, Cursor storage, etc.)
     ↓
-Daemon (reads, normalizes to ChatHistory, syncs every 10 min)
+Readers (packages/shared/src/readers/) - read and normalize to ChatHistory
+    ↓
+Desktop App (Electron main process)
     ↓
 Storage (SQLite local OR Supabase remote)
-    ↓
-Desktop App
 ```
 
 

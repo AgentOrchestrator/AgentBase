@@ -1,29 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IChatHistoryLoader } from '../loaders/interfaces.js';
 import type {
   ChatHistory,
   ChatMessage,
-  IChatHistoryLoader,
   LoaderOptions,
   ProjectInfo,
   SessionMetadata,
-} from '@agent-orchestrator/shared';
-import { IDE_DATA_PATHS } from '@agent-orchestrator/shared';
-
-// Re-export types for backward compatibility
-export type {
-  ChatHistory,
-  ChatMessage,
-  ProjectInfo,
-  SessionMetadata,
-} from '@agent-orchestrator/shared';
-
-/**
- * Get the path to Factory's sessions directory
- */
-export function getFactorySessionsPath(): string {
-  return IDE_DATA_PATHS.factory();
-}
+} from '../loaders/types.js';
+import { IDE_DATA_PATHS } from '../loaders/utilities.js';
 
 interface JsonlLine {
   type?: string;
@@ -39,7 +24,7 @@ interface JsonlLine {
 /**
  * Extract project path from system-reminder message content
  */
-function extractProjectPathFromSystemReminder(content: string): string | null {
+export function extractProjectPathFromSystemReminder(content: string): string | null {
   const pwdMatch = content.match(/% pwd\n([^\n]+)/);
   if (pwdMatch?.[1]) {
     return pwdMatch[1].trim();
@@ -50,7 +35,7 @@ function extractProjectPathFromSystemReminder(content: string): string | null {
 /**
  * Parse a single .jsonl session file
  */
-function parseSessionFile(filePath: string): ChatHistory | null {
+export function parseSessionFile(filePath: string): ChatHistory | null {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content
@@ -115,7 +100,9 @@ function parseSessionFile(filePath: string): ChatHistory | null {
             }
           }
         }
-      } catch {}
+      } catch {
+        // Skip malformed lines
+      }
     }
 
     if (messages.length === 0) {
@@ -147,47 +134,37 @@ function parseSessionFile(filePath: string): ChatHistory | null {
       agent_type: 'factory',
       metadata,
     };
-  } catch (error) {
-    console.error(`[Factory Reader] Error parsing session file ${filePath}:`, error);
+  } catch {
     return null;
   }
 }
 
 /**
- * Read all Factory chat histories from ~/.factory/sessions
+ * Read all Factory chat histories from a sessions directory
+ * @param sessionsDir - Path to the sessions directory (defaults to ~/.factory/sessions)
+ * @param options - Optional filtering options
  */
-export function readFactoryHistories(
-  lookbackDays?: number,
-  sinceTimestamp?: number
-): ChatHistory[] {
+export function readFactoryHistories(sessionsDir?: string, options?: LoaderOptions): ChatHistory[] {
   const histories: ChatHistory[] = [];
+  const dir = sessionsDir || IDE_DATA_PATHS.factory();
 
   try {
-    const sessionsDir = getFactorySessionsPath();
-
-    if (!fs.existsSync(sessionsDir)) {
-      console.log('[Factory Reader] No ~/.factory/sessions directory found');
+    if (!fs.existsSync(dir)) {
       return histories;
     }
 
     let cutoffDate: Date | null = null;
-    if (sinceTimestamp && sinceTimestamp > 0) {
-      cutoffDate = new Date(sinceTimestamp);
-      console.log(
-        `[Factory Reader] Filtering files modified after ${cutoffDate.toISOString()} (incremental sync)`
-      );
-    } else if (lookbackDays && lookbackDays > 0) {
+    if (options?.sinceTimestamp && options.sinceTimestamp > 0) {
+      cutoffDate = new Date(options.sinceTimestamp);
+    } else if (options?.lookbackDays && options.lookbackDays > 0) {
       cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
-      console.log(`[Factory Reader] Filtering files modified after ${cutoffDate.toISOString()}`);
+      cutoffDate.setDate(cutoffDate.getDate() - options.lookbackDays);
     }
 
-    const sessionFiles = fs.readdirSync(sessionsDir).filter((f) => f.endsWith('.jsonl'));
-
-    console.log(`[Factory Reader] Found ${sessionFiles.length} session files`);
+    const sessionFiles = fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
 
     for (const sessionFile of sessionFiles) {
-      const sessionFilePath = path.join(sessionsDir, sessionFile);
+      const sessionFilePath = path.join(dir, sessionFile);
 
       if (cutoffDate) {
         const stats = fs.statSync(sessionFilePath);
@@ -202,10 +179,8 @@ export function readFactoryHistories(
         histories.push(history);
       }
     }
-
-    console.log(`[Factory Reader] ✓ Parsed ${histories.length} Factory sessions with messages`);
-  } catch (error) {
-    console.error('[Factory Reader] Error reading Factory histories:', error);
+  } catch {
+    // Return empty array on error
   }
 
   return histories;
@@ -214,7 +189,7 @@ export function readFactoryHistories(
 /**
  * Extract project information from Factory chat histories
  */
-export function extractProjectsFromFactoryHistories(histories: ChatHistory[]): ProjectInfo[] {
+export function extractProjectsFromHistories(histories: ChatHistory[]): ProjectInfo[] {
   const projectsMap = new Map<
     string,
     {
@@ -269,11 +244,11 @@ export class FactoryLoader implements IChatHistoryLoader {
   readonly name = 'Factory';
 
   readHistories(options?: LoaderOptions): ChatHistory[] {
-    return readFactoryHistories(options?.lookbackDays, options?.sinceTimestamp);
+    return readFactoryHistories(undefined, options);
   }
 
   extractProjects(histories: ChatHistory[]): ProjectInfo[] {
-    return extractProjectsFromFactoryHistories(histories);
+    return extractProjectsFromHistories(histories);
   }
 
   isAvailable(): boolean {
@@ -282,4 +257,5 @@ export class FactoryLoader implements IChatHistoryLoader {
   }
 }
 
+// Default instance for convenience
 export const factoryLoader = new FactoryLoader();

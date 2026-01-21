@@ -89,7 +89,8 @@ describe('claude-code-reader', () => {
 
     beforeAll(() => {
       // Create test project structure
-      const projectDir = path.join(testProjectsDir, '-Users-dev-test-app');
+      // Folder name format: leading '-' replaced with '/', all '-' replaced with '/'
+      const projectDir = path.join(testProjectsDir, '-Users-dev-myapp');
       fs.mkdirSync(projectDir, { recursive: true });
 
       // Copy a fixture session to simulate real structure
@@ -108,7 +109,7 @@ describe('claude-code-reader', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]?.agent_type).toBe('claude_code');
-      expect(result[0]?.metadata?.projectPath).toBe('/Users/dev/test-app');
+      expect(result[0]?.metadata?.projectPath).toBe('/Users/dev/myapp');
     });
 
     it('should return empty array for non-existent directory', () => {
@@ -119,7 +120,7 @@ describe('claude-code-reader', () => {
     it('should convert project directory name to path (replace - with /)', () => {
       const result = readClaudeCodeHistories(testProjectsDir);
 
-      expect(result[0]?.metadata?.projectPath).toBe('/Users/dev/test-app');
+      expect(result[0]?.metadata?.projectPath).toBe('/Users/dev/myapp');
     });
 
     it('should respect lookbackDays filter', () => {

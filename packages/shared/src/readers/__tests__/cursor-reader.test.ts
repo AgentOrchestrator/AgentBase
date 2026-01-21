@@ -242,8 +242,8 @@ describe('cursor-reader', () => {
       const data = {
         sessionId: 'copilot-123',
         messages: [
-          { role: 'user', content: 'Help me', timestamp: '2025-01-15T10:00:00.000Z' },
-          { role: 'assistant', content: 'Sure!', timestamp: '2025-01-15T10:01:00.000Z' },
+          { role: 'user' as const, content: 'Help me', timestamp: '2025-01-15T10:00:00.000Z' },
+          { role: 'assistant' as const, content: 'Sure!', timestamp: '2025-01-15T10:01:00.000Z' },
         ],
       };
 

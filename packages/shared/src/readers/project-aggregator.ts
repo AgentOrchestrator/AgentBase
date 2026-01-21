@@ -1,4 +1,4 @@
-import type { ProjectInfo } from '@agent-orchestrator/shared';
+import type { ProjectInfo } from '../loaders/types.js';
 
 /**
  * Unified project information combining data from all sources

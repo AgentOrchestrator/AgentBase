@@ -80,3 +80,9 @@ export {
 // =============================================================================
 
 export { createLoaderRegistry, LoaderRegistry } from './registry.js';
+
+// =============================================================================
+// Readers (implementations of IChatHistoryLoader)
+// =============================================================================
+
+export * from '../readers/index.js';
