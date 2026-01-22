@@ -22,7 +22,7 @@ import type {
   SessionInfo,
   StreamCallback,
   StructuredStreamCallback,
-} from './coding-agent-adapter';
+} from '../../services/coding-agent';
 
 // Re-export for consumers
 export type { GitInfo };
