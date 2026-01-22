@@ -46,10 +46,12 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
         return state;
       }
       const newActions = [...state.actions, action];
+      const newHighlightId = computeHighlightedAgentId(state.isExpanded, newActions);
+
       return {
         actions: newActions,
         hasNewActions: true,
-        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions),
+        highlightedAgentId: newHighlightId,
       };
     });
   },
@@ -100,9 +102,12 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
   // UI actions
   expand: () => {
     const state = get();
+
     if (state.actions.length === 0 || state.isExpanded) {
       return;
     }
+
+    const computedHighlightId = computeHighlightedAgentId(true, state.actions);
 
     // Start expansion animation sequence
     set({
@@ -114,7 +119,7 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
         isContentVisible: false,
         isTextVisible: false,
       },
-      highlightedAgentId: computeHighlightedAgentId(true, state.actions),
+      highlightedAgentId: computedHighlightId,
     });
 
     // Show content container after shape transition

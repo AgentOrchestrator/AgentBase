@@ -402,6 +402,12 @@ export class AgentServiceImpl implements IAgentService {
     this.isStarting = false; // Clear starting flag now that we're running
     this.updateStatus('running');
 
+    // Set current agent ID in main process for CLI REPL mode
+    // This allows permission events to be associated with the correct agent node
+    if (window.codingAgentAPI?.setCurrentAgentId) {
+      await window.codingAgentAPI.setCurrentAgentId(this.agentType, this.agentId);
+    }
+
     // Persist session state to main process (survives renderer refresh)
     await this.persistSessionStateToMainProcess(sessionId);
   }
@@ -417,6 +423,11 @@ export class AgentServiceImpl implements IAgentService {
     // Cancel all adapter operations
     if (this.adapter) {
       await this.adapter.cancelAll();
+    }
+
+    // Clear current agent ID in main process
+    if (window.codingAgentAPI?.setCurrentAgentId) {
+      await window.codingAgentAPI.setCurrentAgentId(this.agentType, null);
     }
 
     // Update status

@@ -458,6 +458,10 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     unwrapResponse<boolean>(
       ipcRenderer.invoke('coding-agent:session-file-exists', agentType, sessionId, workspacePath)
     ),
+  setCurrentAgentId: (agentType: CodingAgentType, agentId: string | null) =>
+    unwrapResponse<void>(
+      ipcRenderer.invoke('coding-agent:set-current-agent-id', agentType, agentId)
+    ),
 } as CodingAgentAPI);
 
 // Expose LLM API
@@ -752,6 +756,11 @@ contextBridge.exposeInMainWorld('sessionSummaryCacheAPI', {
     await unwrapResponse(ipcRenderer.invoke('session-summary:delete', sessionId, workspacePath));
   },
 } as SessionSummaryCacheAPI);
+
+// Expose debug log API for file-based debug logging from renderer
+contextBridge.exposeInMainWorld('debugLogAPI', {
+  write: (line: string) => ipcRenderer.send('debug-log:write', line),
+});
 
 // Expose recent workspaces API for tracking recently opened workspace paths
 contextBridge.exposeInMainWorld('recentWorkspacesAPI', {

@@ -240,6 +240,17 @@ export interface CodingAgent extends EventEmitter {
    * Get the event registry for custom hook handlers.
    */
   getEventRegistry(): EventRegistry;
+
+  // ============================================
+  // Context Management
+  // ============================================
+
+  /**
+   * Set the current agent ID for CLI REPL mode.
+   * This is used to associate permission events with the correct agent node
+   * when using terminal-based interaction instead of SDK generate() calls.
+   */
+  setCurrentAgentId(agentId: string | null): void;
 }
 
 /**

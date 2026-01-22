@@ -450,6 +450,9 @@ export interface CodingAgentAPI {
 
   /** Respond to pending agent actions (permissions/questions) */
   respondToAction: (response: AgentActionResponse) => Promise<void>;
+
+  /** Set the current agent ID for CLI REPL mode */
+  setCurrentAgentId: (agentType: CodingAgentType, agentId: string | null) => Promise<void>;
 }
 
 // Re-export types needed for IPC

@@ -653,6 +653,25 @@ function registerIpcHandlers(): void {
     }
   });
 
+  // Set current agent ID for CLI REPL mode
+  // This associates permission events with the correct agent node
+  ipcMain.handle(
+    'coding-agent:set-current-agent-id',
+    async (_event, agentType: CodingAgentType, agentId: string | null) => {
+      try {
+        const agentResult = await getCodingAgent(agentType);
+        if (agentResult.success === false) {
+          return { success: false, error: agentResult.error.message };
+        }
+        agentResult.data.setCurrentAgentId(agentId);
+        return { success: true };
+      } catch (error) {
+        console.error('[Main] Error setting current agent ID', { agentType, agentId, error });
+        return { success: false, error: (error as Error).message };
+      }
+    }
+  );
+
   // File reading API for debug mode
   ipcMain.handle('file:read', async (_event, filePath: string) => {
     try {

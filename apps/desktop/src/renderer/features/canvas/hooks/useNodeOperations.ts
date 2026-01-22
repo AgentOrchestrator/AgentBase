@@ -134,8 +134,8 @@ export function useNodeOperations({
 
   const highlightAgentNode = useCallback(
     (agentId: string) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
+      setNodes((currentNodes) => {
+        return currentNodes.map((node) => {
           if (node.type !== 'agent') return node;
           const nodeData = node.data as Record<string, unknown>;
           const nodeAgentId = nodeData?.agentId as string | undefined;
@@ -153,8 +153,8 @@ export function useNodeOperations({
             };
           }
           return node;
-        })
-      );
+        });
+      });
     },
     [setNodes]
   );

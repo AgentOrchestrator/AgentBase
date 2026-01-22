@@ -90,8 +90,15 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
+  private currentAgentId: string | null = null;
   private readonly queryContexts = new WeakMap<
     AbortSignal,
+    { agentId?: string; sessionId?: string; workspacePath?: string }
+  >();
+  // Secondary lookup for active sessions - maps sessionId to context
+  // This provides a fallback when signal-based lookup fails
+  private readonly sessionContexts = new Map<
+    string,
     { agentId?: string; sessionId?: string; workspacePath?: string }
   >();
   private readonly canUseTool: CanUseTool = async (
@@ -99,14 +106,23 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     input: Record<string, unknown>,
     options
   ): Promise<PermissionResult> => {
-    const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
+    // Try signal-based lookup first (primary method for SDK generate calls)
+    let context = options.signal ? this.queryContexts.get(options.signal) : undefined;
+
+    // If signal lookup failed, try session-based lookup (fallback for when signal differs)
+    if (!context && this.currentSessionId) {
+      context = this.sessionContexts.get(this.currentSessionId);
+    }
+
     const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
     const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    // Use agentId from context, or fall back to currentAgentId for CLI REPL mode
+    const agentId = context?.agentId ?? this.currentAgentId ?? undefined;
     const event: AgentEvent<PermissionPayload> = {
       id: crypto.randomUUID(),
       type: 'permission:request',
       agent: 'claude_code',
-      agentId: context?.agentId,
+      agentId,
       sessionId,
       workspacePath,
       timestamp: new Date().toISOString(),
@@ -189,7 +205,11 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
       this.currentSessionId = event.payload.sessionId;
       return { action: 'continue' };
     });
-    this.eventRegistry.on<SessionPayload>('session:end', async () => {
+    this.eventRegistry.on<SessionPayload>('session:end', async (event) => {
+      // Clean up session context
+      if (event.payload.sessionId) {
+        this.sessionContexts.delete(event.payload.sessionId);
+      }
       this.currentSessionId = null;
       return { action: 'continue' };
     });
@@ -200,6 +220,15 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
    */
   getEventRegistry(): EventRegistry {
     return this.eventRegistry;
+  }
+
+  /**
+   * Set the current agent ID for CLI REPL mode.
+   * This is used to associate permission events with the correct agent node
+   * when using terminal-based interaction instead of SDK generate() calls.
+   */
+  setCurrentAgentId(agentId: string | null): void {
+    this.currentAgentId = agentId;
   }
 
   get agentType(): CodingAgentType {
@@ -518,11 +547,19 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
       options.extraArgs = { 'session-id': request.sessionId };
     }
 
-    this.queryContexts.set(abortController.signal, {
+    const contextData = {
       agentId: request.agentId,
       sessionId: request.sessionId,
       workspacePath: options.cwd ?? undefined,
-    });
+    };
+
+    // Store context with signal (primary lookup)
+    this.queryContexts.set(abortController.signal, contextData);
+
+    // Also store by sessionId as fallback (when SDK creates different signal)
+    if (request.sessionId) {
+      this.sessionContexts.set(request.sessionId, contextData);
+    }
 
     // Enable streaming partial messages
     if (streaming) {
@@ -601,11 +638,20 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
         break;
     }
 
-    this.queryContexts.set(abortController.signal, {
+    const sessionId = identifier.type === 'id' ? identifier.value : undefined;
+    const contextData = {
       agentId: continueOptions?.agentId,
-      sessionId: identifier.type === 'id' ? identifier.value : undefined,
+      sessionId,
       workspacePath: options.cwd ?? undefined,
-    });
+    };
+
+    // Store context with signal (primary lookup)
+    this.queryContexts.set(abortController.signal, contextData);
+
+    // Also store by sessionId as fallback (when SDK creates different signal)
+    if (sessionId) {
+      this.sessionContexts.set(sessionId, contextData);
+    }
 
     if (streaming) {
       options.includePartialMessages = true;
