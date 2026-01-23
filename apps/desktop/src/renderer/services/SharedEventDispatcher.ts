@@ -7,11 +7,16 @@
  *
  * This solves the problem of multiple ClaudeCodeAdapter instances each setting up
  * their own IPC listeners, causing duplicate event delivery.
+ *
+ * Handles two event channels:
+ * 1. coding-agent:event - SDK-based agent events (ClaudeCodeAgent)
+ * 2. agent-lifecycle - Terminal-based agent lifecycle events (HTTP sideband)
  */
 
 import type {
   AgentAction,
   ClarifyingQuestionAction,
+  LifecycleEvent,
   ToolApprovalAction,
 } from '@agent-orchestrator/shared';
 import type { AgentAdapterEvent } from '../context/node-services/coding-agent-adapter';
@@ -23,6 +28,7 @@ class SharedEventDispatcher {
   private static instance: SharedEventDispatcher | null = null;
   private listeners = new Map<string, Set<EventCallback>>();
   private ipcCleanup: (() => void) | null = null;
+  private lifecycleCleanup: (() => void) | null = null;
   private initialized = false;
   private processedEventIds = new Set<string>();
 
@@ -34,19 +40,30 @@ class SharedEventDispatcher {
   }
 
   /**
-   * Initialize the dispatcher - sets up single IPC listener.
+   * Initialize the dispatcher - sets up IPC listeners for both channels.
    * Safe to call multiple times (idempotent).
    */
   initialize(): void {
-    if (this.initialized || !window.codingAgentAPI?.onAgentEvent) {
+    if (this.initialized) {
       return;
     }
 
-    this.ipcCleanup = window.codingAgentAPI.onAgentEvent((event: unknown) => {
-      this.handleEvent(event as AgentAdapterEvent);
-    });
+    // Subscribe to SDK agent events (ClaudeCodeAgent via SDK hooks)
+    if (window.codingAgentAPI?.onAgentEvent) {
+      this.ipcCleanup = window.codingAgentAPI.onAgentEvent((event: unknown) => {
+        this.handleEvent(event as AgentAdapterEvent);
+      });
+    }
+
+    // Subscribe to terminal agent lifecycle events (HTTP sideband)
+    if (window.codingAgentAPI?.onAgentLifecycle) {
+      this.lifecycleCleanup = window.codingAgentAPI.onAgentLifecycle((event: unknown) => {
+        this.handleLifecycleEvent(event as LifecycleEvent);
+      });
+    }
+
     this.initialized = true;
-    console.log('[SharedEventDispatcher] Initialized with single IPC listener');
+    console.log('[SharedEventDispatcher] Initialized with IPC listeners');
   }
 
   /**
@@ -101,13 +118,83 @@ class SharedEventDispatcher {
     });
   }
 
+  /**
+   * Handle lifecycle events from terminal-based agents (HTTP sideband).
+   * These come from notify.sh scripts called by Claude Code hooks.
+   */
+  private handleLifecycleEvent(event: LifecycleEvent): void {
+    // Deduplicate by creating an ID from event properties
+    const eventId = `lifecycle-${event.terminalId}-${event.type}-${event.timestamp}`;
+    if (this.processedEventIds.has(eventId)) {
+      return;
+    }
+    this.processedEventIds.add(eventId);
+
+    console.log('[SharedEventDispatcher] Received lifecycle event:', event);
+
+    // Forward lifecycle events to subscribers
+    // Map lifecycle types to our event types for compatibility
+    const eventTypeMap: Record<string, string> = {
+      Start: 'session:start',
+      Stop: 'session:end',
+      PermissionRequest: 'permission:request',
+    };
+
+    const mappedType = eventTypeMap[event.type];
+    if (mappedType) {
+      const callbacks = this.listeners.get(mappedType);
+      callbacks?.forEach((cb) => {
+        try {
+          // Convert to AgentAdapterEvent format for compatibility
+          cb({
+            type: mappedType,
+            agentId: event.agentId,
+            sessionId: event.sessionId,
+            payload: {
+              sessionId: event.sessionId,
+              workspacePath: event.workspacePath,
+            },
+          } as unknown as AgentAdapterEvent);
+        } catch (err) {
+          console.error(`[SharedEventDispatcher] Error in ${mappedType} handler:`, err);
+        }
+      });
+    }
+  }
+
   private buildActionFromPermissionEvent(
     event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
   ): AgentAction | null {
     const { payload, agentId, sessionId } = event;
     const eventId = (event as { id?: string }).id;
     const raw = (event as { raw?: Record<string, unknown> }).raw;
+
+    // Extract required fields from raw event data
     const toolUseId = raw?.toolUseId as string | undefined;
+    const workspacePath = (raw?.workspacePath as string) ?? payload.workingDirectory;
+    const gitBranch = raw?.gitBranch as string | undefined;
+
+    // Validate required fields - throw errors instead of using defaults
+    if (!agentId) {
+      console.error('[SharedEventDispatcher] Missing required field: agentId', event);
+      throw new Error('[SharedEventDispatcher] Cannot build action: agentId is required');
+    }
+    if (!sessionId) {
+      console.error('[SharedEventDispatcher] Missing required field: sessionId', event);
+      throw new Error('[SharedEventDispatcher] Cannot build action: sessionId is required');
+    }
+    if (!workspacePath) {
+      console.error('[SharedEventDispatcher] Missing required field: workspacePath', event);
+      throw new Error('[SharedEventDispatcher] Cannot build action: workspacePath is required');
+    }
+    if (!gitBranch) {
+      console.error('[SharedEventDispatcher] Missing required field: gitBranch', event);
+      throw new Error('[SharedEventDispatcher] Cannot build action: gitBranch is required');
+    }
+    if (!toolUseId) {
+      console.error('[SharedEventDispatcher] Missing required field: toolUseId', event);
+      throw new Error('[SharedEventDispatcher] Cannot build action: toolUseId is required');
+    }
 
     // Clarifying question (AskUserQuestion tool)
     if (payload.toolName === 'askuserquestion' || payload.toolName === 'AskUserQuestion') {
@@ -119,12 +206,14 @@ class SharedEventDispatcher {
       }
 
       return {
-        id: eventId ?? `${agentId}-${toolUseId ?? Date.now()}`,
+        id: eventId ?? `${agentId}-${toolUseId}`,
         type: 'clarifying_question',
         agentId,
         sessionId,
-        createdAt: new Date().toISOString(),
+        workspacePath,
+        gitBranch,
         toolUseId,
+        createdAt: new Date().toISOString(),
         questions: questions.map((q: unknown) => {
           const question = q as { question?: string; options?: unknown[] };
           return {
@@ -142,17 +231,19 @@ class SharedEventDispatcher {
 
     // Tool approval
     return {
-      id: eventId ?? `${agentId}-${toolUseId ?? Date.now()}`,
+      id: eventId ?? `${agentId}-${toolUseId}`,
       type: 'tool_approval',
       agentId,
       sessionId,
+      workspacePath,
+      gitBranch,
+      toolUseId,
       createdAt: new Date().toISOString(),
       toolName: payload.toolName,
       command: payload.command,
       filePath: payload.filePath,
       workingDirectory: payload.workingDirectory,
       reason: payload.reason,
-      toolUseId,
     } as ToolApprovalAction;
   }
 
@@ -162,6 +253,8 @@ class SharedEventDispatcher {
   dispose(): void {
     this.ipcCleanup?.();
     this.ipcCleanup = null;
+    this.lifecycleCleanup?.();
+    this.lifecycleCleanup = null;
     this.listeners.clear();
     this.processedEventIds.clear();
     this.initialized = false;

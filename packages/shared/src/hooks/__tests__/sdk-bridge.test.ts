@@ -25,13 +25,22 @@ const createMockContext = () => ({
   signal: new AbortController().signal,
 });
 
+// Mock context provider for tests
+const mockGetContext = () => ({
+  agentId: 'test-agent-1',
+  gitBranch: 'main',
+});
+
 describe('SDK Hook Bridge', () => {
   let registry: EventRegistry;
   let bridge: SDKHookBridge;
 
   beforeEach(() => {
     registry = createEventRegistry();
-    bridge = createSDKHookBridge(registry, { debug: false });
+    bridge = createSDKHookBridge(registry, {
+      debug: false,
+      getContext: mockGetContext,
+    });
   });
 
   describe('Hook Event Mapping', () => {

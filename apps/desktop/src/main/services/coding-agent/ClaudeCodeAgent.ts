@@ -90,9 +90,11 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
+  private currentGitBranch: string | null = null;
+  private agentId: string | null = null;
   private readonly queryContexts = new WeakMap<
     AbortSignal,
-    { agentId?: string; sessionId?: string; workspacePath?: string }
+    { agentId?: string; sessionId?: string; workspacePath?: string; gitBranch?: string }
   >();
   private readonly canUseTool: CanUseTool = async (
     toolName: string,
@@ -100,15 +102,30 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     options
   ): Promise<PermissionResult> => {
     const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
-    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
-    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath;
+    const sessionId = context?.sessionId ?? this.currentSessionId;
+    const agentId = context?.agentId ?? this.agentId;
+    const gitBranch = context?.gitBranch ?? this.currentGitBranch ?? 'unknown';
+
+    // Validate required context fields - fail explicitly if missing
+    if (!agentId) {
+      throw new Error('[ClaudeCodeAgent] agentId is required for permission request event');
+    }
+    if (!sessionId) {
+      throw new Error('[ClaudeCodeAgent] sessionId is required for permission request event');
+    }
+    if (!workspacePath) {
+      throw new Error('[ClaudeCodeAgent] workspacePath is required for permission request event');
+    }
+
     const event: AgentEvent<PermissionPayload> = {
       id: crypto.randomUUID(),
       type: 'permission:request',
       agent: 'claude_code',
-      agentId: context?.agentId,
+      agentId,
       sessionId,
       workspacePath,
+      gitBranch,
       timestamp: new Date().toISOString(),
       payload: {
         toolName,
@@ -173,6 +190,22 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     this.eventRegistry = createEventRegistry();
     this.hookBridge = createSDKHookBridge(this.eventRegistry, {
       debug: this.debugHooks,
+      getContext: () => {
+        if (!this.agentId) {
+          throw new Error(
+            '[ClaudeCodeAgent] agentId not set. Call setAgentId() before using hooks.'
+          );
+        }
+        if (!this.currentGitBranch) {
+          throw new Error(
+            '[ClaudeCodeAgent] gitBranch not set. Call setGitBranch() before using hooks.'
+          );
+        }
+        return {
+          agentId: this.agentId,
+          gitBranch: this.currentGitBranch,
+        };
+      },
     });
     // Avoid double-emitting permission requests when canUseTool handles them.
     delete this.hookBridge.hooks.PermissionRequest;
@@ -250,6 +283,40 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     this.eventRegistry.clear();
     this.isInitialized = false;
     this.removeAllListeners();
+  }
+
+  // ============================================
+  // Context Management
+  // ============================================
+
+  /**
+   * Set the agent ID for this instance.
+   * Must be called before using hooks that require context.
+   */
+  setAgentId(agentId: string): void {
+    this.agentId = agentId;
+  }
+
+  /**
+   * Set the current git branch for context.
+   * Must be called before using hooks that require context.
+   */
+  setGitBranch(gitBranch: string): void {
+    this.currentGitBranch = gitBranch;
+  }
+
+  /**
+   * Get the current agent ID
+   */
+  getAgentId(): string | null {
+    return this.agentId;
+  }
+
+  /**
+   * Get the current git branch
+   */
+  getGitBranch(): string | null {
+    return this.currentGitBranch;
   }
 
   /**

@@ -240,6 +240,32 @@ export interface CodingAgent extends EventEmitter {
    * Get the event registry for custom hook handlers.
    */
   getEventRegistry(): EventRegistry;
+
+  // ============================================
+  // Context Management
+  // ============================================
+
+  /**
+   * Set the agent ID for this instance.
+   * Required for hooks that need agent context.
+   */
+  setAgentId(agentId: string): void;
+
+  /**
+   * Set the current git branch for context.
+   * Required for hooks that need git context.
+   */
+  setGitBranch(gitBranch: string): void;
+
+  /**
+   * Get the current agent ID
+   */
+  getAgentId(): string | null;
+
+  /**
+   * Get the current git branch
+   */
+  getGitBranch(): string | null;
 }
 
 /**

@@ -14,6 +14,7 @@ import * as pty from 'node-pty';
 import type { CodingAgentState } from '../../types/coding-agent-status';
 import { DatabaseFactory } from './database';
 import type { IDatabase } from './database/IDatabase';
+import { type AgentHooksService, createAgentHooksService } from './services/agent-hooks';
 import type { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
@@ -111,6 +112,9 @@ const TERMINAL_BUFFER_LINES = 1000;
 
 // Database instance
 let database: IDatabase;
+
+// AgentHooksService instance for terminal-based agent lifecycle events
+let agentHooksService: AgentHooksService;
 
 // RepresentationService instance and dependencies
 const representationLogger: ILogger = {
@@ -275,13 +279,15 @@ const createWindow = (): void => {
   const terminalCreationTimes = new Map<string, number>();
 
   // Create a new terminal instance
-  ipcMain.on('terminal-create', (_event, terminalId: string) => {
+  // workspacePath is optional - if provided, hooks env vars are injected and terminal starts in that directory
+  ipcMain.on('terminal-create', (_event, terminalId: string, workspacePath?: string) => {
     const callTime = Date.now();
     const lastCreationTime = terminalCreationTimes.get(terminalId);
     const timeSinceLastCreation = lastCreationTime ? callTime - lastCreationTime : null;
 
     console.log('[Main] terminal-create IPC received', {
       terminalId,
+      workspacePath,
       timeSinceLastCreation: timeSinceLastCreation ? `${timeSinceLastCreation}ms` : 'never',
       existingInMap: terminalProcesses.has(terminalId),
       beingCreated: terminalsBeingCreated.has(terminalId),
@@ -312,13 +318,30 @@ const createWindow = (): void => {
     // This is needed for commands like 'claude' that are installed in user-specific locations
     const shellArgs: string[] = process.platform === 'win32' ? [] : ['-l'];
 
+    // Build environment variables
+    // If workspacePath is provided, inject agent hooks env vars for lifecycle notifications
+    let hookEnv: Record<string, string> = {};
+    if (workspacePath && agentHooksService) {
+      hookEnv = agentHooksService.getTerminalEnv({
+        terminalId,
+        workspacePath,
+        agentId: `agent-${terminalId}`,
+      });
+      console.log('[Main] Injecting hooks env vars', {
+        terminalId,
+        workspacePath,
+        hookEnvKeys: Object.keys(hookEnv),
+      });
+    }
+
     const ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-256color',
       cols: 80,
       rows: 30,
-      cwd: process.env.HOME || process.cwd(),
+      cwd: workspacePath || process.env.HOME || process.cwd(),
       env: {
         ...process.env,
+        ...hookEnv,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
         // Ensure shell runs in interactive mode via environment
@@ -1878,13 +1901,39 @@ app.whenReady().then(async () => {
     // Continue without representation service - app should still function
   }
 
+  // Initialize AgentHooksService for terminal-based agent lifecycle events
+  try {
+    const homeDir = app.getPath('home');
+    agentHooksService = createAgentHooksService(homeDir);
+    await agentHooksService.ensureSetup();
+    agentHooksService.startServer();
+
+    // Forward lifecycle events to all renderer windows
+    agentHooksService.on('lifecycle', (event) => {
+      for (const browserWindow of BrowserWindow.getAllWindows()) {
+        if (
+          !browserWindow.isDestroyed() &&
+          browserWindow.webContents &&
+          !browserWindow.webContents.isDestroyed()
+        ) {
+          browserWindow.webContents.send('agent-lifecycle', event);
+        }
+      }
+    });
+
+    console.log('[Main] AgentHooksService initialized successfully');
+  } catch (error) {
+    console.error('[Main] Error initializing AgentHooksService', error);
+    // Continue without hooks service - app should still function
+  }
+
   createWindow();
 });
 
 // Clean up on app quit
 app.on('will-quit', async () => {
   console.log(
-    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, and representation service'
+    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, representation service, and agent hooks service'
   );
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
@@ -1892,4 +1941,5 @@ app.on('will-quit', async () => {
   await disposeAllCodingAgents();
   await LLMServiceFactory.dispose();
   await representationService.dispose();
+  agentHooksService?.dispose();
 });

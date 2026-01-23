@@ -17,6 +17,8 @@ import {
 
 interface TerminalNodeData {
   terminalId: string;
+  /** Workspace path for agent context - enables hook env injection */
+  workspacePath?: string;
   attachments?: TerminalAttachment[];
   autoStartClaude?: boolean; // Flag to auto-start claude command
   // Legacy support - will be migrated to attachments array
@@ -624,9 +626,11 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       terminalProcessCreatedRef.current = true;
       console.log('[TerminalNode] Creating terminal process', {
         terminalId,
+        workspacePath: nodeData.workspacePath,
         autoStartClaude: nodeData.autoStartClaude,
       });
-      window.electronAPI.createTerminal(terminalId);
+      // Pass workspacePath to enable hook env injection for agent lifecycle events
+      window.electronAPI.createTerminal(terminalId, nodeData.workspacePath);
 
       // Auto-start claude command if flag is set
       if (nodeData.autoStartClaude) {
@@ -702,7 +706,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
                 // Reset the flag to allow recreation
                 terminalProcessCreatedRef.current = false;
                 console.log('[TerminalNode] Restarting terminal process', { terminalId });
-                window.electronAPI?.createTerminal(terminalId);
+                window.electronAPI?.createTerminal(terminalId, nodeData.workspacePath);
                 terminalProcessCreatedRef.current = true;
               },
               isImmediateExit ? 1000 : 100
