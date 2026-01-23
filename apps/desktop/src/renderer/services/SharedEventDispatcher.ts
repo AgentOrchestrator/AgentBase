@@ -13,24 +13,6 @@
  * 2. agent-lifecycle - Terminal-based agent lifecycle events (HTTP sideband)
  */
 
-// Debug logging helper (writes to file via IPC)
-const DBG_ID = 'DBG-h00ks1';
-let dbgStep = 2000; // Start at 2000 for renderer to distinguish from main process
-declare global {
-  interface Window {
-    debugLog?: { write: (line: string) => void };
-  }
-}
-function dbg(loc: string, state: Record<string, unknown>) {
-  dbgStep++;
-  const line = `[${DBG_ID}] Step ${dbgStep} | SharedEventDispatcher.ts:${loc} | ${JSON.stringify(state)}`;
-  try {
-    window.debugLog?.write(line);
-  } catch {
-    // Ignore if not available
-  }
-}
-
 import type {
   AgentAction,
   ClarifyingQuestionAction,
@@ -63,36 +45,25 @@ class SharedEventDispatcher {
    * Safe to call multiple times (idempotent).
    */
   initialize(): void {
-    dbg('initialize-entry', {
-      alreadyInitialized: this.initialized,
-      hasOnAgentEvent: !!window.codingAgentAPI?.onAgentEvent,
-      hasOnAgentLifecycle: !!window.codingAgentAPI?.onAgentLifecycle,
-    });
-
     if (this.initialized) {
       return;
     }
 
     // Subscribe to SDK agent events (ClaudeCodeAgent via SDK hooks)
     if (window.codingAgentAPI?.onAgentEvent) {
-      dbg('initialize-sdk-subscription', { subscribing: true });
       this.ipcCleanup = window.codingAgentAPI.onAgentEvent((event: unknown) => {
-        dbg('sdk-event-received', { eventType: (event as { type?: string }).type });
         this.handleEvent(event as AgentAdapterEvent);
       });
     }
 
     // Subscribe to terminal agent lifecycle events (HTTP sideband)
     if (window.codingAgentAPI?.onAgentLifecycle) {
-      dbg('initialize-lifecycle-subscription', { subscribing: true });
       this.lifecycleCleanup = window.codingAgentAPI.onAgentLifecycle((event: unknown) => {
-        dbg('lifecycle-event-received', { event });
         this.handleLifecycleEvent(event as LifecycleEvent);
       });
     }
 
     this.initialized = true;
-    dbg('initialize-complete', { initialized: true });
     console.log('[SharedEventDispatcher] Initialized with IPC listeners');
   }
 
@@ -154,66 +125,62 @@ class SharedEventDispatcher {
   }
 
   /**
+   * Parse toolInput which can be an object or JSON string.
+   * Returns an empty object if parsing fails.
+   */
+  private parseToolInput(toolInput: unknown): Record<string, unknown> {
+    if (!toolInput) {
+      return {};
+    }
+
+    if (typeof toolInput === 'object') {
+      return toolInput as Record<string, unknown>;
+    }
+
+    if (typeof toolInput === 'string') {
+      try {
+        return JSON.parse(toolInput);
+      } catch (parseError) {
+        console.warn(
+          '[SharedEventDispatcher] toolInput is not valid JSON, storing as raw:',
+          parseError
+        );
+        return { raw: toolInput };
+      }
+    }
+
+    return {};
+  }
+
+  /**
    * Handle lifecycle events from terminal-based agents (HTTP sideband).
    * These come from notify.sh scripts called by Claude Code hooks.
    */
   private handleLifecycleEvent(event: LifecycleEvent): void {
-    dbg('handleLifecycleEvent-entry', {
-      eventType: event.type,
-      terminalId: event.terminalId,
-      agentId: event.agentId,
-      sessionId: event.sessionId,
-    });
-
     // Deduplicate by creating an ID from event properties
     const eventId = `lifecycle-${event.terminalId}-${event.type}-${event.timestamp}`;
     if (this.processedEventIds.has(eventId)) {
-      dbg('handleLifecycleEvent-duplicate', { eventId });
       return;
     }
     this.processedEventIds.add(eventId);
 
     console.log('[SharedEventDispatcher] Received lifecycle event:', event);
 
-    // Forward lifecycle events to subscribers
     // Map lifecycle types to our event types for compatibility
     const eventTypeMap: Record<string, string> = {
       Start: 'session:start',
       Stop: 'session:end',
       PermissionRequest: 'permission:request',
-      PreToolUse: 'permission:request', // Map PreToolUse to permission request
+      PreToolUse: 'permission:request',
     };
 
     const mappedType = eventTypeMap[event.type];
-    dbg('handleLifecycleEvent-mapping', {
-      originalType: event.type,
-      mappedType: mappedType || 'NO MAPPING',
-      hasListeners: mappedType ? (this.listeners.get(mappedType)?.size ?? 0) : 0,
-    });
+    if (!mappedType) {
+      return;
+    }
 
-    // Handle permission requests → add to ActionPill store
+    // Handle permission requests - add to ActionPill store
     if (mappedType === 'permission:request') {
-      dbg('handleLifecycleEvent-permission-request', {
-        agentId: event.agentId,
-        sessionId: event.sessionId,
-        terminalId: event.terminalId,
-      });
-
-      // Build a ToolApprovalAction from the lifecycle event
-      // toolInput can be an object (from jq merge) or string (fallback)
-      let toolInputObj: Record<string, unknown> = {};
-      if (event.toolInput) {
-        if (typeof event.toolInput === 'object') {
-          toolInputObj = event.toolInput as Record<string, unknown>;
-        } else if (typeof event.toolInput === 'string') {
-          try {
-            toolInputObj = JSON.parse(event.toolInput);
-          } catch {
-            toolInputObj = { raw: event.toolInput };
-          }
-        }
-      }
-
       const action: ToolApprovalAction = {
         type: 'tool_approval',
         id: `lifecycle-${event.terminalId}-${event.timestamp}`,
@@ -223,82 +190,120 @@ class SharedEventDispatcher {
         gitBranch: event.gitBranch,
         toolUseId: event.toolUseId || `terminal-tool-${Date.now()}`,
         toolName: event.toolName || 'Terminal Tool',
-        input: toolInputObj,
-        timestamp: Date.now(),
-        terminalId: event.terminalId, // For sending response keystrokes back to terminal
+        input: this.parseToolInput(event.toolInput),
+        createdAt: new Date().toISOString(),
+        terminalId: event.terminalId,
       };
 
-      dbg('handleLifecycleEvent-adding-action', { actionId: action.id, actionType: action.type });
       useActionPillStore.getState().addAction(action);
     }
 
     // Forward to any subscribers
-    if (mappedType) {
-      const callbacks = this.listeners.get(mappedType);
-      dbg('handleLifecycleEvent-forwarding', {
-        mappedType,
-        listenerCount: callbacks?.size ?? 0,
-      });
-
-      callbacks?.forEach((cb) => {
-        try {
-          // Convert to AgentAdapterEvent format for compatibility
-          cb({
-            type: mappedType,
-            agentId: event.agentId,
+    const callbacks = this.listeners.get(mappedType);
+    callbacks?.forEach((cb) => {
+      try {
+        cb({
+          type: mappedType,
+          agentId: event.agentId,
+          sessionId: event.sessionId,
+          payload: {
             sessionId: event.sessionId,
-            payload: {
-              sessionId: event.sessionId,
-              workspacePath: event.workspacePath,
-            },
-          } as unknown as AgentAdapterEvent);
-        } catch (err) {
-          dbg('handleLifecycleEvent-error', { error: String(err), mappedType });
-          console.error(`[SharedEventDispatcher] Error in ${mappedType} handler:`, err);
-        }
-      });
+            workspacePath: event.workspacePath,
+          },
+        } as unknown as AgentAdapterEvent);
+      } catch (err) {
+        console.error(`[SharedEventDispatcher] Error in ${mappedType} handler:`, err);
+      }
+    });
+  }
+
+  /**
+   * Validate and extract required fields from a permission event.
+   * Throws descriptive errors if any required field is missing.
+   */
+  private validatePermissionEventFields(
+    event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
+  ): {
+    agentId: string;
+    sessionId: string;
+    workspacePath: string;
+    gitBranch: string;
+    toolUseId: string;
+    eventId: string | undefined;
+    raw: Record<string, unknown> | undefined;
+  } {
+    const { agentId, sessionId } = event;
+    const eventId = (event as { id?: string }).id;
+    const raw = (event as { raw?: Record<string, unknown> }).raw;
+    const toolUseId = raw?.toolUseId as string | undefined;
+    const workspacePath =
+      (event as { workspacePath?: string }).workspacePath ?? event.payload.workingDirectory;
+    const gitBranch = (event as { gitBranch?: string }).gitBranch;
+
+    // Validate all required fields - collect missing fields for a single error message
+    const missingFields: string[] = [];
+    if (!agentId) missingFields.push('agentId');
+    if (!sessionId) missingFields.push('sessionId');
+    if (!workspacePath) missingFields.push('workspacePath');
+    if (!gitBranch) missingFields.push('gitBranch');
+    if (!toolUseId) missingFields.push('toolUseId');
+
+    if (missingFields.length > 0) {
+      console.error('[SharedEventDispatcher] Missing required fields:', missingFields, event);
+      throw new Error(
+        `[SharedEventDispatcher] Cannot build action: missing required fields: ${missingFields.join(', ')}`
+      );
     }
+
+    return {
+      agentId: agentId!,
+      sessionId: sessionId!,
+      workspacePath: workspacePath!,
+      gitBranch: gitBranch!,
+      toolUseId: toolUseId!,
+      eventId,
+      raw,
+    };
+  }
+
+  /**
+   * Map a raw question object to a typed question with options.
+   */
+  private mapQuestion(q: unknown): {
+    question: string;
+    options: { label: string; value: string }[];
+  } {
+    const questionObj = q as { question?: string; options?: unknown[] };
+    const questionText = questionObj.question ?? '';
+
+    if (!Array.isArray(questionObj.options)) {
+      return { question: questionText, options: [] };
+    }
+
+    const options = questionObj.options.map((o: unknown) => {
+      const opt = o as { label?: string; value?: string };
+      const label = opt.label ?? '';
+      const value = opt.value ?? opt.label ?? '';
+      return { label, value };
+    });
+
+    return { question: questionText, options };
   }
 
   private buildActionFromPermissionEvent(
     event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
   ): AgentAction | null {
-    const { payload, agentId, sessionId } = event;
-    const eventId = (event as { id?: string }).id;
-    const raw = (event as { raw?: Record<string, unknown> }).raw;
-
-    // Extract required fields - these are at the TOP LEVEL of the event (set by ClaudeCodeAgent)
-    // Not in raw! The raw object only has toolInput, toolUseId, signal, suggestions
-    const toolUseId = raw?.toolUseId as string | undefined;
-    const workspacePath =
-      (event as { workspacePath?: string }).workspacePath ?? payload.workingDirectory;
-    const gitBranch = (event as { gitBranch?: string }).gitBranch;
-
-    // Validate required fields - throw errors instead of using defaults
-    if (!agentId) {
-      console.error('[SharedEventDispatcher] Missing required field: agentId', event);
-      throw new Error('[SharedEventDispatcher] Cannot build action: agentId is required');
-    }
-    if (!sessionId) {
-      console.error('[SharedEventDispatcher] Missing required field: sessionId', event);
-      throw new Error('[SharedEventDispatcher] Cannot build action: sessionId is required');
-    }
-    if (!workspacePath) {
-      console.error('[SharedEventDispatcher] Missing required field: workspacePath', event);
-      throw new Error('[SharedEventDispatcher] Cannot build action: workspacePath is required');
-    }
-    if (!gitBranch) {
-      console.error('[SharedEventDispatcher] Missing required field: gitBranch', event);
-      throw new Error('[SharedEventDispatcher] Cannot build action: gitBranch is required');
-    }
-    if (!toolUseId) {
-      console.error('[SharedEventDispatcher] Missing required field: toolUseId', event);
-      throw new Error('[SharedEventDispatcher] Cannot build action: toolUseId is required');
-    }
+    const { payload } = event;
+    const fields = this.validatePermissionEventFields(event);
+    const actionId = fields.eventId ?? `${fields.agentId}-${fields.toolUseId}`;
+    const createdAt = new Date().toISOString();
 
     // Clarifying question (AskUserQuestion tool)
-    if (payload.toolName === 'askuserquestion' || payload.toolName === 'AskUserQuestion') {
-      const toolInput = raw?.toolInput as { questions?: unknown[] } | undefined;
+    const isAskUserQuestion =
+      payload.toolName === 'askuserquestion' || payload.toolName === 'AskUserQuestion';
+
+    if (isAskUserQuestion) {
+      const toolInput = fields.raw?.toolInput as { questions?: unknown[] } | undefined;
       const questions = toolInput?.questions;
 
       if (!Array.isArray(questions)) {
@@ -306,40 +311,29 @@ class SharedEventDispatcher {
       }
 
       return {
-        id: eventId ?? `${agentId}-${toolUseId}`,
+        id: actionId,
         type: 'clarifying_question',
-        agentId,
-        sessionId,
-        workspacePath,
-        gitBranch,
-        toolUseId,
-        createdAt: new Date().toISOString(),
-        questions: questions.map((q: unknown) => {
-          const question = q as { question?: string; options?: unknown[] };
-          return {
-            question: question.question ?? '',
-            options: Array.isArray(question.options)
-              ? question.options.map((o: unknown) => {
-                  const opt = o as { label?: string; value?: string };
-                  return { label: opt.label ?? '', value: opt.value ?? opt.label ?? '' };
-                })
-              : [],
-          };
-        }),
+        agentId: fields.agentId,
+        sessionId: fields.sessionId,
+        workspacePath: fields.workspacePath,
+        gitBranch: fields.gitBranch,
+        toolUseId: fields.toolUseId,
+        createdAt,
+        questions: questions.map((q) => this.mapQuestion(q)),
       } as ClarifyingQuestionAction;
     }
 
     // Tool approval - include input from raw.toolInput for displaying in ActionPill
-    const toolInput = raw?.toolInput as Record<string, unknown> | undefined;
+    const toolInput = fields.raw?.toolInput as Record<string, unknown> | undefined;
     return {
-      id: eventId ?? `${agentId}-${toolUseId}`,
+      id: actionId,
       type: 'tool_approval',
-      agentId,
-      sessionId,
-      workspacePath,
-      gitBranch,
-      toolUseId,
-      createdAt: new Date().toISOString(),
+      agentId: fields.agentId,
+      sessionId: fields.sessionId,
+      workspacePath: fields.workspacePath,
+      gitBranch: fields.gitBranch,
+      toolUseId: fields.toolUseId,
+      createdAt,
       toolName: payload.toolName,
       command: payload.command,
       filePath: payload.filePath,

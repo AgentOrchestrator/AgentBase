@@ -39,7 +39,8 @@ describe('validateHookRequest', () => {
     const result = validateHookRequest(request);
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.missingFields).toContain('workspacePath');
+      // Implementation accepts either workspacePath or cwd (Claude alias)
+      expect(result.missingFields).toContain('workspacePath (or cwd)');
     }
   });
 
@@ -57,7 +58,8 @@ describe('validateHookRequest', () => {
     const result = validateHookRequest(request);
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.missingFields).toContain('sessionId');
+      // Implementation accepts either sessionId or session_id (Claude alias)
+      expect(result.missingFields).toContain('sessionId (or session_id)');
     }
   });
 
@@ -83,12 +85,13 @@ describe('validateHookRequest', () => {
     const result = validateHookRequest({});
     expect(result.valid).toBe(false);
     if (!result.valid) {
+      // Implementation accepts alternate field names from Claude (snake_case aliases)
       expect(result.missingFields).toEqual(
         expect.arrayContaining([
           'terminalId',
-          'workspacePath',
+          'workspacePath (or cwd)',
           'gitBranch',
-          'sessionId',
+          'sessionId (or session_id)',
           'agentId',
           'eventType',
         ])

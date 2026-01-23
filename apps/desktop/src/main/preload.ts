@@ -775,8 +775,3 @@ contextBridge.exposeInMainWorld('recentWorkspacesAPI', {
   hasWorkspace: (workspacePath: string) =>
     unwrapResponse<boolean>(ipcRenderer.invoke('recent-workspaces:has', workspacePath)),
 } as RecentWorkspacesAPI);
-
-// Debug logging API for renderer process (writes to /tmp/debug-terminal-hooks.log via IPC)
-contextBridge.exposeInMainWorld('debugLog', {
-  write: (line: string) => ipcRenderer.send('debug-log', line),
-});

@@ -50,4 +50,23 @@ describe('buildTerminalEnv', () => {
 
     expect(env[ENV_VARS.WORKSPACE_PATH]).toBe('/Users/test/My Project');
   });
+
+  it('omits gitBranch env var when null (not in a git repo)', () => {
+    const params = {
+      terminalId: 'terminal-123',
+      workspacePath: '/Users/test/project',
+      gitBranch: null,
+      agentId: 'agent-456',
+      port: 31415,
+    };
+
+    const env = buildTerminalEnv(params);
+
+    expect(env[ENV_VARS.TERMINAL_ID]).toBe('terminal-123');
+    expect(env[ENV_VARS.WORKSPACE_PATH]).toBe('/Users/test/project');
+    expect(env[ENV_VARS.GIT_BRANCH]).toBeUndefined();
+    expect(env[ENV_VARS.AGENT_ID]).toBe('agent-456');
+    expect(env[ENV_VARS.PORT]).toBe('31415');
+    expect(env[ENV_VARS.MARKER]).toBe(TERMINAL_MARKER);
+  });
 });

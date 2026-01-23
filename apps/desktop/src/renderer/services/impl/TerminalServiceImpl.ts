@@ -5,24 +5,6 @@
  * Manages terminal process lifecycle and I/O.
  */
 
-// Debug logging helper (writes to file via IPC)
-const DBG_ID = 'DBG-h00ks1';
-let dbgStep = 3000; // Start at 3000 for TerminalServiceImpl
-declare global {
-  interface Window {
-    debugLog?: { write: (line: string) => void };
-  }
-}
-function dbg(loc: string, state: Record<string, unknown>) {
-  dbgStep++;
-  const line = `[${DBG_ID}] Step ${dbgStep} | TerminalServiceImpl.ts:${loc} | ${JSON.stringify(state)}`;
-  try {
-    window.debugLog?.write(line);
-  } catch {
-    // Ignore if not available
-  }
-}
-
 import type { ITerminalService } from '../../context/node-services';
 
 /**
@@ -77,14 +59,7 @@ export class TerminalServiceImpl implements ITerminalService {
    * @param workspacePath - Optional workspace path for hook env injection
    */
   async create(workspacePath?: string): Promise<void> {
-    dbg('create-entry', {
-      terminalId: this.terminalId,
-      workspacePath: workspacePath || 'NOT PROVIDED',
-      isAlreadyCreated: this.isCreated,
-    });
-
     if (this.isCreated) {
-      dbg('create-already-created', { terminalId: this.terminalId });
       return;
     }
 
@@ -93,13 +68,8 @@ export class TerminalServiceImpl implements ITerminalService {
     }
 
     // Pass workspacePath to enable agent hooks env var injection
-    dbg('create-calling-ipc', {
-      terminalId: this.terminalId,
-      workspacePath: workspacePath || 'NONE',
-    });
     window.electronAPI.createTerminal(this.terminalId, workspacePath);
     this.isCreated = true;
-    dbg('create-complete', { terminalId: this.terminalId });
   }
 
   /**
