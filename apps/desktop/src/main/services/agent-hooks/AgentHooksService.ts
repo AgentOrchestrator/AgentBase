@@ -159,8 +159,10 @@ export class AgentHooksService extends EventEmitter {
     this.server.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE') {
         console.warn(`[AgentHooksService] Port ${this.port} already in use, skipping server start`);
+        this.server = null;
       } else {
         console.error('[AgentHooksService] Server error:', error);
+        this.server = null;
       }
     });
   }

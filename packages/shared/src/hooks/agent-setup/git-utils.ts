@@ -12,9 +12,9 @@ import { execFileSync } from 'node:child_process';
  * Uses execFileSync instead of execSync for security (prevents shell injection).
  *
  * @param workspacePath - Path to the git repository
- * @returns Current branch name, or 'unknown' if not a git repo or error
+ * @returns Current branch name, or null if not a git repo or git unavailable
  */
-export function resolveGitBranch(workspacePath: string): string {
+export function resolveGitBranch(workspacePath: string): string | null {
   try {
     const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: workspacePath,
@@ -23,8 +23,8 @@ export function resolveGitBranch(workspacePath: string): string {
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
 
-    return branch || 'unknown';
+    return branch || null;
   } catch {
-    return 'unknown';
+    return null;
   }
 }
