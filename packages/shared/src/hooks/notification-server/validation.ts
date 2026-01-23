@@ -13,15 +13,9 @@ import type {
 
 /**
  * Required fields that must be present in every hook request
+ * Note: sessionId can come as session_id from Claude, checked separately
  */
-export const REQUIRED_FIELDS = [
-  'terminalId',
-  'workspacePath',
-  'gitBranch',
-  'sessionId',
-  'agentId',
-  'eventType',
-] as const;
+export const REQUIRED_FIELDS = ['terminalId', 'agentId', 'eventType'] as const;
 
 /**
  * Map raw event type string to normalized LifecycleEventType
@@ -29,6 +23,7 @@ export const REQUIRED_FIELDS = [
  * Claude Code hooks map to lifecycle events:
  * - UserPromptSubmit → Start (agent started processing)
  * - Stop/SessionEnd → Stop (agent finished)
+ * - PreToolUse → PermissionRequest (tool is about to be used, needs attention)
  * - PermissionRequest → PermissionRequest (needs attention)
  */
 export function mapEventType(raw: string | undefined): LifecycleEventType | null {
@@ -40,6 +35,7 @@ export function mapEventType(raw: string | undefined): LifecycleEventType | null
     case 'Stop':
     case 'SessionEnd':
       return 'Stop';
+    case 'PreToolUse':
     case 'PermissionRequest':
       return 'PermissionRequest';
     default:
@@ -63,6 +59,21 @@ export function validateHookRequest(raw: RawHookRequest): ValidationResult {
     }
   }
 
+  // Check for sessionId (can be either sessionId or session_id)
+  if (!raw.sessionId && !raw.session_id) {
+    missingFields.push('sessionId (or session_id)');
+  }
+
+  // Check for workspacePath (can be workspacePath or cwd)
+  if (!raw.workspacePath && !raw.cwd) {
+    missingFields.push('workspacePath (or cwd)');
+  }
+
+  // Check for gitBranch
+  if (!raw.gitBranch) {
+    missingFields.push('gitBranch');
+  }
+
   if (missingFields.length > 0) {
     return {
       valid: false,
@@ -82,14 +93,19 @@ export function validateHookRequest(raw: RawHookRequest): ValidationResult {
   }
 
   // All validations passed - construct the event
+  // Support both snake_case (from Claude) and camelCase field names
   const event: LifecycleEvent = {
     type: eventType,
     terminalId: raw.terminalId!,
-    workspacePath: raw.workspacePath!,
+    workspacePath: raw.workspacePath || raw.cwd || '',
     gitBranch: raw.gitBranch!,
-    sessionId: raw.sessionId!,
+    sessionId: raw.sessionId || raw.session_id || '',
     agentId: raw.agentId!,
     timestamp: new Date().toISOString(),
+    // Pass through tool info for PreToolUse events (prefer snake_case from Claude)
+    toolName: raw.tool_name || raw.toolName,
+    toolInput: raw.tool_input || raw.toolInput,
+    toolUseId: raw.tool_use_id || raw.toolUseId,
   };
 
   return { valid: true, event };

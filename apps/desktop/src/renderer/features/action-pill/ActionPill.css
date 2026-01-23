@@ -160,6 +160,21 @@
   color: var(--color-text-secondary);
 }
 
+.action-pill-input {
+  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary, rgba(0, 0, 0, 0.1));
+  padding: 8px;
+  border-radius: 4px;
+  margin: 4px 0;
+  overflow-x: auto;
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .action-pill-buttons {
   display: flex;
   gap: 8px;

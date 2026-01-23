@@ -5,6 +5,24 @@
  * Manages terminal process lifecycle and I/O.
  */
 
+// Debug logging helper (writes to file via IPC)
+const DBG_ID = 'DBG-h00ks1';
+let dbgStep = 3000; // Start at 3000 for TerminalServiceImpl
+declare global {
+  interface Window {
+    debugLog?: { write: (line: string) => void };
+  }
+}
+function dbg(loc: string, state: Record<string, unknown>) {
+  dbgStep++;
+  const line = `[${DBG_ID}] Step ${dbgStep} | TerminalServiceImpl.ts:${loc} | ${JSON.stringify(state)}`;
+  try {
+    window.debugLog?.write(line);
+  } catch {
+    // Ignore if not available
+  }
+}
+
 import type { ITerminalService } from '../../context/node-services';
 
 /**
@@ -56,9 +74,17 @@ export class TerminalServiceImpl implements ITerminalService {
 
   /**
    * Create the terminal process
+   * @param workspacePath - Optional workspace path for hook env injection
    */
-  async create(): Promise<void> {
+  async create(workspacePath?: string): Promise<void> {
+    dbg('create-entry', {
+      terminalId: this.terminalId,
+      workspacePath: workspacePath || 'NOT PROVIDED',
+      isAlreadyCreated: this.isCreated,
+    });
+
     if (this.isCreated) {
+      dbg('create-already-created', { terminalId: this.terminalId });
       return;
     }
 
@@ -66,8 +92,14 @@ export class TerminalServiceImpl implements ITerminalService {
       throw new Error('electronAPI not available');
     }
 
-    window.electronAPI.createTerminal(this.terminalId);
+    // Pass workspacePath to enable agent hooks env var injection
+    dbg('create-calling-ipc', {
+      terminalId: this.terminalId,
+      workspacePath: workspacePath || 'NONE',
+    });
+    window.electronAPI.createTerminal(this.terminalId, workspacePath);
     this.isCreated = true;
+    dbg('create-complete', { terminalId: this.terminalId });
   }
 
   /**
@@ -86,12 +118,13 @@ export class TerminalServiceImpl implements ITerminalService {
 
   /**
    * Restart the terminal (destroy + create)
+   * @param workspacePath - Optional workspace path for hook env injection
    */
-  async restart(): Promise<void> {
+  async restart(workspacePath?: string): Promise<void> {
     await this.destroy();
     // Small delay to allow cleanup
     await new Promise((resolve) => setTimeout(resolve, 100));
-    await this.create();
+    await this.create(workspacePath);
   }
 
   // ===========================================================================

@@ -14,6 +14,7 @@ import * as pty from 'node-pty';
 import type { CodingAgentState } from '../../types/coding-agent-status';
 import { DatabaseFactory } from './database';
 import type { IDatabase } from './database/IDatabase';
+import { debugInit, debugMark, debugStep, setupRendererDebugIpc } from './debugLogger.js';
 import { type AgentHooksService, createAgentHooksService } from './services/agent-hooks';
 import type { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
@@ -281,6 +282,13 @@ const createWindow = (): void => {
   // Create a new terminal instance
   // workspacePath is optional - if provided, hooks env vars are injected and terminal starts in that directory
   ipcMain.on('terminal-create', (_event, terminalId: string, workspacePath?: string) => {
+    debugMark('TERMINAL CREATE START');
+    debugStep('main.ts', 'terminal-create-entry', {
+      terminalId,
+      workspacePath: workspacePath || 'NOT PROVIDED',
+      hasAgentHooksService: !!agentHooksService,
+    });
+
     const callTime = Date.now();
     const lastCreationTime = terminalCreationTimes.get(terminalId);
     const timeSinceLastCreation = lastCreationTime ? callTime - lastCreationTime : null;
@@ -321,16 +329,36 @@ const createWindow = (): void => {
     // Build environment variables
     // If workspacePath is provided, inject agent hooks env vars for lifecycle notifications
     let hookEnv: Record<string, string> = {};
+    debugStep('main.ts', 'before-hook-env-check', {
+      hasWorkspacePath: !!workspacePath,
+      hasAgentHooksService: !!agentHooksService,
+      willInjectHookEnv: !!(workspacePath && agentHooksService),
+    });
+
     if (workspacePath && agentHooksService) {
       hookEnv = agentHooksService.getTerminalEnv({
         terminalId,
         workspacePath,
         agentId: `agent-${terminalId}`,
       });
+      debugStep('main.ts', 'hook-env-injected', {
+        hookEnvKeys: Object.keys(hookEnv),
+        hookEnvValues: hookEnv,
+      });
       console.log('[Main] Injecting hooks env vars', {
         terminalId,
         workspacePath,
         hookEnvKeys: Object.keys(hookEnv),
+      });
+
+      // Ensure workspace-level hooks are configured (.claude/settings.local.json)
+      // This runs async but should complete before user starts Claude
+      agentHooksService.ensureWorkspaceHooks(workspacePath).catch((error) => {
+        console.error('[Main] Failed to set up workspace hooks:', error);
+      });
+    } else {
+      debugStep('main.ts', 'hook-env-NOT-injected', {
+        reason: !workspacePath ? 'no workspacePath' : 'no agentHooksService',
       });
     }
 
@@ -1850,6 +1878,11 @@ function registerIpcHandlers(): void {
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
+  // Initialize debug logging
+  debugInit();
+  setupRendererDebugIpc();
+  debugStep('main.ts', 'app-ready', { timestamp: Date.now() });
+
   // Register all IPC handlers (must be after app ready for ipcMain)
   registerIpcHandlers();
   registerAgentActionHandlers();
@@ -1902,20 +1935,40 @@ app.whenReady().then(async () => {
   }
 
   // Initialize AgentHooksService for terminal-based agent lifecycle events
+  debugMark('AGENT HOOKS SERVICE INIT');
   try {
     const homeDir = app.getPath('home');
+    debugStep('main.ts', 'hooks-service-init', { homeDir });
+
     agentHooksService = createAgentHooksService(homeDir);
     await agentHooksService.ensureSetup();
+    debugStep('main.ts', 'hooks-service-setup-complete', {
+      port: agentHooksService.getPort(),
+    });
+
     agentHooksService.startServer();
+    debugStep('main.ts', 'hooks-server-started', { port: agentHooksService.getPort() });
 
     // Forward lifecycle events to all renderer windows
     agentHooksService.on('lifecycle', (event) => {
+      debugMark('LIFECYCLE EVENT RECEIVED');
+      debugStep('main.ts', 'lifecycle-event-from-hooks', {
+        eventType: event.type,
+        terminalId: event.terminalId,
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+      });
+
       for (const browserWindow of BrowserWindow.getAllWindows()) {
         if (
           !browserWindow.isDestroyed() &&
           browserWindow.webContents &&
           !browserWindow.webContents.isDestroyed()
         ) {
+          debugStep('main.ts', 'forwarding-to-renderer', {
+            eventType: event.type,
+            windowId: browserWindow.id,
+          });
           browserWindow.webContents.send('agent-lifecycle', event);
         }
       }
@@ -1923,6 +1976,7 @@ app.whenReady().then(async () => {
 
     console.log('[Main] AgentHooksService initialized successfully');
   } catch (error) {
+    debugStep('main.ts', 'hooks-service-init-ERROR', { error: String(error) });
     console.error('[Main] Error initializing AgentHooksService', error);
     // Continue without hooks service - app should still function
   }

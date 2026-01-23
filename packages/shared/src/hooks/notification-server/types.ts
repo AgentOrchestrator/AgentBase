@@ -21,19 +21,44 @@ export interface LifecycleEvent {
   sessionId: string;
   agentId: string;
   timestamp: string;
+  /** Tool name for PreToolUse events */
+  toolName?: string;
+  /** Tool input for PreToolUse events (can be complex object) */
+  toolInput?: unknown;
+  /** Tool use ID from Claude */
+  toolUseId?: string;
 }
 
 /**
  * Raw request data from the HTTP hook endpoint
  * All fields are optional since we need to validate them
+ * Supports both camelCase (our fields) and snake_case (Claude's fields)
  */
 export interface RawHookRequest {
+  // Our terminal context fields
   terminalId?: string;
   workspacePath?: string;
   gitBranch?: string;
-  sessionId?: string;
   agentId?: string;
   eventType?: string;
+
+  // Session ID - supports both formats
+  sessionId?: string;
+  session_id?: string;
+
+  // Claude's hook data (snake_case)
+  hook_event_name?: string;
+  tool_name?: string;
+  tool_input?: unknown;
+  tool_use_id?: string;
+  cwd?: string;
+  prompt?: string;
+  transcript_path?: string;
+
+  // Legacy camelCase versions
+  toolName?: string;
+  toolInput?: unknown;
+  toolUseId?: string;
 }
 
 /**

@@ -105,9 +105,9 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     const workspacePath = context?.workspacePath ?? this.currentWorkspacePath;
     const sessionId = context?.sessionId ?? this.currentSessionId;
     const agentId = context?.agentId ?? this.agentId;
-    const gitBranch = context?.gitBranch ?? this.currentGitBranch ?? 'unknown';
+    const gitBranch = context?.gitBranch ?? this.currentGitBranch;
 
-    // Validate required context fields - fail explicitly if missing
+    // Validate required context fields - fail explicitly if missing (no defensive defaults)
     if (!agentId) {
       throw new Error('[ClaudeCodeAgent] agentId is required for permission request event');
     }
@@ -116,6 +116,9 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     }
     if (!workspacePath) {
       throw new Error('[ClaudeCodeAgent] workspacePath is required for permission request event');
+    }
+    if (!gitBranch) {
+      throw new Error('[ClaudeCodeAgent] gitBranch is required for permission request event');
     }
 
     const event: AgentEvent<PermissionPayload> = {
@@ -578,17 +581,50 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
         workspacePath: request.workingDirectory,
       },
     };
-    this.currentWorkspacePath = options.cwd ?? null;
+    // Validate and set ALL required instance properties so canUseTool can access them
+    // (SDK may pass a different signal, so queryContexts lookup may fail)
+    if (!request.agentId) {
+      throw new Error('[ClaudeCodeAgent] request.agentId is required for generate requests');
+    }
+    if (!request.sessionId) {
+      throw new Error('[ClaudeCodeAgent] request.sessionId is required for generate requests');
+    }
+    if (!request.workingDirectory) {
+      throw new Error(
+        '[ClaudeCodeAgent] request.workingDirectory is required for generate requests'
+      );
+    }
+
+    this.agentId = request.agentId;
+    this.currentSessionId = request.sessionId;
+    this.currentWorkspacePath = request.workingDirectory;
+
+    // Resolve git branch from workingDirectory
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: request.workingDirectory,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (!branch) {
+        throw new Error('git returned empty branch name');
+      }
+      this.currentGitBranch = branch;
+    } catch (error) {
+      throw new Error(
+        `[ClaudeCodeAgent] Failed to resolve git branch for ${request.workingDirectory}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
 
     // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
-    if (request.sessionId) {
-      options.extraArgs = { 'session-id': request.sessionId };
-    }
+    options.extraArgs = { 'session-id': request.sessionId };
 
     this.queryContexts.set(abortController.signal, {
       agentId: request.agentId,
       sessionId: request.sessionId,
       workspacePath: options.cwd ?? undefined,
+      gitBranch: this.currentGitBranch ?? undefined,
     });
 
     // Enable streaming partial messages
@@ -644,16 +680,59 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     continueOptions?: ContinueOptions,
     streaming = false
   ): QueryOptions {
+    // Derive sessionId from identifier
+    const sessionId =
+      identifier.type === 'id' || identifier.type === 'name' ? identifier.value : undefined;
+
     const options: QueryOptions = {
       cwd: continueOptions?.workingDirectory,
       abortController,
       context: {
         agentId: continueOptions?.agentId,
-        sessionId: identifier.type === 'id' ? identifier.value : undefined,
+        sessionId,
         workspacePath: continueOptions?.workingDirectory,
       },
     };
-    this.currentWorkspacePath = options.cwd ?? null;
+
+    // Validate and set ALL required instance properties so canUseTool can access them
+    // (SDK may pass a different signal, so queryContexts lookup may fail)
+    if (!continueOptions?.agentId) {
+      throw new Error(
+        '[ClaudeCodeAgent] continueOptions.agentId is required for continue requests'
+      );
+    }
+    if (!sessionId) {
+      throw new Error(
+        '[ClaudeCodeAgent] sessionId is required for continue requests (use id or name identifier)'
+      );
+    }
+    if (!continueOptions?.workingDirectory) {
+      throw new Error(
+        '[ClaudeCodeAgent] continueOptions.workingDirectory is required for continue requests'
+      );
+    }
+
+    this.agentId = continueOptions.agentId;
+    this.currentSessionId = sessionId;
+    this.currentWorkspacePath = continueOptions.workingDirectory;
+
+    // Resolve git branch from workingDirectory
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: continueOptions.workingDirectory,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (!branch) {
+        throw new Error('git returned empty branch name');
+      }
+      this.currentGitBranch = branch;
+    } catch (error) {
+      throw new Error(
+        `[ClaudeCodeAgent] Failed to resolve git branch for ${continueOptions.workingDirectory}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
 
     // Map SessionIdentifier to query options
     switch (identifier.type) {
@@ -669,9 +748,10 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     }
 
     this.queryContexts.set(abortController.signal, {
-      agentId: continueOptions?.agentId,
-      sessionId: identifier.type === 'id' ? identifier.value : undefined,
-      workspacePath: options.cwd ?? undefined,
+      agentId: continueOptions.agentId,
+      sessionId,
+      workspacePath: continueOptions.workingDirectory,
+      gitBranch: this.currentGitBranch ?? undefined,
     });
 
     if (streaming) {

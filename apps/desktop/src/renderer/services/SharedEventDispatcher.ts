@@ -13,12 +13,31 @@
  * 2. agent-lifecycle - Terminal-based agent lifecycle events (HTTP sideband)
  */
 
+// Debug logging helper (writes to file via IPC)
+const DBG_ID = 'DBG-h00ks1';
+let dbgStep = 2000; // Start at 2000 for renderer to distinguish from main process
+declare global {
+  interface Window {
+    debugLog?: { write: (line: string) => void };
+  }
+}
+function dbg(loc: string, state: Record<string, unknown>) {
+  dbgStep++;
+  const line = `[${DBG_ID}] Step ${dbgStep} | SharedEventDispatcher.ts:${loc} | ${JSON.stringify(state)}`;
+  try {
+    window.debugLog?.write(line);
+  } catch {
+    // Ignore if not available
+  }
+}
+
 import type {
   AgentAction,
   ClarifyingQuestionAction,
   LifecycleEvent,
   ToolApprovalAction,
 } from '@agent-orchestrator/shared';
+// ToolApprovalAction is used for lifecycle events → ActionPill
 import type { AgentAdapterEvent } from '../context/node-services/coding-agent-adapter';
 import { useActionPillStore } from '../features/action-pill';
 
@@ -44,25 +63,36 @@ class SharedEventDispatcher {
    * Safe to call multiple times (idempotent).
    */
   initialize(): void {
+    dbg('initialize-entry', {
+      alreadyInitialized: this.initialized,
+      hasOnAgentEvent: !!window.codingAgentAPI?.onAgentEvent,
+      hasOnAgentLifecycle: !!window.codingAgentAPI?.onAgentLifecycle,
+    });
+
     if (this.initialized) {
       return;
     }
 
     // Subscribe to SDK agent events (ClaudeCodeAgent via SDK hooks)
     if (window.codingAgentAPI?.onAgentEvent) {
+      dbg('initialize-sdk-subscription', { subscribing: true });
       this.ipcCleanup = window.codingAgentAPI.onAgentEvent((event: unknown) => {
+        dbg('sdk-event-received', { eventType: (event as { type?: string }).type });
         this.handleEvent(event as AgentAdapterEvent);
       });
     }
 
     // Subscribe to terminal agent lifecycle events (HTTP sideband)
     if (window.codingAgentAPI?.onAgentLifecycle) {
+      dbg('initialize-lifecycle-subscription', { subscribing: true });
       this.lifecycleCleanup = window.codingAgentAPI.onAgentLifecycle((event: unknown) => {
+        dbg('lifecycle-event-received', { event });
         this.handleLifecycleEvent(event as LifecycleEvent);
       });
     }
 
     this.initialized = true;
+    dbg('initialize-complete', { initialized: true });
     console.log('[SharedEventDispatcher] Initialized with IPC listeners');
   }
 
@@ -101,9 +131,14 @@ class SharedEventDispatcher {
 
     // Handle permission requests directly → ActionPill store
     if (event.type === 'permission:request') {
-      const action = this.buildActionFromPermissionEvent(event);
-      if (action) {
-        useActionPillStore.getState().addAction(action);
+      try {
+        const action = this.buildActionFromPermissionEvent(event);
+        if (action) {
+          useActionPillStore.getState().addAction(action);
+        }
+      } catch (err) {
+        console.error('[SharedEventDispatcher] Failed to build action from permission event:', err);
+        console.error('[SharedEventDispatcher] Event that caused the error:', event);
       }
     }
 
@@ -123,9 +158,17 @@ class SharedEventDispatcher {
    * These come from notify.sh scripts called by Claude Code hooks.
    */
   private handleLifecycleEvent(event: LifecycleEvent): void {
+    dbg('handleLifecycleEvent-entry', {
+      eventType: event.type,
+      terminalId: event.terminalId,
+      agentId: event.agentId,
+      sessionId: event.sessionId,
+    });
+
     // Deduplicate by creating an ID from event properties
     const eventId = `lifecycle-${event.terminalId}-${event.type}-${event.timestamp}`;
     if (this.processedEventIds.has(eventId)) {
+      dbg('handleLifecycleEvent-duplicate', { eventId });
       return;
     }
     this.processedEventIds.add(eventId);
@@ -138,11 +181,64 @@ class SharedEventDispatcher {
       Start: 'session:start',
       Stop: 'session:end',
       PermissionRequest: 'permission:request',
+      PreToolUse: 'permission:request', // Map PreToolUse to permission request
     };
 
     const mappedType = eventTypeMap[event.type];
+    dbg('handleLifecycleEvent-mapping', {
+      originalType: event.type,
+      mappedType: mappedType || 'NO MAPPING',
+      hasListeners: mappedType ? (this.listeners.get(mappedType)?.size ?? 0) : 0,
+    });
+
+    // Handle permission requests → add to ActionPill store
+    if (mappedType === 'permission:request') {
+      dbg('handleLifecycleEvent-permission-request', {
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+        terminalId: event.terminalId,
+      });
+
+      // Build a ToolApprovalAction from the lifecycle event
+      // toolInput can be an object (from jq merge) or string (fallback)
+      let toolInputObj: Record<string, unknown> = {};
+      if (event.toolInput) {
+        if (typeof event.toolInput === 'object') {
+          toolInputObj = event.toolInput as Record<string, unknown>;
+        } else if (typeof event.toolInput === 'string') {
+          try {
+            toolInputObj = JSON.parse(event.toolInput);
+          } catch {
+            toolInputObj = { raw: event.toolInput };
+          }
+        }
+      }
+
+      const action: ToolApprovalAction = {
+        type: 'tool_approval',
+        id: `lifecycle-${event.terminalId}-${event.timestamp}`,
+        agentId: event.agentId,
+        sessionId: event.sessionId,
+        workspacePath: event.workspacePath,
+        gitBranch: event.gitBranch,
+        toolUseId: event.toolUseId || `terminal-tool-${Date.now()}`,
+        toolName: event.toolName || 'Terminal Tool',
+        input: toolInputObj,
+        timestamp: Date.now(),
+      };
+
+      dbg('handleLifecycleEvent-adding-action', { actionId: action.id, actionType: action.type });
+      useActionPillStore.getState().addAction(action);
+    }
+
+    // Forward to any subscribers
     if (mappedType) {
       const callbacks = this.listeners.get(mappedType);
+      dbg('handleLifecycleEvent-forwarding', {
+        mappedType,
+        listenerCount: callbacks?.size ?? 0,
+      });
+
       callbacks?.forEach((cb) => {
         try {
           // Convert to AgentAdapterEvent format for compatibility
@@ -156,6 +252,7 @@ class SharedEventDispatcher {
             },
           } as unknown as AgentAdapterEvent);
         } catch (err) {
+          dbg('handleLifecycleEvent-error', { error: String(err), mappedType });
           console.error(`[SharedEventDispatcher] Error in ${mappedType} handler:`, err);
         }
       });
@@ -169,10 +266,12 @@ class SharedEventDispatcher {
     const eventId = (event as { id?: string }).id;
     const raw = (event as { raw?: Record<string, unknown> }).raw;
 
-    // Extract required fields from raw event data
+    // Extract required fields - these are at the TOP LEVEL of the event (set by ClaudeCodeAgent)
+    // Not in raw! The raw object only has toolInput, toolUseId, signal, suggestions
     const toolUseId = raw?.toolUseId as string | undefined;
-    const workspacePath = (raw?.workspacePath as string) ?? payload.workingDirectory;
-    const gitBranch = raw?.gitBranch as string | undefined;
+    const workspacePath =
+      (event as { workspacePath?: string }).workspacePath ?? payload.workingDirectory;
+    const gitBranch = (event as { gitBranch?: string }).gitBranch;
 
     // Validate required fields - throw errors instead of using defaults
     if (!agentId) {
@@ -229,7 +328,8 @@ class SharedEventDispatcher {
       } as ClarifyingQuestionAction;
     }
 
-    // Tool approval
+    // Tool approval - include input from raw.toolInput for displaying in ActionPill
+    const toolInput = raw?.toolInput as Record<string, unknown> | undefined;
     return {
       id: eventId ?? `${agentId}-${toolUseId}`,
       type: 'tool_approval',
@@ -244,6 +344,7 @@ class SharedEventDispatcher {
       filePath: payload.filePath,
       workingDirectory: payload.workingDirectory,
       reason: payload.reason,
+      input: toolInput,
     } as ToolApprovalAction;
   }
 

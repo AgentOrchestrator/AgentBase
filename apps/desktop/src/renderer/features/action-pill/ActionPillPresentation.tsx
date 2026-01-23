@@ -147,6 +147,11 @@ export function ActionPillPresentation({
                       {approvalAction.filePath && (
                         <span className="action-pill-path">{approvalAction.filePath}</span>
                       )}
+                      {approvalAction.input && Object.keys(approvalAction.input).length > 0 && (
+                        <pre className="action-pill-input">
+                          {JSON.stringify(approvalAction.input, null, 2)}
+                        </pre>
+                      )}
                     </div>
                     <div className="action-pill-buttons">
                       <button

@@ -328,6 +328,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
 
   /**
    * Build command to start a new CLI REPL session with a specific session ID.
+   * Hooks are loaded from workspace-level .claude/settings.local.json (set up by AgentHooksService)
    */
   buildStartSessionCommand(workspacePath: string, sessionId: string): string {
     const escapedPath = workspacePath.replace(/"/g, '\\"');
@@ -336,6 +337,7 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
 
   /**
    * Build command to resume an existing CLI REPL session.
+   * Hooks are loaded from workspace-level .claude/settings.local.json (set up by AgentHooksService)
    */
   buildResumeSessionCommand(workspacePath: string, sessionId: string): string {
     const escapedPath = workspacePath.replace(/"/g, '\\"');

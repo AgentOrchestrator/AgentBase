@@ -928,7 +928,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         window.electronAPI.destroyTerminal(terminalId);
       }
     };
-  }, [terminalId, nodeData.autoStartClaude]);
+  }, [terminalId, nodeData.autoStartClaude, nodeData.workspacePath]);
 
   // Migrate legacy issue to attachments array
   const attachments = nodeData.attachments || [];
