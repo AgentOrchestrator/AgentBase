@@ -275,6 +275,8 @@ export interface AgentActionBase {
   /** Tool use ID for correlating with SDK events */
   toolUseId: string;
   createdAt: string;
+  /** Terminal ID for terminal-based actions (used to send response keystrokes) */
+  terminalId?: string;
 }
 
 export interface ClarifyingQuestionAction extends AgentActionBase {
@@ -290,8 +292,6 @@ export interface ToolApprovalAction extends AgentActionBase {
   workingDirectory?: string;
   reason?: string;
   input?: Record<string, unknown>;
-  /** Terminal ID for terminal-based actions (used to send response keystrokes) */
-  terminalId?: string;
 }
 
 export type AgentAction = ClarifyingQuestionAction | ToolApprovalAction;

@@ -23,4 +23,14 @@ export interface IActionPillService {
     action: ClarifyingQuestionAction,
     answers: Record<string, string>
   ): Promise<void>;
+
+  /**
+   * Submit a selected option for a clarifying question.
+   * For terminal-based actions, sends the option number as a keystroke.
+   */
+  submitOptionSelection(
+    action: ClarifyingQuestionAction,
+    questionIndex: number,
+    optionIndex: number
+  ): Promise<void>;
 }

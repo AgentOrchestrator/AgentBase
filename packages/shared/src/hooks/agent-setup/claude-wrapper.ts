@@ -31,7 +31,8 @@ export function generateClaudeSettings(notifyScriptPath: string): object {
           ],
         },
       ],
-      // Called before each tool use (for permission notification)
+      // Called before tool use - only AskUserQuestion triggers ActionPill
+      // (filtered in SharedEventDispatcher)
       PreToolUse: [
         {
           matcher: '*',

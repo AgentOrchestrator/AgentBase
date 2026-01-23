@@ -123,6 +123,55 @@ class ActionPillServiceImpl implements IActionPillService {
       store.setSubmitting(action.id, false);
     }
   }
+
+  /**
+   * Submit an option selection for a clarifying question.
+   * For terminal-based actions, sends the option number as a keystroke.
+   * Claude Code's @inquirer/prompts accepts single number keys to select options.
+   */
+  async submitOptionSelection(
+    action: ClarifyingQuestionAction,
+    _questionIndex: number,
+    optionIndex: number
+  ): Promise<void> {
+    const store = useActionPillStore.getState();
+    const isDummyAction = action.id.startsWith('dummy-action-') || action.id.startsWith('debug-');
+    const isTerminalAction = action.terminalId != null;
+
+    store.setSubmitting(action.id, true);
+
+    try {
+      if (isDummyAction) {
+        store.removeAction(action.id);
+      } else if (isTerminalAction) {
+        // Terminal-based action: send option number as keystroke (1-indexed)
+        const keystroke = String(optionIndex + 1);
+        console.log('[ActionPillService] Sending terminal option selection', {
+          terminalId: action.terminalId,
+          optionIndex,
+          keystroke,
+        });
+        window.electronAPI.sendTerminalInput(action.terminalId!, keystroke);
+        store.removeAction(action.id);
+      } else if (window.codingAgentAPI?.respondToAction) {
+        // SDK-based action: build answer from selected option
+        const question = action.questions[_questionIndex];
+        const selectedOption = question?.options?.[optionIndex];
+        if (question && selectedOption) {
+          await window.codingAgentAPI.respondToAction({
+            actionId: action.id,
+            type: 'clarifying_question',
+            answers: { [question.question]: selectedOption.label },
+          });
+        }
+        store.removeAction(action.id);
+      } else {
+        console.warn('[ActionPillService] No response channel available for action', action.id);
+      }
+    } finally {
+      store.setSubmitting(action.id, false);
+    }
+  }
 }
 
 /**

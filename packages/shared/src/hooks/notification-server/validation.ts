@@ -23,8 +23,8 @@ export const REQUIRED_FIELDS = ['terminalId', 'agentId', 'eventType'] as const;
  * Claude Code hooks map to lifecycle events:
  * - UserPromptSubmit → Start (agent started processing)
  * - Stop/SessionEnd → Stop (agent finished)
- * - PreToolUse → PermissionRequest (tool is about to be used, needs attention)
- * - PermissionRequest → PermissionRequest (needs attention)
+ * - PreToolUse → PreToolUse (tool about to be used, filtered for AskUserQuestion)
+ * - PermissionRequest → PermissionRequest (actual permission prompt)
  */
 export function mapEventType(raw: string | undefined): LifecycleEventType | null {
   if (!raw) return null;
@@ -36,6 +36,7 @@ export function mapEventType(raw: string | undefined): LifecycleEventType | null
     case 'SessionEnd':
       return 'Stop';
     case 'PreToolUse':
+      return 'PreToolUse';
     case 'PermissionRequest':
       return 'PermissionRequest';
     default:

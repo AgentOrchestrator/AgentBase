@@ -85,6 +85,18 @@ class SharedEventDispatcher {
     };
   }
 
+  /**
+   * Check if an SDK permission event should be shown in the ActionPill.
+   * SDK events only show AskUserQuestion (clarifying questions that need user response).
+   * Regular tool permission prompts are handled in the terminal UI, not ActionPill.
+   */
+  private shouldShowSdkEventInActionPill(
+    event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
+  ): boolean {
+    const toolName = event.payload.toolName?.toLowerCase();
+    return toolName === 'askuserquestion' || toolName === 'askclarifyingquestion';
+  }
+
   private handleEvent(event: AgentAdapterEvent): void {
     // Deduplicate by event ID if present
     const eventId = (event as { id?: string }).id;
@@ -101,7 +113,8 @@ class SharedEventDispatcher {
     }
 
     // Handle permission requests directly → ActionPill store
-    if (event.type === 'permission:request') {
+    // Only show AskUserQuestion in ActionPill; other tools are handled in terminal UI
+    if (event.type === 'permission:request' && this.shouldShowSdkEventInActionPill(event)) {
       try {
         const action = this.buildActionFromPermissionEvent(event);
         if (action) {
@@ -153,6 +166,92 @@ class SharedEventDispatcher {
   }
 
   /**
+   * Map lifecycle event types to internal event types.
+   * Returns null for unrecognized types.
+   */
+  private mapLifecycleTypeToEventType(
+    type: string
+  ): 'session:start' | 'session:end' | 'permission:request' | 'tool:begin' | null {
+    switch (type) {
+      case 'Start':
+        return 'session:start';
+      case 'Stop':
+        return 'session:end';
+      case 'PermissionRequest':
+        return 'permission:request';
+      case 'PreToolUse':
+        return 'tool:begin';
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Check if a lifecycle event should show in ActionPill.
+   * - PermissionRequest: always show (actual permission prompts)
+   * - PreToolUse: only show AskUserQuestion (clarifying questions)
+   */
+  private shouldLifecycleEventShowInActionPill(event: LifecycleEvent): boolean {
+    if (event.type === 'PermissionRequest') {
+      return true;
+    }
+    if (event.type === 'PreToolUse') {
+      const toolName = event.toolName?.toLowerCase();
+      return toolName === 'askuserquestion' || toolName === 'askclarifyingquestion';
+    }
+    return false;
+  }
+
+  /**
+   * Check if a lifecycle event is an AskUserQuestion (clarifying question)
+   */
+  private isAskUserQuestionEvent(event: LifecycleEvent): boolean {
+    if (event.type !== 'PreToolUse') return false;
+    const toolName = event.toolName?.toLowerCase();
+    return toolName === 'askuserquestion' || toolName === 'askclarifyingquestion';
+  }
+
+  /**
+   * Build the appropriate action type from a lifecycle event.
+   * - AskUserQuestion → ClarifyingQuestionAction with questions/options
+   * - Other events → ToolApprovalAction
+   */
+  private buildActionFromLifecycleEvent(event: LifecycleEvent): AgentAction {
+    const baseFields = {
+      id: `lifecycle-${event.terminalId}-${event.timestamp}`,
+      agentId: event.agentId,
+      sessionId: event.sessionId,
+      workspacePath: event.workspacePath,
+      gitBranch: event.gitBranch,
+      toolUseId: event.toolUseId || `terminal-tool-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      terminalId: event.terminalId,
+    };
+
+    // For AskUserQuestion, create a ClarifyingQuestionAction with questions/options
+    if (this.isAskUserQuestionEvent(event)) {
+      const toolInput = this.parseToolInput(event.toolInput) as { questions?: unknown[] };
+      const questions = Array.isArray(toolInput.questions)
+        ? toolInput.questions.map((q) => this.mapQuestion(q))
+        : [];
+
+      return {
+        ...baseFields,
+        type: 'clarifying_question',
+        questions,
+      } as ClarifyingQuestionAction & { terminalId: string };
+    }
+
+    // For other events, create a ToolApprovalAction
+    return {
+      ...baseFields,
+      type: 'tool_approval',
+      toolName: event.toolName || 'Terminal Tool',
+      input: this.parseToolInput(event.toolInput),
+    } as ToolApprovalAction;
+  }
+
+  /**
    * Handle lifecycle events from terminal-based agents (HTTP sideband).
    * These come from notify.sh scripts called by Claude Code hooks.
    */
@@ -167,34 +266,16 @@ class SharedEventDispatcher {
     console.log('[SharedEventDispatcher] Received lifecycle event:', event);
 
     // Map lifecycle types to our event types for compatibility
-    const eventTypeMap: Record<string, string> = {
-      Start: 'session:start',
-      Stop: 'session:end',
-      PermissionRequest: 'permission:request',
-      PreToolUse: 'permission:request',
-    };
-
-    const mappedType = eventTypeMap[event.type];
+    const mappedType = this.mapLifecycleTypeToEventType(event.type);
     if (!mappedType) {
       return;
     }
 
-    // Handle permission requests - add to ActionPill store
-    if (mappedType === 'permission:request') {
-      const action: ToolApprovalAction = {
-        type: 'tool_approval',
-        id: `lifecycle-${event.terminalId}-${event.timestamp}`,
-        agentId: event.agentId,
-        sessionId: event.sessionId,
-        workspacePath: event.workspacePath,
-        gitBranch: event.gitBranch,
-        toolUseId: event.toolUseId || `terminal-tool-${Date.now()}`,
-        toolName: event.toolName || 'Terminal Tool',
-        input: this.parseToolInput(event.toolInput),
-        createdAt: new Date().toISOString(),
-        terminalId: event.terminalId,
-      };
-
+    // Add to ActionPill store if this event type should show
+    // - PermissionRequest: always (actual permission prompts)
+    // - PreToolUse: only AskUserQuestion (clarifying questions)
+    if (this.shouldLifecycleEventShowInActionPill(event)) {
+      const action = this.buildActionFromLifecycleEvent(event);
       useActionPillStore.getState().addAction(action);
     }
 
