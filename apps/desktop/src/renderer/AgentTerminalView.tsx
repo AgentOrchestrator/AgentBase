@@ -117,8 +117,9 @@ export default function AgentTerminalView({
     terminal.focus();
 
     // Create terminal process and start agent REPL
+    // Pass workspacePath to enable agent hooks env var injection
     terminalService
-      .create()
+      .create(workspacePath)
       .then(async () => {
         // Restore terminal buffer after process creation
         const buffer = await terminalService.getBuffer();

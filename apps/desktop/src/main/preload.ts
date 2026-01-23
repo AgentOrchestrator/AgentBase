@@ -54,7 +54,8 @@ import type {
 
 // Type definitions for the electron API
 export interface ElectronAPI {
-  createTerminal: (terminalId: string) => void;
+  /** Create a terminal process. workspacePath is optional - if provided, hooks env vars are injected */
+  createTerminal: (terminalId: string, workspacePath?: string) => void;
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
   onTerminalExit: (
     callback: (data: { terminalId: string; code: number; signal?: number }) => void
@@ -177,8 +178,8 @@ export interface RepresentationAPI {
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  createTerminal: (terminalId: string) => {
-    ipcRenderer.send('terminal-create', terminalId);
+  createTerminal: (terminalId: string, workspacePath?: string) => {
+    ipcRenderer.send('terminal-create', terminalId, workspacePath);
   },
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => {
     ipcRenderer.on('terminal-data', (_event, data: { terminalId: string; data: string }) =>
@@ -446,6 +447,11 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('coding-agent:event', handler);
     return () => ipcRenderer.removeListener('coding-agent:event', handler);
+  },
+  onAgentLifecycle: (callback: (event: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('agent-lifecycle', handler);
+    return () => ipcRenderer.removeListener('agent-lifecycle', handler);
   },
   respondToAction: async (response) => {
     await unwrapResponse(ipcRenderer.invoke('coding-agent:respond-to-action', response));

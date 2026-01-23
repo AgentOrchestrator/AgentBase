@@ -76,6 +76,12 @@ Rule: Avoid using the spread operator; use explicit replacement instead as much 
 
 Rule: Never use defensive defaults. Let the code fail explicitly or ask for user input during implementation. Defensive defaults hide missing configuration and create silent failures.
 
+This applies to:
+- Configuration values
+- Function parameters (prefer required parameters over optional with defaults)
+- Object construction (throw if required fields are missing)
+- Event/action building (require context, don't use placeholder values like 'unknown')
+
 Correct pattern:
 
 ```typescript
@@ -90,6 +96,30 @@ const apiUrl = config.apiUrl;
 
 // ✅ Also correct: Ask user during implementation
 const apiUrl = config.apiUrl; // Will fail at runtime if missing, prompting proper setup
+```
+
+```typescript
+// ❌ Wrong: Default parameter hides missing context
+function buildEvent(context?: EventContext) {
+  return {
+    agentId: context?.agentId ?? 'unknown',  // Silent failure - bugs hidden
+    sessionId: context?.sessionId ?? 'unknown',
+  };
+}
+
+// ✅ Correct: Require the context parameter
+function buildEvent(context: EventContext) {
+  if (!context.agentId) {
+    throw new Error('context.agentId is required');
+  }
+  if (!context.sessionId) {
+    throw new Error('context.sessionId is required');
+  }
+  return {
+    agentId: context.agentId,
+    sessionId: context.sessionId,
+  };
+}
 ```
 
 Correct pattern:

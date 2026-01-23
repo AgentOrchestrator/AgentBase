@@ -32,9 +32,12 @@ export function firePermissionRequest(options?: {
   command?: string;
   filePath?: string;
   workingDirectory?: string;
+  workspacePath?: string;
+  gitBranch?: string;
   reason?: string;
   agentId?: string;
   sessionId?: string;
+  toolUseId?: string;
 }): void {
   import('../features/action-pill').then(({ useActionPillStore }) => {
     const action = {
@@ -47,6 +50,9 @@ export function firePermissionRequest(options?: {
       reason: options?.reason ?? 'The agent wants to execute this shell command',
       agentId: options?.agentId ?? 'debug-agent-1',
       sessionId: options?.sessionId ?? 'debug-session-1',
+      workspacePath: options?.workspacePath ?? '/Users/test/project',
+      gitBranch: options?.gitBranch ?? 'main',
+      toolUseId: options?.toolUseId ?? `tool-${generateId()}`,
       createdAt: new Date().toISOString(),
     };
 
@@ -69,6 +75,9 @@ export function fireClarifyingQuestion(options?: {
   }>;
   agentId?: string;
   sessionId?: string;
+  workspacePath?: string;
+  gitBranch?: string;
+  toolUseId?: string;
 }): void {
   // Import the store directly for clarifying questions
   // as they may not go through the same IPC channel
@@ -89,6 +98,9 @@ export function fireClarifyingQuestion(options?: {
       ],
       agentId: options?.agentId ?? 'debug-agent-1',
       sessionId: options?.sessionId ?? 'debug-session-1',
+      workspacePath: options?.workspacePath ?? '/Users/test/project',
+      gitBranch: options?.gitBranch ?? 'main',
+      toolUseId: options?.toolUseId ?? `tool-${generateId()}`,
       createdAt: new Date().toISOString(),
     };
 

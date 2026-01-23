@@ -253,15 +253,30 @@ export interface ClarifyingQuestion {
   multiSelect?: boolean;
 }
 
+/**
+ * Base interface for all agent actions
+ *
+ * Context fields (agentId, sessionId, workspacePath, gitBranch) are REQUIRED
+ * to ensure proper routing and display of actions in the UI.
+ */
 export interface AgentActionBase {
   id: string;
   type: AgentActionType;
-  agentId?: string;
+  /** Agent node identifier - REQUIRED for routing to correct terminal */
+  agentId: string;
+  /** Agent type (e.g., 'claude_code') */
   agentType?: AgentType;
-  sessionId?: string;
-  workspacePath?: string;
-  toolUseId?: string;
+  /** Session identifier - REQUIRED for response routing */
+  sessionId: string;
+  /** Workspace/project path - REQUIRED for context display */
+  workspacePath: string;
+  /** Git branch - REQUIRED for context display */
+  gitBranch: string;
+  /** Tool use ID for correlating with SDK events */
+  toolUseId: string;
   createdAt: string;
+  /** Terminal ID for terminal-based actions (used to send response keystrokes) */
+  terminalId?: string;
 }
 
 export interface ClarifyingQuestionAction extends AgentActionBase {
@@ -281,6 +296,8 @@ export interface ToolApprovalAction extends AgentActionBase {
 
 export type AgentAction = ClarifyingQuestionAction | ToolApprovalAction;
 
+export type ToolApprovalDecision = 'allow' | 'allow_all' | 'deny';
+
 export type AgentActionResponse =
   | {
       actionId: string;
@@ -290,6 +307,97 @@ export type AgentActionResponse =
   | {
       actionId: string;
       type: 'tool_approval';
-      decision: 'allow' | 'deny';
+      decision: ToolApprovalDecision;
       message?: string;
     };
+
+// =============================================================================
+// Agent Action Factory
+// =============================================================================
+
+/**
+ * Parameters for creating a ToolApprovalAction
+ */
+export interface CreateToolApprovalParams {
+  type: 'tool_approval';
+  agentId: string;
+  sessionId: string;
+  workspacePath: string;
+  gitBranch: string;
+  toolUseId: string;
+  toolName: string;
+  command?: string;
+  filePath?: string;
+  workingDirectory?: string;
+  reason?: string;
+  input?: Record<string, unknown>;
+  agentType?: AgentType;
+}
+
+/**
+ * Parameters for creating a ClarifyingQuestionAction
+ */
+export interface CreateClarifyingQuestionParams {
+  type: 'clarifying_question';
+  agentId: string;
+  sessionId: string;
+  workspacePath: string;
+  gitBranch: string;
+  toolUseId: string;
+  questions: ClarifyingQuestion[];
+  agentType?: AgentType;
+}
+
+export type CreateAgentActionParams = CreateToolApprovalParams | CreateClarifyingQuestionParams;
+
+/**
+ * Create an AgentAction with validation of all required fields
+ *
+ * @throws Error if any required field is missing
+ */
+export function createAgentAction(params: CreateAgentActionParams): AgentAction {
+  // Validate required fields
+  const requiredFields = [
+    'agentId',
+    'sessionId',
+    'workspacePath',
+    'gitBranch',
+    'toolUseId',
+  ] as const;
+  const missingFields = requiredFields.filter((field) => !params[field as keyof typeof params]);
+
+  if (missingFields.length > 0) {
+    throw new Error(`createAgentAction: Missing required fields: ${missingFields.join(', ')}`);
+  }
+
+  const baseAction: AgentActionBase = {
+    id: crypto.randomUUID(),
+    type: params.type,
+    agentId: params.agentId,
+    agentType: params.agentType,
+    sessionId: params.sessionId,
+    workspacePath: params.workspacePath,
+    gitBranch: params.gitBranch,
+    toolUseId: params.toolUseId,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (params.type === 'tool_approval') {
+    return {
+      ...baseAction,
+      type: 'tool_approval',
+      toolName: params.toolName,
+      command: params.command,
+      filePath: params.filePath,
+      workingDirectory: params.workingDirectory,
+      reason: params.reason,
+      input: params.input,
+    } as ToolApprovalAction;
+  }
+
+  return {
+    ...baseAction,
+    type: 'clarifying_question',
+    questions: params.questions,
+  } as ClarifyingQuestionAction;
+}
