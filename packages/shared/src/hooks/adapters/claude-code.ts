@@ -89,6 +89,10 @@ export interface ClaudeCodeHookData {
   workspace_path?: string;
   agent_version?: string;
   reason?: string;
+
+  // Context fields (may be provided by orchestrator)
+  agent_id?: string;
+  git_branch?: string;
 }
 
 // =============================================================================
@@ -156,12 +160,36 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
       return null;
     }
 
+    // Validate required context fields - fail explicitly if missing
+    if (!rawData.agent_id) {
+      throw new Error(
+        `[ClaudeCodeAdapter] agent_id is required in hook data for event ${rawData.event}`
+      );
+    }
+    if (!rawData.session_id) {
+      throw new Error(
+        `[ClaudeCodeAdapter] session_id is required in hook data for event ${rawData.event}`
+      );
+    }
+    if (!rawData.workspace_path) {
+      throw new Error(
+        `[ClaudeCodeAdapter] workspace_path is required in hook data for event ${rawData.event}`
+      );
+    }
+    if (!rawData.git_branch) {
+      throw new Error(
+        `[ClaudeCodeAdapter] git_branch is required in hook data for event ${rawData.event}`
+      );
+    }
+
     const baseEvent = {
       id: randomUUID(),
       type: eventType,
       agent: this.agentType,
+      agentId: rawData.agent_id,
       sessionId: rawData.session_id,
       workspacePath: rawData.workspace_path,
+      gitBranch: rawData.git_branch,
       timestamp: rawData.timestamp ?? new Date().toISOString(),
       raw: rawData,
     };
@@ -176,10 +204,20 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
   }
 
   /**
-   * Parse terminal output to detect Claude Code events
+   * Context required for parsing terminal output into events
    */
-  parseTerminalOutput(output: string): AgentEvent[] {
+  /**
+   * Parse terminal output to detect Claude Code events
+   *
+   * @param output - Terminal output to parse
+   * @param context - Required context for building events (agentId, sessionId, workspacePath, gitBranch)
+   */
+  parseTerminalOutput(
+    output: string,
+    context: { agentId: string; sessionId: string; workspacePath: string; gitBranch: string }
+  ): AgentEvent[] {
     const events: AgentEvent[] = [];
+    const timestamp = new Date().toISOString();
 
     // Check for permission request
     const permissionMatch = output.match(TERMINAL_PATTERNS.permissionRequest);
@@ -188,7 +226,11 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
         id: randomUUID(),
         type: 'permission:request',
         agent: this.agentType,
-        timestamp: new Date().toISOString(),
+        agentId: context.agentId,
+        sessionId: context.sessionId,
+        workspacePath: context.workspacePath,
+        gitBranch: context.gitBranch,
+        timestamp,
         payload: {
           toolName: 'Bash',
           command: permissionMatch[1],
@@ -204,7 +246,11 @@ export class ClaudeCodeAdapter implements IAgentAdapter {
         id: randomUUID(),
         type: 'tool:begin',
         agent: this.agentType,
-        timestamp: new Date().toISOString(),
+        agentId: context.agentId,
+        sessionId: context.sessionId,
+        workspacePath: context.workspacePath,
+        gitBranch: context.gitBranch,
+        timestamp,
         payload: {
           toolName: toolBeginMatch[1],
           toolCategory: 'unknown',

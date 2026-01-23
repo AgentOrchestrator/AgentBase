@@ -101,6 +101,10 @@ export interface CodexEvent {
 export type CodexMessage = (CodexOp | CodexEvent) & {
   session_id?: string;
   timestamp?: string;
+  // Context fields (may be provided by orchestrator)
+  agent_id?: string;
+  workspace_path?: string;
+  git_branch?: string;
 };
 
 // =============================================================================
@@ -178,11 +182,36 @@ export class CodexAdapter implements IAgentAdapter {
       finalEventType = rawData.approval === 'deny' ? 'permission:deny' : 'permission:approve';
     }
 
+    // Validate required context fields - fail explicitly if missing
+    if (!rawData.agent_id) {
+      throw new Error(
+        `[CodexAdapter] agent_id is required in message data for type ${rawData.type}`
+      );
+    }
+    if (!rawData.session_id) {
+      throw new Error(
+        `[CodexAdapter] session_id is required in message data for type ${rawData.type}`
+      );
+    }
+    if (!rawData.workspace_path) {
+      throw new Error(
+        `[CodexAdapter] workspace_path is required in message data for type ${rawData.type}`
+      );
+    }
+    if (!rawData.git_branch) {
+      throw new Error(
+        `[CodexAdapter] git_branch is required in message data for type ${rawData.type}`
+      );
+    }
+
     const baseEvent = {
       id: randomUUID(),
       type: finalEventType,
       agent: this.agentType,
+      agentId: rawData.agent_id,
       sessionId: rawData.session_id,
+      workspacePath: rawData.workspace_path,
+      gitBranch: rawData.git_branch,
       timestamp: rawData.timestamp ?? new Date().toISOString(),
       raw: rawData,
     };
@@ -197,9 +226,16 @@ export class CodexAdapter implements IAgentAdapter {
 
   /**
    * Parse terminal output to detect Codex events
+   *
+   * @param output - Terminal output to parse
+   * @param context - Required context for building events (agentId, sessionId, workspacePath, gitBranch)
    */
-  parseTerminalOutput(output: string): AgentEvent[] {
+  parseTerminalOutput(
+    output: string,
+    context: { agentId: string; sessionId: string; workspacePath: string; gitBranch: string }
+  ): AgentEvent[] {
     const events: AgentEvent[] = [];
+    const timestamp = new Date().toISOString();
 
     // Check for approval request
     const approvalMatch = output.match(TERMINAL_PATTERNS.approvalRequest);
@@ -208,7 +244,11 @@ export class CodexAdapter implements IAgentAdapter {
         id: randomUUID(),
         type: 'permission:request',
         agent: this.agentType,
-        timestamp: new Date().toISOString(),
+        agentId: context.agentId,
+        sessionId: context.sessionId,
+        workspacePath: context.workspacePath,
+        gitBranch: context.gitBranch,
+        timestamp,
         payload: {
           toolName: 'shell',
           command: approvalMatch[1],
@@ -224,7 +264,11 @@ export class CodexAdapter implements IAgentAdapter {
         id: randomUUID(),
         type: 'tool:begin',
         agent: this.agentType,
-        timestamp: new Date().toISOString(),
+        agentId: context.agentId,
+        sessionId: context.sessionId,
+        workspacePath: context.workspacePath,
+        gitBranch: context.gitBranch,
+        timestamp,
         payload: {
           toolName: toolMatch[1],
           toolCategory: 'shell',

@@ -11,7 +11,7 @@ import type {
   SDKPartialAssistantMessage,
   SDKResultMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { GenerateResponse, StreamingBlockType, StreamingChunk } from '../types/message.types';
+import type { GenerateResponse, StreamingBlockType, StreamingChunk } from '../types';
 
 /**
  * Extract the result message from an array of SDK messages

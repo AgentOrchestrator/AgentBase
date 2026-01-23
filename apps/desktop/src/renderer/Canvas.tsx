@@ -162,11 +162,14 @@ function CanvasFlow() {
   // Node Operations (declarative methods replacing setNodes)
   // =============================================================================
 
+  // Memoize onUserChange to prevent nodeOps from being recreated every render
+  const handleNodesPersist = useCallback((updatedNodes: Node[]) => {
+    useCanvasPersistenceStore.getState().persistNodes(updatedNodes);
+  }, []);
+
   const nodeOps = useNodeOperations({
     setNodes,
-    onUserChange: (updatedNodes) => {
-      useCanvasPersistenceStore.getState().persistNodes(updatedNodes);
-    },
+    onUserChange: handleNodesPersist,
   });
 
   // =============================================================================
@@ -238,13 +241,18 @@ function CanvasFlow() {
 
   const { highlightedAgentId } = useActionPillHighlight();
 
+  // Use ref to avoid re-running effect when nodeOps reference changes
+  // The effect only needs to run when highlightedAgentId changes
+  const nodeOpsRef = useRef(nodeOps);
+  nodeOpsRef.current = nodeOps;
+
   useEffect(() => {
     if (highlightedAgentId) {
-      nodeOps.highlightAgentNode(highlightedAgentId);
+      nodeOpsRef.current.highlightAgentNode(highlightedAgentId);
     } else {
-      nodeOps.unhighlightAllAgentNodes();
+      nodeOpsRef.current.unhighlightAllAgentNodes();
     }
-  }, [highlightedAgentId, nodeOps]);
+  }, [highlightedAgentId]);
 
   // =============================================================================
   // React Flow Utilities and Feature Hooks
@@ -313,8 +321,11 @@ function CanvasFlow() {
 
   // Apply highlight styles to nodes
   useEffect(() => {
-    nodeOps.applyFolderHighlights(folderHighlight.highlightedFolders, folderHighlight.folderColors);
-  }, [folderHighlight.highlightedFolders, folderHighlight.folderColors, nodeOps]);
+    nodeOpsRef.current.applyFolderHighlights(
+      folderHighlight.highlightedFolders,
+      folderHighlight.folderColors
+    );
+  }, [folderHighlight.highlightedFolders, folderHighlight.folderColors]);
 
   // =============================================================================
   // Node Store Sync
