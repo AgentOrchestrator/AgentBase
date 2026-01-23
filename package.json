@@ -1,6 +1,6 @@
 {
   "name": "agent-orchestrator",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Agent Orchestrator - A multi-agent orchestration system",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
