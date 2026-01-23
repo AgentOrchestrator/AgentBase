@@ -9,6 +9,7 @@ import type {
   AgentAction,
   ClarifyingQuestionAction,
   ToolApprovalAction,
+  ToolApprovalDecision,
 } from '@agent-orchestrator/shared';
 import type { PillAnimationState } from './store';
 
@@ -30,7 +31,7 @@ export interface ActionPillPresentationProps {
   onCollapse: () => void;
   onUpdateAnswer: (actionId: string, question: string, value: string) => void;
   onSubmitClarifying: (action: ClarifyingQuestionAction) => void;
-  onToolApproval: (action: ToolApprovalAction, decision: 'allow' | 'deny') => void;
+  onToolApproval: (action: ToolApprovalAction, decision: ToolApprovalDecision) => void;
 }
 
 export function ActionPillPresentation({
@@ -162,6 +163,16 @@ export function ActionPillPresentation({
                       >
                         Accept
                       </button>
+                      {approvalAction.terminalId && (
+                        <button
+                          className="action-pill-approve-all"
+                          type="button"
+                          onClick={() => onToolApproval(approvalAction, 'allow_all')}
+                          disabled={submittingActions.has(action.id)}
+                        >
+                          Accept all
+                        </button>
+                      )}
                       <button
                         className="action-pill-deny"
                         type="button"

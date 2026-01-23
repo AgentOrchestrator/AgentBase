@@ -182,6 +182,7 @@
 }
 
 .action-pill-approve,
+.action-pill-approve-all,
 .action-pill-deny {
   border-radius: 6px;
   padding: 6px 12px;
@@ -195,6 +196,12 @@
   color: #ffffff;
 }
 
+.action-pill-approve-all {
+  background: #333333;
+  color: #ffffff;
+  font-size: 12px;
+}
+
 .action-pill-deny {
   background: #ffffff;
   border-color: #000000;
@@ -202,6 +209,7 @@
 }
 
 .action-pill-approve:disabled,
+.action-pill-approve-all:disabled,
 .action-pill-deny:disabled {
   opacity: 0.6;
   cursor: not-allowed;

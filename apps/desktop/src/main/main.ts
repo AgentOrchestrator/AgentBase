@@ -466,10 +466,20 @@ const createWindow = (): void => {
   ipcMain.on(
     'terminal-input',
     (_event, { terminalId, data }: { terminalId: string; data: string }) => {
-      // Don't log every input - too verbose (logs every keystroke)
       const ptyProcess = terminalProcesses.get(terminalId);
+      // Log action pill responses (non-printable or short inputs that look like menu selections)
+      if (data.length <= 2 || data.includes('\n') || data.includes('\r')) {
+        console.log('[Main] terminal-input (action response)', {
+          terminalId,
+          data: JSON.stringify(data),
+          ptyExists: !!ptyProcess,
+          allTerminalIds: Array.from(terminalProcesses.keys()),
+        });
+      }
       if (ptyProcess) {
         ptyProcess.write(data);
+      } else {
+        console.warn('[Main] terminal-input: no PTY process for terminalId', terminalId);
       }
     }
   );

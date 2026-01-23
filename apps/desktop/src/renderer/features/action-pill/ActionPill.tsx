@@ -5,7 +5,11 @@
  * Handles keyboard shortcuts and delegates rendering to the presentation component.
  */
 
-import type { ClarifyingQuestionAction, ToolApprovalAction } from '@agent-orchestrator/shared';
+import type {
+  ClarifyingQuestionAction,
+  ToolApprovalAction,
+  ToolApprovalDecision,
+} from '@agent-orchestrator/shared';
 import { useCallback, useEffect } from 'react';
 import './ActionPill.css';
 import { ActionPillPresentation } from './ActionPillPresentation';
@@ -51,7 +55,7 @@ export function ActionPill() {
   );
 
   const handleToolApproval = useCallback(
-    async (action: ToolApprovalAction, decision: 'allow' | 'deny') => {
+    async (action: ToolApprovalAction, decision: ToolApprovalDecision) => {
       await actionPillService.submitToolApproval(action, decision);
     },
     []

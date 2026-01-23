@@ -225,6 +225,7 @@ class SharedEventDispatcher {
         toolName: event.toolName || 'Terminal Tool',
         input: toolInputObj,
         timestamp: Date.now(),
+        terminalId: event.terminalId, // For sending response keystrokes back to terminal
       };
 
       dbg('handleLifecycleEvent-adding-action', { actionId: action.id, actionType: action.type });

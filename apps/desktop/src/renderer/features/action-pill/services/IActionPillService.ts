@@ -4,13 +4,17 @@
  * Defines the contract for business logic operations on actions.
  */
 
-import type { ClarifyingQuestionAction, ToolApprovalAction } from '@agent-orchestrator/shared';
+import type {
+  ClarifyingQuestionAction,
+  ToolApprovalAction,
+  ToolApprovalDecision,
+} from '@agent-orchestrator/shared';
 
 export interface IActionPillService {
   /**
-   * Submit a tool approval decision (allow/deny)
+   * Submit a tool approval decision (allow/deny/allow_all)
    */
-  submitToolApproval(action: ToolApprovalAction, decision: 'allow' | 'deny'): Promise<void>;
+  submitToolApproval(action: ToolApprovalAction, decision: ToolApprovalDecision): Promise<void>;
 
   /**
    * Submit answers to clarifying questions

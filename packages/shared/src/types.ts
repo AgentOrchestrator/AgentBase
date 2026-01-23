@@ -290,9 +290,13 @@ export interface ToolApprovalAction extends AgentActionBase {
   workingDirectory?: string;
   reason?: string;
   input?: Record<string, unknown>;
+  /** Terminal ID for terminal-based actions (used to send response keystrokes) */
+  terminalId?: string;
 }
 
 export type AgentAction = ClarifyingQuestionAction | ToolApprovalAction;
+
+export type ToolApprovalDecision = 'allow' | 'allow_all' | 'deny';
 
 export type AgentActionResponse =
   | {
@@ -303,7 +307,7 @@ export type AgentActionResponse =
   | {
       actionId: string;
       type: 'tool_approval';
-      decision: 'allow' | 'deny';
+      decision: ToolApprovalDecision;
       message?: string;
     };
 
