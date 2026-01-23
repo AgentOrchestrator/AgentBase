@@ -11,6 +11,7 @@
  * - This service validates and forwards events via EventEmitter
  */
 
+import { execFileSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
@@ -21,11 +22,29 @@ import {
   generateClaudeWrapper,
   generateNotifyScript,
   type LifecycleEvent,
-  resolveGitBranch,
   TERMINAL_MARKER,
   type TerminalEnvParams,
   validateHookRequest,
 } from '@agent-orchestrator/shared';
+
+/**
+ * Resolve the current git branch for a workspace path.
+ * Inlined here to avoid browser bundling issues with the shared package.
+ */
+function resolveGitBranch(workspacePath: string): string {
+  try {
+    const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    return branch || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 import {
   getClaudeSettingsPath,
   getClaudeWrapperPath,
