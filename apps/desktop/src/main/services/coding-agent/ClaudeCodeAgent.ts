@@ -10,23 +10,16 @@ import {
   type EventRegistry,
   type SDKHookBridge,
 } from '@agent-orchestrator/shared';
+import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { ForkAdapterFactory } from '../fork-adapters/factory/ForkAdapterFactory';
+import type { CodingAgent } from './CodingAgent';
 import type {
-  CanUseTool,
-  Options,
-  PermissionResult,
-  Query,
-  SDKMessage,
-} from '@anthropic-ai/claude-agent-sdk';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import { ForkAdapterFactory } from '../../fork-adapters/factory/ForkAdapterFactory';
-import type {
-  IChatHistoryProvider,
-  ICodingAgentProvider,
-  IProcessLifecycle,
-  ISessionForkable,
-  ISessionResumable,
-  ISessionValidator,
-} from '../interfaces';
+  QueryExecutor,
+  QueryMessageUnion,
+  QueryOptions,
+  QueryResultMessage,
+} from './query-executor';
+import { SdkQueryExecutor } from './query-executor';
 import type {
   AgentCapabilities,
   AgentConfig,
@@ -46,23 +39,15 @@ import type {
   SessionSummary,
   StreamCallback,
   StructuredStreamCallback,
-} from '../types';
-import { AgentErrorCode, agentError, err, ok } from '../types';
-import { mapSdkError, mapSdkResultError, noResultError } from '../utils/sdk-error-mapper';
-import {
-  extractStreamingChunk,
-  extractStructuredStreamingChunk,
-  findResultMessage,
-  isResultError,
-  mapSdkMessagesToResponse,
-} from '../utils/sdk-message-mapper';
+} from './types';
+import { AgentErrorCode, agentError, err, ok } from './types';
+import { mapQueryResultError, mapSdkError, noResultError } from './utils/sdk-error-mapper';
 
 /**
  * Active query handle for tracking and cancellation
  */
 interface QueryHandle {
   id: string;
-  query: Query;
   abortController: AbortController;
   startTime: number;
 }
@@ -70,12 +55,12 @@ interface QueryHandle {
 /**
  * Claude Code SDK agent implementation
  *
- * Implements:
- * - ICodingAgentProvider: Core generation via SDK query()
- * - ISessionResumable: Resume via SDK options.resume and options.continue
- * - ISessionForkable: Fork via SDK options.forkSession
- * - IProcessLifecycle: Lifecycle management via AbortController
- * - IChatHistoryProvider: Session listing via filesystem (SDK doesn't support this)
+ * Implements the unified CodingAgent interface, providing:
+ * - Core generation via SDK query()
+ * - Session resumption via SDK options.resume and options.continue
+ * - Session forking via SDK options.forkSession
+ * - Lifecycle management via AbortController
+ * - Session listing via filesystem (SDK doesn't support this)
  *
  * SDK Methods Used:
  * - query({ prompt }) - One-off generation
@@ -90,30 +75,26 @@ interface QueryHandle {
 export interface ClaudeCodeAgentConfig extends AgentConfig {
   /** Enable debug logging for hooks */
   debugHooks?: boolean;
+  /** Custom query executor (for testing) */
+  queryExecutor?: QueryExecutor;
 }
 
-export class ClaudeCodeAgent
-  extends EventEmitter
-  implements
-    ICodingAgentProvider,
-    ISessionResumable,
-    ISessionForkable,
-    IProcessLifecycle,
-    IChatHistoryProvider,
-    ISessionValidator
-{
+export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
   protected readonly config: AgentConfig;
   private readonly eventRegistry: EventRegistry;
   private readonly hookBridge: SDKHookBridge;
   private readonly debugHooks: boolean;
+  private readonly queryExecutor: QueryExecutor;
   private readonly activeQueries = new Map<string, QueryHandle>();
   private readonly jsonlParser = new ClaudeCodeJsonlParser();
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
+  private currentGitBranch: string | null = null;
+  private agentId: string | null = null;
   private readonly queryContexts = new WeakMap<
     AbortSignal,
-    { agentId?: string; sessionId?: string; workspacePath?: string }
+    { agentId?: string; sessionId?: string; workspacePath?: string; gitBranch?: string }
   >();
   private readonly canUseTool: CanUseTool = async (
     toolName: string,
@@ -121,15 +102,33 @@ export class ClaudeCodeAgent
     options
   ): Promise<PermissionResult> => {
     const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
-    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
-    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath;
+    const sessionId = context?.sessionId ?? this.currentSessionId;
+    const agentId = context?.agentId ?? this.agentId;
+    const gitBranch = context?.gitBranch ?? this.currentGitBranch;
+
+    // Validate required context fields - fail explicitly if missing (no defensive defaults)
+    if (!agentId) {
+      throw new Error('[ClaudeCodeAgent] agentId is required for permission request event');
+    }
+    if (!sessionId) {
+      throw new Error('[ClaudeCodeAgent] sessionId is required for permission request event');
+    }
+    if (!workspacePath) {
+      throw new Error('[ClaudeCodeAgent] workspacePath is required for permission request event');
+    }
+    if (!gitBranch) {
+      throw new Error('[ClaudeCodeAgent] gitBranch is required for permission request event');
+    }
+
     const event: AgentEvent<PermissionPayload> = {
       id: crypto.randomUUID(),
       type: 'permission:request',
       agent: 'claude_code',
-      agentId: context?.agentId,
+      agentId,
       sessionId,
       workspacePath,
+      gitBranch,
       timestamp: new Date().toISOString(),
       payload: {
         toolName,
@@ -194,9 +193,34 @@ export class ClaudeCodeAgent
     this.eventRegistry = createEventRegistry();
     this.hookBridge = createSDKHookBridge(this.eventRegistry, {
       debug: this.debugHooks,
+      getContext: () => {
+        if (!this.agentId) {
+          throw new Error(
+            '[ClaudeCodeAgent] agentId not set. Call setAgentId() before using hooks.'
+          );
+        }
+        if (!this.currentGitBranch) {
+          throw new Error(
+            '[ClaudeCodeAgent] gitBranch not set. Call setGitBranch() before using hooks.'
+          );
+        }
+        return {
+          agentId: this.agentId,
+          gitBranch: this.currentGitBranch,
+        };
+      },
     });
     // Avoid double-emitting permission requests when canUseTool handles them.
     delete this.hookBridge.hooks.PermissionRequest;
+
+    // Initialize query executor (injected or default SdkQueryExecutor)
+    this.queryExecutor =
+      config.queryExecutor ??
+      new SdkQueryExecutor({
+        hooks: this.hookBridge.hooks,
+        canUseTool: this.canUseTool,
+      });
+
     this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
       this.currentSessionId = event.payload.sessionId;
       return { action: 'continue' };
@@ -229,7 +253,7 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // IProcessLifecycle Implementation
+  // Lifecycle Management
   // ============================================
 
   async initialize(): Promise<Result<void, AgentError>> {
@@ -264,6 +288,40 @@ export class ClaudeCodeAgent
     this.removeAllListeners();
   }
 
+  // ============================================
+  // Context Management
+  // ============================================
+
+  /**
+   * Set the agent ID for this instance.
+   * Must be called before using hooks that require context.
+   */
+  setAgentId(agentId: string): void {
+    this.agentId = agentId;
+  }
+
+  /**
+   * Set the current git branch for context.
+   * Must be called before using hooks that require context.
+   */
+  setGitBranch(gitBranch: string): void {
+    this.currentGitBranch = gitBranch;
+  }
+
+  /**
+   * Get the current agent ID
+   */
+  getAgentId(): string | null {
+    return this.agentId;
+  }
+
+  /**
+   * Get the current git branch
+   */
+  getGitBranch(): string | null {
+    return this.currentGitBranch;
+  }
+
   /**
    * Check if the agent is initialized
    */
@@ -286,73 +344,89 @@ export class ClaudeCodeAgent
   /**
    * Execute a single query attempt and collect messages.
    *
+   * Uses the injected QueryExecutor for SDK-agnostic query execution.
+   *
    * @param prompt - The prompt to send
-   * @param options - SDK query options (must include abortController)
+   * @param options - Query execution options
    * @param onChunk - Optional streaming callback for plain text
    * @param onStructuredChunk - Optional structured streaming callback for content blocks
    * @returns Result with GenerateResponse or AgentError
    */
   private async executeQuery(
     prompt: string,
-    options: Partial<Options>,
+    options: QueryOptions,
     onChunk?: StreamCallback,
     onStructuredChunk?: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>> {
     const queryId = crypto.randomUUID();
-    const abortController = options.abortController!;
+    const abortController = options.abortController ?? new AbortController();
 
     try {
-      const queryResult = query({ prompt, options });
-
       const handle: QueryHandle = {
         id: queryId,
-        query: queryResult,
         abortController,
         startTime: Date.now(),
       };
       this.activeQueries.set(queryId, handle);
 
       console.log(`[ClaudeCodeAgent] Starting query ${queryId}`);
-      console.log(`[ClaudeCodeAgent] Query Result:`, queryResult);
 
-      const messages: SDKMessage[] = [];
-      for await (const message of queryResult) {
-        console.log(`[ClaudeCodeAgent] Query ${queryId} received message:`, message);
+      const messages: QueryMessageUnion[] = [];
+      let assistantContent = '';
+
+      for await (const message of this.queryExecutor.execute(prompt, options)) {
+        console.log(`[ClaudeCodeAgent] Query ${queryId} received message:`, message.type);
         messages.push(message);
 
+        // Process stream events for callbacks
         if (message.type === 'stream_event') {
+          const { textChunk, structuredChunk } = message.data;
+
           // Plain text streaming callback (backward compatible)
-          if (onChunk) {
-            const chunk = extractStreamingChunk(message);
-            if (chunk) {
-              onChunk(chunk);
-            }
+          if (onChunk && textChunk) {
+            onChunk(textChunk);
           }
 
           // Structured streaming callback (content blocks)
-          if (onStructuredChunk) {
-            const structuredChunk = extractStructuredStreamingChunk(message);
-            if (structuredChunk) {
-              onStructuredChunk(structuredChunk);
-            }
+          if (onStructuredChunk && structuredChunk) {
+            onStructuredChunk(structuredChunk);
           }
+        }
+
+        // Accumulate assistant content
+        if (message.type === 'assistant') {
+          assistantContent += message.data.content;
         }
       }
 
       console.log(`[ClaudeCodeAgent] Completed query ${queryId} with ${messages.length} messages`);
       this.activeQueries.delete(queryId);
 
-      const resultMessage = findResultMessage(messages);
+      // Find the result message
+      const resultMessage = messages.find((m): m is QueryResultMessage => m.type === 'result');
+
       if (!resultMessage) {
         console.error(`[ClaudeCodeAgent] No result message found for query ${queryId}`);
         return err(noResultError());
       }
 
-      if (isResultError(resultMessage)) {
-        return err(mapSdkResultError(resultMessage));
+      if (resultMessage.data.isError) {
+        return err(mapQueryResultError(resultMessage));
       }
 
-      return ok(mapSdkMessagesToResponse(messages, resultMessage));
+      // Build GenerateResponse from collected messages
+      const content = resultMessage.data.content ?? assistantContent;
+      const tokensUsed = resultMessage.data.usage
+        ? (resultMessage.data.usage.inputTokens ?? 0) + (resultMessage.data.usage.outputTokens ?? 0)
+        : undefined;
+
+      return ok({
+        content: content.trim(),
+        sessionId: resultMessage.data.sessionId ?? '',
+        messageId: resultMessage.data.uuid ?? crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        tokensUsed,
+      });
     } catch (error) {
       this.activeQueries.delete(queryId);
       throw error; // Re-throw for runQuery to handle fallback
@@ -360,7 +434,7 @@ export class ClaudeCodeAgent
   }
 
   /**
-   * Central method for executing SDK queries with resume fallback logic.
+   * Central method for executing queries with resume fallback logic.
    *
    * When a sessionId is provided, this method:
    * 1. First tries to resume the session using `options.resume`
@@ -368,29 +442,29 @@ export class ClaudeCodeAgent
    *    with `extraArgs['session-id']`
    *
    * @param prompt - The prompt to send to Claude
-   * @param options - SDK query options
+   * @param options - Query execution options
    * @param onChunk - Optional streaming callback for partial messages (plain text)
    * @param onStructuredChunk - Optional structured streaming callback (content blocks)
    * @returns Result with GenerateResponse or AgentError
    */
   private async runQuery(
     prompt: string,
-    options: Partial<Options>,
+    options: QueryOptions,
     onChunk?: StreamCallback,
     onStructuredChunk?: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>> {
     const abortController = options.abortController ?? new AbortController();
-    const baseOptions: Partial<Options> = {
+    const baseOptions: QueryOptions = {
       ...options,
       abortController,
     };
 
     // Extract sessionId from extraArgs if present (for fallback scenario)
-    const sessionId = baseOptions.extraArgs?.['session-id'] as string | undefined;
+    const sessionId = baseOptions.extraArgs?.['session-id'];
 
     // If we have a sessionId, try resume first
     if (sessionId) {
-      const resumeOptions: Partial<Options> = {
+      const resumeOptions: QueryOptions = {
         ...baseOptions,
         resume: sessionId,
         extraArgs: undefined, // Remove extraArgs when using resume
@@ -408,7 +482,7 @@ export class ClaudeCodeAgent
 
         // Create a new AbortController for the retry
         const retryAbortController = new AbortController();
-        const fallbackOptions: Partial<Options> = {
+        const fallbackOptions: QueryOptions = {
           ...baseOptions,
           abortController: retryAbortController,
           resume: undefined, // Clear resume
@@ -432,7 +506,7 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // ICodingAgentProvider Implementation
+  // Generation
   // ============================================
 
   async generate(request: GenerateRequest): Promise<Result<GenerateResponse, AgentError>> {
@@ -483,7 +557,7 @@ export class ClaudeCodeAgent
   }
 
   /**
-   * Build SDK query options from a generate request.
+   * Build query options from a generate request.
    *
    * Note: Session handling (resume vs new session) is handled by runQuery(),
    * which tries resume first and falls back to extraArgs['session-id'].
@@ -496,36 +570,61 @@ export class ClaudeCodeAgent
     request: GenerateRequest,
     abortController: AbortController,
     streaming = false
-  ): Partial<Options> {
-    const options: Partial<Options> = {
+  ): QueryOptions {
+    const options: QueryOptions = {
       cwd: request.workingDirectory,
       abortController,
-      hooks: this.hookBridge.hooks,
-      canUseTool: this.canUseTool,
-      tools: { type: 'preset', preset: 'claude_code' },
+      systemPrompt: request.systemPrompt,
+      context: {
+        agentId: request.agentId,
+        sessionId: request.sessionId,
+        workspacePath: request.workingDirectory,
+      },
     };
-    this.currentWorkspacePath = options.cwd ?? null;
+    // Validate and set ALL required instance properties so canUseTool can access them
+    // (SDK may pass a different signal, so queryContexts lookup may fail)
+    if (!request.agentId) {
+      throw new Error('[ClaudeCodeAgent] request.agentId is required for generate requests');
+    }
+    if (!request.sessionId) {
+      throw new Error('[ClaudeCodeAgent] request.sessionId is required for generate requests');
+    }
+    if (!request.workingDirectory) {
+      throw new Error(
+        '[ClaudeCodeAgent] request.workingDirectory is required for generate requests'
+      );
+    }
 
-    // Handle system prompt
-    if (request.systemPrompt) {
-      options.systemPrompt = {
-        type: 'preset',
-        preset: 'claude_code',
-        append: request.systemPrompt,
-      };
-    } else {
-      options.systemPrompt = { type: 'preset', preset: 'claude_code' };
+    this.agentId = request.agentId;
+    this.currentSessionId = request.sessionId;
+    this.currentWorkspacePath = request.workingDirectory;
+
+    // Resolve git branch from workingDirectory
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: request.workingDirectory,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (!branch) {
+        throw new Error('git returned empty branch name');
+      }
+      this.currentGitBranch = branch;
+    } catch (error) {
+      throw new Error(
+        `[ClaudeCodeAgent] Failed to resolve git branch for ${request.workingDirectory}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
-    if (request.sessionId) {
-      options.extraArgs = { 'session-id': request.sessionId };
-    }
+    options.extraArgs = { 'session-id': request.sessionId };
 
     this.queryContexts.set(abortController.signal, {
       agentId: request.agentId,
       sessionId: request.sessionId,
       workspacePath: options.cwd ?? undefined,
+      gitBranch: this.currentGitBranch ?? undefined,
     });
 
     // Enable streaming partial messages
@@ -537,7 +636,7 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // ISessionResumable Implementation
+  // Session Continuation
   // ============================================
 
   async continueSession(
@@ -570,7 +669,7 @@ export class ClaudeCodeAgent
   }
 
   /**
-   * Build SDK options for session continuation.
+   * Build query options for session continuation.
    *
    * Note: For 'id' and 'name' identifiers, we use extraArgs['session-id']
    * and let runQuery() handle the resume fallback logic.
@@ -580,18 +679,62 @@ export class ClaudeCodeAgent
     abortController: AbortController,
     continueOptions?: ContinueOptions,
     streaming = false
-  ): Partial<Options> {
-    const options: Partial<Options> = {
+  ): QueryOptions {
+    // Derive sessionId from identifier
+    const sessionId =
+      identifier.type === 'id' || identifier.type === 'name' ? identifier.value : undefined;
+
+    const options: QueryOptions = {
       cwd: continueOptions?.workingDirectory,
       abortController,
-      hooks: this.hookBridge.hooks,
-      canUseTool: this.canUseTool,
-      tools: { type: 'preset', preset: 'claude_code' },
-      systemPrompt: { type: 'preset', preset: 'claude_code' },
+      context: {
+        agentId: continueOptions?.agentId,
+        sessionId,
+        workspacePath: continueOptions?.workingDirectory,
+      },
     };
-    this.currentWorkspacePath = options.cwd ?? null;
 
-    // Map SessionIdentifier to SDK options
+    // Validate and set ALL required instance properties so canUseTool can access them
+    // (SDK may pass a different signal, so queryContexts lookup may fail)
+    if (!continueOptions?.agentId) {
+      throw new Error(
+        '[ClaudeCodeAgent] continueOptions.agentId is required for continue requests'
+      );
+    }
+    if (!sessionId) {
+      throw new Error(
+        '[ClaudeCodeAgent] sessionId is required for continue requests (use id or name identifier)'
+      );
+    }
+    if (!continueOptions?.workingDirectory) {
+      throw new Error(
+        '[ClaudeCodeAgent] continueOptions.workingDirectory is required for continue requests'
+      );
+    }
+
+    this.agentId = continueOptions.agentId;
+    this.currentSessionId = sessionId;
+    this.currentWorkspacePath = continueOptions.workingDirectory;
+
+    // Resolve git branch from workingDirectory
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: continueOptions.workingDirectory,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (!branch) {
+        throw new Error('git returned empty branch name');
+      }
+      this.currentGitBranch = branch;
+    } catch (error) {
+      throw new Error(
+        `[ClaudeCodeAgent] Failed to resolve git branch for ${continueOptions.workingDirectory}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    // Map SessionIdentifier to query options
     switch (identifier.type) {
       case 'latest':
         // 'latest' uses continue: true (no session ID)
@@ -605,9 +748,10 @@ export class ClaudeCodeAgent
     }
 
     this.queryContexts.set(abortController.signal, {
-      agentId: continueOptions?.agentId,
-      sessionId: identifier.type === 'id' ? identifier.value : undefined,
-      workspacePath: options.cwd ?? undefined,
+      agentId: continueOptions.agentId,
+      sessionId,
+      workspacePath: continueOptions.workingDirectory,
+      gitBranch: this.currentGitBranch ?? undefined,
     });
 
     if (streaming) {
@@ -618,7 +762,7 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // ISessionForkable Implementation
+  // Session Forking
   // ============================================
 
   async forkSession(options: ForkOptions): Promise<Result<SessionInfo, AgentError>> {
@@ -713,18 +857,14 @@ export class ClaudeCodeAgent
     } else {
       // For same-directory forks with worktree, use SDK's built-in fork mechanism
       const abortController = new AbortController();
-      const sdkOptions: Partial<Options> = {
+      const queryOptions: QueryOptions = {
         abortController,
-        hooks: this.hookBridge.hooks,
-        canUseTool: this.canUseTool,
-        tools: { type: 'preset', preset: 'claude_code' },
-        systemPrompt: { type: 'preset', preset: 'claude_code' },
         resume: sourceSessionId,
         forkSession: true,
       };
 
       try {
-        await this.executeQuery('', sdkOptions);
+        await this.executeQuery('', queryOptions);
       } catch (error) {
         console.error('[ClaudeCodeAgent] Failed to create forked session via SDK', { error });
       }
@@ -742,8 +882,7 @@ export class ClaudeCodeAgent
   }
 
   // ============================================
-  // IChatHistoryProvider Implementation
-  // (Filesystem-based - unchanged from CLI version)
+  // Chat History (Filesystem-based)
   // ============================================
 
   /**
@@ -772,20 +911,20 @@ export class ClaudeCodeAgent
 
   /**
    * Check if a session file exists for the given session ID and workspace path.
-   * A session is considered "active" if its JSONL file exists on disk.
+   * This verifies file existence on disk, not runtime session state.
    */
-  async checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
+  async sessionFileExists(sessionId: string, workspacePath: string): Promise<boolean> {
     const encodedPath = this.encodeWorkspacePath(workspacePath);
     const sessionFilePath = path.join(this.getProjectsDir(), encodedPath, `${sessionId}.jsonl`);
-    const res = fs.existsSync(sessionFilePath);
+    const exists = fs.existsSync(sessionFilePath);
 
-    console.log('[ClaudeCodeAgent] Checking session active', {
+    console.log('[ClaudeCodeAgent] Checking session file exists', {
       sessionId,
       workspacePath,
       sessionFilePath,
-      res,
+      exists,
     });
-    return res;
+    return exists;
   }
 
   async getSessionModificationTimes(
@@ -950,7 +1089,7 @@ export class ClaudeCodeAgent
     }
   }
 
-  async getFilteredSession(
+  async getSession(
     sessionId: string,
     filter?: MessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {

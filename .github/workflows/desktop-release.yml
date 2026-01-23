@@ -62,6 +62,34 @@ jobs:
       - name: Build shared package
         run: npm run build --workspace=@agent-orchestrator/shared
 
+      - name: Setup macOS signing keychain
+        if: runner.os == 'macOS'
+        run: |
+          # Create a temporary keychain for CI
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create and configure keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$CSC_LINK" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -k "$KEYCHAIN_PATH" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+
+          # Allow codesign to access keychain without prompts
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add to keychain search list (prepend so it's checked first)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          # Export for electron-builder
+          echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> $GITHUB_ENV
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
       - name: Prepare Apple API Key
         if: runner.os == 'macOS'
         run: |

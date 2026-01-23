@@ -64,6 +64,9 @@ export type AgentEventType =
 
 /**
  * Base interface for all agent events
+ *
+ * Context fields (agentId, sessionId, workspacePath, gitBranch) are REQUIRED
+ * to ensure proper event routing and context preservation.
  */
 export interface AgentEvent<T = unknown> {
   /** Unique event identifier */
@@ -75,14 +78,17 @@ export interface AgentEvent<T = unknown> {
   /** Agent that emitted the event */
   agent: AgentType;
 
-  /** Agent node identifier (if available) */
-  agentId?: string;
+  /** Agent node identifier - REQUIRED for routing to correct terminal */
+  agentId: string;
 
-  /** Session identifier (if available) */
-  sessionId?: string;
+  /** Session identifier - REQUIRED for response routing */
+  sessionId: string;
 
-  /** Workspace/project path */
-  workspacePath?: string;
+  /** Workspace/project path - REQUIRED for context */
+  workspacePath: string;
+
+  /** Git branch - REQUIRED for context display */
+  gitBranch: string;
 
   /** ISO 8601 timestamp */
   timestamp: string;

@@ -1304,11 +1304,12 @@
 }
 
 .issues-pill.expanded {
-  width: 400px;
+  width: 480px;
 }
 
 .issues-pill.square {
   height: 500px;
+  max-height: 80vh;
 }
 
 .issues-pill.cursor-pointer:hover:not(.square) {

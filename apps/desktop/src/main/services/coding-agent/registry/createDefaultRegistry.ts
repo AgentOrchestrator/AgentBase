@@ -10,7 +10,7 @@
  * ```
  */
 
-import { ClaudeCodeAgent } from '../implementations';
+import { ClaudeCodeAgent } from '../ClaudeCodeAgent';
 import type { CodingAgentType } from '../types';
 import { ProviderRegistry } from './ProviderRegistry';
 

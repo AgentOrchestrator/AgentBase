@@ -1,5 +1,5 @@
 /**
- * ProviderRegistry - manages IChatHistoryProvider instances
+ * ProviderRegistry - manages CodingAgent instances
  *
  * Provides centralized access to chat history providers with:
  * - Registration and lookup by agent type
@@ -19,7 +19,7 @@
  * ```
  */
 
-import type { IChatHistoryProvider } from '../interfaces';
+import type { CodingAgent } from '../CodingAgent';
 import type {
   AgentError,
   CodingAgentSessionContent,
@@ -48,7 +48,7 @@ export interface ProviderMessageFilterOptions extends MessageFilterOptions {
 }
 
 export class ProviderRegistry {
-  private providers = new Map<CodingAgentType, IChatHistoryProvider>();
+  private providers = new Map<CodingAgentType, CodingAgent>();
 
   // ============================================
   // Registration
@@ -58,7 +58,7 @@ export class ProviderRegistry {
    * Register a provider for an agent type
    * Replaces any existing provider for the same type
    */
-  register(agentType: CodingAgentType, provider: IChatHistoryProvider): void {
+  register(agentType: CodingAgentType, provider: CodingAgent): void {
     this.providers.set(agentType, provider);
   }
 
@@ -77,14 +77,14 @@ export class ProviderRegistry {
   /**
    * Get a specific provider by agent type
    */
-  getProvider(agentType: CodingAgentType): IChatHistoryProvider | undefined {
+  getProvider(agentType: CodingAgentType): CodingAgent | undefined {
     return this.providers.get(agentType);
   }
 
   /**
    * Get all registered providers
    */
-  getAll(): IChatHistoryProvider[] {
+  getAll(): CodingAgent[] {
     return Array.from(this.providers.values());
   }
 
@@ -176,7 +176,7 @@ export class ProviderRegistry {
   }
 
   /**
-   * Get a filtered session by ID
+   * Get session content by ID
    *
    * If agent is specified, queries only that provider.
    * Otherwise, searches all providers until found.
@@ -185,7 +185,7 @@ export class ProviderRegistry {
    * @param filter - Optional filter with agent hint
    * @returns Session content or null if not found
    */
-  async getFilteredSession(
+  async getSession(
     sessionId: string,
     filter?: ProviderMessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>> {
@@ -200,13 +200,13 @@ export class ProviderRegistry {
           )
         );
       }
-      return provider.getFilteredSession(sessionId, filter);
+      return provider.getSession(sessionId, filter);
     }
 
     // Search all providers
     for (const [agentType, provider] of this.providers) {
       try {
-        const result = await provider.getFilteredSession(sessionId, filter);
+        const result = await provider.getSession(sessionId, filter);
         if (result.success && result.data !== null) {
           return result;
         }

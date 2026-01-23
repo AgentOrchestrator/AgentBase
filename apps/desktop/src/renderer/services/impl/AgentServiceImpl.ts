@@ -549,6 +549,20 @@ export class AgentServiceImpl implements IAgentService {
     workspacePath: string,
     sessionId: string
   ): Promise<GenerateResponse> {
+    // Validate all required fields before sending request
+    if (!prompt) {
+      throw new Error('[AgentService] prompt is required for sendMessage');
+    }
+    if (!workspacePath) {
+      throw new Error('[AgentService] workspacePath is required for sendMessage');
+    }
+    if (!sessionId) {
+      throw new Error('[AgentService] sessionId is required for sendMessage');
+    }
+    if (!this.agentId) {
+      throw new Error('[AgentService] agentId is not set - service not properly initialized');
+    }
+
     const adapter = this.requireAdapter();
 
     this.updateStatus('running');
@@ -590,6 +604,20 @@ export class AgentServiceImpl implements IAgentService {
     sessionId: string,
     onChunk: StreamCallback
   ): Promise<GenerateResponse> {
+    // Validate all required fields before sending request
+    if (!prompt) {
+      throw new Error('[AgentService] prompt is required for sendMessageStreaming');
+    }
+    if (!workspacePath) {
+      throw new Error('[AgentService] workspacePath is required for sendMessageStreaming');
+    }
+    if (!sessionId) {
+      throw new Error('[AgentService] sessionId is required for sendMessageStreaming');
+    }
+    if (!this.agentId) {
+      throw new Error('[AgentService] agentId is not set - service not properly initialized');
+    }
+
     const adapter = this.requireAdapter();
 
     this.updateStatus('running');
@@ -635,6 +663,22 @@ export class AgentServiceImpl implements IAgentService {
     sessionId: string,
     onChunk: StructuredStreamCallback
   ): Promise<GenerateResponse> {
+    // Validate all required fields before sending request
+    if (!prompt) {
+      throw new Error('[AgentService] prompt is required for sendMessageStreamingStructured');
+    }
+    if (!workspacePath) {
+      throw new Error(
+        '[AgentService] workspacePath is required for sendMessageStreamingStructured'
+      );
+    }
+    if (!sessionId) {
+      throw new Error('[AgentService] sessionId is required for sendMessageStreamingStructured');
+    }
+    if (!this.agentId) {
+      throw new Error('[AgentService] agentId is not set - service not properly initialized');
+    }
+
     const adapter = this.requireAdapter();
 
     // Check if adapter supports structured streaming
@@ -702,18 +746,18 @@ export class AgentServiceImpl implements IAgentService {
       filter,
     });
 
-    const result = await adapter.getFilteredSession(sessionId, filterWithWorkspace);
+    const result = await adapter.getSession(sessionId, filterWithWorkspace);
     return this.unwrapResult(result);
   }
 
   /**
-   * Check if a session is active (file exists).
+   * Check if a session file exists on disk.
    * @param sessionId - Session ID to check
    * @param workspacePath - Working directory to scope session lookup
    */
   async isSessionActive(sessionId: string, workspacePath: string): Promise<boolean> {
     const adapter = this.requireAdapter();
-    return adapter.checkSessionActive(sessionId, workspacePath);
+    return adapter.sessionFileExists(sessionId, workspacePath);
   }
 
   /**
