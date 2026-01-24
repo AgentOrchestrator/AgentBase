@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import { useActionPillHighlight, useActiveAgent } from './hooks';
+import { useActionPillHighlight, useSelectedAgent } from './hooks';
 import { MessagePillPresentation } from './MessagePillPresentation';
 import { selectCanSend, useMessagePillStore } from './store/messagePillStore';
 
@@ -25,8 +25,8 @@ export function MessagePill() {
   const clearInput = useMessagePillStore((state) => state.clearInput);
   const addToHistory = useMessagePillStore((state) => state.addToHistory);
 
-  // Get active agent and channel from ActionPill (uses activeActionIndex)
-  const { agentId, channel } = useActiveAgent();
+  // Get selected agent and channel from ActionPill (uses selectedActionIndex)
+  const { agentId, channel } = useSelectedAgent();
 
   // Get highlighted agent for pill display
   const { highlightedAgentId } = useActionPillHighlight();

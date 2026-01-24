@@ -14,6 +14,7 @@ import AgentOverviewView from '../../AgentOverviewView';
 import AgentTerminalView from '../../AgentTerminalView';
 import AttachmentHeader from '../../AttachmentHeader';
 import { useAgentService, useTerminalService } from '../../context';
+import { useActionPillStore } from '../../features/action-pill/store';
 import { useAgentViewMode, useSessionOverview } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import IssueDetailsModal from '../../IssueDetailsModal';
@@ -59,6 +60,7 @@ export function AgentNodePresentation({
 }: AgentNodePresentationProps) {
   const agent = useAgentService();
   const terminalService = useTerminalService();
+  const selectAgent = useActionPillStore((s) => s.selectAgent);
   const isSessionReady = sessionReadiness === 'ready';
 
   // Use centralized view mode management with terminal lifecycle coordination
@@ -276,6 +278,11 @@ export function AgentNodePresentation({
 
   // Start polling when node is clicked and forking is false
   const handleNodeClick = useCallback(() => {
+    // Select this agent in the action pill store
+    if (data.agentId) {
+      selectAgent(data.agentId);
+    }
+
     if (forking || !data.sessionId || !workspacePath) {
       return;
     }
@@ -295,7 +302,7 @@ export function AgentNodePresentation({
     }, 5000);
 
     console.log('[AgentNode] Started polling for JSONL file');
-  }, [forking, data.sessionId, workspacePath, checkJsonlFile]);
+  }, [forking, data.sessionId, data.agentId, workspacePath, checkJsonlFile, selectAgent]);
 
   // Cleanup polling on unmount or when forking becomes true
   useEffect(() => {

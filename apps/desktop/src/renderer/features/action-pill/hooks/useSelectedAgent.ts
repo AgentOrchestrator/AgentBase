@@ -1,7 +1,7 @@
 /**
- * useActiveAgent Hook
+ * useSelectedAgent Hook
  *
- * Provides the active agent's information and message channel
+ * Provides the selected agent's information and message channel
  * based on the currently selected action.
  *
  * Used by MessagePill to send messages to the correct agent
@@ -10,24 +10,24 @@
 
 import { useMemo } from 'react';
 import { createMessageChannel, type MessageChannel } from '../services/MessageChannel';
-import { selectActiveAction, useActionPillStore } from '../store';
+import { selectSelectedAction, useActionPillStore } from '../store';
 
-export interface ActiveAgentState {
-  /** The agent ID of the currently active action */
+export interface SelectedAgentState {
+  /** The agent ID of the currently selected action */
   agentId: string | null;
   /** Message channel for sending to this agent (null if no valid target) */
   channel: MessageChannel | null;
 }
 
 /**
- * Hook to get the active agent's information and message channel.
+ * Hook to get the selected agent's information and message channel.
  *
- * The active agent is determined by the activeActionIndex in the store,
+ * The selected agent is determined by the selectedActionIndex in the store,
  * which cycles through sorted actions when user presses ArrowUp/ArrowDown.
  *
  * @example
  * ```tsx
- * const { agentId, channel } = useActiveAgent();
+ * const { agentId, channel } = useSelectedAgent();
  *
  * const handleSend = async () => {
  *   if (channel) {
@@ -36,16 +36,16 @@ export interface ActiveAgentState {
  * };
  * ```
  */
-export function useActiveAgent(): ActiveAgentState {
-  const activeAction = useActionPillStore(selectActiveAction);
+export function useSelectedAgent(): SelectedAgentState {
+  const selectedAction = useActionPillStore(selectSelectedAction);
 
   // Memoize channel creation to avoid recreating on every render
   const channel = useMemo(() => {
-    if (!activeAction) return null;
-    return createMessageChannel(activeAction);
-  }, [activeAction]);
+    if (!selectedAction) return null;
+    return createMessageChannel(selectedAction);
+  }, [selectedAction]);
 
-  if (!activeAction) {
+  if (!selectedAction) {
     return {
       agentId: null,
       channel: null,
@@ -53,7 +53,7 @@ export function useActiveAgent(): ActiveAgentState {
   }
 
   return {
-    agentId: activeAction.agentId,
+    agentId: selectedAction.agentId,
     channel,
   };
 }

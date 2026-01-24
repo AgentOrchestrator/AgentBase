@@ -4,8 +4,8 @@
 
 export {
   selectActionCount,
-  selectActiveAction,
   selectHasActions,
+  selectSelectedAction,
   selectSortedActions,
   selectTopmostAction,
   useActionPillStore,

@@ -35,8 +35,10 @@ describe('ActionPillStore', () => {
         isContentVisible: false,
         isTextVisible: true,
       },
+      selectedAgentId: null,
       actionAnswers: {},
       submittingActions: new Set(),
+      dismissingActions: new Set(),
       highlightedAgentId: null,
     });
     vi.useFakeTimers();
@@ -104,6 +106,16 @@ describe('ActionPillStore', () => {
       expect(state.highlightedAgentId).toBeNull();
     });
 
+    it('should preserve selectedAgentId when actions are removed', () => {
+      const action = createMockToolApproval('action-1', 'agent-1');
+      useActionPillStore.getState().addAction(action);
+      useActionPillStore.getState().selectAgent('agent-1');
+      useActionPillStore.getState().removeAction('action-1');
+
+      // Selection is preserved even when agent has no more actions
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-1');
+    });
+
     it('should update highlightedAgentId to next action when current is removed', () => {
       const action1 = createMockToolApproval('action-1', 'agent-1');
       const action2 = createMockToolApproval('action-2', 'agent-2');
@@ -115,9 +127,9 @@ describe('ActionPillStore', () => {
       // Use expand() to properly set highlightedAgentId (not just setState)
       useActionPillStore.getState().expand();
 
-      // Check initial state
+      // Check initial state - first action is highlighted by default
       const state = useActionPillStore.getState();
-      expect(state.highlightedAgentId).toBe('agent-1'); // First action (earliest timestamp)
+      expect(state.highlightedAgentId).toBe('agent-1');
 
       // Remove first action
       useActionPillStore.getState().removeAction('action-1');
@@ -167,6 +179,41 @@ describe('ActionPillStore', () => {
       expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-1');
     });
 
+    it('should use pre-selected agent when expanding if it has actions', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      // Add actions with different timestamps
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+
+      // Pre-select agent-2 while collapsed
+      useActionPillStore.getState().selectAgent('agent-2');
+
+      // Verify selection was stored but highlight not updated (collapsed)
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-2');
+      expect(useActionPillStore.getState().highlightedAgentId).toBeNull();
+
+      // Now expand - should use the pre-selected agent
+      useActionPillStore.getState().expand();
+
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-2');
+    });
+
+    it('should fall back to first action agent when selected agent has no actions', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+
+      // Select an agent that has no actions
+      useActionPillStore.getState().selectAgent('agent-nonexistent');
+
+      // Expand - should fall back to first action's agent
+      useActionPillStore.getState().expand();
+
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-1');
+    });
+
     it('should collapse the pill', () => {
       const action = createMockToolApproval('action-1', 'agent-1');
       useActionPillStore.getState().addAction(action);
@@ -180,6 +227,184 @@ describe('ActionPillStore', () => {
       const state = useActionPillStore.getState();
       expect(state.isExpanded).toBe(false);
       expect(state.highlightedAgentId).toBeNull();
+    });
+
+    it('should preserve selection when collapsing', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+      useActionPillStore.getState().expand();
+
+      // Select agent-2
+      useActionPillStore.getState().selectAgent('agent-2');
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-2');
+
+      // Collapse
+      useActionPillStore.getState().collapse();
+      vi.advanceTimersByTime(400);
+
+      // Selection should be preserved
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-2');
+      expect(useActionPillStore.getState().highlightedAgentId).toBeNull();
+
+      // Expand again - should restore to agent-2
+      useActionPillStore.getState().expand();
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-2');
+    });
+  });
+
+  describe('selectAgent', () => {
+    it('should select any agent, even without actions', () => {
+      const result = useActionPillStore.getState().selectAgent('agent-nonexistent');
+
+      expect(result).toBe(true);
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-nonexistent');
+    });
+
+    it('should select agent with actions', () => {
+      const action = createMockToolApproval('action-1', 'agent-1');
+      useActionPillStore.getState().addAction(action);
+
+      const result = useActionPillStore.getState().selectAgent('agent-1');
+
+      expect(result).toBe(true);
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-1');
+    });
+
+    it('should NOT auto-expand when selecting while collapsed', () => {
+      const action = createMockToolApproval('action-1', 'agent-1');
+      useActionPillStore.getState().addAction(action);
+
+      useActionPillStore.getState().selectAgent('agent-1');
+
+      expect(useActionPillStore.getState().isExpanded).toBe(false);
+    });
+
+    it('should update highlightedAgentId only when expanded and agent has actions', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+      useActionPillStore.getState().expand();
+
+      // Now select agent-2 while expanded
+      useActionPillStore.getState().selectAgent('agent-2');
+
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-2');
+    });
+
+    it('should not change highlight when selecting agent without actions while expanded', () => {
+      const action = createMockToolApproval('action-1', 'agent-1');
+      useActionPillStore.getState().addAction(action);
+      useActionPillStore.getState().expand();
+
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-1');
+
+      // Select agent without actions
+      useActionPillStore.getState().selectAgent('agent-nonexistent');
+
+      // Highlight falls back to first action's agent
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-1');
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-nonexistent');
+    });
+  });
+
+  describe('clearSelection', () => {
+    it('should reset selection to null', () => {
+      useActionPillStore.getState().selectAgent('agent-1');
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-1');
+
+      useActionPillStore.getState().clearSelection();
+
+      expect(useActionPillStore.getState().selectedAgentId).toBeNull();
+    });
+
+    it('should update highlightedAgentId to first action when expanded', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+      useActionPillStore.getState().expand();
+
+      // Select agent-2
+      useActionPillStore.getState().selectAgent('agent-2');
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-2');
+
+      // Clear selection
+      useActionPillStore.getState().clearSelection();
+
+      expect(useActionPillStore.getState().selectedAgentId).toBeNull();
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-1');
+    });
+
+    it('should NOT collapse the pill', () => {
+      const action = createMockToolApproval('action-1', 'agent-1');
+      useActionPillStore.getState().addAction(action);
+      useActionPillStore.getState().expand();
+
+      useActionPillStore.getState().clearSelection();
+
+      expect(useActionPillStore.getState().isExpanded).toBe(true);
+    });
+  });
+
+  describe('cycleSelectedAgent', () => {
+    it('should cycle to next agent', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+      useActionPillStore.getState().expand();
+
+      useActionPillStore.getState().cycleSelectedAgent('next');
+
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-2');
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-2');
+    });
+
+    it('should wrap around when cycling past last', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+      useActionPillStore.getState().expand();
+
+      // Cycle next twice to wrap around
+      useActionPillStore.getState().cycleSelectedAgent('next');
+      useActionPillStore.getState().cycleSelectedAgent('next');
+
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-1');
+    });
+
+    it('should cycle to previous agent', () => {
+      const action1 = createMockToolApproval('action-1', 'agent-1');
+      const action2 = createMockToolApproval('action-2', 'agent-2');
+
+      useActionPillStore.getState().addAction({ ...action1, createdAt: '2024-01-01T00:00:00Z' });
+      useActionPillStore.getState().addAction({ ...action2, createdAt: '2024-01-01T00:01:00Z' });
+      useActionPillStore.getState().expand();
+      useActionPillStore.getState().selectAgent('agent-2');
+
+      useActionPillStore.getState().cycleSelectedAgent('prev');
+
+      expect(useActionPillStore.getState().selectedAgentId).toBe('agent-1');
+      expect(useActionPillStore.getState().highlightedAgentId).toBe('agent-1');
+    });
+
+    it('should not cycle when collapsed', () => {
+      const action = createMockToolApproval('action-1', 'agent-1');
+      useActionPillStore.getState().addAction(action);
+
+      useActionPillStore.getState().cycleSelectedAgent('next');
+
+      // No change since collapsed
+      expect(useActionPillStore.getState().selectedAgentId).toBeNull();
     });
   });
 

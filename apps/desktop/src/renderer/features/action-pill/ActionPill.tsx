@@ -15,12 +15,12 @@ import './ActionPill.css';
 import { ActionPillPresentation } from './ActionPillPresentation';
 import { useActionPillHighlight, useToolCompletionService } from './hooks';
 import { actionPillService } from './services';
-import { selectActiveAction, selectSortedActions, useActionPillStore } from './store';
+import { selectSelectedAction, selectSortedActions, useActionPillStore } from './store';
 
 export function ActionPill() {
   // Store state
   const sortedActions = useActionPillStore(selectSortedActions);
-  const activeAction = useActionPillStore(selectActiveAction);
+  const selectedAction = useActionPillStore(selectSelectedAction);
   const isExpanded = useActionPillStore((state) => state.isExpanded);
   const animationState = useActionPillStore((state) => state.animationState);
   const actionAnswers = useActionPillStore((state) => state.actionAnswers);
@@ -30,7 +30,7 @@ export function ActionPill() {
   const expand = useActionPillStore((state) => state.expand);
   const collapse = useActionPillStore((state) => state.collapse);
   const updateActionAnswer = useActionPillStore((state) => state.updateActionAnswer);
-  const cycleActiveAgent = useActionPillStore((state) => state.cycleActiveAgent);
+  const cycleSelectedAgent = useActionPillStore((state) => state.cycleSelectedAgent);
 
   // Highlight state
   const { shouldHighlightPill } = useActionPillHighlight();
@@ -106,31 +106,31 @@ export function ActionPill() {
       // ArrowDown to cycle to next agent (when expanded)
       if (event.key === 'ArrowDown' && isExpanded) {
         event.preventDefault();
-        cycleActiveAgent('next');
+        cycleSelectedAgent('next');
         return;
       }
 
       // ArrowUp to cycle to previous agent (when expanded)
       if (event.key === 'ArrowUp' && isExpanded) {
         event.preventDefault();
-        cycleActiveAgent('prev');
+        cycleSelectedAgent('prev');
         return;
       }
 
-      // Enter to accept active tool approval action
-      if (event.key === 'Enter' && isExpanded && activeAction) {
-        if (activeAction.type === 'tool_approval' && !submittingActions.has(activeAction.id)) {
+      // Enter to accept selected tool approval action
+      if (event.key === 'Enter' && isExpanded && selectedAction) {
+        if (selectedAction.type === 'tool_approval' && !submittingActions.has(selectedAction.id)) {
           event.preventDefault();
-          handleToolApproval(activeAction as ToolApprovalAction, 'allow');
+          handleToolApproval(selectedAction as ToolApprovalAction, 'allow');
         }
         return;
       }
 
-      // Delete/Backspace to deny active tool approval action
-      if ((event.key === 'Delete' || event.key === 'Backspace') && isExpanded && activeAction) {
-        if (activeAction.type === 'tool_approval' && !submittingActions.has(activeAction.id)) {
+      // Delete/Backspace to deny selected tool approval action
+      if ((event.key === 'Delete' || event.key === 'Backspace') && isExpanded && selectedAction) {
+        if (selectedAction.type === 'tool_approval' && !submittingActions.has(selectedAction.id)) {
           event.preventDefault();
-          handleToolApproval(activeAction as ToolApprovalAction, 'deny');
+          handleToolApproval(selectedAction as ToolApprovalAction, 'deny');
         }
         return;
       }
@@ -145,8 +145,8 @@ export function ActionPill() {
     hasActions,
     expand,
     collapse,
-    activeAction,
-    cycleActiveAgent,
+    selectedAction,
+    cycleSelectedAgent,
     submittingActions,
     handleToolApproval,
   ]);

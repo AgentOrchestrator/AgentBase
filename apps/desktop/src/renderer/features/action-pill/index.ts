@@ -7,8 +7,13 @@
 // Main components
 export { ActionPill } from './ActionPill';
 // Hooks
-export type { ActionPillHighlightState, ActiveAgentState, MessageChannel } from './hooks';
-export { useActionPillHighlight, useActiveAgent } from './hooks';
+export type {
+  ActionPillHighlightState,
+  AgentSelectionState,
+  MessageChannel,
+  SelectedAgentState,
+} from './hooks';
+export { useActionPillHighlight, useAgentSelection, useSelectedAgent } from './hooks';
 export { MessagePill } from './MessagePill';
 // Services - ActionPill
 // Services - MessageChannel & Dispatcher
@@ -23,6 +28,7 @@ export {
   selectHasActions,
   selectHasInput,
   selectRecentHistory,
+  selectSelectedAction,
   selectSortedActions,
   selectTopmostAction,
   useActionPillStore,

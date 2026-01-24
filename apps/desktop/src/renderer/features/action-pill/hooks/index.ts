@@ -6,6 +6,8 @@
 export type { MessageChannel } from '../services/MessageChannel';
 export type { ActionPillHighlightState } from './useActionPillHighlight';
 export { useActionPillHighlight } from './useActionPillHighlight';
-export type { ActiveAgentState } from './useActiveAgent';
-export { useActiveAgent } from './useActiveAgent';
+export type { AgentSelectionState } from './useAgentSelection';
+export { useAgentSelection } from './useAgentSelection';
+export type { SelectedAgentState } from './useSelectedAgent';
+export { useSelectedAgent } from './useSelectedAgent';
 export { useToolCompletionService } from './useToolCompletionService';

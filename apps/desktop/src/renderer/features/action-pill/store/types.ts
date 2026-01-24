@@ -32,8 +32,8 @@ export interface ActionPillState {
   hasNewActions: boolean;
   animationState: PillAnimationState;
 
-  // Active agent cycling state
-  activeActionIndex: number;
+  // Selected agent (independent of action pill state)
+  selectedAgentId: string | null;
 
   // Form state for clarifying questions
   actionAnswers: Record<string, Record<string, string>>;
@@ -55,8 +55,10 @@ export interface ActionPillState {
   collapse: () => void;
   markActionsViewed: () => void;
 
-  // Actions - Cycling
-  cycleActiveAgent: (direction: 'next' | 'prev') => void;
+  // Actions - Selection
+  selectAgent: (agentId: string) => boolean;
+  clearSelection: () => void;
+  cycleSelectedAgent: (direction: 'next' | 'prev') => void;
 
   // Actions - Form
   updateActionAnswer: (actionId: string, question: string, value: string) => void;
