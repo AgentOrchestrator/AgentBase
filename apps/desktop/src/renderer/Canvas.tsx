@@ -67,9 +67,10 @@ import {
   usePendingAgent,
   usePillState,
   useSidebarState,
+  useWorktreeConfigState,
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
-import { forkService } from './services';
+import { forkService, worktreeService } from './services';
 import { forkStore, nodeStore } from './stores';
 import { createLinearIssueAttachment } from './types/attachments';
 import { getOptimalHandles, updateEdgesWithOptimalHandles } from './utils/edgeHandles';
@@ -267,6 +268,7 @@ function CanvasFlow() {
     linear.fetchIssues();
     linear.fetchProjects();
   });
+  const worktreeConfig = useWorktreeConfigState();
 
   const forkModal = useForkModal({
     nodes,
@@ -1108,17 +1110,43 @@ function CanvasFlow() {
           onClose={() => {
             canvasUI.closeNewAgentModal();
             pendingAgent.clearPending();
+            worktreeConfig.reset();
           }}
-          onCreate={(data) => {
+          onCreate={async (data) => {
+            let finalWorkspacePath = data.workspacePath;
+
+            // Create worktree if enabled
+            if (worktreeConfig.enabled && data.workspacePath) {
+              const parentDir = data.workspacePath.split('/').slice(0, -1).join('/');
+              const worktreePath = `${parentDir}/${worktreeConfig.folderName}`;
+
+              const result = await worktreeService.createWorktree(
+                data.workspacePath,
+                worktreeConfig.branchName,
+                { worktreePath }
+              );
+
+              if (!result.success) {
+                console.error('[Canvas] Failed to create worktree:', result.error);
+                alert(`Failed to create worktree: ${result.error || 'Unknown error'}`);
+                return;
+              }
+
+              // Use the worktree path for the agent
+              if (result.path) {
+                finalWorkspacePath = result.path;
+              }
+            }
+
             canvasActions.createAgentWithData({
               position: pendingAgent.pendingPosition,
               gitInfo: data.gitInfo,
               modalData: {
                 title: data.title,
                 description: data.description,
-                workspacePath: data.workspacePath,
+                workspacePath: finalWorkspacePath,
               },
-              lockedFolderPath: data.workspacePath || folderLock.lockedFolderPath,
+              lockedFolderPath: finalWorkspacePath || folderLock.lockedFolderPath,
               initialAttachments: pendingAgent.pendingLinearIssue
                 ? [
                     createLinearIssueAttachment({
@@ -1136,10 +1164,10 @@ function CanvasFlow() {
             });
             canvasUI.closeNewAgentModal();
             pendingAgent.clearPending();
+            worktreeConfig.reset();
           }}
           initialPosition={pendingAgent.pendingPosition}
           initialWorkspacePath={folderLock.lockedFolderPath}
-          autoCreateWorktree={pendingAgent.autoCreateWorktree}
           initialDescription={
             pendingAgent.pendingLinearIssue
               ? pendingAgent.pendingLinearIssue.description

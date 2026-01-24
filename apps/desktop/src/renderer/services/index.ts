@@ -39,3 +39,7 @@ export { FileBasedSessionProvider, sessionProvider } from './SessionProvider';
 
 // Shared event dispatcher (single IPC listener for agent events)
 export { sharedEventDispatcher } from './SharedEventDispatcher';
+
+// Worktree service (git worktree operations)
+export type { IWorktreeService, WorktreeResult } from './WorktreeService';
+export { WorktreeService, worktreeService } from './WorktreeService';

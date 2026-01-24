@@ -513,3 +513,79 @@
   background: var(--color-bg-primary);
   border-top: 1px solid var(--color-border);
 }
+
+/* ============================================ */
+/* Worktree Config Section (non-fork mode)      */
+/* ============================================ */
+
+.worktree-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.worktree-config-checkbox {
+  flex-shrink: 0;
+}
+
+.worktree-config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.worktree-config-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.worktree-config-label {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.worktree-config-input {
+  flex: 1;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.worktree-config-input:focus {
+  border-color: var(--color-text-secondary);
+}
+
+.worktree-config-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.worktree-config-path {
+  font-size: 11px;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
+  padding-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worktree-config-path-prefix {
+  color: var(--color-text-tertiary, #666);
+}
+
+.worktree-config-path-folder {
+  color: var(--color-text-secondary);
+}
