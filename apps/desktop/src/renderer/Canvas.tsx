@@ -1134,6 +1134,12 @@ function CanvasFlow() {
 
             // Create worktree if enabled
             if (worktreeConfig.enabled && data.workspacePath) {
+              // Validate branch and folder names
+              if (!worktreeConfig.branchName.trim() || !worktreeConfig.folderName.trim()) {
+                alert('Please provide branch and folder names for the worktree');
+                return;
+              }
+
               const parentDir = data.workspacePath.split('/').slice(0, -1).join('/');
               const worktreePath = `${parentDir}/${worktreeConfig.folderName}`;
 
@@ -1146,6 +1152,7 @@ function CanvasFlow() {
               if (!result.success) {
                 console.error('[Canvas] Failed to create worktree:', result.error);
                 alert(`Failed to create worktree: ${result.error || 'Unknown error'}`);
+                worktreeConfig.setEnabled(false);
                 return;
               }
 
