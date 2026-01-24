@@ -135,6 +135,39 @@ export interface AgentSummary {
   title: string;
   workspacePath: string;
   status?: string;
+  /** Short summary of what the agent is working on */
+  summary?: string | null;
+  /** The initial prompt/task given to the agent */
+  initialPrompt?: string;
+  /** Progress info as human-readable string */
+  progressInfo?: string;
+  /** Session ID for fetching detailed session data */
+  sessionId?: string;
+  /** Agent type (claude_code, cursor, etc.) */
+  agentType?: string;
+}
+
+/**
+ * Detailed session data for an agent
+ */
+export interface AgentSessionData {
+  agentId: string;
+  sessionId: string;
+  agentType: string;
+  workspacePath: string;
+  /** Recent messages from the session (last N) */
+  recentMessages: AgentSessionMessage[];
+  /** Total message count in session */
+  totalMessageCount: number;
+}
+
+/**
+ * A message from an agent's session
+ */
+export interface AgentSessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: number;
 }
 
 /**
@@ -167,6 +200,13 @@ export interface ICanvasStateProvider {
    * Delete an agent from the canvas
    */
   deleteAgent(agentId: string): Promise<void>;
+
+  /**
+   * Get detailed session data for an agent
+   * @param agentId - The agent ID to get session data for
+   * @param maxMessages - Maximum number of recent messages to return (default: 10)
+   */
+  getAgentSession(agentId: string, maxMessages?: number): Promise<AgentSessionData | null>;
 }
 
 // =============================================================================

@@ -6,9 +6,11 @@
  * canvas state via IPC.
  */
 
+import type { AgentProgress } from '@agent-orchestrator/shared';
 import type { Node } from '@xyflow/react';
 import { useEffect, useRef } from 'react';
 import type {
+  AgentSessionData,
   AgentSummary,
   CanvasStateHandlers,
   CreateAgentParams,
@@ -28,6 +30,33 @@ export interface UseCanvasStateRequestHandlerProps {
   addAgentNode: (params: CreateAgentParams) => Promise<{ agentId: string }>;
   /** Function to delete an agent node */
   deleteAgentNode: (agentId: string) => void;
+  /** Function to get session data for an agent */
+  getAgentSession?: (agentId: string, maxMessages?: number) => Promise<AgentSessionData | null>;
+}
+
+/**
+ * Format progress as a human-readable string
+ * Returns null if no progress info available
+ */
+function formatProgressInfo(progress: AgentProgress | null | undefined): string | null {
+  if (!progress) {
+    return null;
+  }
+
+  if (progress.type === 'percentage') {
+    return `${progress.value}%${progress.label ? ` - ${progress.label}` : ''}`;
+  }
+
+  if (progress.type === 'todoList') {
+    const completed = progress.items.filter((item) => item.completed).length;
+    const total = progress.items.length;
+    const currentTask = progress.items.find((item) => !item.completed);
+    const taskInfo = currentTask ? ` - ${currentTask.content}` : '';
+    return `${completed}/${total} tasks${taskInfo}`;
+  }
+
+  // Unknown progress type - should not happen with discriminated unions
+  return null;
 }
 
 /**
@@ -46,6 +75,11 @@ function nodeToAgentSummary(node: Node): AgentSummary | null {
     title: data.title?.value || 'Untitled Agent',
     workspacePath: data.workspacePath || '',
     status: data.status,
+    summary: data.summary,
+    initialPrompt: data.initialPrompt,
+    progressInfo: formatProgressInfo(data.progress) ?? undefined,
+    sessionId: data.sessionId,
+    agentType: data.agentType,
   };
 }
 
@@ -80,16 +114,19 @@ export function useCanvasStateRequestHandler({
   getNodes,
   addAgentNode,
   deleteAgentNode,
+  getAgentSession,
 }: UseCanvasStateRequestHandlerProps): void {
   // Use refs to always have access to latest functions without re-registering handlers
   const getNodesRef = useRef(getNodes);
   const addAgentNodeRef = useRef(addAgentNode);
   const deleteAgentNodeRef = useRef(deleteAgentNode);
+  const getAgentSessionRef = useRef(getAgentSession);
 
   // Update refs on each render
   getNodesRef.current = getNodes;
   addAgentNodeRef.current = addAgentNode;
   deleteAgentNodeRef.current = deleteAgentNode;
+  getAgentSessionRef.current = getAgentSession;
 
   useEffect(() => {
     const api = window.canvasStateRequestAPI;
@@ -127,6 +164,18 @@ export function useCanvasStateRequestHandler({
       deleteAgent: async (agentId: string) => {
         console.log('[useCanvasStateRequestHandler] deleteAgent:', { agentId });
         deleteAgentNodeRef.current(agentId);
+      },
+
+      getAgentSession: async (agentId: string, maxMessages?: number) => {
+        console.log('[useCanvasStateRequestHandler] getAgentSession:', { agentId, maxMessages });
+
+        const handler = getAgentSessionRef.current;
+        if (!handler) {
+          console.warn('[useCanvasStateRequestHandler] getAgentSession handler not provided');
+          return null;
+        }
+
+        return handler(agentId, maxMessages);
       },
     };
 

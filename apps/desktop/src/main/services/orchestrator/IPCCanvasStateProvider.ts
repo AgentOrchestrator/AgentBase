@@ -9,7 +9,12 @@
 import * as crypto from 'node:crypto';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
-import type { AgentSummary, CreateAgentParams, ICanvasStateProvider } from './interfaces';
+import type {
+  AgentSessionData,
+  AgentSummary,
+  CreateAgentParams,
+  ICanvasStateProvider,
+} from './interfaces';
 
 /**
  * IPC Channel names for canvas state operations
@@ -19,6 +24,7 @@ export const CANVAS_STATE_CHANNELS = {
   LIST_AGENTS_REQUEST: 'canvas-state:list-agents:request',
   CREATE_AGENT_REQUEST: 'canvas-state:create-agent:request',
   DELETE_AGENT_REQUEST: 'canvas-state:delete-agent:request',
+  GET_AGENT_SESSION_REQUEST: 'canvas-state:get-agent-session:request',
   // Responses use dynamic channels: canvas-state:{operation}:response:{uuid}
 } as const;
 
@@ -156,5 +162,28 @@ export class IPCCanvasStateProvider implements ICanvasStateProvider {
     console.log('[IPCCanvasStateProvider] deleteAgent: deleted', {
       agentId,
     });
+  }
+
+  /**
+   * Get detailed session data for an agent
+   */
+  async getAgentSession(agentId: string, maxMessages = 10): Promise<AgentSessionData | null> {
+    console.log('[IPCCanvasStateProvider] getAgentSession: sending request to renderer', {
+      agentId,
+      maxMessages,
+    });
+
+    const result = await this.sendRequest<AgentSessionData | null>(
+      CANVAS_STATE_CHANNELS.GET_AGENT_SESSION_REQUEST,
+      { agentId, maxMessages }
+    );
+
+    console.log('[IPCCanvasStateProvider] getAgentSession: received', {
+      agentId,
+      hasData: !!result,
+      messageCount: result?.recentMessages.length ?? 0,
+    });
+
+    return result;
   }
 }

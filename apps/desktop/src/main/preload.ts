@@ -837,9 +837,7 @@ contextBridge.exposeInMainWorld('orchestratorAPI', {
     ),
 
   getMostRecentConversation: () =>
-    unwrapResponse<OrchestratorConversation | null>(
-      ipcRenderer.invoke('orchestrator:get-most-recent-conversation')
-    ),
+    unwrapResponse<OrchestratorConversation | null>(ipcRenderer.invoke('orchestrator:get-recent')),
 
   sendMessage: async (
     conversationId: string,
@@ -881,6 +879,39 @@ export interface AgentSummary {
   title: string;
   workspacePath: string;
   status?: string;
+  /** Short summary of what the agent is working on */
+  summary?: string | null;
+  /** The initial prompt/task given to the agent */
+  initialPrompt?: string;
+  /** Progress info as human-readable string */
+  progressInfo?: string;
+  /** Session ID for fetching detailed session data */
+  sessionId?: string;
+  /** Agent type (claude_code, cursor, etc.) */
+  agentType?: string;
+}
+
+/**
+ * A message from an agent's session
+ */
+export interface AgentSessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: number;
+}
+
+/**
+ * Detailed session data for an agent
+ */
+export interface AgentSessionData {
+  agentId: string;
+  sessionId: string;
+  agentType: string;
+  workspacePath: string;
+  /** Recent messages from the session (last N) */
+  recentMessages: AgentSessionMessage[];
+  /** Total message count in session */
+  totalMessageCount: number;
 }
 
 /**
@@ -908,6 +939,7 @@ export interface CanvasStateHandlers {
   listAgents: () => Promise<AgentSummary[]>;
   createAgent: (params: CreateAgentParams) => Promise<{ agentId: string }>;
   deleteAgent: (agentId: string) => Promise<void>;
+  getAgentSession: (agentId: string, maxMessages?: number) => Promise<AgentSessionData | null>;
 }
 
 /**
@@ -974,16 +1006,38 @@ contextBridge.exposeInMainWorld('canvasStateRequestAPI', {
       }
     };
 
+    // Handler for get agent session request
+    const getAgentSessionHandler = async (
+      _event: Electron.IpcRendererEvent,
+      request: CanvasStateRequest
+    ) => {
+      try {
+        const { agentId, maxMessages } = request.payload as {
+          agentId: string;
+          maxMessages?: number;
+        };
+        const result = await handlers.getAgentSession(agentId, maxMessages);
+        ipcRenderer.invoke(request.responseChannel, { success: true, data: result });
+      } catch (error) {
+        ipcRenderer.invoke(request.responseChannel, {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
     // Register all handlers
     ipcRenderer.on('canvas-state:list-agents:request', listAgentsHandler);
     ipcRenderer.on('canvas-state:create-agent:request', createAgentHandler);
     ipcRenderer.on('canvas-state:delete-agent:request', deleteAgentHandler);
+    ipcRenderer.on('canvas-state:get-agent-session:request', getAgentSessionHandler);
 
     // Return cleanup function
     return () => {
       ipcRenderer.removeListener('canvas-state:list-agents:request', listAgentsHandler);
       ipcRenderer.removeListener('canvas-state:create-agent:request', createAgentHandler);
       ipcRenderer.removeListener('canvas-state:delete-agent:request', deleteAgentHandler);
+      ipcRenderer.removeListener('canvas-state:get-agent-session:request', getAgentSessionHandler);
     };
   },
 } as CanvasStateRequestAPI);

@@ -5,6 +5,8 @@
 export { CANVAS_STATE_CHANNELS, IPCCanvasStateProvider } from './IPCCanvasStateProvider';
 export type {
   AddOrchestratorMessageInput,
+  AgentSessionData,
+  AgentSessionMessage,
   AgentSummary,
   CreateAgentParams,
   ICanvasStateProvider,

@@ -25,8 +25,9 @@ import '@xyflow/react/dist/style.css';
 import ForkGhostNode from './ForkGhostNode';
 import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
-import type { AgentNodeData, GitInfo } from '@agent-orchestrator/shared';
+import type { AgentNodeData, CodingAgentType, GitInfo } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
+import type { AgentSessionData } from '../main/preload';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -399,11 +400,80 @@ function CanvasFlow() {
     [getNodes, nodeOps]
   );
 
+  /**
+   * Get agent session data for orchestrator's canvas/get_agent_session MCP tool.
+   * Fetches session messages from the coding agent API.
+   */
+  const getAgentSessionForOrchestrator = useCallback(
+    async (agentId: string, maxMessages = 10): Promise<AgentSessionData | null> => {
+      const currentNodes = getNodes();
+      const agentNode = currentNodes.find((node) => {
+        if (node.type !== 'agent') return false;
+        const data = node.data as unknown as AgentNodeData;
+        return data.agentId === agentId;
+      });
+
+      if (!agentNode) {
+        console.warn('[Canvas] Agent not found for session fetch:', agentId);
+        return null;
+      }
+
+      const agentData = agentNode.data as unknown as AgentNodeData;
+      const { sessionId, agentType, workspacePath } = agentData;
+
+      if (!sessionId) {
+        console.warn('[Canvas] Agent has no sessionId:', agentId);
+        return null;
+      }
+
+      try {
+        // Fetch session content from coding agent API
+        const sessionContent = await window.codingAgentAPI?.getSession(
+          agentType as CodingAgentType,
+          sessionId,
+          { lastN: maxMessages }
+        );
+
+        if (!sessionContent) {
+          return {
+            agentId,
+            sessionId,
+            agentType,
+            workspacePath,
+            recentMessages: [],
+            totalMessageCount: 0,
+          };
+        }
+
+        // Convert messages to our format
+        const recentMessages = sessionContent.messages.map((msg) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+          timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : undefined,
+        }));
+
+        return {
+          agentId,
+          sessionId,
+          agentType,
+          workspacePath,
+          recentMessages,
+          totalMessageCount: sessionContent.messages.length,
+        };
+      } catch (error) {
+        console.error('[Canvas] Failed to fetch agent session:', error);
+        return null;
+      }
+    },
+    [getNodes]
+  );
+
   // Register handlers for main process canvas state requests
   useCanvasStateRequestHandler({
     getNodes,
     addAgentNode: addAgentForOrchestrator,
     deleteAgentNode: deleteAgentForOrchestrator,
+    getAgentSession: getAgentSessionForOrchestrator,
   });
 
   // =============================================================================

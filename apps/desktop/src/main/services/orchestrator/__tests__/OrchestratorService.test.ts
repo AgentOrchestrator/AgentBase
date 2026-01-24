@@ -99,6 +99,7 @@ function createMockCanvasProvider(): ICanvasStateProvider {
     listAgents: vi.fn().mockResolvedValue([]),
     createAgent: vi.fn().mockResolvedValue({ agentId: 'new-agent-1' }),
     deleteAgent: vi.fn().mockResolvedValue(undefined),
+    getAgentSession: vi.fn().mockResolvedValue(null),
   };
 }
 

@@ -1971,6 +1971,14 @@ app.whenReady().then(async () => {
         // TODO: Implement IPC call to renderer to delete agent
         console.log('[Main] canvasStateProvider.deleteAgent() called (placeholder)', { agentId });
       },
+      async getAgentSession(agentId, maxMessages) {
+        // TODO: Implement IPC call to renderer to get agent session
+        console.log('[Main] canvasStateProvider.getAgentSession() called (placeholder)', {
+          agentId,
+          maxMessages,
+        });
+        return null;
+      },
     };
 
     orchestratorService = new OrchestratorService(database, canvasStateProvider);

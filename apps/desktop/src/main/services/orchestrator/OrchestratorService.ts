@@ -264,9 +264,14 @@ export class OrchestratorService implements IOrchestratorService {
     return `You are a meta-orchestrator for an agent canvas system. You can control agents on the canvas using MCP tools.
 
 Available tools:
-- canvas/list_agents: List all agents currently on the canvas
+- canvas/list_agents: List all agents currently on the canvas (includes id, title, status, summary, sessionId)
 - canvas/create_agent: Create a new agent with a workspace path
 - canvas/delete_agent: Delete an agent by ID
+- canvas/get_agent_session: Get detailed session data for an agent (recent messages, full context)
+
+When the user asks about what agents are doing:
+1. First use canvas/list_agents to see all agents and their summaries
+2. If more detail is needed, use canvas/get_agent_session with the agent's ID to see their recent conversation
 
 When the user asks to manage agents, use these tools to accomplish their requests.
 Be concise and helpful. Report what actions you took.`;
@@ -290,6 +295,12 @@ Be concise and helpful. Report what actions you took.`;
       case 'canvas/delete_agent':
         await this.canvasProvider.deleteAgent(input.agentId as string);
         return { success: true };
+
+      case 'canvas/get_agent_session':
+        return this.canvasProvider.getAgentSession(
+          input.agentId as string,
+          (input.maxMessages as number | undefined) ?? 10
+        );
 
       default:
         throw new Error(`Unknown MCP tool: ${toolName}`);
