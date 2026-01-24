@@ -25,7 +25,7 @@ import '@xyflow/react/dist/style.css';
 import ForkGhostNode from './ForkGhostNode';
 import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
-import type { AgentNodeData } from '@agent-orchestrator/shared';
+import type { AgentNodeData, GitInfo } from '@agent-orchestrator/shared';
 import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
@@ -48,6 +48,7 @@ import {
 } from './features';
 import { ActionPill, MessagePill, useActionPillHighlight } from './features/action-pill';
 import { NodeActionsProvider } from './features/canvas/context';
+import { useCanvasStateRequestHandler } from './features/canvas/hooks/useCanvasStateRequestHandler';
 import { useNodeOperations } from './features/canvas/hooks/useNodeOperations';
 import {
   hasPositionChanges,
@@ -74,7 +75,7 @@ import {
   useSidebarState,
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
-import { forkService } from './services';
+import { canvasNodeService, forkService } from './services';
 import { forkStore, nodeStore } from './stores';
 import { createLinearIssueAttachment } from './types/attachments';
 import { getOptimalHandles, updateEdgesWithOptimalHandles } from './utils/edgeHandles';
@@ -311,6 +312,98 @@ function CanvasFlow() {
       pendingAgent.setPending(pos);
       canvasUI.openNewAgentModal();
     },
+  });
+
+  // =============================================================================
+  // Canvas State Request Handler (for Orchestrator MCP tools)
+  // =============================================================================
+
+  /**
+   * Add agent callback for orchestrator's canvas/create_agent MCP tool.
+   * Fetches git info and creates an agent node programmatically.
+   */
+  const addAgentForOrchestrator = useCallback(
+    async (params: { workspacePath: string; title?: string; initialPrompt?: string }) => {
+      const { workspacePath, title, initialPrompt } = params;
+
+      // Fetch git info for the workspace
+      let gitInfo: GitInfo | undefined;
+      try {
+        gitInfo = await window.gitAPI?.getInfo(workspacePath);
+      } catch (error) {
+        console.warn('[Canvas] Failed to get git info for orchestrator agent:', error);
+        // Use a minimal git info structure for non-git directories
+        gitInfo = {
+          branch: 'main',
+          status: 'unknown',
+          ahead: 0,
+          behind: 0,
+        };
+      }
+
+      // Create agent node at a default position (center of viewport)
+      const position = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+
+      // Default gitInfo if fetch failed
+      const defaultGitInfo: GitInfo = {
+        branch: 'main',
+        status: 'unknown',
+        ahead: 0,
+        behind: 0,
+      };
+
+      const newNode = canvasNodeService.createAgentNode({
+        position,
+        contextMenuPosition: null,
+        screenToFlowPosition,
+        gitInfo: gitInfo || defaultGitInfo,
+        workspacePath,
+        modalData: {
+          title: title || 'Orchestrator Agent',
+          description: initialPrompt || '',
+          workspacePath,
+        },
+      });
+
+      nodeOps.addNode(newNode);
+
+      // Return the agent ID
+      const agentData = newNode.data as unknown as AgentNodeData;
+      return { agentId: agentData.agentId };
+    },
+    [screenToFlowPosition, nodeOps]
+  );
+
+  /**
+   * Delete agent callback for orchestrator's canvas/delete_agent MCP tool.
+   * Finds the node by agent ID and removes it.
+   */
+  const deleteAgentForOrchestrator = useCallback(
+    (agentId: string) => {
+      const currentNodes = getNodes();
+      const nodeToDelete = currentNodes.find((node) => {
+        if (node.type !== 'agent') return false;
+        const data = node.data as unknown as AgentNodeData;
+        return data.agentId === agentId;
+      });
+
+      if (nodeToDelete) {
+        nodeOps.removeNode(nodeToDelete.id);
+      } else {
+        console.warn('[Canvas] Agent not found for deletion:', agentId);
+      }
+    },
+    [getNodes, nodeOps]
+  );
+
+  // Register handlers for main process canvas state requests
+  useCanvasStateRequestHandler({
+    getNodes,
+    addAgentNode: addAgentForOrchestrator,
+    deleteAgentNode: deleteAgentForOrchestrator,
   });
 
   // =============================================================================

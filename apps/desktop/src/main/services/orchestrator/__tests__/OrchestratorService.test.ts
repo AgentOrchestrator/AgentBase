@@ -104,15 +104,19 @@ function createMockCanvasProvider(): ICanvasStateProvider {
 
 // Create mock child process
 function createMockProcess(outputLines: string[]): ChildProcess {
+  const stdout = new EventEmitter();
+  const stderr = new EventEmitter();
+
   const proc = new EventEmitter() as ChildProcess & EventEmitter;
-  proc.stdout = new EventEmitter() as NodeJS.ReadableStream & EventEmitter;
-  proc.stderr = new EventEmitter() as NodeJS.ReadableStream & EventEmitter;
+  // Cast through unknown to satisfy TypeScript - we only need EventEmitter behavior for tests
+  proc.stdout = stdout as unknown as ChildProcess['stdout'];
+  proc.stderr = stderr as unknown as ChildProcess['stderr'];
   proc.kill = vi.fn();
 
   // Emit output lines asynchronously
   setTimeout(() => {
     for (const line of outputLines) {
-      (proc.stdout as EventEmitter).emit('data', Buffer.from(`${line}\n`));
+      stdout.emit('data', Buffer.from(`${line}\n`));
     }
     proc.emit('close', 0);
   }, 10);
@@ -374,9 +378,11 @@ describe('OrchestratorService', () => {
     it('handles CLI crash gracefully', async () => {
       const conv = await service.createConversation();
 
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
       const proc = new EventEmitter() as ChildProcess & EventEmitter;
-      proc.stdout = new EventEmitter() as NodeJS.ReadableStream & EventEmitter;
-      proc.stderr = new EventEmitter() as NodeJS.ReadableStream & EventEmitter;
+      proc.stdout = stdout as unknown as ChildProcess['stdout'];
+      proc.stderr = stderr as unknown as ChildProcess['stderr'];
       proc.kill = vi.fn();
 
       vi.mocked(spawn).mockReturnValue(proc);
