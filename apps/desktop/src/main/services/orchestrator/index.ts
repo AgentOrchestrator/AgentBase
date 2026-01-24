@@ -2,6 +2,7 @@
  * Orchestrator Service Exports
  */
 
+export { CANVAS_STATE_CHANNELS, IPCCanvasStateProvider } from './IPCCanvasStateProvider';
 export type {
   AddOrchestratorMessageInput,
   AgentSummary,
@@ -16,4 +17,5 @@ export type {
   StreamCallback,
   ToolCall,
 } from './interfaces';
+export { registerOrchestratorIpcHandlers } from './ipc';
 export { OrchestratorService } from './OrchestratorService';

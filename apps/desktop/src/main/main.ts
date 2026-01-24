@@ -85,6 +85,11 @@ import {
 import { gitBranchService } from './services/git';
 import { DEFAULT_LLM_CONFIG, LLMServiceFactory, registerLLMIpcHandlers } from './services/llm';
 import {
+  type ICanvasStateProvider,
+  OrchestratorService,
+  registerOrchestratorIpcHandlers,
+} from './services/orchestrator';
+import {
   type AudioTransformOptions,
   type IIdGenerator,
   type ILogger,
@@ -115,6 +120,9 @@ let database: IDatabase;
 
 // AgentHooksService instance for terminal-based agent lifecycle events
 let agentHooksService: AgentHooksService;
+
+// OrchestratorService instance for meta-orchestrator functionality
+let orchestratorService: OrchestratorService;
 
 // RepresentationService instance and dependencies
 const representationLogger: ILogger = {
@@ -1944,13 +1952,43 @@ app.whenReady().then(async () => {
     // Continue without hooks service - app should still function
   }
 
+  // Initialize OrchestratorService for meta-orchestrator functionality
+  try {
+    // Create a placeholder canvas state provider
+    // This will be enhanced later to communicate with the renderer via IPC
+    const canvasStateProvider: ICanvasStateProvider = {
+      async listAgents() {
+        // TODO: Implement IPC call to renderer to get canvas agents
+        console.log('[Main] canvasStateProvider.listAgents() called (placeholder)');
+        return [];
+      },
+      async createAgent(params) {
+        // TODO: Implement IPC call to renderer to create agent
+        console.log('[Main] canvasStateProvider.createAgent() called (placeholder)', params);
+        return { agentId: 'placeholder-id' };
+      },
+      async deleteAgent(agentId) {
+        // TODO: Implement IPC call to renderer to delete agent
+        console.log('[Main] canvasStateProvider.deleteAgent() called (placeholder)', { agentId });
+      },
+    };
+
+    orchestratorService = new OrchestratorService(database, canvasStateProvider);
+    await orchestratorService.initialize();
+    registerOrchestratorIpcHandlers(orchestratorService);
+    console.log('[Main] OrchestratorService initialized successfully');
+  } catch (error) {
+    console.error('[Main] Error initializing OrchestratorService', error);
+    // Continue without orchestrator service - app should still function
+  }
+
   createWindow();
 });
 
 // Clean up on app quit
 app.on('will-quit', async () => {
   console.log(
-    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, representation service, and agent hooks service'
+    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, representation service, agent hooks service, and orchestrator service'
   );
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
@@ -1959,4 +1997,5 @@ app.on('will-quit', async () => {
   await LLMServiceFactory.dispose();
   await representationService.dispose();
   agentHooksService?.dispose();
+  orchestratorService?.dispose();
 });

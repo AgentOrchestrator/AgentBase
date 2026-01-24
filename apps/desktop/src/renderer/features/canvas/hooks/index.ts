@@ -20,6 +20,10 @@ export {
   useCanvasPersistenceStore,
 } from './useCanvasPersistenceStore';
 export {
+  type UseCanvasStateRequestHandlerProps,
+  useCanvasStateRequestHandler,
+} from './useCanvasStateRequestHandler';
+export {
   type CanvasUIStore,
   type UseCanvasUIStateReturn,
   useCanvasUIState,

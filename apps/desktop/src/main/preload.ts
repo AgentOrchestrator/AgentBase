@@ -775,3 +775,215 @@ contextBridge.exposeInMainWorld('recentWorkspacesAPI', {
   hasWorkspace: (workspacePath: string) =>
     unwrapResponse<boolean>(ipcRenderer.invoke('recent-workspaces:has', workspacePath)),
 } as RecentWorkspacesAPI);
+
+// Orchestrator types for meta-agent pill
+export interface OrchestratorHealth {
+  cliAvailable: boolean;
+  lastHealthCheck: number;
+}
+
+export interface OrchestratorConversation {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  result?: unknown;
+}
+
+export interface OrchestratorMessage {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  toolCalls?: ToolCall[];
+}
+
+export interface OrchestratorResponse {
+  content: string;
+  toolCalls?: ToolCall[];
+}
+
+export interface OrchestratorAPI {
+  getHealth(): Promise<OrchestratorHealth>;
+  createConversation(): Promise<OrchestratorConversation>;
+  getMessages(conversationId: string): Promise<OrchestratorMessage[]>;
+  getMostRecentConversation(): Promise<OrchestratorConversation | null>;
+  sendMessage(
+    conversationId: string,
+    message: string,
+    onChunk: (chunk: string) => void
+  ): Promise<OrchestratorResponse>;
+}
+
+// Expose orchestrator API for meta-agent pill
+contextBridge.exposeInMainWorld('orchestratorAPI', {
+  getHealth: () =>
+    unwrapResponse<OrchestratorHealth>(ipcRenderer.invoke('orchestrator:get-health')),
+
+  createConversation: () =>
+    unwrapResponse<OrchestratorConversation>(
+      ipcRenderer.invoke('orchestrator:create-conversation')
+    ),
+
+  getMessages: (conversationId: string) =>
+    unwrapResponse<OrchestratorMessage[]>(
+      ipcRenderer.invoke('orchestrator:get-messages', conversationId)
+    ),
+
+  getMostRecentConversation: () =>
+    unwrapResponse<OrchestratorConversation | null>(
+      ipcRenderer.invoke('orchestrator:get-most-recent-conversation')
+    ),
+
+  sendMessage: async (
+    conversationId: string,
+    message: string,
+    onChunk: (chunk: string) => void
+  ) => {
+    const requestId = globalThis.crypto.randomUUID();
+
+    // Set up chunk listener
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { requestId: string; chunk: string }
+    ) => {
+      if (data.requestId === requestId) {
+        onChunk(data.chunk);
+      }
+    };
+    ipcRenderer.on('orchestrator:stream-chunk', handler);
+
+    try {
+      return await unwrapResponse<OrchestratorResponse>(
+        ipcRenderer.invoke('orchestrator:send-message', requestId, conversationId, message)
+      );
+    } finally {
+      ipcRenderer.removeListener('orchestrator:stream-chunk', handler);
+    }
+  },
+} as OrchestratorAPI);
+
+// =============================================================================
+// Canvas State Request Handler API
+// =============================================================================
+
+/**
+ * Summary of an agent on the canvas (matches ICanvasStateProvider interface)
+ */
+export interface AgentSummary {
+  id: string;
+  title: string;
+  workspacePath: string;
+  status?: string;
+}
+
+/**
+ * Parameters for creating an agent (matches ICanvasStateProvider interface)
+ */
+export interface CreateAgentParams {
+  workspacePath: string;
+  title?: string;
+  initialPrompt?: string;
+}
+
+/**
+ * Canvas state request payload from main process
+ */
+interface CanvasStateRequest {
+  requestId: string;
+  responseChannel: string;
+  payload?: unknown;
+}
+
+/**
+ * Handlers that the renderer can register to respond to canvas state requests
+ */
+export interface CanvasStateHandlers {
+  listAgents: () => Promise<AgentSummary[]>;
+  createAgent: (params: CreateAgentParams) => Promise<{ agentId: string }>;
+  deleteAgent: (agentId: string) => Promise<void>;
+}
+
+/**
+ * API for canvas state request handling (main -> renderer communication)
+ */
+export interface CanvasStateRequestAPI {
+  /**
+   * Register handlers for canvas state requests from the main process.
+   * Returns a cleanup function to unregister handlers.
+   */
+  registerHandlers: (handlers: CanvasStateHandlers) => () => void;
+}
+
+// Expose canvas state request API for orchestrator MCP tools
+contextBridge.exposeInMainWorld('canvasStateRequestAPI', {
+  registerHandlers: (handlers: CanvasStateHandlers) => {
+    // Handler for list agents request
+    const listAgentsHandler = async (
+      _event: Electron.IpcRendererEvent,
+      request: CanvasStateRequest
+    ) => {
+      try {
+        const agents = await handlers.listAgents();
+        ipcRenderer.invoke(request.responseChannel, { success: true, data: agents });
+      } catch (error) {
+        ipcRenderer.invoke(request.responseChannel, {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    // Handler for create agent request
+    const createAgentHandler = async (
+      _event: Electron.IpcRendererEvent,
+      request: CanvasStateRequest
+    ) => {
+      try {
+        const params = request.payload as CreateAgentParams;
+        const result = await handlers.createAgent(params);
+        ipcRenderer.invoke(request.responseChannel, { success: true, data: result });
+      } catch (error) {
+        ipcRenderer.invoke(request.responseChannel, {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    // Handler for delete agent request
+    const deleteAgentHandler = async (
+      _event: Electron.IpcRendererEvent,
+      request: CanvasStateRequest
+    ) => {
+      try {
+        const { agentId } = request.payload as { agentId: string };
+        await handlers.deleteAgent(agentId);
+        ipcRenderer.invoke(request.responseChannel, { success: true });
+      } catch (error) {
+        ipcRenderer.invoke(request.responseChannel, {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    // Register all handlers
+    ipcRenderer.on('canvas-state:list-agents:request', listAgentsHandler);
+    ipcRenderer.on('canvas-state:create-agent:request', createAgentHandler);
+    ipcRenderer.on('canvas-state:delete-agent:request', deleteAgentHandler);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener('canvas-state:list-agents:request', listAgentsHandler);
+      ipcRenderer.removeListener('canvas-state:create-agent:request', createAgentHandler);
+      ipcRenderer.removeListener('canvas-state:delete-agent:request', deleteAgentHandler);
+    };
+  },
+} as CanvasStateRequestAPI);
