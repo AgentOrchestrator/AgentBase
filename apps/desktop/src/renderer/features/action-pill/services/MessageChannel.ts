@@ -114,7 +114,7 @@ class TerminalChannel implements MessageChannel {
       throw new Error('electronAPI.sendTerminalInput not available');
     }
     // Send message followed by newline to submit
-    window.electronAPI.sendTerminalInput(this.terminalId, message + '\n');
+    window.electronAPI.sendTerminalInput(this.terminalId, `${message}\n`);
   }
 }
 

@@ -38,5 +38,6 @@ declare global {
     sessionWatcherAPI?: SessionWatcherAPI;
     recentWorkspacesAPI?: RecentWorkspacesAPI;
     sessionSummaryCacheAPI?: SessionSummaryCacheAPI;
+    orchestratorAPI?: import('./features/action-pill/store/orchestratorPillTypes').OrchestratorAPI;
   }
 }
