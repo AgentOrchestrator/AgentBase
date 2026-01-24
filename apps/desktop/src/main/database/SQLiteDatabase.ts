@@ -3,9 +3,15 @@
  * Stores canvas state in a local SQLite database
  */
 
+import { randomUUID } from 'node:crypto';
 import type { RecentWorkspace } from '@agent-orchestrator/shared';
 import sqlite3 from 'sqlite3';
 import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type {
+  AddOrchestratorMessageInput,
+  OrchestratorConversation,
+  OrchestratorMessage,
+} from '../services/orchestrator/interfaces';
 import type { CanvasEdge, CanvasMetadata, CanvasNode, CanvasState } from '../types/database';
 import type { IDatabase } from './IDatabase';
 
@@ -118,6 +124,36 @@ export class SQLiteDatabase implements IDatabase {
     // Create index for session lookup
     await this.run(
       'CREATE INDEX IF NOT EXISTS idx_session_summaries_session_id ON session_summaries(session_id)'
+    );
+
+    // Create orchestrator_conversations table
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS orchestrator_conversations (
+        id TEXT PRIMARY KEY,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    // Create orchestrator_messages table
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS orchestrator_messages (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        tool_calls TEXT,
+        FOREIGN KEY (conversation_id) REFERENCES orchestrator_conversations(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Create indices for orchestrator tables
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_orchestrator_messages_conversation_id ON orchestrator_messages(conversation_id)'
+    );
+    await this.run(
+      'CREATE INDEX IF NOT EXISTS idx_orchestrator_conversations_updated_at ON orchestrator_conversations(updated_at DESC)'
     );
   }
 
@@ -581,6 +617,117 @@ export class SQLiteDatabase implements IDatabase {
       sessionId,
       workspacePath,
     ]);
+  }
+
+  // ===========================================================================
+  // Orchestrator Conversation Methods
+  // ===========================================================================
+
+  async createOrchestratorConversation(): Promise<OrchestratorConversation> {
+    const id = randomUUID();
+    const now = Date.now();
+
+    await this.run(
+      'INSERT INTO orchestrator_conversations (id, created_at, updated_at) VALUES (?, ?, ?)',
+      [id, now, now]
+    );
+
+    return { id, createdAt: now, updatedAt: now };
+  }
+
+  async getOrchestratorConversation(id: string): Promise<OrchestratorConversation | null> {
+    const row = await this.get<{
+      id: string;
+      created_at: number;
+      updated_at: number;
+    }>('SELECT id, created_at, updated_at FROM orchestrator_conversations WHERE id = ?', [id]);
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async getMostRecentOrchestratorConversation(): Promise<OrchestratorConversation | null> {
+    const row = await this.get<{
+      id: string;
+      created_at: number;
+      updated_at: number;
+    }>(
+      'SELECT id, created_at, updated_at FROM orchestrator_conversations ORDER BY updated_at DESC LIMIT 1'
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async deleteOrchestratorConversation(id: string): Promise<void> {
+    // Foreign key constraint will cascade delete messages
+    await this.run('DELETE FROM orchestrator_conversations WHERE id = ?', [id]);
+  }
+
+  async addOrchestratorMessage(input: AddOrchestratorMessageInput): Promise<OrchestratorMessage> {
+    const id = randomUUID();
+    const toolCallsJson = input.toolCalls ? JSON.stringify(input.toolCalls) : null;
+
+    await this.run(
+      `INSERT INTO orchestrator_messages (id, conversation_id, role, content, timestamp, tool_calls)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, input.conversationId, input.role, input.content, input.timestamp, toolCallsJson]
+    );
+
+    // Update conversation's updated_at timestamp
+    await this.run('UPDATE orchestrator_conversations SET updated_at = ? WHERE id = ?', [
+      Date.now(),
+      input.conversationId,
+    ]);
+
+    return {
+      id,
+      conversationId: input.conversationId,
+      role: input.role,
+      content: input.content,
+      timestamp: input.timestamp,
+      toolCalls: input.toolCalls,
+    };
+  }
+
+  async getOrchestratorMessages(conversationId: string): Promise<OrchestratorMessage[]> {
+    const rows = await this.all<{
+      id: string;
+      conversation_id: string;
+      role: string;
+      content: string;
+      timestamp: number;
+      tool_calls: string | null;
+    }>(
+      `SELECT id, conversation_id, role, content, timestamp, tool_calls
+       FROM orchestrator_messages
+       WHERE conversation_id = ?
+       ORDER BY timestamp ASC`,
+      [conversationId]
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      conversationId: row.conversation_id,
+      role: row.role as 'user' | 'assistant',
+      content: row.content,
+      timestamp: row.timestamp,
+      toolCalls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined,
+    }));
   }
 
   // Helper methods to promisify sqlite3 callbacks

@@ -2,26 +2,23 @@
  * Acceptance Tests: Orchestrator Persistence Layer
  *
  * TDD: These tests define the contract for orchestrator conversation persistence.
- * They should fail until the implementation is complete.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { IOrchestratorDatabase, ToolCall } from '../../services/orchestrator/interfaces';
+import type { ToolCall } from '../../services/orchestrator/interfaces';
 import type { IDatabase } from '../IDatabase';
+import { SQLiteDatabase } from '../SQLiteDatabase';
 
-// Mock database for testing - will be replaced with actual implementation
-// The database implements both IDatabase and IOrchestratorDatabase
-let db: IDatabase & IOrchestratorDatabase;
+let db: IDatabase;
 
 describe('Orchestrator Persistence', () => {
   beforeEach(async () => {
-    // TODO: Initialize test database
-    // db = new SQLiteDatabase(':memory:');
-    // await db.initialize();
+    db = new SQLiteDatabase(':memory:');
+    await db.initialize();
   });
 
   afterEach(() => {
-    // db?.close();
+    db?.close();
   });
 
   describe('Conversation CRUD', () => {
@@ -49,7 +46,7 @@ describe('Orchestrator Persistence', () => {
 
     it('restores most recent conversation', async () => {
       // Create multiple conversations with different timestamps
-      const _conv1 = await db.createOrchestratorConversation();
+      await db.createOrchestratorConversation();
 
       // Small delay to ensure different timestamps
       await new Promise((resolve) => setTimeout(resolve, 10));

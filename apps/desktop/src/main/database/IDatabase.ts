@@ -5,6 +5,11 @@
 
 import type { RecentWorkspace } from '@agent-orchestrator/shared';
 import type { CodingAgentState } from '../../../types/coding-agent-status';
+import type {
+  AddOrchestratorMessageInput,
+  OrchestratorConversation,
+  OrchestratorMessage,
+} from '../services/orchestrator/interfaces';
 import type { CanvasMetadata, CanvasState } from '../types/database';
 
 export interface IDatabase {
@@ -167,4 +172,47 @@ export interface IDatabase {
    * @param workspacePath - Workspace path
    */
   deleteSessionSummary(sessionId: string, workspacePath: string): Promise<void>;
+
+  // ==========================================================================
+  // Orchestrator Conversation Methods
+  // ==========================================================================
+
+  /**
+   * Create a new orchestrator conversation
+   * @returns The created conversation with generated UUID
+   */
+  createOrchestratorConversation(): Promise<OrchestratorConversation>;
+
+  /**
+   * Get an orchestrator conversation by ID
+   * @param id - Conversation ID
+   * @returns The conversation, or null if not found
+   */
+  getOrchestratorConversation(id: string): Promise<OrchestratorConversation | null>;
+
+  /**
+   * Get the most recent orchestrator conversation
+   * @returns The most recent conversation, or null if none exist
+   */
+  getMostRecentOrchestratorConversation(): Promise<OrchestratorConversation | null>;
+
+  /**
+   * Delete an orchestrator conversation and its messages
+   * @param id - Conversation ID to delete
+   */
+  deleteOrchestratorConversation(id: string): Promise<void>;
+
+  /**
+   * Add a message to an orchestrator conversation
+   * @param input - Message data (ID is generated)
+   * @returns The created message with generated ID
+   */
+  addOrchestratorMessage(input: AddOrchestratorMessageInput): Promise<OrchestratorMessage>;
+
+  /**
+   * Get all messages in an orchestrator conversation
+   * @param conversationId - Conversation ID
+   * @returns Messages sorted by timestamp ascending
+   */
+  getOrchestratorMessages(conversationId: string): Promise<OrchestratorMessage[]>;
 }
