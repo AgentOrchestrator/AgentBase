@@ -9,6 +9,7 @@ import type {
   AgentAction,
   ClarifyingQuestionAction,
   ToolApprovalAction,
+  ToolApprovalDecision,
 } from '@agent-orchestrator/shared';
 import type { PillAnimationState } from './store';
 
@@ -30,7 +31,12 @@ export interface ActionPillPresentationProps {
   onCollapse: () => void;
   onUpdateAnswer: (actionId: string, question: string, value: string) => void;
   onSubmitClarifying: (action: ClarifyingQuestionAction) => void;
-  onToolApproval: (action: ToolApprovalAction, decision: 'allow' | 'deny') => void;
+  onSelectOption: (
+    action: ClarifyingQuestionAction,
+    questionIndex: number,
+    optionIndex: number
+  ) => void;
+  onToolApproval: (action: ToolApprovalAction, decision: ToolApprovalDecision) => void;
 }
 
 export function ActionPillPresentation({
@@ -44,6 +50,7 @@ export function ActionPillPresentation({
   onCollapse,
   onUpdateAnswer,
   onSubmitClarifying,
+  onSelectOption,
   onToolApproval,
 }: ActionPillPresentationProps) {
   const { isSquare, showContent, isContentVisible, isTextVisible } = animationState;
@@ -83,11 +90,7 @@ export function ActionPillPresentation({
               </div>
             )}
             {actions.map((action, index) => {
-              const agentLabel = action.agentId
-                ? action.agentId
-                : action.agentType
-                  ? action.agentType
-                  : 'Unknown agent';
+              const agentLabel = action.agentId || action.agentType || 'Unknown agent';
 
               // Highlight the topmost action (index 0)
               const isTopmost = index === 0 && isExpanded;
@@ -101,31 +104,60 @@ export function ActionPillPresentation({
                   >
                     <div className="action-pill-agent-label">{agentLabel}</div>
                     <div className="action-pill-card-body">
-                      {questionAction.questions.map((question) => (
+                      {questionAction.questions.map((question, questionIndex) => (
                         <div key={question.question} className="action-pill-question">
                           <div className="action-pill-question-title">
                             {question.header ? `${question.header}: ` : ''}
                             {question.question}
                           </div>
-                          <input
-                            className="action-pill-question-input"
-                            type="text"
-                            value={actionAnswers[action.id]?.[question.question] || ''}
-                            onChange={(event) =>
-                              onUpdateAnswer(action.id, question.question, event.target.value)
-                            }
-                            placeholder="Enter your response..."
-                          />
+                          {/* Show clickable options if available */}
+                          {question.options && question.options.length > 0 ? (
+                            <div className="action-pill-options">
+                              {question.options.map((option, optionIndex) => (
+                                <button
+                                  key={option.label}
+                                  type="button"
+                                  className="action-pill-option"
+                                  onClick={() =>
+                                    onSelectOption(questionAction, questionIndex, optionIndex)
+                                  }
+                                  disabled={submittingActions.has(action.id)}
+                                  title={option.description}
+                                >
+                                  <span className="action-pill-option-number">
+                                    {optionIndex + 1}
+                                  </span>
+                                  <span className="action-pill-option-label">{option.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            /* Fallback to text input if no options */
+                            <input
+                              className="action-pill-question-input"
+                              type="text"
+                              value={actionAnswers[action.id]?.[question.question] || ''}
+                              onChange={(event) =>
+                                onUpdateAnswer(action.id, question.question, event.target.value)
+                              }
+                              placeholder="Enter your response..."
+                            />
+                          )}
                         </div>
                       ))}
-                      <button
-                        className="action-pill-submit"
-                        type="button"
-                        onClick={() => onSubmitClarifying(questionAction)}
-                        disabled={submittingActions.has(action.id)}
-                      >
-                        Submit response
-                      </button>
+                      {/* Only show submit button for text inputs (no options) */}
+                      {questionAction.questions.some(
+                        (q) => !q.options || q.options.length === 0
+                      ) && (
+                        <button
+                          className="action-pill-submit"
+                          type="button"
+                          onClick={() => onSubmitClarifying(questionAction)}
+                          disabled={submittingActions.has(action.id)}
+                        >
+                          Submit response
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -147,6 +179,11 @@ export function ActionPillPresentation({
                       {approvalAction.filePath && (
                         <span className="action-pill-path">{approvalAction.filePath}</span>
                       )}
+                      {approvalAction.input && Object.keys(approvalAction.input).length > 0 && (
+                        <pre className="action-pill-input">
+                          {JSON.stringify(approvalAction.input, null, 2)}
+                        </pre>
+                      )}
                     </div>
                     <div className="action-pill-buttons">
                       <button
@@ -157,6 +194,16 @@ export function ActionPillPresentation({
                       >
                         Accept
                       </button>
+                      {approvalAction.terminalId && (
+                        <button
+                          className="action-pill-approve-all"
+                          type="button"
+                          onClick={() => onToolApproval(approvalAction, 'allow_all')}
+                          disabled={submittingActions.has(action.id)}
+                        >
+                          Accept all
+                        </button>
+                      )}
                       <button
                         className="action-pill-deny"
                         type="button"

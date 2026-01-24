@@ -14,6 +14,7 @@ import * as pty from 'node-pty';
 import type { CodingAgentState } from '../../types/coding-agent-status';
 import { DatabaseFactory } from './database';
 import type { IDatabase } from './database/IDatabase';
+import { type AgentHooksService, createAgentHooksService } from './services/agent-hooks';
 import type { CanvasState } from './types/database';
 import { WorktreeManagerFactory } from './worktree';
 import { registerWorktreeIpcHandlers } from './worktree/ipc';
@@ -75,13 +76,7 @@ import type {
   SessionIdentifier,
   StreamingChunk,
 } from './services/coding-agent';
-import {
-  CodingAgentFactory,
-  isChatHistoryProvider,
-  isSessionForkable,
-  isSessionResumable,
-  isSessionValidator,
-} from './services/coding-agent';
+import { disposeAllCodingAgents, getCodingAgent } from './services/coding-agent';
 import {
   awaitAgentActionResponse,
   emitAgentEvent,
@@ -117,6 +112,9 @@ const TERMINAL_BUFFER_LINES = 1000;
 
 // Database instance
 let database: IDatabase;
+
+// AgentHooksService instance for terminal-based agent lifecycle events
+let agentHooksService: AgentHooksService;
 
 // RepresentationService instance and dependencies
 const representationLogger: ILogger = {
@@ -281,13 +279,15 @@ const createWindow = (): void => {
   const terminalCreationTimes = new Map<string, number>();
 
   // Create a new terminal instance
-  ipcMain.on('terminal-create', (_event, terminalId: string) => {
+  // workspacePath is optional - if provided, hooks env vars are injected and terminal starts in that directory
+  ipcMain.on('terminal-create', (_event, terminalId: string, workspacePath?: string) => {
     const callTime = Date.now();
     const lastCreationTime = terminalCreationTimes.get(terminalId);
     const timeSinceLastCreation = lastCreationTime ? callTime - lastCreationTime : null;
 
     console.log('[Main] terminal-create IPC received', {
       terminalId,
+      workspacePath,
       timeSinceLastCreation: timeSinceLastCreation ? `${timeSinceLastCreation}ms` : 'never',
       existingInMap: terminalProcesses.has(terminalId),
       beingCreated: terminalsBeingCreated.has(terminalId),
@@ -318,13 +318,37 @@ const createWindow = (): void => {
     // This is needed for commands like 'claude' that are installed in user-specific locations
     const shellArgs: string[] = process.platform === 'win32' ? [] : ['-l'];
 
+    // Build environment variables
+    // If workspacePath is provided, inject agent hooks env vars for lifecycle notifications
+    let hookEnv: Record<string, string> = {};
+
+    if (workspacePath && agentHooksService) {
+      hookEnv = agentHooksService.getTerminalEnv({
+        terminalId,
+        workspacePath,
+        agentId: `agent-${terminalId}`,
+      });
+      console.log('[Main] Injecting hooks env vars', {
+        terminalId,
+        workspacePath,
+        hookEnvKeys: Object.keys(hookEnv),
+      });
+
+      // Ensure workspace-level hooks are configured (.claude/settings.local.json)
+      // This runs async but should complete before user starts Claude
+      agentHooksService.ensureWorkspaceHooks(workspacePath).catch((error) => {
+        console.error('[Main] Failed to set up workspace hooks:', error);
+      });
+    }
+
     const ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-256color',
       cols: 80,
       rows: 30,
-      cwd: process.env.HOME || process.cwd(),
+      cwd: workspacePath || process.env.HOME || process.cwd(),
       env: {
         ...process.env,
+        ...hookEnv,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
         // Ensure shell runs in interactive mode via environment
@@ -421,10 +445,20 @@ const createWindow = (): void => {
   ipcMain.on(
     'terminal-input',
     (_event, { terminalId, data }: { terminalId: string; data: string }) => {
-      // Don't log every input - too verbose (logs every keystroke)
       const ptyProcess = terminalProcesses.get(terminalId);
+      // Log action pill responses (non-printable or short inputs that look like menu selections)
+      if (data.length <= 2 || data.includes('\n') || data.includes('\r')) {
+        console.log('[Main] terminal-input (action response)', {
+          terminalId,
+          data: JSON.stringify(data),
+          ptyExists: !!ptyProcess,
+          allTerminalIds: Array.from(terminalProcesses.keys()),
+        });
+      }
       if (ptyProcess) {
         ptyProcess.write(data);
+      } else {
+        console.warn('[Main] terminal-input: no PTY process for terminalId', terminalId);
       }
     }
   );
@@ -867,7 +901,7 @@ function registerIpcHandlers(): void {
     'coding-agent:generate',
     async (_event, agentType: CodingAgentType, request: GenerateRequest) => {
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent', {
             agentType,
@@ -905,16 +939,13 @@ function registerIpcHandlers(): void {
       options?: ContinueOptions
     ) => {
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
 
         const agent = agentResult.data;
         ensureAgentEventBridge(agent);
-        if (!isSessionResumable(agent)) {
-          return { success: false, error: `${agentType} does not support session resumption` };
-        }
 
         const result = await agent.continueSession(identifier, prompt, options);
         if (result.success === false) {
@@ -956,7 +987,7 @@ function registerIpcHandlers(): void {
       });
 
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent', {
             requestId,
@@ -968,9 +999,6 @@ function registerIpcHandlers(): void {
 
         const agent = agentResult.data;
         ensureAgentEventBridge(agent);
-        if (!isSessionResumable(agent)) {
-          return { success: false, error: `${agentType} does not support session resumption` };
-        }
 
         const result = await agent.continueSessionStreaming(
           identifier,
@@ -1035,16 +1063,13 @@ function registerIpcHandlers(): void {
     'coding-agent:fork-session',
     async (_event, agentType: CodingAgentType, options: ForkOptions) => {
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           return { success: false, error: agentResult.error.message };
         }
 
         const agent = agentResult.data;
         ensureAgentEventBridge(agent);
-        if (!isSessionForkable(agent)) {
-          return { success: false, error: `${agentType} does not support session forking` };
-        }
 
         const result = await agent.forkSession(options);
         if (result.success === false) {
@@ -1062,19 +1087,15 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('coding-agent:get-available', async () => {
-    try {
-      const available = await CodingAgentFactory.getAvailableAgents();
-      console.log('[Main] Available coding agents', { agents: available });
-      return { success: true, data: available };
-    } catch (error) {
-      console.error('[Main] Error getting available agents', { error });
-      return { success: false, error: (error as Error).message };
-    }
+    // Currently only claude_code is supported
+    const available: CodingAgentType[] = ['claude_code'];
+    console.log('[Main] Available coding agents', { agents: available });
+    return { success: true, data: available };
   });
 
   ipcMain.handle('coding-agent:get-capabilities', async (_event, agentType: CodingAgentType) => {
     try {
-      const agentResult = await CodingAgentFactory.getAgent(agentType);
+      const agentResult = await getCodingAgent(agentType);
       if (agentResult.success === false) {
         return { success: false, error: agentResult.error.message };
       }
@@ -1090,8 +1111,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('coding-agent:is-available', async (_event, agentType: CodingAgentType) => {
     try {
-      const available = await CodingAgentFactory.isAgentAvailable(agentType);
-      return { success: true, data: available };
+      const result = await getCodingAgent(agentType);
+      return { success: true, data: result.success };
     } catch (error) {
       console.error('[Main] Error checking agent availability', { agentType, error });
       return { success: false, error: (error as Error).message };
@@ -1103,7 +1124,7 @@ function registerIpcHandlers(): void {
     async (_event, agentType: CodingAgentType, filter?: SessionFilterOptions) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1111,9 +1132,6 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return { success: false, error: `${agentType} does not support chat history retrieval` };
-        }
 
         const result = await agent.listSessionSummaries(filter);
         if (result.success === false) {
@@ -1143,7 +1161,7 @@ function registerIpcHandlers(): void {
     ) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1151,11 +1169,8 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return { success: false, error: `${agentType} does not support chat history retrieval` };
-        }
 
-        const result = await agent.getFilteredSession(sessionId, filter);
+        const result = await agent.getSession(sessionId, filter);
         if (result.success === false) {
           console.error('[Main] Error getting session', {
             agentType,
@@ -1184,7 +1199,7 @@ function registerIpcHandlers(): void {
     async (_event, agentType: CodingAgentType, workspacePath: string) => {
       try {
         // Use skipCliVerification since chat history reads from filesystem, not CLI
-        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1192,9 +1207,6 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isChatHistoryProvider(agent)) {
-          return { success: false, error: `${agentType} does not support chat history retrieval` };
-        }
 
         const result = await agent.listSessionSummaries({ projectPath: workspacePath });
         if (result.success === false) {
@@ -1224,12 +1236,12 @@ function registerIpcHandlers(): void {
     }
   );
 
-  // Check if a session file exists (session is active)
+  // Check if a session file exists on disk
   ipcMain.handle(
-    'coding-agent:check-session-active',
+    'coding-agent:session-file-exists',
     async (_event, agentType: CodingAgentType, sessionId: string, workspacePath: string) => {
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType, {
+        const agentResult = await getCodingAgent(agentType, {
           skipCliVerification: true,
         });
         if (agentResult.success === false) {
@@ -1237,14 +1249,11 @@ function registerIpcHandlers(): void {
         }
 
         const agent = agentResult.data;
-        if (!isSessionValidator(agent)) {
-          return { success: false, error: `${agentType} does not support session validation` };
-        }
 
-        const isActive = await agent.checkSessionActive(sessionId, workspacePath);
-        return { success: true, data: isActive };
+        const exists = await agent.sessionFileExists(sessionId, workspacePath);
+        return { success: true, data: exists };
       } catch (error) {
-        console.error('[Main] Error checking session active', {
+        console.error('[Main] Error checking session file exists', {
           agentType,
           sessionId,
           workspacePath,
@@ -1273,7 +1282,7 @@ function registerIpcHandlers(): void {
       });
 
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent', {
             requestId,
@@ -1361,7 +1370,7 @@ function registerIpcHandlers(): void {
       });
 
       try {
-        const agentResult = await CodingAgentFactory.getAgent(agentType);
+        const agentResult = await getCodingAgent(agentType);
         if (agentResult.success === false) {
           console.error('[Main] Error getting coding agent for structured streaming', {
             requestId,
@@ -1909,18 +1918,45 @@ app.whenReady().then(async () => {
     // Continue without representation service - app should still function
   }
 
+  // Initialize AgentHooksService for terminal-based agent lifecycle events
+  try {
+    const homeDir = app.getPath('home');
+    agentHooksService = createAgentHooksService(homeDir);
+    await agentHooksService.ensureSetup();
+    agentHooksService.startServer();
+
+    // Forward lifecycle events to all renderer windows
+    agentHooksService.on('lifecycle', (event) => {
+      for (const browserWindow of BrowserWindow.getAllWindows()) {
+        if (
+          !browserWindow.isDestroyed() &&
+          browserWindow.webContents &&
+          !browserWindow.webContents.isDestroyed()
+        ) {
+          browserWindow.webContents.send('agent-lifecycle', event);
+        }
+      }
+    });
+
+    console.log('[Main] AgentHooksService initialized successfully');
+  } catch (error) {
+    console.error('[Main] Error initializing AgentHooksService', error);
+    // Continue without hooks service - app should still function
+  }
+
   createWindow();
 });
 
 // Clean up on app quit
 app.on('will-quit', async () => {
   console.log(
-    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, and representation service'
+    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, representation service, and agent hooks service'
   );
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
   disposeSessionWatcher();
-  await CodingAgentFactory.disposeAll();
+  await disposeAllCodingAgents();
   await LLMServiceFactory.dispose();
   await representationService.dispose();
+  agentHooksService?.dispose();
 });

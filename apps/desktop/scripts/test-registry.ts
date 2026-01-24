@@ -58,7 +58,7 @@ async function main() {
     const firstSession = allResult.data[0];
     console.log(`Fetching full session: ${firstSession.id}...`);
 
-    const sessionResult = await registry.getFilteredSession(firstSession.id);
+    const sessionResult = await registry.getSession(firstSession.id);
     if (sessionResult.success && sessionResult.data) {
       console.log(`  Messages: ${sessionResult.data.messages.length}`);
       console.log(`  Project: ${sessionResult.data.projectPath}`);

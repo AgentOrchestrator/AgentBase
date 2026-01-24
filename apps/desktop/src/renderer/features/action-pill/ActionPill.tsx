@@ -5,7 +5,11 @@
  * Handles keyboard shortcuts and delegates rendering to the presentation component.
  */
 
-import type { ClarifyingQuestionAction, ToolApprovalAction } from '@agent-orchestrator/shared';
+import type {
+  ClarifyingQuestionAction,
+  ToolApprovalAction,
+  ToolApprovalDecision,
+} from '@agent-orchestrator/shared';
 import { useCallback, useEffect } from 'react';
 import './ActionPill.css';
 import { ActionPillPresentation } from './ActionPillPresentation';
@@ -50,16 +54,23 @@ export function ActionPill() {
     [actionAnswers]
   );
 
+  const handleSelectOption = useCallback(
+    async (action: ClarifyingQuestionAction, questionIndex: number, optionIndex: number) => {
+      await actionPillService.submitOptionSelection(action, questionIndex, optionIndex);
+    },
+    []
+  );
+
   const handleToolApproval = useCallback(
-    async (action: ToolApprovalAction, decision: 'allow' | 'deny') => {
+    async (action: ToolApprovalAction, decision: ToolApprovalDecision) => {
       await actionPillService.submitToolApproval(action, decision);
     },
     []
   );
 
-  // Keyboard shortcuts: Tab to open, Shift+Tab to close
+  // Keyboard shortcuts: Tab/Shift+Tab to toggle, Enter to accept, Delete/Backspace to deny
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    function handleKeyDown(event: KeyboardEvent): void {
       // Don't interfere if user is typing in an input/textarea
       const target = event.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
@@ -81,22 +92,6 @@ export function ActionPill() {
           event.preventDefault();
           collapse();
         }
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isExpanded, hasActions, expand, collapse]);
-
-  // Keyboard shortcuts: Enter to accept, Delete/Backspace to deny (topmost action)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't interfere if user is typing in an input/textarea
-      const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
@@ -123,13 +118,21 @@ export function ActionPill() {
         }
         return;
       }
-    };
+    }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isExpanded, sortedActions, submittingActions, handleToolApproval]);
+  }, [
+    isExpanded,
+    hasActions,
+    expand,
+    collapse,
+    sortedActions,
+    submittingActions,
+    handleToolApproval,
+  ]);
 
   return (
     <ActionPillPresentation
@@ -143,6 +146,7 @@ export function ActionPill() {
       onCollapse={collapse}
       onUpdateAnswer={updateActionAnswer}
       onSubmitClarifying={handleSubmitClarifying}
+      onSelectOption={handleSelectOption}
       onToolApproval={handleToolApproval}
     />
   );

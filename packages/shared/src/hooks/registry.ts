@@ -254,18 +254,31 @@ export function createEventRegistry(): EventRegistry {
 }
 
 /**
+ * Required context for creating an AgentEvent
+ */
+export interface CreateEventContext {
+  /** Agent node identifier - REQUIRED for routing */
+  agentId: string;
+  /** Session identifier - REQUIRED for response routing */
+  sessionId: string;
+  /** Workspace/project path - REQUIRED for context */
+  workspacePath: string;
+  /** Git branch - REQUIRED for context display */
+  gitBranch: string;
+  /** Vendor-specific raw data (optional) */
+  raw?: unknown;
+}
+
+/**
  * Helper to create an AgentEvent with auto-generated ID and timestamp
+ *
+ * Context fields (agentId, sessionId, workspacePath, gitBranch) are REQUIRED.
  */
 export function createEvent<T>(
   type: AgentEventType,
   agent: import('../loaders/types.js').AgentType,
   payload: T,
-  options?: {
-    agentId?: string;
-    sessionId?: string;
-    workspacePath?: string;
-    raw?: unknown;
-  }
+  context: CreateEventContext
 ): AgentEvent<T> {
   return {
     id: randomUUID(),
@@ -273,6 +286,10 @@ export function createEvent<T>(
     agent,
     timestamp: new Date().toISOString(),
     payload,
-    ...options,
+    agentId: context.agentId,
+    sessionId: context.sessionId,
+    workspacePath: context.workspacePath,
+    gitBranch: context.gitBranch,
+    raw: context.raw,
   };
 }

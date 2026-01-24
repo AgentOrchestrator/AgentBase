@@ -9,6 +9,16 @@ import type { AgentType } from '../../loaders/types.js';
 import type { AgentEvent, AgentEventType } from '../types.js';
 
 /**
+ * Required context for building events from terminal output
+ */
+export interface TerminalEventContext {
+  agentId: string;
+  sessionId: string;
+  workspacePath: string;
+  gitBranch: string;
+}
+
+/**
  * Interface for agent-specific event adapters
  *
  * Each coding agent (Claude Code, Codex, etc.) has different event formats.
@@ -21,8 +31,9 @@ export interface IAgentAdapter {
   /**
    * Parse raw vendor data into an AgentEvent
    *
-   * @param rawData - Vendor-specific event data
+   * @param rawData - Vendor-specific event data (must include context fields)
    * @returns Parsed AgentEvent or null if data cannot be parsed
+   * @throws Error if required context fields are missing
    */
   parse(rawData: unknown): AgentEvent | null;
 
@@ -33,9 +44,10 @@ export interface IAgentAdapter {
    * This method extracts structured events from terminal text.
    *
    * @param output - Terminal output string
+   * @param context - Required context for building events (agentId, sessionId, etc.)
    * @returns Array of detected events (may be empty)
    */
-  parseTerminalOutput?(output: string): AgentEvent[];
+  parseTerminalOutput?(output: string, context: TerminalEventContext): AgentEvent[];
 
   /**
    * Map a vendor-specific event type to the abstract AgentEventType
@@ -101,14 +113,19 @@ export class AdapterRegistry {
    *
    * @param agentType - Agent type to use
    * @param output - Terminal output to parse
+   * @param context - Required context for building events
    * @returns Array of detected events
    */
-  parseTerminalOutput(agentType: AgentType, output: string): AgentEvent[] {
+  parseTerminalOutput(
+    agentType: AgentType,
+    output: string,
+    context: TerminalEventContext
+  ): AgentEvent[] {
     const adapter = this.adapters.get(agentType);
     if (!adapter?.parseTerminalOutput) {
       return [];
     }
-    return adapter.parseTerminalOutput(output);
+    return adapter.parseTerminalOutput(output, context);
   }
 }
 

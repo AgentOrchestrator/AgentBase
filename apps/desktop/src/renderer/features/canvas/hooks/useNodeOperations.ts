@@ -1,5 +1,5 @@
 import type { Node } from '@xyflow/react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { applyHighlightStylesToNodes } from '../../sidebar/hooks/useFolderHighlight';
 
 /**
@@ -12,6 +12,36 @@ import { applyHighlightStylesToNodes } from '../../sidebar/hooks/useFolderHighli
  * - Internal: Restoration, highlighting (should NOT trigger persistence)
  * - User-initiated: Add, delete, update (SHOULD trigger persistence)
  */
+
+// =============================================================================
+// Pure Functions (testable logic, no React state)
+// =============================================================================
+
+/**
+ * Removes highlight styles (border, boxShadow, borderRadius) from all agent nodes.
+ * Returns the same array reference if no changes are needed to prevent unnecessary re-renders.
+ */
+export function removeHighlightStylesFromNodes(nodes: Node[]): Node[] {
+  if (nodes.length === 0) return nodes;
+
+  const needsUpdate = nodes.some((node) => {
+    if (node.type !== 'agent') return false;
+    const style = node.style as Record<string, unknown> | undefined;
+    return !!(style?.border || style?.boxShadow || style?.borderRadius);
+  });
+
+  if (!needsUpdate) return nodes;
+
+  return nodes.map((node) => {
+    if (node.type !== 'agent') return node;
+    const currentStyle = node.style || {};
+    const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
+      string,
+      unknown
+    >;
+    return { ...node, style: restStyle };
+  });
+}
 
 // =============================================================================
 // Types
@@ -130,17 +160,7 @@ export function useNodeOperations({
   );
 
   const unhighlightAllAgentNodes = useCallback(() => {
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        if (node.type !== 'agent') return node;
-        const currentStyle = node.style || {};
-        const { border, boxShadow, borderRadius, ...restStyle } = currentStyle as Record<
-          string,
-          unknown
-        >;
-        return { ...node, style: restStyle };
-      })
-    );
+    setNodes(removeHighlightStylesFromNodes);
   }, [setNodes]);
 
   const applyFolderHighlights = useCallback(
@@ -268,23 +288,40 @@ export function useNodeOperations({
     return initialStateApplied.current;
   }, []);
 
-  return {
-    // Internal operations
-    restoreNodes,
-    highlightAgentNode,
-    unhighlightAllAgentNodes,
-    applyFolderHighlights,
-    // User operations
-    addNode,
-    removeNode,
-    replaceNode,
-    updateNodePosition,
-    // Specific node data updates
-    updateNodeSessionId,
-    updateNodeAttachments,
-    updateNodeGitInfo,
-    // State management
-    markInitialStateApplied,
-    isInitialStateApplied,
-  };
+  return useMemo(
+    () => ({
+      // Internal operations
+      restoreNodes,
+      highlightAgentNode,
+      unhighlightAllAgentNodes,
+      applyFolderHighlights,
+      // User operations
+      addNode,
+      removeNode,
+      replaceNode,
+      updateNodePosition,
+      // Specific node data updates
+      updateNodeSessionId,
+      updateNodeAttachments,
+      updateNodeGitInfo,
+      // State management
+      markInitialStateApplied,
+      isInitialStateApplied,
+    }),
+    [
+      restoreNodes,
+      highlightAgentNode,
+      unhighlightAllAgentNodes,
+      applyFolderHighlights,
+      addNode,
+      removeNode,
+      replaceNode,
+      updateNodePosition,
+      updateNodeSessionId,
+      updateNodeAttachments,
+      updateNodeGitInfo,
+      markInitialStateApplied,
+      isInitialStateApplied,
+    ]
+  );
 }

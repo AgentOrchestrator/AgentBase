@@ -68,12 +68,18 @@ export interface ITerminalService extends INodeService {
   readonly terminalId: string;
 
   // Lifecycle
-  /** Create the terminal process */
-  create(): Promise<void>;
+  /**
+   * Create the terminal process
+   * @param workspacePath - Optional workspace path for hook env injection
+   */
+  create(workspacePath?: string): Promise<void>;
   /** Destroy the terminal process */
   destroy(): Promise<void>;
-  /** Restart the terminal (destroy + create) */
-  restart(): Promise<void>;
+  /**
+   * Restart the terminal (destroy + create)
+   * @param workspacePath - Optional workspace path for hook env injection
+   */
+  restart(workspacePath?: string): Promise<void>;
 
   // I/O
   /**
