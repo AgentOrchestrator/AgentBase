@@ -787,6 +787,7 @@ export function AgentNodePresentation({
           {activeView === 'chat' && data.sessionId && data.workspacePath && (
             <AgentChatView
               nodeId={nodeId || ''}
+              agentId={data.agentId}
               sessionId={data.sessionId}
               workspacePath={data.workspacePath}
               agentType={data.agentType}

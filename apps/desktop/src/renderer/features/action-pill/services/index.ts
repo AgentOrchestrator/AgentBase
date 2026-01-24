@@ -4,10 +4,11 @@
 
 export { actionPillService } from './ActionPillService';
 export type { IActionPillService } from './IActionPillService';
-export type {
-  IMessagePillService,
-  SendMessageOptions,
-  SendMessageResult,
-} from './IMessagePillService';
-// MessagePill service
-export { messagePillService } from './MessagePillService';
+
+// MessageChannel - unified message delivery abstraction
+export type { AgentMessageEvent, MessageChannel } from './MessageChannel';
+export { createMessageChannel, messageDispatcher } from './MessageChannel';
+
+// ToolCompletionService - auto-dismisses actions when tools complete
+export type { IToolCompletionService } from './ToolCompletionService';
+export { toolCompletionService } from './ToolCompletionService';

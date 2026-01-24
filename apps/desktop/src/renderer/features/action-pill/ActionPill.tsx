@@ -13,13 +13,14 @@ import type {
 import { useCallback, useEffect } from 'react';
 import './ActionPill.css';
 import { ActionPillPresentation } from './ActionPillPresentation';
-import { useActionPillHighlight } from './hooks';
+import { useActionPillHighlight, useToolCompletionService } from './hooks';
 import { actionPillService } from './services';
-import { selectSortedActions, useActionPillStore } from './store';
+import { selectActiveAction, selectSortedActions, useActionPillStore } from './store';
 
 export function ActionPill() {
   // Store state
   const sortedActions = useActionPillStore(selectSortedActions);
+  const activeAction = useActionPillStore(selectActiveAction);
   const isExpanded = useActionPillStore((state) => state.isExpanded);
   const animationState = useActionPillStore((state) => state.animationState);
   const actionAnswers = useActionPillStore((state) => state.actionAnswers);
@@ -29,9 +30,16 @@ export function ActionPill() {
   const expand = useActionPillStore((state) => state.expand);
   const collapse = useActionPillStore((state) => state.collapse);
   const updateActionAnswer = useActionPillStore((state) => state.updateActionAnswer);
+  const cycleActiveAgent = useActionPillStore((state) => state.cycleActiveAgent);
 
   // Highlight state
   const { shouldHighlightPill } = useActionPillHighlight();
+
+  // Initialize tool completion service for auto-dismissal
+  useToolCompletionService();
+
+  // Dismissing actions for visual feedback
+  const dismissingActions = useActionPillStore((state) => state.dismissingActions);
 
   const hasActions = sortedActions.length > 0;
 
@@ -95,26 +103,34 @@ export function ActionPill() {
         return;
       }
 
-      // Enter to accept topmost tool approval action
-      if (event.key === 'Enter' && isExpanded && sortedActions.length > 0) {
-        const topAction = sortedActions[0];
-        if (topAction.type === 'tool_approval' && !submittingActions.has(topAction.id)) {
+      // ArrowDown to cycle to next agent (when expanded)
+      if (event.key === 'ArrowDown' && isExpanded) {
+        event.preventDefault();
+        cycleActiveAgent('next');
+        return;
+      }
+
+      // ArrowUp to cycle to previous agent (when expanded)
+      if (event.key === 'ArrowUp' && isExpanded) {
+        event.preventDefault();
+        cycleActiveAgent('prev');
+        return;
+      }
+
+      // Enter to accept active tool approval action
+      if (event.key === 'Enter' && isExpanded && activeAction) {
+        if (activeAction.type === 'tool_approval' && !submittingActions.has(activeAction.id)) {
           event.preventDefault();
-          handleToolApproval(topAction as ToolApprovalAction, 'allow');
+          handleToolApproval(activeAction as ToolApprovalAction, 'allow');
         }
         return;
       }
 
-      // Delete/Backspace to deny topmost tool approval action
-      if (
-        (event.key === 'Delete' || event.key === 'Backspace') &&
-        isExpanded &&
-        sortedActions.length > 0
-      ) {
-        const topAction = sortedActions[0];
-        if (topAction.type === 'tool_approval' && !submittingActions.has(topAction.id)) {
+      // Delete/Backspace to deny active tool approval action
+      if ((event.key === 'Delete' || event.key === 'Backspace') && isExpanded && activeAction) {
+        if (activeAction.type === 'tool_approval' && !submittingActions.has(activeAction.id)) {
           event.preventDefault();
-          handleToolApproval(topAction as ToolApprovalAction, 'deny');
+          handleToolApproval(activeAction as ToolApprovalAction, 'deny');
         }
         return;
       }
@@ -129,7 +145,8 @@ export function ActionPill() {
     hasActions,
     expand,
     collapse,
-    sortedActions,
+    activeAction,
+    cycleActiveAgent,
     submittingActions,
     handleToolApproval,
   ]);
@@ -139,6 +156,7 @@ export function ActionPill() {
       actions={sortedActions}
       actionAnswers={actionAnswers}
       submittingActions={submittingActions}
+      dismissingActions={dismissingActions}
       isExpanded={isExpanded}
       animationState={animationState}
       shouldHighlightPill={shouldHighlightPill}

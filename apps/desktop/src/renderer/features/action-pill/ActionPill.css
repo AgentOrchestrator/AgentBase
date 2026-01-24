@@ -334,3 +334,36 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* =============================================================================
+ * Dismissing State (auto-dismiss visual feedback)
+ * ============================================================================= */
+
+.action-pill-card.dismissing {
+  position: relative;
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+}
+
+.action-pill-card.dismissing::after {
+  content: "\2713"; /* Unicode checkmark */
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  color: #22c55e;
+  font-size: 20px;
+  font-weight: bold;
+  animation: checkmark-fade-in 0.2s ease-in;
+}
+
+@keyframes checkmark-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

@@ -1,14 +1,14 @@
 /**
  * MessagePill Container Component
  *
- * Connects the MessagePill feature to the Zustand store and service layer.
- * Integrates with ActionPill's highlighted agent for targeted messaging.
+ * Connects the MessagePill feature to the Zustand store.
+ * Uses the channel abstraction to send messages without knowing
+ * the underlying transport (terminal vs SDK).
  */
 
 import { useCallback, useEffect } from 'react';
-import { useActionPillHighlight } from './hooks';
+import { useActionPillHighlight, useActiveAgent } from './hooks';
 import { MessagePillPresentation } from './MessagePillPresentation';
-import { messagePillService } from './services/MessagePillService';
 import { selectCanSend, useMessagePillStore } from './store/messagePillStore';
 
 export function MessagePill() {
@@ -21,8 +21,14 @@ export function MessagePill() {
   // Store actions
   const setInputValue = useMessagePillStore((state) => state.setInputValue);
   const setTargetAgent = useMessagePillStore((state) => state.setTargetAgent);
+  const setSending = useMessagePillStore((state) => state.setSending);
+  const clearInput = useMessagePillStore((state) => state.clearInput);
+  const addToHistory = useMessagePillStore((state) => state.addToHistory);
 
-  // Get highlighted agent from ActionPill
+  // Get active agent and channel from ActionPill (uses activeActionIndex)
+  const { agentId, channel } = useActiveAgent();
+
+  // Get highlighted agent for pill display
   const { highlightedAgentId } = useActionPillHighlight();
 
   // Sync target agent with ActionPill's highlighted agent
@@ -30,32 +36,34 @@ export function MessagePill() {
     setTargetAgent(highlightedAgentId);
   }, [highlightedAgentId, setTargetAgent]);
 
-  // Send handler
+  // Send handler - unified via channel abstraction
   const handleSend = useCallback(async () => {
-    if (!canSend) return;
-
-    // Get agent info for the target
-    const agentIdToUse = targetAgentId;
-
-    if (agentIdToUse) {
-      const agentInfo = messagePillService.getAgentInfo(agentIdToUse);
-
-      if (agentInfo) {
-        const result = await messagePillService.sendMessage(inputValue, agentInfo);
-
-        if (!result.success) {
-          console.error('[MessagePill] Failed to send:', result.error);
-        }
-      } else {
-        console.warn('[MessagePill] No agent info found for:', agentIdToUse);
+    if (!canSend || !channel) {
+      if (!channel) {
+        console.warn('[MessagePill] No valid channel for sending');
       }
-    } else {
-      // No target agent - could show a picker or send to a default
-      console.log('[MessagePill] No target agent, message:', inputValue);
-      // For now, just clear the input
-      useMessagePillStore.getState().clearInput();
+      return;
     }
-  }, [canSend, targetAgentId, inputValue]);
+
+    setSending(true);
+
+    try {
+      await channel.send(inputValue);
+
+      addToHistory({
+        id: `msg-${Date.now()}`,
+        content: inputValue,
+        targetAgentId: agentId,
+        timestamp: Date.now(),
+      });
+
+      clearInput();
+    } catch (error) {
+      console.error(`[MessagePill] Failed to send via ${channel.type}:`, error);
+    } finally {
+      setSending(false);
+    }
+  }, [canSend, channel, inputValue, agentId, clearInput, addToHistory, setSending]);
 
   // Keyboard handler
   const handleKeyDown = useCallback(

@@ -12,6 +12,7 @@ import { marked } from 'marked';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TextSelectionButton } from './components/TextSelectionButton';
 import { useAgentService } from './context';
+import { messageDispatcher } from './features/action-pill';
 import { useChatMessages } from './hooks/useChatMessages';
 import type { AgentChatMessage } from './types/agent-node';
 import './AgentChatView.css';
@@ -36,6 +37,8 @@ interface AgentChatViewProps {
   selected?: boolean;
   /** Node ID for fork events */
   nodeId: string;
+  /** Agent ID for receiving messages from MessagePill */
+  agentId?: string;
 }
 
 // Represents a displayable item for assistant messages (matches ConversationNode)
@@ -59,6 +62,7 @@ export default function AgentChatView({
   isSessionReady = true,
   selected = false,
   nodeId,
+  agentId,
 }: AgentChatViewProps) {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +100,32 @@ export default function AgentChatView({
     onError: setError,
     onSessionCreated,
   });
+
+  // Subscribe to external messages from MessagePill via messageDispatcher
+  useEffect(() => {
+    if (!agentId || !isSessionReady) return;
+
+    const unsubscribe = messageDispatcher.subscribe(agentId, (event) => {
+      // Verify this message is for our session
+      if (event.sessionId !== sessionId || event.workspacePath !== workspacePath) {
+        console.warn('[AgentChatView] Received message for different session, ignoring');
+        return;
+      }
+
+      // Don't send if already streaming
+      if (isStreaming) {
+        console.warn('[AgentChatView] Cannot send message while streaming');
+        return;
+      }
+
+      // Send the message
+      sendMessage(event.message).catch((err: unknown) => {
+        console.error('[AgentChatView] Failed to send external message:', err);
+      });
+    });
+
+    return unsubscribe;
+  }, [agentId, sessionId, workspacePath, isSessionReady, isStreaming, sendMessage]);
 
   // Set attached text from initialInputText prop (only if we haven't sent a message yet)
   useEffect(() => {

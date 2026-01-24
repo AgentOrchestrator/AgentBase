@@ -8,7 +8,13 @@
 /**
  * Lifecycle event types that can be received from terminal agents
  */
-export type LifecycleEventType = 'Start' | 'Stop' | 'PermissionRequest' | 'PreToolUse';
+export type LifecycleEventType =
+  | 'Start'
+  | 'Stop'
+  | 'PermissionRequest'
+  | 'PreToolUse'
+  | 'PostToolUse'
+  | 'PostToolUseFailure';
 
 /**
  * Validated lifecycle event ready for processing

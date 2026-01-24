@@ -17,15 +17,26 @@ const initialAnimationState: PillAnimationState = {
 };
 
 /**
+ * Helper to get sorted actions array
+ */
+function getSortedActions(actions: AgentAction[]): AgentAction[] {
+  return [...actions].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
  * Helper to compute the highlighted agent ID from current state
  */
-function computeHighlightedAgentId(isExpanded: boolean, actions: AgentAction[]): string | null {
+function computeHighlightedAgentId(
+  isExpanded: boolean,
+  actions: AgentAction[],
+  activeIndex: number
+): string | null {
   if (!isExpanded || actions.length === 0) {
     return null;
   }
-  // Sort by createdAt and get the topmost (earliest) action's agentId
-  const sorted = [...actions].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  return sorted[0]?.agentId ?? null;
+  const sorted = getSortedActions(actions);
+  const clampedIndex = Math.min(activeIndex, sorted.length - 1);
+  return sorted[clampedIndex]?.agentId ?? null;
 }
 
 export const useActionPillStore = create<ActionPillState>((set, get) => ({
@@ -34,8 +45,10 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
   isExpanded: false,
   hasNewActions: false,
   animationState: initialAnimationState,
+  activeActionIndex: 0,
   actionAnswers: {},
   submittingActions: new Set(),
+  dismissingActions: new Set(),
   highlightedAgentId: null,
 
   // Core actions
@@ -49,7 +62,11 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
       return {
         actions: newActions,
         hasNewActions: true,
-        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions),
+        highlightedAgentId: computeHighlightedAgentId(
+          state.isExpanded,
+          newActions,
+          state.activeActionIndex
+        ),
       };
     });
   },
@@ -65,13 +82,18 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
           isExpanded: false,
           hasNewActions: false,
           animationState: initialAnimationState,
+          activeActionIndex: 0,
           highlightedAgentId: null,
         };
       }
 
+      // Clamp activeActionIndex to valid range
+      const newActiveIndex = Math.min(state.activeActionIndex, newActions.length - 1);
+
       return {
         actions: newActions,
-        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions),
+        activeActionIndex: newActiveIndex,
+        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions, newActiveIndex),
       };
     });
   },
@@ -86,13 +108,18 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
           isExpanded: false,
           hasNewActions: false,
           animationState: initialAnimationState,
+          activeActionIndex: 0,
           highlightedAgentId: null,
         };
       }
 
+      // Clamp activeActionIndex to valid range
+      const newActiveIndex = Math.min(state.activeActionIndex, newActions.length - 1);
+
       return {
         actions: newActions,
-        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions),
+        activeActionIndex: newActiveIndex,
+        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions, newActiveIndex),
       };
     });
   },
@@ -104,17 +131,21 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
       return;
     }
 
+    // Reset to first action when expanding
+    const newActiveIndex = 0;
+
     // Start expansion animation sequence
     set({
       isExpanded: true,
       hasNewActions: false,
+      activeActionIndex: newActiveIndex,
       animationState: {
         isSquare: true,
         showContent: false,
         isContentVisible: false,
         isTextVisible: false,
       },
-      highlightedAgentId: computeHighlightedAgentId(true, state.actions),
+      highlightedAgentId: computeHighlightedAgentId(true, state.actions, newActiveIndex),
     });
 
     // Show content container after shape transition
@@ -156,6 +187,7 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
     setTimeout(() => {
       set({
         isExpanded: false,
+        activeActionIndex: 0,
         animationState: {
           isSquare: false,
           showContent: false,
@@ -179,6 +211,32 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
 
   markActionsViewed: () => {
     set({ hasNewActions: false });
+  },
+
+  // Cycling actions
+  cycleActiveAgent: (direction: 'next' | 'prev') => {
+    set((state) => {
+      if (!state.isExpanded || state.actions.length === 0) {
+        return state;
+      }
+
+      const sortedActions = getSortedActions(state.actions);
+      const count = sortedActions.length;
+
+      let newIndex: number;
+      if (direction === 'next') {
+        // Wrap around: last -> first
+        newIndex = (state.activeActionIndex + 1) % count;
+      } else {
+        // Wrap around: first -> last
+        newIndex = (state.activeActionIndex - 1 + count) % count;
+      }
+
+      return {
+        activeActionIndex: newIndex,
+        highlightedAgentId: computeHighlightedAgentId(true, state.actions, newIndex),
+      };
+    });
   },
 
   // Form actions
@@ -216,6 +274,52 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
       return { submittingActions: newSet };
     });
   },
+
+  markDismissing: (actionId: string) => {
+    set((state) => {
+      // Idempotent: check if already dismissing
+      if (state.dismissingActions.has(actionId)) {
+        return state;
+      }
+      const newSet = new Set(state.dismissingActions);
+      newSet.add(actionId);
+      return { dismissingActions: newSet };
+    });
+  },
+
+  completeDismissal: (actionId: string) => {
+    set((state) => {
+      // Remove from dismissing set
+      const newDismissing = new Set(state.dismissingActions);
+      newDismissing.delete(actionId);
+
+      // Remove the action
+      const newActions = state.actions.filter((a) => a.id !== actionId);
+
+      // Handle cleanup if no actions left
+      if (newActions.length === 0) {
+        return {
+          actions: newActions,
+          dismissingActions: newDismissing,
+          isExpanded: false,
+          hasNewActions: false,
+          animationState: initialAnimationState,
+          activeActionIndex: 0,
+          highlightedAgentId: null,
+        };
+      }
+
+      // Clamp activeActionIndex
+      const newActiveIndex = Math.min(state.activeActionIndex, newActions.length - 1);
+
+      return {
+        actions: newActions,
+        dismissingActions: newDismissing,
+        activeActionIndex: newActiveIndex,
+        highlightedAgentId: computeHighlightedAgentId(state.isExpanded, newActions, newActiveIndex),
+      };
+    });
+  },
 }));
 
 /**
@@ -237,4 +341,11 @@ export const selectTopmostAction = (state: ActionPillState): AgentAction | null 
   if (state.actions.length === 0) return null;
   const sorted = selectSortedActions(state);
   return sorted[0] ?? null;
+};
+
+export const selectActiveAction = (state: ActionPillState): AgentAction | null => {
+  if (state.actions.length === 0) return null;
+  const sorted = selectSortedActions(state);
+  const clampedIndex = Math.min(state.activeActionIndex, sorted.length - 1);
+  return sorted[clampedIndex] ?? null;
 };

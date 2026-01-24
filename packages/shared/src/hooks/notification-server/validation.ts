@@ -24,6 +24,7 @@ export const REQUIRED_FIELDS = ['terminalId', 'agentId', 'eventType'] as const;
  * - UserPromptSubmit → Start (agent started processing)
  * - Stop/SessionEnd → Stop (agent finished)
  * - PreToolUse → PreToolUse (tool about to be used, filtered for AskUserQuestion)
+ * - PostToolUse → PostToolUse (tool completed, used to auto-dismiss ActionPill)
  * - PermissionRequest → PermissionRequest (actual permission prompt)
  */
 export function mapEventType(raw: string | undefined): LifecycleEventType | null {
@@ -37,6 +38,8 @@ export function mapEventType(raw: string | undefined): LifecycleEventType | null
       return 'Stop';
     case 'PreToolUse':
       return 'PreToolUse';
+    case 'PostToolUse':
+      return 'PostToolUse';
     case 'PermissionRequest':
       return 'PermissionRequest';
     default:

@@ -6,23 +6,17 @@
 
 // Main components
 export { ActionPill } from './ActionPill';
-export type { ActionPillHighlightState } from './hooks';
-
 // Hooks
-export { useActionPillHighlight } from './hooks';
+export type { ActionPillHighlightState, ActiveAgentState, MessageChannel } from './hooks';
+export { useActionPillHighlight, useActiveAgent } from './hooks';
 export { MessagePill } from './MessagePill';
-export type {
-  IActionPillService,
-  IMessagePillService,
-  SendMessageOptions,
-  SendMessageResult,
-} from './services';
 // Services - ActionPill
-// Services - MessagePill
-export { actionPillService, messagePillService } from './services';
+// Services - MessageChannel & Dispatcher
+export type { AgentMessageEvent, IActionPillService } from './services';
+export { actionPillService, createMessageChannel, messageDispatcher } from './services';
+
+// Store - ActionPill & MessagePill
 export type { ActionPillState, MessagePillState, PillAnimationState, SentMessage } from './store';
-// Store - ActionPill
-// Store - MessagePill
 export {
   selectActionCount,
   selectCanSend,

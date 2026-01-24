@@ -44,6 +44,18 @@ export function generateClaudeSettings(notifyScriptPath: string): object {
           ],
         },
       ],
+      // Called after tool use completes - used to auto-dismiss ActionPill items
+      PostToolUse: [
+        {
+          matcher: '*',
+          hooks: [
+            {
+              type: 'command',
+              command: notifyScriptPath,
+            },
+          ],
+        },
+      ],
       // Called when session ends
       Stop: [
         {
