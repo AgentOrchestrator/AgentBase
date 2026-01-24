@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './NewAgentModal.css';
 import type { GitInfo } from '@agent-orchestrator/shared';
 import type { MessagePreview } from '../hooks';
+import { useBranchSearch } from '../hooks/useBranchSearch';
 import { useWorktreeConfigState } from '../hooks/useWorktreeConfigState';
 import { BranchSwitchWarningDialog } from './BranchSwitchWarningDialog';
 import { MessagePreviewPanel } from './MessagePreviewPanel';
@@ -114,6 +115,15 @@ export function NewAgentModal({
   const containerRef = useRef<HTMLDivElement>(null);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
   const newBranchInputRef = useRef<HTMLInputElement>(null);
+  const branchSearchInputRef = useRef<HTMLInputElement>(null);
+
+  // Branch search store
+  const {
+    searchTerm: branchSearchTerm,
+    setSearchTerm: setBranchSearchTerm,
+    reset: resetBranchSearch,
+    filterBranches,
+  } = useBranchSearch();
 
   // Update workspace path when initialWorkspacePath changes
   useEffect(() => {
@@ -183,6 +193,9 @@ export function NewAgentModal({
   // Get available branches for dropdown (excluding current branch)
   const availableBranches = branches.filter((branch) => branch !== gitInfo?.branch);
 
+  // Filter branches based on search term
+  const filteredBranches = filterBranches(availableBranches);
+
   // Define handleBrowseFolder before it's used in useEffect
   const handleBrowseFolder = useCallback(async () => {
     setIsSelectingFolder(true);
@@ -220,20 +233,22 @@ export function NewAgentModal({
         action: () => setIsCreatingNewBranch(true),
       });
     }
-    items.push(...availableBranches.map((branch) => ({ type: 'branch' as const, branch })));
+    items.push(...filteredBranches.map((branch) => ({ type: 'branch' as const, branch })));
     return items;
-  }, [workspacePath, gitInfo?.branch, availableBranches]);
+  }, [workspacePath, gitInfo?.branch, filteredBranches]);
 
-  // Auto-open dropdown when branch is highlighted
+  // Auto-open dropdown when branch is highlighted via keyboard navigation
+  // Note: We only auto-OPEN here, not auto-close. Closing is handled by:
+  // - Outside click handler
+  // - Escape key handler
+  // - Tab away from branch (in keydown handler)
+  // - Selecting a branch
   useEffect(() => {
     if (keyboardFocus === 'branch' && gitInfo?.branch && !isCreatingNewBranch) {
       setIsBranchDropdownOpen(true);
       if (dropdownItems.length > 0 && dropdownItemIndex === null) {
         setDropdownItemIndex(0);
       }
-    } else if (keyboardFocus !== 'branch') {
-      setIsBranchDropdownOpen(false);
-      setDropdownItemIndex(null);
     }
   }, [
     keyboardFocus,
@@ -243,12 +258,37 @@ export function NewAgentModal({
     dropdownItemIndex,
   ]);
 
+  // Reset branch search when dropdown closes, focus search when it opens
+  useEffect(() => {
+    if (isBranchDropdownOpen) {
+      // Focus search input when dropdown opens
+      setTimeout(() => branchSearchInputRef.current?.focus(), 0);
+    } else {
+      // Reset search when dropdown closes
+      resetBranchSearch();
+    }
+  }, [isBranchDropdownOpen, resetBranchSearch]);
+
   // Handle Escape key, Tab navigation, and Command shortcuts
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
+
+      // Allow branch search input to handle its own keys
+      const isBranchSearchInput =
+        target === branchSearchInputRef.current ||
+        target.classList?.contains('new-agent-modal-branch-search') ||
+        (target.tagName === 'INPUT' && target.closest('.new-agent-modal-branch-dropdown') !== null);
+      if (isBranchSearchInput) {
+        if (event.key === 'Escape') {
+          // Close dropdown on Escape from search
+          setIsBranchDropdownOpen(false);
+          setDropdownItemIndex(null);
+        }
+        return; // Let search input handle all other keys
+      }
 
       // Allow new branch input to handle its own keys
       if (target === newBranchInputRef.current) {
@@ -307,6 +347,8 @@ export function NewAgentModal({
         } else if (keyboardFocus === 'branch') {
           // Tab from branch: go back to input
           setKeyboardFocus('input');
+          setIsBranchDropdownOpen(false);
+          setDropdownItemIndex(null);
           descriptionInputRef.current?.focus();
         }
         return;
@@ -752,6 +794,23 @@ export function NewAgentModal({
                 </div>
                 {isBranchDropdownOpen && !isCreatingNewBranch && (
                   <div className="new-agent-modal-branch-dropdown">
+                    <div className="new-agent-modal-branch-search-wrapper">
+                      <input
+                        ref={branchSearchInputRef}
+                        data-branch-search="true"
+                        type="text"
+                        className="new-agent-modal-branch-search"
+                        placeholder="Search branches..."
+                        value={branchSearchTerm}
+                        onChange={(e) => setBranchSearchTerm(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          // Stop both React synthetic and native event propagation
+                          e.stopPropagation();
+                          e.nativeEvent.stopImmediatePropagation();
+                        }}
+                      />
+                    </div>
                     {workspacePath && gitInfo?.branch && (
                       <>
                         <div
@@ -771,22 +830,26 @@ export function NewAgentModal({
                     )}
                     {isLoadingBranches ? (
                       <div className="new-agent-modal-branch-dropdown-item">Loading...</div>
-                    ) : availableBranches.length === 0 ? (
-                      <div className="new-agent-modal-branch-dropdown-item">No branches found</div>
+                    ) : filteredBranches.length === 0 ? (
+                      <div className="new-agent-modal-branch-dropdown-item">
+                        {branchSearchTerm ? 'No matching branches' : 'No branches found'}
+                      </div>
                     ) : (
-                      availableBranches.map((branch, index) => {
+                      filteredBranches.map((branch, index) => {
                         // Calculate the actual index in dropdownItems (after action items)
                         const actionItemsCount = workspacePath && gitInfo?.branch ? 1 : 0; // Only "New branch" action
                         const itemIndex = actionItemsCount + index;
+                        // Find original index in availableBranches for selection
+                        const originalIndex = availableBranches.indexOf(branch);
                         return (
                           <div
                             key={branch}
                             className={`new-agent-modal-branch-dropdown-item ${
-                              selectedBranchIndex === index ? 'selected' : ''
+                              selectedBranchIndex === originalIndex ? 'selected' : ''
                             } ${dropdownItemIndex === itemIndex ? 'keyboard-selected' : ''}`}
                             onClick={() => {
-                              // Set the selected branch index to trigger checkout on create
-                              setSelectedBranchIndex(index);
+                              // Set the selected branch index using original index
+                              setSelectedBranchIndex(originalIndex);
                               setIsBranchDropdownOpen(false);
                             }}
                           >
