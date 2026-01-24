@@ -90,9 +90,11 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
   private isInitialized = false;
   private currentSessionId: string | null = null;
   private currentWorkspacePath: string | null = null;
+  private currentGitBranch: string | null = null;
+  private agentId: string | null = null;
   private readonly queryContexts = new WeakMap<
     AbortSignal,
-    { agentId?: string; sessionId?: string; workspacePath?: string }
+    { agentId?: string; sessionId?: string; workspacePath?: string; gitBranch?: string }
   >();
   private readonly canUseTool: CanUseTool = async (
     toolName: string,
@@ -100,15 +102,33 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     options
   ): Promise<PermissionResult> => {
     const context = options.signal ? this.queryContexts.get(options.signal) : undefined;
-    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath ?? undefined;
-    const sessionId = context?.sessionId ?? this.currentSessionId ?? undefined;
+    const workspacePath = context?.workspacePath ?? this.currentWorkspacePath;
+    const sessionId = context?.sessionId ?? this.currentSessionId;
+    const agentId = context?.agentId ?? this.agentId;
+    const gitBranch = context?.gitBranch ?? this.currentGitBranch;
+
+    // Validate required context fields - fail explicitly if missing (no defensive defaults)
+    if (!agentId) {
+      throw new Error('[ClaudeCodeAgent] agentId is required for permission request event');
+    }
+    if (!sessionId) {
+      throw new Error('[ClaudeCodeAgent] sessionId is required for permission request event');
+    }
+    if (!workspacePath) {
+      throw new Error('[ClaudeCodeAgent] workspacePath is required for permission request event');
+    }
+    if (!gitBranch) {
+      throw new Error('[ClaudeCodeAgent] gitBranch is required for permission request event');
+    }
+
     const event: AgentEvent<PermissionPayload> = {
       id: crypto.randomUUID(),
       type: 'permission:request',
       agent: 'claude_code',
-      agentId: context?.agentId,
+      agentId,
       sessionId,
       workspacePath,
+      gitBranch,
       timestamp: new Date().toISOString(),
       payload: {
         toolName,
@@ -173,6 +193,22 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     this.eventRegistry = createEventRegistry();
     this.hookBridge = createSDKHookBridge(this.eventRegistry, {
       debug: this.debugHooks,
+      getContext: () => {
+        if (!this.agentId) {
+          throw new Error(
+            '[ClaudeCodeAgent] agentId not set. Call setAgentId() before using hooks.'
+          );
+        }
+        if (!this.currentGitBranch) {
+          throw new Error(
+            '[ClaudeCodeAgent] gitBranch not set. Call setGitBranch() before using hooks.'
+          );
+        }
+        return {
+          agentId: this.agentId,
+          gitBranch: this.currentGitBranch,
+        };
+      },
     });
     // Avoid double-emitting permission requests when canUseTool handles them.
     delete this.hookBridge.hooks.PermissionRequest;
@@ -250,6 +286,40 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     this.eventRegistry.clear();
     this.isInitialized = false;
     this.removeAllListeners();
+  }
+
+  // ============================================
+  // Context Management
+  // ============================================
+
+  /**
+   * Set the agent ID for this instance.
+   * Must be called before using hooks that require context.
+   */
+  setAgentId(agentId: string): void {
+    this.agentId = agentId;
+  }
+
+  /**
+   * Set the current git branch for context.
+   * Must be called before using hooks that require context.
+   */
+  setGitBranch(gitBranch: string): void {
+    this.currentGitBranch = gitBranch;
+  }
+
+  /**
+   * Get the current agent ID
+   */
+  getAgentId(): string | null {
+    return this.agentId;
+  }
+
+  /**
+   * Get the current git branch
+   */
+  getGitBranch(): string | null {
+    return this.currentGitBranch;
   }
 
   /**
@@ -511,17 +581,50 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
         workspacePath: request.workingDirectory,
       },
     };
-    this.currentWorkspacePath = options.cwd ?? null;
+    // Validate and set ALL required instance properties so canUseTool can access them
+    // (SDK may pass a different signal, so queryContexts lookup may fail)
+    if (!request.agentId) {
+      throw new Error('[ClaudeCodeAgent] request.agentId is required for generate requests');
+    }
+    if (!request.sessionId) {
+      throw new Error('[ClaudeCodeAgent] request.sessionId is required for generate requests');
+    }
+    if (!request.workingDirectory) {
+      throw new Error(
+        '[ClaudeCodeAgent] request.workingDirectory is required for generate requests'
+      );
+    }
+
+    this.agentId = request.agentId;
+    this.currentSessionId = request.sessionId;
+    this.currentWorkspacePath = request.workingDirectory;
+
+    // Resolve git branch from workingDirectory
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: request.workingDirectory,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (!branch) {
+        throw new Error('git returned empty branch name');
+      }
+      this.currentGitBranch = branch;
+    } catch (error) {
+      throw new Error(
+        `[ClaudeCodeAgent] Failed to resolve git branch for ${request.workingDirectory}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
 
     // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
-    if (request.sessionId) {
-      options.extraArgs = { 'session-id': request.sessionId };
-    }
+    options.extraArgs = { 'session-id': request.sessionId };
 
     this.queryContexts.set(abortController.signal, {
       agentId: request.agentId,
       sessionId: request.sessionId,
       workspacePath: options.cwd ?? undefined,
+      gitBranch: this.currentGitBranch ?? undefined,
     });
 
     // Enable streaming partial messages
@@ -577,16 +680,59 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     continueOptions?: ContinueOptions,
     streaming = false
   ): QueryOptions {
+    // Derive sessionId from identifier
+    const sessionId =
+      identifier.type === 'id' || identifier.type === 'name' ? identifier.value : undefined;
+
     const options: QueryOptions = {
       cwd: continueOptions?.workingDirectory,
       abortController,
       context: {
         agentId: continueOptions?.agentId,
-        sessionId: identifier.type === 'id' ? identifier.value : undefined,
+        sessionId,
         workspacePath: continueOptions?.workingDirectory,
       },
     };
-    this.currentWorkspacePath = options.cwd ?? null;
+
+    // Validate and set ALL required instance properties so canUseTool can access them
+    // (SDK may pass a different signal, so queryContexts lookup may fail)
+    if (!continueOptions?.agentId) {
+      throw new Error(
+        '[ClaudeCodeAgent] continueOptions.agentId is required for continue requests'
+      );
+    }
+    if (!sessionId) {
+      throw new Error(
+        '[ClaudeCodeAgent] sessionId is required for continue requests (use id or name identifier)'
+      );
+    }
+    if (!continueOptions?.workingDirectory) {
+      throw new Error(
+        '[ClaudeCodeAgent] continueOptions.workingDirectory is required for continue requests'
+      );
+    }
+
+    this.agentId = continueOptions.agentId;
+    this.currentSessionId = sessionId;
+    this.currentWorkspacePath = continueOptions.workingDirectory;
+
+    // Resolve git branch from workingDirectory
+    try {
+      const { execFileSync } = require('node:child_process');
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: continueOptions.workingDirectory,
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (!branch) {
+        throw new Error('git returned empty branch name');
+      }
+      this.currentGitBranch = branch;
+    } catch (error) {
+      throw new Error(
+        `[ClaudeCodeAgent] Failed to resolve git branch for ${continueOptions.workingDirectory}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
 
     // Map SessionIdentifier to query options
     switch (identifier.type) {
@@ -602,9 +748,10 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     }
 
     this.queryContexts.set(abortController.signal, {
-      agentId: continueOptions?.agentId,
-      sessionId: identifier.type === 'id' ? identifier.value : undefined,
-      workspacePath: options.cwd ?? undefined,
+      agentId: continueOptions.agentId,
+      sessionId,
+      workspacePath: continueOptions.workingDirectory,
+      gitBranch: this.currentGitBranch ?? undefined,
     });
 
     if (streaming) {

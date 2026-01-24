@@ -56,8 +56,9 @@ export class TerminalServiceImpl implements ITerminalService {
 
   /**
    * Create the terminal process
+   * @param workspacePath - Optional workspace path for hook env injection
    */
-  async create(): Promise<void> {
+  async create(workspacePath?: string): Promise<void> {
     if (this.isCreated) {
       return;
     }
@@ -66,7 +67,8 @@ export class TerminalServiceImpl implements ITerminalService {
       throw new Error('electronAPI not available');
     }
 
-    window.electronAPI.createTerminal(this.terminalId);
+    // Pass workspacePath to enable agent hooks env var injection
+    window.electronAPI.createTerminal(this.terminalId, workspacePath);
     this.isCreated = true;
   }
 
@@ -86,12 +88,13 @@ export class TerminalServiceImpl implements ITerminalService {
 
   /**
    * Restart the terminal (destroy + create)
+   * @param workspacePath - Optional workspace path for hook env injection
    */
-  async restart(): Promise<void> {
+  async restart(workspacePath?: string): Promise<void> {
     await this.destroy();
     // Small delay to allow cleanup
     await new Promise((resolve) => setTimeout(resolve, 100));
-    await this.create();
+    await this.create(workspacePath);
   }
 
   // ===========================================================================

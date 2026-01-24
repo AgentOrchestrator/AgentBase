@@ -448,6 +448,9 @@ export interface CodingAgentAPI {
   /** Subscribe to agent hook events */
   onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
 
+  /** Subscribe to agent lifecycle events from terminal-based agents */
+  onAgentLifecycle: (callback: (event: unknown) => void) => () => void;
+
   /** Respond to pending agent actions (permissions/questions) */
   respondToAction: (response: AgentActionResponse) => Promise<void>;
 }

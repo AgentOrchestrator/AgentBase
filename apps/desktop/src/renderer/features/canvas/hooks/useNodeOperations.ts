@@ -1,5 +1,5 @@
 import type { Node } from '@xyflow/react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { applyHighlightStylesToNodes } from '../../sidebar/hooks/useFolderHighlight';
 
 /**
@@ -288,23 +288,40 @@ export function useNodeOperations({
     return initialStateApplied.current;
   }, []);
 
-  return {
-    // Internal operations
-    restoreNodes,
-    highlightAgentNode,
-    unhighlightAllAgentNodes,
-    applyFolderHighlights,
-    // User operations
-    addNode,
-    removeNode,
-    replaceNode,
-    updateNodePosition,
-    // Specific node data updates
-    updateNodeSessionId,
-    updateNodeAttachments,
-    updateNodeGitInfo,
-    // State management
-    markInitialStateApplied,
-    isInitialStateApplied,
-  };
+  return useMemo(
+    () => ({
+      // Internal operations
+      restoreNodes,
+      highlightAgentNode,
+      unhighlightAllAgentNodes,
+      applyFolderHighlights,
+      // User operations
+      addNode,
+      removeNode,
+      replaceNode,
+      updateNodePosition,
+      // Specific node data updates
+      updateNodeSessionId,
+      updateNodeAttachments,
+      updateNodeGitInfo,
+      // State management
+      markInitialStateApplied,
+      isInitialStateApplied,
+    }),
+    [
+      restoreNodes,
+      highlightAgentNode,
+      unhighlightAllAgentNodes,
+      applyFolderHighlights,
+      addNode,
+      removeNode,
+      replaceNode,
+      updateNodePosition,
+      updateNodeSessionId,
+      updateNodeAttachments,
+      updateNodeGitInfo,
+      markInitialStateApplied,
+      isInitialStateApplied,
+    ]
+  );
 }
