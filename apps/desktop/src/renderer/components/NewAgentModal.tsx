@@ -170,7 +170,8 @@ export function NewAgentModal({
       // Reset worktree config when modal closes
       worktreeConfig.reset();
     }
-  }, [isOpen, initialWorkspacePath, initialDescription, worktreeConfig]);
+    // Note: worktreeConfig.reset is stable (Zustand store action), no need in deps
+  }, [isOpen, initialWorkspacePath, initialDescription]);
 
   // Focus new branch input when entering new branch mode
   useEffect(() => {
