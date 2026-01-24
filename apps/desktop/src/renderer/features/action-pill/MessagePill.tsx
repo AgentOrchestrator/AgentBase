@@ -1,69 +1,40 @@
 /**
  * MessagePill Container Component
  *
- * Connects the MessagePill feature to the Zustand store.
- * Uses the channel abstraction to send messages without knowing
- * the underlying transport (terminal vs SDK).
+ * Meta-orchestrator chat interface that sends messages to Claude CLI.
+ * Uses orchestratorPillStore for state management.
  */
 
 import { useCallback, useEffect } from 'react';
-import { useActionPillHighlight, useSelectedAgent } from './hooks';
 import { MessagePillPresentation } from './MessagePillPresentation';
-import { selectCanSend, useMessagePillStore } from './store/messagePillStore';
+import {
+  selectCanSend,
+  selectCliAvailable,
+  useOrchestratorPillStore,
+} from './store/orchestratorPillStore';
 
 export function MessagePill() {
   // Store state
-  const inputValue = useMessagePillStore((state) => state.inputValue);
-  const isSending = useMessagePillStore((state) => state.isSending);
-  const targetAgentId = useMessagePillStore((state) => state.targetAgentId);
-  const canSend = useMessagePillStore(selectCanSend);
+  const inputValue = useOrchestratorPillStore((state) => state.inputValue);
+  const isSending = useOrchestratorPillStore((state) => state.isSending);
+  const canSend = useOrchestratorPillStore(selectCanSend);
+  const cliAvailable = useOrchestratorPillStore(selectCliAvailable);
 
   // Store actions
-  const setInputValue = useMessagePillStore((state) => state.setInputValue);
-  const setTargetAgent = useMessagePillStore((state) => state.setTargetAgent);
-  const setSending = useMessagePillStore((state) => state.setSending);
-  const clearInput = useMessagePillStore((state) => state.clearInput);
-  const addToHistory = useMessagePillStore((state) => state.addToHistory);
+  const initialize = useOrchestratorPillStore((state) => state.initialize);
+  const setInputValue = useOrchestratorPillStore((state) => state.setInputValue);
+  const sendMessage = useOrchestratorPillStore((state) => state.sendMessage);
 
-  // Get selected agent and channel from ActionPill (uses selectedActionIndex)
-  const { agentId, channel } = useSelectedAgent();
-
-  // Get highlighted agent for pill display
-  const { highlightedAgentId } = useActionPillHighlight();
-
-  // Sync target agent with ActionPill's highlighted agent
+  // Initialize on mount - check CLI health and restore conversation
   useEffect(() => {
-    setTargetAgent(highlightedAgentId);
-  }, [highlightedAgentId, setTargetAgent]);
+    initialize();
+  }, [initialize]);
 
-  // Send handler - unified via channel abstraction
+  // Send handler
   const handleSend = useCallback(async () => {
-    if (!canSend || !channel) {
-      if (!channel) {
-        console.warn('[MessagePill] No valid channel for sending');
-      }
-      return;
-    }
-
-    setSending(true);
-
-    try {
-      await channel.send(inputValue);
-
-      addToHistory({
-        id: `msg-${Date.now()}`,
-        content: inputValue,
-        targetAgentId: agentId,
-        timestamp: Date.now(),
-      });
-
-      clearInput();
-    } catch (error) {
-      console.error(`[MessagePill] Failed to send via ${channel.type}:`, error);
-    } finally {
-      setSending(false);
-    }
-  }, [canSend, channel, inputValue, agentId, clearInput, addToHistory, setSending]);
+    if (!canSend) return;
+    await sendMessage();
+  }, [canSend, sendMessage]);
 
   // Keyboard handler
   const handleKeyDown = useCallback(
@@ -76,11 +47,16 @@ export function MessagePill() {
     [handleSend]
   );
 
+  // Don't render if CLI is not available
+  if (!cliAvailable) {
+    return null;
+  }
+
   return (
     <MessagePillPresentation
       inputValue={inputValue}
       isSending={isSending}
-      targetAgentId={targetAgentId}
+      targetAgentId={null} // Orchestrator doesn't target specific agents
       canSend={canSend}
       onInputChange={setInputValue}
       onSend={handleSend}
