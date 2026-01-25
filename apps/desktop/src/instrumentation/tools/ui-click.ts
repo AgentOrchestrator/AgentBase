@@ -26,7 +26,7 @@ interface Output {
 
 export const uiClickTool: Tool<Input, Output> = {
   name: 'ui_click',
-  description: 'Click an element in the app UI by CSS selector, text content, or coordinates',
+  description: 'Click an element in the app UI by CSS selector, text content, or coordinates. WARNING: Prefer exposing UI elements explicitly via useExpose and using expose_call to trigger actions instead. Screen position-based clicking is highly unreliable due to layout shifts, responsive sizing, and timing issues.',
   inputSchema,
   handler: async (params) => {
     const bridge = getIpcBridge();
