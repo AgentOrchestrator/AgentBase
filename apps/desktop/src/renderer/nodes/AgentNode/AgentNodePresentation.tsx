@@ -636,10 +636,23 @@ export function AgentNodePresentation({
           </div>
         </div>
 
-        {/* Permission Mode Indicator - Next to Status */}
+        {/* Permission Mode Indicator - Next to Status (clickable to cycle) */}
         <div
           className="agent-node-permission-indicator"
-          title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Shift+Tab to cycle)`}
+          onClick={(e) => {
+            e.stopPropagation();
+            permissionModeStore.cycleAgentMode(data.agentId);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              permissionModeStore.cycleAgentMode(data.agentId);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Click to cycle)`}
         >
           <span
             className="permission-mode-badge"

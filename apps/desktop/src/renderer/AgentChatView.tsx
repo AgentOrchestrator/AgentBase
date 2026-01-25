@@ -24,23 +24,6 @@ marked.setOptions({
   breaks: false,
 });
 
-/**
- * Permission mode display configuration
- */
-const PERMISSION_MODE_CONFIG: Record<
-  PermissionMode,
-  { label: string; icon: string; color: string; tooltip: string }
-> = {
-  plan: { label: 'Plan', icon: '📋', color: '#f59e0b', tooltip: 'Plan Mode - Read-only' },
-  'auto-accept': {
-    label: 'Auto',
-    icon: '✓',
-    color: '#22c55e',
-    tooltip: 'Auto-Accept - Skip prompts',
-  },
-  ask: { label: 'Ask', icon: '?', color: '#3b82f6', tooltip: 'Ask Mode - Interactive' },
-};
-
 interface AgentChatViewProps {
   /** Agent ID for permission mode tracking */
   agentId: string;
@@ -136,11 +119,6 @@ export default function AgentChatView({
     };
   }, [agentId]);
 
-  // Handle permission mode click to cycle
-  const handlePermissionClick = useCallback(() => {
-    permissionModeStore.cycleAgentMode(agentId);
-  }, [agentId]);
-
   // Expose for automation testing
   useExpose(`chat:${sessionId}`, {
     // State (readable)
@@ -165,6 +143,8 @@ export default function AgentChatView({
     // Permission mode actions for E2E
     cyclePermissionMode: () => permissionModeStore.cycleAgentMode(agentId),
     setPermissionMode: (mode: PermissionMode) => permissionModeStore.setAgentMode(agentId, mode),
+    // Restart session with current permission mode (applies mode change to CLI)
+    restartSession: () => agentService?.restartSession(workspacePath, sessionId),
   });
 
   // Set attached text from initialInputText prop (only if we haven't sent a message yet)
@@ -661,33 +641,6 @@ export default function AgentChatView({
     <div className="agent-chat-view">
       {/* Forehead - covers everything above the top sticky user message */}
       {stickyUserMessageId && <div className="agent-chat-view-forehead" />}
-
-      {/* Permission Mode Indicator - clickable badge to cycle mode */}
-      <div
-        className="agent-chat-permission-indicator"
-        onClick={handlePermissionClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handlePermissionClick();
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Shift+Tab to cycle)`}
-      >
-        <span
-          className="permission-mode-badge"
-          style={
-            {
-              '--permission-color': PERMISSION_MODE_CONFIG[permissionMode].color,
-            } as React.CSSProperties
-          }
-        >
-          <span className="permission-icon">{PERMISSION_MODE_CONFIG[permissionMode].icon}</span>
-          <span className="permission-label">{PERMISSION_MODE_CONFIG[permissionMode].label}</span>
-        </span>
-      </div>
 
       {/* Messages */}
       <div

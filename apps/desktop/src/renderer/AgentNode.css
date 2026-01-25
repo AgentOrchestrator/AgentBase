@@ -157,7 +157,14 @@
   border: 1px solid var(--permission-color, #888);
   border-radius: 12px;
   font-size: 11px;
-  cursor: default;
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+
+.agent-node-permission-indicator .permission-mode-badge:hover {
+  background: rgba(0, 0, 0, 0.8);
 }
 
 .agent-node-permission-indicator .permission-icon {
