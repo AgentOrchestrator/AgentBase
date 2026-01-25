@@ -57,6 +57,14 @@ export class SdkQueryExecutor implements QueryExecutor {
   async *execute(prompt: string, options: QueryOptions): AsyncIterable<QueryMessageUnion> {
     const sdkOptions = this.mapToSdkOptions(options);
 
+    console.log('[SdkQueryExecutor] SDK options:', {
+      cwd: sdkOptions.cwd,
+      settingSources: sdkOptions.settingSources,
+      extraArgs: sdkOptions.extraArgs,
+      resume: sdkOptions.resume,
+      hasCanUseTool: !!sdkOptions.canUseTool,
+    });
+
     const queryResult = query({ prompt, options: sdkOptions });
 
     for await (const sdkMessage of queryResult) {
@@ -77,6 +85,7 @@ export class SdkQueryExecutor implements QueryExecutor {
       hooks: this.hooks,
       canUseTool: this.canUseTool,
       tools: { type: 'preset', preset: 'claude_code' },
+      settingSources: ['local'], // Only read from workspace .claude/settings.local.json
     };
 
     // System prompt

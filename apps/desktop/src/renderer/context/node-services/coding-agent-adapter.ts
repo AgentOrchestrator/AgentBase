@@ -81,6 +81,8 @@ export interface GenerateRequest {
   sessionId: string;
   systemPrompt?: string;
   agentId?: string;
+  /** Permission mode for tool restrictions (plan, auto-accept, ask) */
+  permissionMode?: PermissionMode;
 }
 
 /**

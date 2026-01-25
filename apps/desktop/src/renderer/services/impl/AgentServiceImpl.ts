@@ -497,6 +497,40 @@ export class AgentServiceImpl implements IAgentService {
   }
 
   /**
+   * Restart the CLI REPL session with the current permission mode from the store.
+   * This is used when permission mode changes to apply the new mode.
+   * Exits the current session and resumes with new CLI flags.
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID to resume
+   */
+  async restartSession(workspacePath: string, sessionId: string): Promise<void> {
+    const permissionMode = permissionModeStore.getEffectiveMode(this.agentId);
+    console.log('[AgentService] restartSession() called', {
+      agentId: this.agentId,
+      workspacePath,
+      sessionId,
+      isRunning: this.isRunning,
+      permissionMode,
+    });
+
+    // Exit the current REPL if running
+    if (this.isRunning) {
+      await this.exitRepl();
+      // Reset running state after exit
+      this.isRunning = false;
+    }
+
+    // Explicitly clear session state in main process to ensure start() sends the CLI command
+    await this.clearSessionStateInMainProcess();
+
+    // Small delay to ensure terminal is ready for new command
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Start the session again - this will pick up the new permission mode from the store
+    await this.start(workspacePath, sessionId);
+  }
+
+  /**
    * Abort all pending operations and return to idle state.
    * Cancels SDK queries and sends Ctrl+C to terminal if running.
    * This is a recovery mechanism, so it must be resilient to failures.
@@ -732,6 +766,14 @@ export class AgentServiceImpl implements IAgentService {
 
     this.updateStatus('running');
 
+    // Get permission mode for this agent to pass to SDK
+    const permissionMode = permissionModeStore.getEffectiveMode(this.agentId);
+    console.log('[AgentService] sendMessageStreamingStructured with permission mode', {
+      agentId: this.agentId,
+      sessionId,
+      permissionMode,
+    });
+
     try {
       const result = await adapter.generateStreamingStructured(
         {
@@ -739,6 +781,7 @@ export class AgentServiceImpl implements IAgentService {
           workingDirectory: workspacePath,
           sessionId,
           agentId: this.agentId,
+          permissionMode,
         },
         onChunk
       );

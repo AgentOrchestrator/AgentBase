@@ -194,6 +194,15 @@ export interface IAgentService extends INodeService {
   exitRepl(timeoutMs?: number): Promise<void>;
 
   /**
+   * Restart the CLI REPL session with the current permission mode from the store.
+   * This is used when permission mode changes to apply the new mode.
+   * Exits the current session and resumes with new CLI flags.
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID to resume
+   */
+  restartSession(workspacePath: string, sessionId: string): Promise<void>;
+
+  /**
    * Abort all pending operations and return to idle state.
    * Cancels SDK queries and sends Ctrl+C to terminal if running.
    */

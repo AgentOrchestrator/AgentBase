@@ -10,7 +10,12 @@
  * - ipc.types.ts (IPC API)
  */
 
-import type { AgentActionResponse, AgentEvent, AgentType } from '@agent-orchestrator/shared';
+import type {
+  AgentActionResponse,
+  AgentEvent,
+  AgentType,
+  PermissionMode,
+} from '@agent-orchestrator/shared';
 
 // ============================================
 // Agent Types
@@ -257,6 +262,8 @@ export interface GenerateRequest {
   timeout?: number;
   /** Session ID for stateful agents */
   sessionId?: string;
+  /** Permission mode for tool restrictions (plan, auto-accept, ask) */
+  permissionMode?: PermissionMode;
 }
 
 /**
