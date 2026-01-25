@@ -5,6 +5,7 @@
  * Handles UI rendering, status display, and user interactions.
  */
 
+import { useExpose } from '@agent-orchestrator/shared';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,7 +18,12 @@ import { useAgentService, useTerminalService } from '../../context';
 import { useAgentViewMode, useSessionOverview } from '../../hooks';
 import type { SessionReadiness } from '../../hooks/useAgentState';
 import IssueDetailsModal from '../../IssueDetailsModal';
-import type { AgentNodeData, AgentNodeView, AgentProgress } from '../../types/agent-node';
+import type {
+  AgentNodeData,
+  AgentNodeView,
+  AgentProgress,
+  PermissionMode,
+} from '../../types/agent-node';
 import {
   createLinearIssueAttachment,
   isLinearIssueAttachment,
@@ -25,8 +31,26 @@ import {
 } from '../../types/attachments';
 import { getConversationFilePath } from '../../utils/getConversationFilePath';
 import '../../AgentNode.css';
+import { permissionModeStore } from '../../stores';
 import { AgentNodeChatHandle } from './AgentNodeChatHandle';
 import { AgentNodeForkHandle } from './AgentNodeForkHandle';
+
+/**
+ * Permission mode display configuration
+ */
+const PERMISSION_MODE_CONFIG: Record<
+  PermissionMode,
+  { label: string; icon: string; color: string; tooltip: string }
+> = {
+  plan: { label: 'Plan', icon: '📋', color: '#f59e0b', tooltip: 'Plan Mode - Restrictive' },
+  'auto-accept': {
+    label: 'Auto',
+    icon: '✓',
+    color: '#22c55e',
+    tooltip: 'Auto-Accept - Permissive',
+  },
+  ask: { label: 'Ask', icon: '?', color: '#3b82f6', tooltip: 'Ask Mode - Interactive' },
+};
 
 export interface AgentNodePresentationProps {
   /** Agent node data (single source of truth for workspace) */
@@ -79,6 +103,52 @@ export function AgentNodePresentation({
   const forking = data.forking ?? false;
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCheckingRef = useRef(false);
+
+  // Permission mode state - subscribes to global mode changes
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(() =>
+    permissionModeStore.getEffectiveMode(data.agentId)
+  );
+
+  // Subscribe to permission mode changes
+  useEffect(() => {
+    // Immediately sync state for the current agentId to avoid stale UI
+    setPermissionMode(permissionModeStore.getEffectiveMode(data.agentId));
+
+    // Update when agent-specific mode changes
+    const unsubAgent = permissionModeStore.subscribe(data.agentId, setPermissionMode);
+    // Also update when global mode changes (in case agent has no override)
+    const unsubGlobal = permissionModeStore.subscribeGlobal(() => {
+      setPermissionMode(permissionModeStore.getEffectiveMode(data.agentId));
+    });
+    return () => {
+      unsubAgent();
+      unsubGlobal();
+    };
+  }, [data.agentId]);
+
+  // =============================================================================
+  // E2E Automation (useExpose)
+  // =============================================================================
+
+  useExpose(`agent:${data.agentId}`, {
+    // State
+    agentId: data.agentId,
+    sessionId: data.sessionId,
+    status: data.status,
+    permissionMode,
+    activeView,
+
+    // View actions
+    setActiveView: (view: AgentNodeView) => setActiveView(view),
+    showOverview: () => setActiveView('overview'),
+    showTerminal: () => setActiveView('terminal'),
+    showChat: () => setActiveView('chat'),
+
+    // Permission mode actions
+    cyclePermissionMode: () => permissionModeStore.cycleAgentMode(data.agentId),
+    setPermissionMode: (mode: PermissionMode) =>
+      permissionModeStore.setAgentMode(data.agentId, mode),
+  });
 
   // Stop agent when node unmounts
   // Agent start is handled by AgentTerminalView when it mounts
@@ -569,6 +639,42 @@ export function AgentNodePresentation({
           </div>
         </div>
 
+        {/* Permission Mode Indicator - Next to Status (clickable to cycle) */}
+        {/* Hidden in terminal view since CLI handles its own permission mode */}
+        {activeView !== 'terminal' && (
+          <div
+            className="agent-node-permission-indicator"
+            onClick={(e) => {
+              e.stopPropagation();
+              permissionModeStore.cycleAgentMode(data.agentId);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                permissionModeStore.cycleAgentMode(data.agentId);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Click to cycle)`}
+          >
+            <span
+              className="permission-mode-badge"
+              style={
+                {
+                  '--permission-color': PERMISSION_MODE_CONFIG[permissionMode].color,
+                } as React.CSSProperties
+              }
+            >
+              <span className="permission-icon">{PERMISSION_MODE_CONFIG[permissionMode].icon}</span>
+              <span className="permission-label">
+                {PERMISSION_MODE_CONFIG[permissionMode].label}
+              </span>
+            </span>
+          </div>
+        )}
+
         {/* View Switcher Buttons - Top Right */}
         <div
           className={`agent-node-view-switcher ${activeView === 'terminal' ? 'terminal-active' : ''}`}
@@ -786,6 +892,7 @@ export function AgentNodePresentation({
           )}
           {activeView === 'chat' && data.sessionId && data.workspacePath && (
             <AgentChatView
+              agentId={data.agentId}
               nodeId={nodeId || ''}
               sessionId={data.sessionId}
               workspacePath={data.workspacePath}

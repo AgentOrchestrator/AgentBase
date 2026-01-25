@@ -29,6 +29,7 @@ import type {
   StreamCallback,
   StructuredStreamCallback,
 } from '../../context/node-services/coding-agent-adapter';
+import { permissionModeStore } from '../../stores';
 
 /**
  * Agent service implementation using adapter pattern
@@ -372,18 +373,30 @@ export class AgentServiceImpl implements IAgentService {
         // Session is already running, no need to send CLI command
       } else {
         let cliCommand: string;
+        // Get permission mode for this agent to pass to CLI
+        const permissionMode = permissionModeStore.getEffectiveMode(this.agentId);
 
         if (isResume && this.adapter.buildResumeSessionCommand) {
-          cliCommand = this.adapter.buildResumeSessionCommand(workspacePath, sessionId);
+          cliCommand = this.adapter.buildResumeSessionCommand(
+            workspacePath,
+            sessionId,
+            permissionMode
+          );
           console.log('[AgentService] Resuming session in terminal', {
             sessionId,
             workspacePath,
+            permissionMode,
           });
         } else if (this.adapter.buildStartSessionCommand) {
-          cliCommand = this.adapter.buildStartSessionCommand(workspacePath, sessionId);
+          cliCommand = this.adapter.buildStartSessionCommand(
+            workspacePath,
+            sessionId,
+            permissionMode
+          );
           console.log('[AgentService] Starting new session in terminal', {
             sessionId,
             workspacePath,
+            permissionMode,
           });
         } else {
           console.warn('[AgentService] Adapter does not support CLI session commands');
@@ -481,6 +494,43 @@ export class AgentServiceImpl implements IAgentService {
       this.isRunning = false;
       this.updateStatus('idle');
     });
+  }
+
+  /**
+   * Restart the CLI REPL session with the current permission mode from the store.
+   * This is used when permission mode changes to apply the new mode.
+   * Exits the current session and resumes with new CLI flags.
+   * @param workspacePath - Working directory for the agent
+   * @param sessionId - Session ID to resume
+   */
+  async restartSession(workspacePath: string, sessionId: string): Promise<void> {
+    const permissionMode = permissionModeStore.getEffectiveMode(this.agentId);
+    console.log('[AgentService] restartSession() called', {
+      agentId: this.agentId,
+      workspacePath,
+      sessionId,
+      isRunning: this.isRunning,
+      permissionMode,
+    });
+
+    // Exit the current REPL if running
+    if (this.isRunning) {
+      await this.exitRepl();
+      // Reset running state after exit
+      this.isRunning = false;
+    }
+
+    // Explicitly clear session state in main process to ensure start() sends the CLI command
+    await this.clearSessionStateInMainProcess();
+
+    // Delay to allow terminal PTY to fully reset after REPL exit.
+    // The terminal needs time to process the exit and reinitialize before accepting new commands.
+    // Without this delay, the resume command may be sent before the terminal is ready.
+    const TERMINAL_READY_DELAY_MS = 500;
+    await new Promise((resolve) => setTimeout(resolve, TERMINAL_READY_DELAY_MS));
+
+    // Start the session again - this will pick up the new permission mode from the store
+    await this.start(workspacePath, sessionId);
   }
 
   /**
@@ -719,6 +769,14 @@ export class AgentServiceImpl implements IAgentService {
 
     this.updateStatus('running');
 
+    // Get permission mode for this agent to pass to SDK
+    const permissionMode = permissionModeStore.getEffectiveMode(this.agentId);
+    console.log('[AgentService] sendMessageStreamingStructured with permission mode', {
+      agentId: this.agentId,
+      sessionId,
+      permissionMode,
+    });
+
     try {
       const result = await adapter.generateStreamingStructured(
         {
@@ -726,6 +784,7 @@ export class AgentServiceImpl implements IAgentService {
           workingDirectory: workspacePath,
           sessionId,
           agentId: this.agentId,
+          permissionMode,
         },
         onChunk
       );
