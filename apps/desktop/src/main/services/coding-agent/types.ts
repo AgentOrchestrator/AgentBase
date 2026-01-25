@@ -453,6 +453,9 @@ export interface CodingAgentAPI {
 
   /** Respond to pending agent actions (permissions/questions) */
   respondToAction: (response: AgentActionResponse) => Promise<void>;
+
+  /** Abort all pending operations for the agent */
+  abort: (agentType: CodingAgentType) => Promise<void>;
 }
 
 // Re-export types needed for IPC

@@ -97,6 +97,8 @@ export interface UseChatMessagesReturn {
   reload: () => Promise<void>;
   /** Send a message and stream the response */
   sendMessage: (prompt: string) => Promise<void>;
+  /** Abort ongoing streaming and return to idle state */
+  abort: () => Promise<void>;
 }
 
 /**
@@ -362,6 +364,20 @@ export function useChatMessages({
     [agentService, sessionId, workspacePath, onSessionCreated, onError]
   );
 
+  // Abort ongoing streaming and return to idle state
+  const abort = useCallback(async () => {
+    if (!isStreaming) {
+      return;
+    }
+    console.log('[useChatMessages] Aborting streaming');
+    try {
+      await agentService.abort();
+    } finally {
+      // Always reset streaming state, even if abort throws
+      setIsStreaming(false);
+    }
+  }, [isStreaming, agentService]);
+
   return {
     messages,
     isLoading,
@@ -370,5 +386,6 @@ export function useChatMessages({
     setMessages,
     reload,
     sendMessage,
+    abort,
   };
 }

@@ -66,6 +66,7 @@ import type {
   EventResult,
   PermissionPayload,
 } from '@agent-orchestrator/shared';
+import { getLogServer, isMcpMode, startMcpServer, stopMcpServer } from '../instrumentation';
 import type {
   CodingAgentType,
   ContinueOptions,
@@ -1457,6 +1458,29 @@ function registerIpcHandlers(): void {
     }
   );
 
+  // Abort all pending operations for a coding agent
+  // IMPORTANT: Must use the cached singleton (no skipCliVerification) to access activeQueries
+  ipcMain.handle('coding-agent:abort', async (_event, agentType: CodingAgentType) => {
+    try {
+      // Use the cached singleton - skipCliVerification creates a fresh instance with empty activeQueries
+      const agentResult = await getCodingAgent(agentType);
+      if (agentResult.success === false) {
+        console.error('[Main] Error getting coding agent for abort', {
+          agentType,
+          error: agentResult.error,
+        });
+        return { success: false, error: agentResult.error.message };
+      }
+
+      await agentResult.data.cancelAll();
+      console.log('[Main] Aborted all operations for agent', { agentType });
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:abort', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   // ============================================
   // Representation Service IPC Handlers
   // ============================================
@@ -1867,6 +1891,12 @@ function registerIpcHandlers(): void {
 app.whenReady().then(async () => {
   console.log('[Main] App ready');
 
+  // Check if running in MCP server mode
+  const mcpMode = isMcpMode();
+  if (mcpMode) {
+    console.log('[Main] Starting in MCP server mode');
+  }
+
   // Register all IPC handlers (must be after app ready for ipcMain)
   registerIpcHandlers();
   registerAgentActionHandlers();
@@ -1951,13 +1981,26 @@ app.whenReady().then(async () => {
     // Continue without hooks service - app should still function
   }
 
+  // Start MCP server if in MCP mode
+  if (mcpMode) {
+    try {
+      await startMcpServer();
+      getLogServer().log('info', 'mcp', 'MCP server started successfully');
+      console.log('[Main] MCP server started successfully');
+    } catch (error) {
+      console.error('[Main] Error starting MCP server', error);
+      // In MCP mode, failing to start the server is fatal
+      process.exit(1);
+    }
+  }
+
   createWindow();
 });
 
 // Clean up on app quit
 app.on('will-quit', async () => {
   console.log(
-    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, representation service, and agent hooks service'
+    '[Main] App quitting, closing database, worktree manager, coding agents, LLM service, session watcher, representation service, agent hooks service, and MCP server'
   );
   DatabaseFactory.closeDatabase();
   WorktreeManagerFactory.closeManager();
@@ -1966,4 +2009,5 @@ app.on('will-quit', async () => {
   await LLMServiceFactory.dispose();
   await representationService.dispose();
   agentHooksService?.dispose();
+  await stopMcpServer();
 });
