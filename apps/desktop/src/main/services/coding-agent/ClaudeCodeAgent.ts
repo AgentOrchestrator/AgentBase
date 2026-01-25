@@ -223,7 +223,7 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
       config.queryExecutor ??
       new SdkQueryExecutor({
         hooks: this.hookBridge.hooks,
-        canUseTool: undefined, // Temporarily disabled - remove to re-enable permission interception
+        canUseTool: this.canUseTool,
       });
 
     this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
