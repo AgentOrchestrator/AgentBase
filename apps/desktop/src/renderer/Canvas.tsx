@@ -26,7 +26,7 @@ import ForkGhostNode from './ForkGhostNode';
 import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
-import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
+import { createDefaultAgentTitle, useExpose } from '@agent-orchestrator/shared';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -328,6 +328,38 @@ function CanvasFlow() {
       folderHighlight.folderColors
     );
   }, [folderHighlight.highlightedFolders, folderHighlight.folderColors]);
+
+  // =============================================================================
+  // E2E Automation (useExpose)
+  // =============================================================================
+
+  useExpose('canvas', {
+    // State
+    nodeCount: nodes.length,
+    hasAgents,
+    isLoading: isCanvasLoading,
+
+    // Node creation actions
+    addAgentNode: () => canvasActions.addAgentNode(),
+    addStarterNode: () => canvasActions.addStarterNode(),
+    addTerminalNode: () => canvasActions.addTerminalNode(),
+    addBrowserNode: () => canvasActions.addBrowserNode(),
+
+    // Get nodes info
+    getAgentNodes: () =>
+      nodes
+        .filter((n) => n.type === 'agent')
+        .map((n) => ({
+          id: n.id,
+          agentId: (n.data as AgentNodeData).agentId,
+          sessionId: (n.data as AgentNodeData).sessionId,
+          status: (n.data as AgentNodeData).status,
+        })),
+
+    // Zoom controls
+    zoomIn: () => zoomIn(),
+    zoomOut: () => zoomOut(),
+  });
 
   // =============================================================================
   // Node Store Sync

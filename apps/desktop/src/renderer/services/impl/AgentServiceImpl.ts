@@ -29,6 +29,7 @@ import type {
   StreamCallback,
   StructuredStreamCallback,
 } from '../../context/node-services/coding-agent-adapter';
+import { permissionModeStore } from '../../stores';
 
 /**
  * Agent service implementation using adapter pattern
@@ -372,18 +373,30 @@ export class AgentServiceImpl implements IAgentService {
         // Session is already running, no need to send CLI command
       } else {
         let cliCommand: string;
+        // Get permission mode for this agent to pass to CLI
+        const permissionMode = permissionModeStore.getEffectiveMode(this.agentId);
 
         if (isResume && this.adapter.buildResumeSessionCommand) {
-          cliCommand = this.adapter.buildResumeSessionCommand(workspacePath, sessionId);
+          cliCommand = this.adapter.buildResumeSessionCommand(
+            workspacePath,
+            sessionId,
+            permissionMode
+          );
           console.log('[AgentService] Resuming session in terminal', {
             sessionId,
             workspacePath,
+            permissionMode,
           });
         } else if (this.adapter.buildStartSessionCommand) {
-          cliCommand = this.adapter.buildStartSessionCommand(workspacePath, sessionId);
+          cliCommand = this.adapter.buildStartSessionCommand(
+            workspacePath,
+            sessionId,
+            permissionMode
+          );
           console.log('[AgentService] Starting new session in terminal', {
             sessionId,
             workspacePath,
+            permissionMode,
           });
         } else {
           console.warn('[AgentService] Adapter does not support CLI session commands');

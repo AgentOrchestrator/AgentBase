@@ -6,7 +6,7 @@
  * Displays messages exactly like ConversationNode.
  */
 
-import type { AgentContentBlock } from '@agent-orchestrator/shared';
+import type { AgentContentBlock, PermissionMode } from '@agent-orchestrator/shared';
 import { useExpose } from '@agent-orchestrator/shared';
 import { useReactFlow } from '@xyflow/react';
 import { marked } from 'marked';
@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TextSelectionButton } from './components/TextSelectionButton';
 import { useAgentService } from './context';
 import { useChatMessages } from './hooks/useChatMessages';
+import { permissionModeStore } from './stores';
 import type { AgentChatMessage } from './types/agent-node';
 import './AgentChatView.css';
 
@@ -23,7 +24,26 @@ marked.setOptions({
   breaks: false,
 });
 
+/**
+ * Permission mode display configuration
+ */
+const PERMISSION_MODE_CONFIG: Record<
+  PermissionMode,
+  { label: string; icon: string; color: string; tooltip: string }
+> = {
+  plan: { label: 'Plan', icon: '📋', color: '#f59e0b', tooltip: 'Plan Mode - Read-only' },
+  'auto-accept': {
+    label: 'Auto',
+    icon: '✓',
+    color: '#22c55e',
+    tooltip: 'Auto-Accept - Skip prompts',
+  },
+  ask: { label: 'Ask', icon: '?', color: '#3b82f6', tooltip: 'Ask Mode - Interactive' },
+};
+
 interface AgentChatViewProps {
+  /** Agent ID for permission mode tracking */
+  agentId: string;
   /** Session ID (required for chat operations) */
   sessionId: string;
   agentType: string;
@@ -51,6 +71,7 @@ type DisplayItem =
     };
 
 export default function AgentChatView({
+  agentId,
   sessionId,
   agentType,
   workspacePath,
@@ -63,6 +84,11 @@ export default function AgentChatView({
 }: AgentChatViewProps) {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Permission mode state - subscribes to store changes
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(() =>
+    permissionModeStore.getEffectiveMode(agentId)
+  );
   // Track the initial input text for display (cleared after first message)
   const [attachedText, setAttachedText] = useState<string | undefined>(initialInputText);
   const hasSentFirstMessage = useRef(false);
@@ -98,6 +124,23 @@ export default function AgentChatView({
     onSessionCreated,
   });
 
+  // Subscribe to permission mode changes
+  useEffect(() => {
+    const unsubAgent = permissionModeStore.subscribe(agentId, setPermissionMode);
+    const unsubGlobal = permissionModeStore.subscribeGlobal(() => {
+      setPermissionMode(permissionModeStore.getEffectiveMode(agentId));
+    });
+    return () => {
+      unsubAgent();
+      unsubGlobal();
+    };
+  }, [agentId]);
+
+  // Handle permission mode click to cycle
+  const handlePermissionClick = useCallback(() => {
+    permissionModeStore.cycleAgentMode(agentId);
+  }, [agentId]);
+
   // Expose for automation testing
   useExpose(`chat:${sessionId}`, {
     // State (readable)
@@ -105,6 +148,7 @@ export default function AgentChatView({
     isStreaming,
     isLoaded,
     messageCount: messages.length,
+    permissionMode,
     // Actions
     type: (text: string) => setInputValue(text),
     // Send accepts optional message param (for automation - React state is async)
@@ -118,6 +162,9 @@ export default function AgentChatView({
     },
     abort,
     clear: () => setInputValue(''),
+    // Permission mode actions for E2E
+    cyclePermissionMode: () => permissionModeStore.cycleAgentMode(agentId),
+    setPermissionMode: (mode: PermissionMode) => permissionModeStore.setAgentMode(agentId, mode),
   });
 
   // Set attached text from initialInputText prop (only if we haven't sent a message yet)
@@ -435,6 +482,11 @@ export default function AgentChatView({
       e.preventDefault();
       handleSend();
     }
+    // Shift+Tab cycles permission mode
+    if (e.shiftKey && e.key === 'Tab') {
+      e.preventDefault();
+      permissionModeStore.cycleAgentMode(agentId);
+    }
   };
 
   // Get tool type (matches ConversationNode exactly)
@@ -609,6 +661,33 @@ export default function AgentChatView({
     <div className="agent-chat-view">
       {/* Forehead - covers everything above the top sticky user message */}
       {stickyUserMessageId && <div className="agent-chat-view-forehead" />}
+
+      {/* Permission Mode Indicator - clickable badge to cycle mode */}
+      <div
+        className="agent-chat-permission-indicator"
+        onClick={handlePermissionClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handlePermissionClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Shift+Tab to cycle)`}
+      >
+        <span
+          className="permission-mode-badge"
+          style={
+            {
+              '--permission-color': PERMISSION_MODE_CONFIG[permissionMode].color,
+            } as React.CSSProperties
+          }
+        >
+          <span className="permission-icon">{PERMISSION_MODE_CONFIG[permissionMode].icon}</span>
+          <span className="permission-label">{PERMISSION_MODE_CONFIG[permissionMode].label}</span>
+        </span>
+      </div>
 
       {/* Messages */}
       <div

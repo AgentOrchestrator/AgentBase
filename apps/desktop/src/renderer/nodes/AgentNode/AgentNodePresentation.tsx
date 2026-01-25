@@ -5,6 +5,7 @@
  * Handles UI rendering, status display, and user interactions.
  */
 
+import { useExpose } from '@agent-orchestrator/shared';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -121,6 +122,30 @@ export function AgentNodePresentation({
       unsubGlobal();
     };
   }, [data.agentId]);
+
+  // =============================================================================
+  // E2E Automation (useExpose)
+  // =============================================================================
+
+  useExpose(`agent:${data.agentId}`, {
+    // State
+    agentId: data.agentId,
+    sessionId: data.sessionId,
+    status: data.status,
+    permissionMode,
+    activeView,
+
+    // View actions
+    setActiveView: (view: AgentNodeView) => setActiveView(view),
+    showOverview: () => setActiveView('overview'),
+    showTerminal: () => setActiveView('terminal'),
+    showChat: () => setActiveView('chat'),
+
+    // Permission mode actions
+    cyclePermissionMode: () => permissionModeStore.cycleAgentMode(data.agentId),
+    setPermissionMode: (mode: PermissionMode) =>
+      permissionModeStore.setAgentMode(data.agentId, mode),
+  });
 
   // Stop agent when node unmounts
   // Agent start is handled by AgentTerminalView when it mounts
@@ -846,6 +871,7 @@ export function AgentNodePresentation({
           )}
           {activeView === 'chat' && data.sessionId && data.workspacePath && (
             <AgentChatView
+              agentId={data.agentId}
               nodeId={nodeId || ''}
               sessionId={data.sessionId}
               workspacePath={data.workspacePath}

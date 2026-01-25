@@ -12,6 +12,7 @@
  * - Is stateless - all parameters must be provided per-request
  */
 
+import type { PermissionMode } from '@agent-orchestrator/shared';
 import type { AgentType } from '../../../../types/coding-agent-status';
 import type {
   AgentAdapterEventType,
@@ -330,21 +331,49 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   // ============================================
 
   /**
+   * Get CLI flags based on permission mode
+   */
+  private getPermissionFlag(mode?: PermissionMode): string {
+    switch (mode) {
+      case 'plan':
+        // Read-only tools for plan mode
+        return ' --allowedTools "Read,Glob,Grep,LSP,WebFetch,WebSearch"';
+      case 'auto-accept':
+        // Skip all permission prompts
+        return ' --dangerously-skip-permissions';
+      case 'ask':
+      default:
+        // Default interactive mode - no flag needed
+        return '';
+    }
+  }
+
+  /**
    * Build command to start a new CLI REPL session with a specific session ID.
    * Hooks are loaded from workspace-level .claude/settings.local.json (set up by AgentHooksService)
    */
-  buildStartSessionCommand(workspacePath: string, sessionId: string): string {
+  buildStartSessionCommand(
+    workspacePath: string,
+    sessionId: string,
+    permissionMode?: PermissionMode
+  ): string {
     const escapedPath = workspacePath.replace(/"/g, '\\"');
-    return `cd "${escapedPath}" && claude --session-id ${sessionId}\n`;
+    const permissionFlag = this.getPermissionFlag(permissionMode);
+    return `cd "${escapedPath}" && claude --session-id ${sessionId}${permissionFlag}\n`;
   }
 
   /**
    * Build command to resume an existing CLI REPL session.
    * Hooks are loaded from workspace-level .claude/settings.local.json (set up by AgentHooksService)
    */
-  buildResumeSessionCommand(workspacePath: string, sessionId: string): string {
+  buildResumeSessionCommand(
+    workspacePath: string,
+    sessionId: string,
+    permissionMode?: PermissionMode
+  ): string {
     const escapedPath = workspacePath.replace(/"/g, '\\"');
-    return `cd "${escapedPath}" && claude --resume ${sessionId}\n`;
+    const permissionFlag = this.getPermissionFlag(permissionMode);
+    return `cd "${escapedPath}" && claude --resume ${sessionId}${permissionFlag}\n`;
   }
 
   /**
