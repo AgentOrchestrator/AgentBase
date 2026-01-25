@@ -56,7 +56,10 @@ export function WorktreeConfigSection({ workspacePath }: WorktreeConfigSectionPr
             />
           </div>
           <div className="worktree-config-path">
-            <span className="worktree-config-path-prefix">{parentDir}{pathSeparator}</span>
+            <span className="worktree-config-path-prefix">
+              {parentDir}
+              {pathSeparator}
+            </span>
             <span className="worktree-config-path-folder">
               {config.folderName || 'folder-name'}
             </span>
