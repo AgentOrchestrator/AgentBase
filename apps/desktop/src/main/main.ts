@@ -1459,9 +1459,11 @@ function registerIpcHandlers(): void {
   );
 
   // Abort all pending operations for a coding agent
+  // IMPORTANT: Must use the cached singleton (no skipCliVerification) to access activeQueries
   ipcMain.handle('coding-agent:abort', async (_event, agentType: CodingAgentType) => {
     try {
-      const agentResult = await getCodingAgent(agentType, { skipCliVerification: true });
+      // Use the cached singleton - skipCliVerification creates a fresh instance with empty activeQueries
+      const agentResult = await getCodingAgent(agentType);
       if (agentResult.success === false) {
         console.error('[Main] Error getting coding agent for abort', {
           agentType,

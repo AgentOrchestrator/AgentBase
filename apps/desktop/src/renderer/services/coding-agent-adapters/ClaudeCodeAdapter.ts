@@ -106,8 +106,11 @@ export class ClaudeCodeAdapter implements ICodingAgentAdapter {
   }
 
   async cancelAll(): Promise<void> {
-    // Currently no cancellation mechanism in the IPC API
-    // This would require adding cancel support to the main process
+    if (!this.api?.abort) {
+      console.warn('[ClaudeCodeAdapter] abort not available in codingAgentAPI');
+      return;
+    }
+    await this.api.abort(this.agentType);
   }
 
   // ============================================
