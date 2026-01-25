@@ -9,6 +9,64 @@ import { MessagePreviewPanel } from './MessagePreviewPanel';
 import { WorktreeConfigSection } from './WorktreeConfigSection';
 
 /**
+ * UX Copy - all user-facing text centralized for easy updates
+ */
+const COPY = {
+  placeholders: {
+    taskDescription: 'What do you want the agent to work on?',
+    forkName: 'Fork name...',
+    branchName: 'Branch name',
+    branchSearch: 'Search branches...',
+  },
+  labels: {
+    forkTitle: 'Fork Agent Session',
+    newBranch: 'New branch',
+    worktree: 'Worktree',
+    createAgentIn: 'Create Agent in:',
+  },
+  shortcuts: {
+    newBranch: '⌘E',
+  },
+  buttons: {
+    creatingBranch: 'Creating branch...',
+    checkingGit: 'Checking git...',
+    gitRequired: 'Git required',
+    createFork: 'Create fork',
+    startAgent: 'Start agent',
+  },
+  states: {
+    noFolderSelected: 'No folder selected',
+    workspaceFallback: 'Workspace',
+    loadingBranches: 'Loading...',
+    noMatchingBranches: 'No matching branches',
+    noBranchesFound: 'No branches found',
+    loadingMessages: 'Loading messages...',
+  },
+  tooltips: {
+    selectFolder: 'Click to select folder',
+    gitRequired: 'Please select a git repository',
+  },
+  alerts: {
+    createBranchFailed: 'Failed to create branch',
+    createBranchError: 'Error creating branch',
+    checkoutBranchFailed: 'Failed to checkout branch',
+    checkoutBranchError: 'Error checking out branch',
+    gitRequired:
+      'Please select a git repository. Agent creation requires a git-initialized directory.',
+    workspaceRequired: 'Please select a workspace folder.',
+    unknownError: 'Unknown error',
+  },
+  dialogs: {
+    selectWorkspace: 'Select Workspace Directory',
+  },
+  defaults: {
+    agentTitle: 'New Agent',
+    worktreePrefix: 'agent-',
+    worktreeFallback: 'agent-fork',
+  },
+} as const;
+
+/**
  * Data for fork mode operations
  */
 interface ForkData {
@@ -205,7 +263,7 @@ export function NewAgentModal({
       }
 
       const path = await window.shellAPI.openDirectoryDialog({
-        title: 'Select Workspace Directory',
+        title: COPY.dialogs.selectWorkspace,
       });
       if (path) {
         setWorkspacePath(path);
@@ -229,7 +287,7 @@ export function NewAgentModal({
     if (workspacePath && gitInfo?.branch) {
       items.push({
         type: 'action',
-        label: 'New branch',
+        label: COPY.labels.newBranch,
         action: () => setIsCreatingNewBranch(true),
       });
     }
@@ -492,8 +550,8 @@ export function NewAgentModal({
 
   // Get folder name (last segment of path)
   const getFolderName = (path: string | null): string => {
-    if (!path) return 'No folder selected';
-    return path.split('/').pop() || 'Workspace';
+    if (!path) return COPY.states.noFolderSelected;
+    return path.split('/').pop() || COPY.states.workspaceFallback;
   };
 
   const handleCreate = async () => {
@@ -507,7 +565,7 @@ export function NewAgentModal({
         const result = await window.gitAPI?.createBranch(workspacePath, newBranchName.trim());
         if (!result?.success) {
           console.error('[NewAgentModal] Failed to create branch:', result?.error);
-          alert(`Failed to create branch: ${result?.error || 'Unknown error'}`);
+          alert(`${COPY.alerts.createBranchFailed}: ${result?.error || COPY.alerts.unknownError}`);
           setIsCreatingBranch(false);
           return;
         }
@@ -518,7 +576,7 @@ export function NewAgentModal({
         }
       } catch (error) {
         console.error('[NewAgentModal] Error creating branch:', error);
-        alert(`Error creating branch: ${(error as Error).message}`);
+        alert(`${COPY.alerts.createBranchError}: ${(error as Error).message}`);
         setIsCreatingBranch(false);
         return;
       } finally {
@@ -554,7 +612,9 @@ export function NewAgentModal({
               setShowBranchSwitchWarning(true);
               return;
             }
-            alert(`Failed to checkout branch: ${result?.error || 'Unknown error'}`);
+            alert(
+              `${COPY.alerts.checkoutBranchFailed}: ${result?.error || COPY.alerts.unknownError}`
+            );
             return;
           }
           // Refresh git info to get the checked out branch
@@ -569,7 +629,7 @@ export function NewAgentModal({
             setShowBranchSwitchWarning(true);
             return;
           }
-          alert(`Error checking out branch: ${(error as Error).message}`);
+          alert(`${COPY.alerts.checkoutBranchError}: ${(error as Error).message}`);
           return;
         }
       }
@@ -577,12 +637,12 @@ export function NewAgentModal({
 
     // Validate git info is available (required for agent creation)
     if (!gitInfo) {
-      alert('Please select a git repository. Agent creation requires a git-initialized directory.');
+      alert(COPY.alerts.gitRequired);
       return;
     }
 
     if (!finalWorkspacePath) {
-      alert('Please select a workspace folder.');
+      alert(COPY.alerts.workspaceRequired);
       return;
     }
 
@@ -591,12 +651,12 @@ export function NewAgentModal({
       // Compute full sibling worktree path from workspace path
       const parentDir = finalWorkspacePath.split('/').slice(0, -1).join('/');
       const dirName = description.trim()
-        ? `agent-${description
+        ? `${COPY.defaults.worktreePrefix}${description
             .trim()
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .slice(0, 30)}`
-        : `agent-fork-${Date.now()}`;
+        : `${COPY.defaults.worktreeFallback}-${Date.now()}`;
       const fullWorktreePath = `${parentDir}/${dirName}`;
 
       onForkConfirm({
@@ -613,7 +673,7 @@ export function NewAgentModal({
 
     // Regular mode: call onCreate
     onCreate({
-      title: description.trim() || 'New Agent',
+      title: description.trim() || COPY.defaults.agentTitle,
       description: description.trim(),
       workspacePath: finalWorkspacePath,
       gitInfo,
@@ -635,13 +695,13 @@ export function NewAgentModal({
         <div className="new-agent-modal-header">
           <div className="new-agent-modal-header-left">
             {/* Fork mode title */}
-            {isForkMode && <span className="new-agent-modal-title">Fork Agent Session</span>}
+            {isForkMode && <span className="new-agent-modal-title">{COPY.labels.forkTitle}</span>}
             {/* Show folder selector */}
             <div
               className={`new-agent-modal-folder-wrapper ${keyboardFocus === 'folder' ? 'keyboard-selected' : ''}`}
               onClick={handleBrowseFolder}
               style={{ cursor: 'pointer' }}
-              title="Click to select folder"
+              title={COPY.tooltips.selectFolder}
             >
               <div className="new-agent-modal-folder-icon">
                 <svg
@@ -762,7 +822,7 @@ export function NewAgentModal({
                       ref={newBranchInputRef}
                       type="text"
                       className="new-agent-modal-branch-input"
-                      placeholder="Branch name"
+                      placeholder={COPY.placeholders.branchName}
                       value={newBranchName}
                       onChange={(e) => setNewBranchName(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -800,7 +860,7 @@ export function NewAgentModal({
                         data-branch-search="true"
                         type="text"
                         className="new-agent-modal-branch-search"
-                        placeholder="Search branches..."
+                        placeholder={COPY.placeholders.branchSearch}
                         value={branchSearchTerm}
                         onChange={(e) => setBranchSearchTerm(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
@@ -823,16 +883,23 @@ export function NewAgentModal({
                             setIsCreatingNewBranch(true);
                           }}
                         >
-                          New branch <span className="new-agent-modal-command-hint">⌘E</span>
+                          {COPY.labels.newBranch}{' '}
+                          <span className="new-agent-modal-command-hint">
+                            {COPY.shortcuts.newBranch}
+                          </span>
                         </div>
                         <div className="new-agent-modal-branch-dropdown-divider" />
                       </>
                     )}
                     {isLoadingBranches ? (
-                      <div className="new-agent-modal-branch-dropdown-item">Loading...</div>
+                      <div className="new-agent-modal-branch-dropdown-item">
+                        {COPY.states.loadingBranches}
+                      </div>
                     ) : filteredBranches.length === 0 ? (
                       <div className="new-agent-modal-branch-dropdown-item">
-                        {branchSearchTerm ? 'No matching branches' : 'No branches found'}
+                        {branchSearchTerm
+                          ? COPY.states.noMatchingBranches
+                          : COPY.states.noBranchesFound}
                       </div>
                     ) : (
                       filteredBranches.map((branch, index) => {
@@ -886,7 +953,7 @@ export function NewAgentModal({
             <textarea
               ref={descriptionInputRef}
               className="new-agent-modal-description-input new-agent-modal-fork-input"
-              placeholder="Fork name..."
+              placeholder={COPY.placeholders.forkName}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onKeyDown={(e) => {
@@ -914,7 +981,7 @@ export function NewAgentModal({
             <textarea
               ref={descriptionInputRef}
               className="new-agent-modal-description-input"
-              placeholder="Create a new agent"
+              placeholder={COPY.placeholders.taskDescription}
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -970,7 +1037,9 @@ export function NewAgentModal({
                       isLoading={isLoadingMessages}
                     />
                   ) : isLoadingMessages ? (
-                    <div className="new-agent-modal-preview-loading">Loading messages...</div>
+                    <div className="new-agent-modal-preview-loading">
+                      {COPY.states.loadingMessages}
+                    </div>
                   ) : null}
                 </div>
               )}
@@ -988,7 +1057,7 @@ export function NewAgentModal({
                 checked={shouldCreateWorktreeForFork}
                 onChange={(e) => setShouldCreateWorktreeForFork(e.target.checked)}
               />
-              <span className="new-agent-modal-checkbox-text">Worktree</span>
+              <span className="new-agent-modal-checkbox-text">{COPY.labels.worktree}</span>
             </label>
           )}
           {!isForkMode && <WorktreeConfigSection workspacePath={workspacePath} />}
@@ -1002,35 +1071,35 @@ export function NewAgentModal({
               isLoadingGit ||
               !gitInfo
             }
-            title={!gitInfo && !isLoadingGit ? 'Please select a git repository' : undefined}
+            title={!gitInfo && !isLoadingGit ? COPY.tooltips.gitRequired : undefined}
           >
             {isCreatingBranch
-              ? 'Creating branch...'
+              ? COPY.buttons.creatingBranch
               : isLoadingGit
-                ? 'Checking git...'
+                ? COPY.buttons.checkingGit
                 : !gitInfo
-                  ? 'Git required'
+                  ? COPY.buttons.gitRequired
                   : isForkMode
-                    ? 'Create fork'
-                    : 'Start agent'}
+                    ? COPY.buttons.createFork
+                    : COPY.buttons.startAgent}
           </button>
         </div>
 
         {/* Chin area for worktree path info */}
         {isForkMode && shouldCreateWorktreeForFork && workspacePath && (
           <div className="new-agent-modal-chin new-agent-modal-fork-worktree-path">
-            <span className="new-agent-modal-fork-worktree-label">Create Agent in:</span>
+            <span className="new-agent-modal-fork-worktree-label">{COPY.labels.createAgentIn}</span>
             <span className="new-agent-modal-fork-worktree-value">
               {(() => {
                 // Compute sibling path: parent directory of workspace + directory name
                 const parentDir = workspacePath.split('/').slice(0, -1).join('/');
                 const dirName = description.trim()
-                  ? `agent-${description
+                  ? `${COPY.defaults.worktreePrefix}${description
                       .trim()
                       .toLowerCase()
                       .replace(/[^a-z0-9]+/g, '-')
                       .slice(0, 30)}`
-                  : 'agent-fork';
+                  : COPY.defaults.worktreeFallback;
                 return `${parentDir}/${dirName}`;
               })()}
             </span>
