@@ -4,6 +4,8 @@ import { canvasAddNodeTool } from './canvas-add-node';
 import { canvasConnectTool } from './canvas-connect';
 import { canvasQueryTool } from './canvas-query';
 import { canvasRemoveNodeTool } from './canvas-remove-node';
+// Expose tools (automation)
+import { exposeCallTool, exposeGetTool, exposeListTool, exposeSetTool } from './expose';
 import { logClearTool } from './log-clear';
 // Logging tools
 import { logInjectTool } from './log-inject';
@@ -43,6 +45,12 @@ export const allTools: Tool[] = [
   canvasRemoveNodeTool,
   canvasConnectTool,
   canvasQueryTool,
+
+  // Expose (automation)
+  exposeListTool,
+  exposeGetTool,
+  exposeSetTool,
+  exposeCallTool,
 ];
 
 export {
@@ -63,4 +71,9 @@ export {
   canvasRemoveNodeTool,
   canvasConnectTool,
   canvasQueryTool,
+  // Expose (automation)
+  exposeListTool,
+  exposeGetTool,
+  exposeSetTool,
+  exposeCallTool,
 };

@@ -1458,6 +1458,27 @@ function registerIpcHandlers(): void {
     }
   );
 
+  // Abort all pending operations for a coding agent
+  ipcMain.handle('coding-agent:abort', async (_event, agentType: CodingAgentType) => {
+    try {
+      const agentResult = await getCodingAgent(agentType, { skipCliVerification: true });
+      if (agentResult.success === false) {
+        console.error('[Main] Error getting coding agent for abort', {
+          agentType,
+          error: agentResult.error,
+        });
+        return { success: false, error: agentResult.error.message };
+      }
+
+      await agentResult.data.cancelAll();
+      console.log('[Main] Aborted all operations for agent', { agentType });
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Error in coding-agent:abort', { agentType, error });
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   // ============================================
   // Representation Service IPC Handlers
   // ============================================

@@ -1,9 +1,8 @@
 {
   "mcpServers": {
     "agent-base": {
-      "command": "npm",
-      "args": ["run", "dev:mcp"],
-      "cwd": "."
+      "type": "http",
+      "url": "http://localhost:3100/mcp"
     }
   }
 }

@@ -483,6 +483,31 @@ export class AgentServiceImpl implements IAgentService {
     });
   }
 
+  /**
+   * Abort all pending operations and return to idle state.
+   * Cancels SDK queries and sends Ctrl+C to terminal if running.
+   */
+  async abort(): Promise<void> {
+    console.log('[AgentService] abort() called', {
+      agentId: this.agentId,
+      hasAdapter: !!this.adapter,
+      terminalRunning: this.terminalService.isRunning(),
+    });
+
+    // Cancel all adapter operations (SDK queries)
+    if (this.adapter) {
+      await this.adapter.cancelAll();
+    }
+
+    // Send Ctrl+C to terminal to interrupt any running process
+    if (this.terminalService.isRunning()) {
+      this.terminalService.sendUserInput('\x03');
+    }
+
+    // Update status to idle
+    this.updateStatus('idle');
+  }
+
   // =============================================================================
   // Status
   // =============================================================================

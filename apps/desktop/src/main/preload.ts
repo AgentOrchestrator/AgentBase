@@ -489,6 +489,9 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     unwrapResponse<boolean>(
       ipcRenderer.invoke('coding-agent:session-file-exists', agentType, sessionId, workspacePath)
     ),
+  abort: async (agentType: CodingAgentType) => {
+    await unwrapResponse(ipcRenderer.invoke('coding-agent:abort', agentType));
+  },
 } as CodingAgentAPI);
 
 // Expose LLM API

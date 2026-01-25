@@ -5,6 +5,8 @@
  * that are invoked from the main process MCP server.
  */
 
+import { getExposeRegistry } from '@agent-orchestrator/shared';
+
 type RequestHandler = (payload: unknown) => Promise<unknown>;
 
 interface BridgeRequest {
@@ -381,6 +383,53 @@ const handlers: Record<string, RequestHandler> = {
         error: error instanceof Error ? error.message : 'Query failed',
       };
     }
+  },
+
+  // ============================================================================
+  // Automation handlers (expose_* tools)
+  // ============================================================================
+
+  // List all exposed components
+  'automation:list': async (payload) => {
+    const params = payload as { filter?: { tag?: string } };
+    const registry = getExposeRegistry();
+
+    try {
+      const entries = registry.list(params.filter);
+      return { success: true, entries };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'List failed',
+      };
+    }
+  },
+
+  // Get a value from an exposed component
+  'automation:get': async (payload) => {
+    const params = payload as { id: string; key: string };
+    const registry = getExposeRegistry();
+
+    const result = registry.get(params.id, params.key);
+    return result;
+  },
+
+  // Set a value on an exposed component
+  'automation:set': async (payload) => {
+    const params = payload as { id: string; key: string; value: unknown };
+    const registry = getExposeRegistry();
+
+    const result = registry.set(params.id, params.key, params.value);
+    return result;
+  },
+
+  // Call an action on an exposed component
+  'automation:call': async (payload) => {
+    const params = payload as { id: string; key: string; args?: unknown[] };
+    const registry = getExposeRegistry();
+
+    const result = registry.call(params.id, params.key, params.args ?? []);
+    return result;
   },
 };
 
