@@ -42,7 +42,8 @@ const sanitize = (text: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
-    .slice(0, 30);
+    .slice(0, 30)
+    .replace(/-+$/g, ''); // Remove trailing hyphens after truncation
 
 const initialState: WorktreeConfigState = {
   enabled: false,

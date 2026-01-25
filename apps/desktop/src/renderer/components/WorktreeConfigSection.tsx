@@ -17,7 +17,9 @@ export function WorktreeConfigSection({ workspacePath }: WorktreeConfigSectionPr
 
   if (!workspacePath) return null;
 
-  const parentDir = workspacePath.split('/').slice(0, -1).join('/');
+  // Handle both Unix (/) and Windows (\) path separators
+  const pathSeparator = workspacePath.includes('\\') ? '\\' : '/';
+  const parentDir = workspacePath.split(/[\\/]/).slice(0, -1).join(pathSeparator);
 
   return (
     <div className="worktree-config-section">
@@ -54,7 +56,7 @@ export function WorktreeConfigSection({ workspacePath }: WorktreeConfigSectionPr
             />
           </div>
           <div className="worktree-config-path">
-            <span className="worktree-config-path-prefix">{parentDir}/</span>
+            <span className="worktree-config-path-prefix">{parentDir}{pathSeparator}</span>
             <span className="worktree-config-path-folder">
               {config.folderName || 'folder-name'}
             </span>
