@@ -110,8 +110,12 @@ export class LogServer {
     }
 
     if (options?.pattern) {
-      const regex = new RegExp(options.pattern, 'i');
-      entries = entries.filter((e) => regex.test(e.message));
+      try {
+        const regex = new RegExp(options.pattern, 'i');
+        entries = entries.filter((e) => regex.test(e.message));
+      } catch {
+        // Invalid regex pattern - skip filtering rather than throw
+      }
     }
 
     if (options?.limit && options.limit > 0) {

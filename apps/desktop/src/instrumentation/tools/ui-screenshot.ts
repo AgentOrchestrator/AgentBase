@@ -25,8 +25,8 @@ export const uiScreenshotTool: Tool<Input, Output> = {
   description: 'Capture a screenshot of the current app window',
   inputSchema,
   handler: async (params) => {
-    const windows = BrowserWindow.getAllWindows();
-    const mainWindow = windows[0];
+    // Prefer focused window, fall back to first window if none focused
+    const mainWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
 
     if (!mainWindow) {
       return { success: false, error: 'No active window found' };

@@ -45,18 +45,7 @@ export const canvasQueryTool: Tool<Input, Output> = {
     const bridge = getIpcBridge();
 
     try {
-      const result = await bridge.invoke<{
-        success: boolean;
-        node?: NodeInfo;
-        nodes?: NodeInfo[];
-        edges?: EdgeInfo[];
-        viewport?: {
-          x: number;
-          y: number;
-          zoom: number;
-        };
-        error?: string;
-      }>('test-bridge:canvas-query', {
+      const result = await bridge.invoke<Output>('test-bridge:canvas-query', {
         nodeId: params.nodeId,
       });
 

@@ -9,7 +9,6 @@ const inputSchema = z.object({
     .optional()
     .describe('CSS selector of input element (uses focused element if not specified)'),
   clear: z.boolean().optional().default(false).describe('Clear existing content before typing'),
-  delay: z.number().optional().describe('Delay between keystrokes in ms (for realistic typing)'),
 });
 
 type Input = z.infer<typeof inputSchema>;
@@ -38,7 +37,6 @@ export const uiTypeTool: Tool<Input, Output> = {
         text: params.text,
         selector: params.selector,
         clear: params.clear,
-        delay: params.delay,
       });
 
       if (!result.success) {

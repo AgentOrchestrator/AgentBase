@@ -154,7 +154,6 @@ const handlers: Record<string, RequestHandler> = {
       text: string;
       selector?: string;
       clear?: boolean;
-      delay?: number;
     };
 
     let element: Element | HTMLInputElement | HTMLTextAreaElement;
