@@ -637,35 +637,40 @@ export function AgentNodePresentation({
         </div>
 
         {/* Permission Mode Indicator - Next to Status (clickable to cycle) */}
-        <div
-          className="agent-node-permission-indicator"
-          onClick={(e) => {
-            e.stopPropagation();
-            permissionModeStore.cycleAgentMode(data.agentId);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+        {/* Hidden in terminal view since CLI handles its own permission mode */}
+        {activeView !== 'terminal' && (
+          <div
+            className="agent-node-permission-indicator"
+            onClick={(e) => {
               e.stopPropagation();
               permissionModeStore.cycleAgentMode(data.agentId);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Click to cycle)`}
-        >
-          <span
-            className="permission-mode-badge"
-            style={
-              {
-                '--permission-color': PERMISSION_MODE_CONFIG[permissionMode].color,
-              } as React.CSSProperties
-            }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                permissionModeStore.cycleAgentMode(data.agentId);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            title={`${PERMISSION_MODE_CONFIG[permissionMode].tooltip} (Click to cycle)`}
           >
-            <span className="permission-icon">{PERMISSION_MODE_CONFIG[permissionMode].icon}</span>
-            <span className="permission-label">{PERMISSION_MODE_CONFIG[permissionMode].label}</span>
-          </span>
-        </div>
+            <span
+              className="permission-mode-badge"
+              style={
+                {
+                  '--permission-color': PERMISSION_MODE_CONFIG[permissionMode].color,
+                } as React.CSSProperties
+              }
+            >
+              <span className="permission-icon">{PERMISSION_MODE_CONFIG[permissionMode].icon}</span>
+              <span className="permission-label">
+                {PERMISSION_MODE_CONFIG[permissionMode].label}
+              </span>
+            </span>
+          </div>
+        )}
 
         {/* View Switcher Buttons - Top Right */}
         <div
