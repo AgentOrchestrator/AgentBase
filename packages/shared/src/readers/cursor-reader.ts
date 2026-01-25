@@ -129,7 +129,6 @@ export function detectStorageFormat(
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='cursorDiskKV'")
         .get();
       if (cursorDiskKV) {
-        db.close();
         return 'cursorDiskKV';
       }
 
@@ -138,7 +137,6 @@ export function detectStorageFormat(
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ItemTable'")
         .get();
       if (itemTable) {
-        db.close();
         return 'ItemTable';
       }
     } finally {

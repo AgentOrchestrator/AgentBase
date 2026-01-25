@@ -180,7 +180,7 @@ export function readFactoryHistories(sessionsDir?: string, options?: LoaderOptio
       }
     }
   } catch {
-    // Return empty array on error
+    // Return accumulated results on error
   }
 
   return histories;

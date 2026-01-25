@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import type { IDatabaseLoader } from '../loaders/interfaces.js';
 import type { ChatHistory, LoaderOptions, ProjectInfo, SessionMetadata } from '../loaders/types.js';
@@ -70,8 +71,10 @@ export function parseWorkspaceInfo(workspaceDir: string): WorkspaceInfo | null {
     let folder: string | undefined;
     if (workspaceJson.folder) {
       const uri = workspaceJson.folder;
-      if (typeof uri === 'string') {
-        folder = uri.replace('file://', '');
+      if (typeof uri === 'string' && uri.startsWith('file://')) {
+        folder = fileURLToPath(uri);
+      } else if (typeof uri === 'string') {
+        folder = uri;
       } else if (uri && typeof uri === 'object' && 'path' in uri) {
         folder = String(uri.path);
       }
