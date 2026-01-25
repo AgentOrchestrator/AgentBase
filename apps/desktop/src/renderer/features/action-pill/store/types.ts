@@ -43,6 +43,7 @@ export interface ActionPillState {
   addAction: (action: AgentAction) => void;
   removeAction: (actionId: string) => void;
   clearAgent: (agentId: string) => void;
+  clearAll: () => void;
 
   // Actions - UI
   expand: () => void;

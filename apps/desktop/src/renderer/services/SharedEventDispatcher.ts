@@ -43,11 +43,18 @@ class SharedEventDispatcher {
   /**
    * Initialize the dispatcher - sets up IPC listeners for both channels.
    * Safe to call multiple times (idempotent).
+   *
+   * Clears any stale pending actions from previous sessions on startup.
+   * This ensures actions don't persist across app restarts (e.g., from HMR in dev mode).
    */
   initialize(): void {
     if (this.initialized) {
       return;
     }
+
+    // Clear any stale actions from previous session
+    // This handles cases where actions might persist due to HMR or other edge cases
+    useActionPillStore.getState().clearAll();
 
     // Subscribe to SDK agent events (ClaudeCodeAgent via SDK hooks)
     if (window.codingAgentAPI?.onAgentEvent) {
