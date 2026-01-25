@@ -218,6 +218,12 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     // Avoid double-emitting permission requests when canUseTool handles them.
     delete this.hookBridge.hooks.PermissionRequest;
 
+    // PreToolUse should only emit events for AskUserQuestion (clarifying questions).
+    // Other tools emit events via PermissionRequest (handled by canUseTool).
+    if (this.hookBridge.hooks.PreToolUse?.[0]) {
+      this.hookBridge.hooks.PreToolUse[0].matcher = 'AskUserQuestion';
+    }
+
     // Initialize query executor (injected or default SdkQueryExecutor)
     this.queryExecutor =
       config.queryExecutor ??

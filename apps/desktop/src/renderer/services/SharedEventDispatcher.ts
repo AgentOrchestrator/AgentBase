@@ -122,14 +122,14 @@ class SharedEventDispatcher {
 
   /**
    * Check if an SDK permission event should be shown in the ActionPill.
-   * SDK events only show AskUserQuestion (clarifying questions that need user response).
-   * Regular tool permission prompts are handled in the terminal UI, not ActionPill.
+   * All SDK permission requests should be shown since SDK-based chat has no terminal UI.
    */
   private shouldShowSdkEventInActionPill(
-    event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
+    _event: Extract<AgentAdapterEvent, { type: 'permission:request' }>
   ): boolean {
-    const toolName = event.payload.toolName?.toLowerCase();
-    return toolName === 'askuserquestion' || toolName === 'askclarifyingquestion';
+    // All SDK permission events should show in ActionPill
+    // (terminal-based agents handle permissions in terminal UI instead)
+    return true;
   }
 
   /**
