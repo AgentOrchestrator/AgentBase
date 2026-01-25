@@ -15,24 +15,13 @@ apps/
   desktop/          # Electron app (Vite + React + xterm.js)
 packages/
   shared/           # Shared TypeScript types and readers
-supabase/
-  migrations/       # Database migrations
 ```
 
 ## Setup
 
 ```bash
 npm install                 # Install all dependencies
-```
-
-**Choose your storage backend:**
-
-```bash
-# Option 1: Local SQLite (simple, no external services)
-cp .env.local.example .env
-
-# Option 2: Remote Supabase (team collaboration, cloud sync)
-cp .env.remote.example .env
+cp .env.local.example .env  # Configure environment
 ```
 
 For git worktrees, copy `.env` from the main worktree instead:
@@ -58,7 +47,7 @@ Readers (packages/shared/src/readers/) - read and normalize to ChatHistory
     ↓
 Desktop App (Electron main process)
     ↓
-Storage (SQLite local OR Supabase remote)
+Storage (SQLite)
 ```
 
 

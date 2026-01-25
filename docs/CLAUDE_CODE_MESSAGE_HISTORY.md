@@ -47,7 +47,7 @@ The module:
    - **Conversation name** from first user message or `conversationTitle`
    - **Project path** from `workingDirectory` field in conversation metadata
    - **Project name** derived from the working directory path
-8. Uploads to Supabase with `role`, `source: 'claude_code'`, and project metadata
+8. Stores with `role`, `source: 'claude_code'`, and project metadata
 
 ## Viewing Claude Code Messages
 
