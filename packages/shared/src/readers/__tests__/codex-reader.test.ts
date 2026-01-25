@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatHistory } from '../../loaders/types.js';
 import {
   CodexLoader,
@@ -60,12 +60,14 @@ describe('codex-reader', () => {
     });
 
     it('should include today as the first folder', () => {
-      const result = calculateDateFoldersToScan(1);
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      expect(result[0]).toBe(`${year}/${month}/${day}`);
+      const fixedDate = new Date('2025-01-15T12:00:00.000Z');
+      vi.setSystemTime(fixedDate);
+      try {
+        const result = calculateDateFoldersToScan(1);
+        expect(result[0]).toBe('2025/01/15');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -194,7 +196,7 @@ describe('codex-reader', () => {
     it('should use default lookbackDays of 7 when not specified', () => {
       const result = readCodexHistories(testSessionsDir);
       // Should find sessions from today (within 7 days)
-      expect(result.length).toBeGreaterThanOrEqual(0);
+      expect(result).toHaveLength(1);
     });
   });
 

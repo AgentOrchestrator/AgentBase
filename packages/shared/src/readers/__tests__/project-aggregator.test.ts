@@ -208,7 +208,7 @@ describe('project-aggregator', () => {
       expect(result[0]?.workspaceIds).toContain('ws-789');
     });
 
-    it('should use earlier lastActivity when newer source has older timestamp', () => {
+    it('should keep latest lastActivity when merging projects', () => {
       const cursorProjects: ProjectInfo[] = [
         {
           name: 'my-app',
