@@ -32,6 +32,14 @@ class SharedEventDispatcher {
   private lifecycleCleanup: (() => void) | null = null;
   private initialized = false;
   private processedEventIds = new Set<string>();
+  private initializationTime: number | null = null;
+
+  /**
+   * Short grace period (in ms) after initialization for timestamp-based filtering.
+   * Events with timestamps older than initialization time are filtered.
+   * This is a fallback for events without parseable timestamps.
+   */
+  private static readonly STARTUP_GRACE_PERIOD_MS = 1000;
 
   static getInstance(): SharedEventDispatcher {
     if (!SharedEventDispatcher.instance) {
@@ -43,15 +51,36 @@ class SharedEventDispatcher {
   /**
    * Initialize the dispatcher - sets up IPC listeners for both channels.
    * Safe to call multiple times (idempotent).
+   *
+   * Clears any stale pending actions from previous sessions on startup.
+   * This ensures actions don't persist across app restarts (e.g., from HMR in dev mode).
    */
   initialize(): void {
     if (this.initialized) {
+      console.log('[SharedEventDispatcher] Already initialized, skipping');
       return;
     }
+
+    // Clear any stale actions from previous session
+    // This handles cases where actions might persist due to HMR or other edge cases
+    const existingActions = useActionPillStore.getState().actions;
+    console.log('[SharedEventDispatcher] Clearing stale actions on startup', {
+      actionCount: existingActions.length,
+      actions: existingActions.map((a) => ({ id: a.id, type: a.type, agentId: a.agentId })),
+    });
+    useActionPillStore.getState().clearAll();
+
+    // Record initialization time to filter stale events during startup grace period
+    this.initializationTime = Date.now();
 
     // Subscribe to SDK agent events (ClaudeCodeAgent via SDK hooks)
     if (window.codingAgentAPI?.onAgentEvent) {
       this.ipcCleanup = window.codingAgentAPI.onAgentEvent((event: unknown) => {
+        console.log('[SharedEventDispatcher] Received SDK agent event', {
+          type: (event as AgentAdapterEvent).type,
+          agentId: (event as AgentAdapterEvent).agentId,
+          sessionId: (event as AgentAdapterEvent).sessionId,
+        });
         this.handleEvent(event as AgentAdapterEvent);
       });
     }
@@ -59,6 +88,12 @@ class SharedEventDispatcher {
     // Subscribe to terminal agent lifecycle events (HTTP sideband)
     if (window.codingAgentAPI?.onAgentLifecycle) {
       this.lifecycleCleanup = window.codingAgentAPI.onAgentLifecycle((event: unknown) => {
+        console.log('[SharedEventDispatcher] Received lifecycle event from terminal', {
+          type: (event as LifecycleEvent).type,
+          terminalId: (event as LifecycleEvent).terminalId,
+          agentId: (event as LifecycleEvent).agentId,
+          toolName: (event as LifecycleEvent).toolName,
+        });
         this.handleLifecycleEvent(event as LifecycleEvent);
       });
     }
@@ -97,6 +132,68 @@ class SharedEventDispatcher {
     return toolName === 'askuserquestion' || toolName === 'askclarifyingquestion';
   }
 
+  /**
+   * Check if an event is stale based on its timestamp.
+   * An event is considered stale if:
+   * 1. We're still within the grace period after initialization, AND
+   * 2. The event's timestamp is older than our initialization time
+   *
+   * This allows legitimate new events to pass through even during the grace period,
+   * while filtering out stale events from session history.
+   *
+   * @param eventTimestamp - The event's timestamp (Unix ms, Unix seconds, or ISO string)
+   * @returns true if the event should be filtered as stale
+   */
+  private isStaleEvent(eventTimestamp: number | string | undefined): boolean {
+    if (!this.initializationTime) {
+      return false;
+    }
+
+    const timeSinceInit = Date.now() - this.initializationTime;
+
+    // After grace period, accept all events
+    if (timeSinceInit >= SharedEventDispatcher.STARTUP_GRACE_PERIOD_MS) {
+      return false;
+    }
+
+    // During grace period, filter based on event timestamp
+    if (eventTimestamp === undefined) {
+      // No timestamp available - can't determine staleness, accept the event
+      // This is safer than dropping potentially legitimate events
+      return false;
+    }
+
+    // Threshold to distinguish Unix seconds from milliseconds:
+    // - Unix seconds are ~1.7 billion (10 digits) for current dates
+    // - Unix milliseconds are ~1.7 trillion (13 digits) for current dates
+    // Using 10 billion as threshold safely distinguishes between them
+    const SECONDS_VS_MS_THRESHOLD = 10_000_000_000;
+
+    let eventTimeMs: number;
+    if (typeof eventTimestamp === 'string') {
+      // Try parsing as ISO string or Unix timestamp string
+      const parsed = Date.parse(eventTimestamp);
+      if (isNaN(parsed)) {
+        // Try as Unix timestamp (seconds)
+        const asNumber = Number(eventTimestamp);
+        if (isNaN(asNumber)) {
+          return false; // Can't parse, accept the event
+        }
+        // If it looks like seconds (< 10 billion), convert to ms
+        eventTimeMs = asNumber < SECONDS_VS_MS_THRESHOLD ? asNumber * 1000 : asNumber;
+      } else {
+        eventTimeMs = parsed;
+      }
+    } else {
+      // Number - could be ms or seconds
+      eventTimeMs =
+        eventTimestamp < SECONDS_VS_MS_THRESHOLD ? eventTimestamp * 1000 : eventTimestamp;
+    }
+
+    // Event is stale if it was created before we initialized
+    return eventTimeMs < this.initializationTime;
+  }
+
   private handleEvent(event: AgentAdapterEvent): void {
     // Deduplicate by event ID if present
     const eventId = (event as { id?: string }).id;
@@ -115,6 +212,24 @@ class SharedEventDispatcher {
     // Handle permission requests directly → ActionPill store
     // Only show AskUserQuestion in ActionPill; other tools are handled in terminal UI
     if (event.type === 'permission:request' && this.shouldShowSdkEventInActionPill(event)) {
+      // Filter stale events based on timestamp comparison
+      // When the app starts and SDK connects to existing sessions, stale permission requests
+      // from session history may be re-emitted. We filter these by comparing event timestamps.
+      const raw = (event as { raw?: Record<string, unknown> }).raw;
+      const eventTimestamp =
+        (raw?.timestamp as number | string | undefined) ??
+        (raw?.createdAt as number | string | undefined);
+
+      if (this.isStaleEvent(eventTimestamp)) {
+        console.log('[SharedEventDispatcher] Filtering stale SDK permission event', {
+          eventId,
+          agentId: event.agentId,
+          eventTimestamp,
+          initializationTime: this.initializationTime,
+        });
+        return;
+      }
+
       try {
         const action = this.buildActionFromPermissionEvent(event);
         if (action) {
@@ -275,6 +390,19 @@ class SharedEventDispatcher {
     // - PermissionRequest: always (actual permission prompts)
     // - PreToolUse: only AskUserQuestion (clarifying questions)
     if (this.shouldLifecycleEventShowInActionPill(event)) {
+      // Filter stale events based on timestamp comparison
+      // Lifecycle events have a timestamp field we can use directly
+      if (this.isStaleEvent(event.timestamp)) {
+        console.log('[SharedEventDispatcher] Filtering stale lifecycle event', {
+          eventId,
+          type: event.type,
+          terminalId: event.terminalId,
+          eventTimestamp: event.timestamp,
+          initializationTime: this.initializationTime,
+        });
+        return;
+      }
+
       const action = this.buildActionFromLifecycleEvent(event);
       useActionPillStore.getState().addAction(action);
     }
@@ -434,6 +562,7 @@ class SharedEventDispatcher {
     this.lifecycleCleanup = null;
     this.listeners.clear();
     this.processedEventIds.clear();
+    this.initializationTime = null;
     this.initialized = false;
   }
 }

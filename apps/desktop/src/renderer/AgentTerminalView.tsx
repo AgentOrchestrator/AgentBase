@@ -118,6 +118,12 @@ export default function AgentTerminalView({
 
     // Create terminal process and start agent REPL
     // Pass workspacePath to enable agent hooks env var injection
+    console.log('[AgentTerminalView] Creating terminal and starting agent REPL', {
+      terminalId: terminalService.terminalId,
+      workspacePath,
+      sessionId,
+      hasInitialPrompt: !!initialPrompt,
+    });
     terminalService
       .create(workspacePath)
       .then(async () => {
@@ -133,6 +139,12 @@ export default function AgentTerminalView({
 
         // Start agent REPL in the terminal
         // agent.start() is idempotent - it checks if already running
+        console.log('[AgentTerminalView] Starting agent REPL', {
+          workspacePath,
+          sessionId,
+          hasInitialPrompt: !!initialPrompt,
+          initialPromptLength: initialPrompt?.length,
+        });
         await agentService.start(workspacePath, sessionId, initialPrompt);
       })
       .catch((error) => {

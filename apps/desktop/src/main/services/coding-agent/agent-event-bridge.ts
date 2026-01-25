@@ -10,6 +10,12 @@ interface PendingAction {
 const pendingActions = new Map<string, PendingAction>();
 
 export function emitAgentEvent(event: AgentEvent): void {
+  console.log('[agent-event-bridge] Emitting SDK agent event to renderer', {
+    type: event.type,
+    agentId: event.agentId,
+    sessionId: event.sessionId,
+    id: (event as { id?: string }).id,
+  });
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send('coding-agent:event', event);
   }

@@ -97,6 +97,18 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
     });
   },
 
+  clearAll: () => {
+    set({
+      actions: [],
+      isExpanded: false,
+      hasNewActions: false,
+      animationState: initialAnimationState,
+      actionAnswers: {},
+      submittingActions: new Set(),
+      highlightedAgentId: null,
+    });
+  },
+
   // UI actions
   expand: () => {
     const state = get();
