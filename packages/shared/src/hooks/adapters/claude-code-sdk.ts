@@ -37,6 +37,7 @@ import type {
   PreToolUseHookInput,
   SessionEndHookInput,
   SessionStartHookInput,
+  SetupHookInput,
   StopHookInput,
   SubagentStartHookInput,
   SubagentStopHookInput,
@@ -80,6 +81,7 @@ const SDK_EVENT_MAP: Record<HookEvent, AgentEventType> = {
   PreCompact: 'context:compact',
   PermissionRequest: 'permission:request',
   Notification: 'system:info',
+  Setup: 'session:start',
 };
 
 // =============================================================================
@@ -219,6 +221,17 @@ function buildSystemPayload(input: NotificationHookInput): SystemPayload {
     level: 'info',
     message: input.message,
     code: input.title,
+  };
+}
+
+/**
+ * Build vendor-agnostic payload from SDK Setup input
+ */
+function buildSetupPayload(input: SetupHookInput): SessionPayload {
+  return {
+    sessionId: input.session_id,
+    workspacePath: input.cwd,
+    reason: input.trigger,
   };
 }
 
@@ -508,6 +521,11 @@ export function createSDKHookBridge(
         hooks: [createBridgeCallback<NotificationHookInput>('system:info', buildSystemPayload)],
       },
     ],
+    Setup: [
+      {
+        hooks: [createBridgeCallback<SetupHookInput>('session:start', buildSetupPayload)],
+      },
+    ],
   };
 
   return {
@@ -543,4 +561,5 @@ export const SDK_HOOK_EVENTS: HookEvent[] = [
   'PreCompact',
   'PermissionRequest',
   'Notification',
+  'Setup',
 ];

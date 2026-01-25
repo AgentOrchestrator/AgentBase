@@ -145,3 +145,7 @@ export type {
 // Session Overview Hook - Unified session data management
 // =============================================================================
 export { useSessionOverview } from './useSessionOverview';
+// =============================================================================
+// Worktree Config Hook - Worktree configuration state for New Agent Modal
+// =============================================================================
+export { useWorktreeConfigState, type WorktreeConfigStore } from './useWorktreeConfigState';
