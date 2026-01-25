@@ -1,0 +1,30 @@
+{
+  "sessionId": "vscode-session-123",
+  "requesterUsername": "Copilot Chat",
+  "creationDate": "2025-01-15T09:00:00.000Z",
+  "lastMessageDate": "2025-01-15T10:05:00.000Z",
+  "requests": [
+    {
+      "message": {
+        "text": "How do I fix this TypeScript error?"
+      },
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "response": [
+        {
+          "value": "You can fix this TypeScript error by ensuring the type is correctly defined."
+        }
+      ]
+    },
+    {
+      "message": {
+        "text": "Can you show me an example?"
+      },
+      "timestamp": "2025-01-15T10:05:00.000Z",
+      "response": [
+        {
+          "value": "Sure! Here's an example:\n```typescript\ntype User = { name: string };\n```"
+        }
+      ]
+    }
+  ]
+}

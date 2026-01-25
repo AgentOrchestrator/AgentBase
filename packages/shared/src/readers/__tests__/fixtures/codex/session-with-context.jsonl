@@ -1,0 +1,5 @@
+{"type":"session_meta","payload":{"id":"codex-session-456","timestamp":"2025-01-15T09:00:00.000Z","cwd":"/Users/dev/codex-project"}}
+{"type":"response_item","timestamp":"2025-01-15T10:00:00.000Z","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>file: main.ts</environment_context>"}]}}
+{"type":"response_item","timestamp":"2025-01-15T10:01:00.000Z","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"## Active file:\nmain.ts\n## Open tabs:\nutils.ts"}]}}
+{"type":"response_item","timestamp":"2025-01-15T10:02:00.000Z","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"## My request for Codex:\nWhat does this code do?"}]}}
+{"type":"response_item","timestamp":"2025-01-15T10:03:00.000Z","payload":{"type":"message","role":"assistant","content":[{"type":"input_text","text":"This code processes data from an API."}]}}

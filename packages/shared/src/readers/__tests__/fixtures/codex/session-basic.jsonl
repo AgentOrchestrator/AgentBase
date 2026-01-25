@@ -1,0 +1,3 @@
+{"type":"session_meta","payload":{"id":"codex-session-123","timestamp":"2025-01-15T09:00:00.000Z","cwd":"/Users/dev/codex-project","git":{"branch":"main","commit_hash":"abc123","repository_url":"https://github.com/user/repo"}}}
+{"type":"response_item","timestamp":"2025-01-15T10:00:00.000Z","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"## My request for Codex:\nHelp me optimize this function"}]}}
+{"type":"response_item","timestamp":"2025-01-15T10:01:00.000Z","payload":{"type":"message","role":"assistant","content":[{"type":"input_text","text":"I'll help you optimize that function. Let me analyze it first."}]}}
