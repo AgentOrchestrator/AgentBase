@@ -2,7 +2,12 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { AgentEvent, PermissionPayload, SessionPayload } from '@agent-orchestrator/shared';
+import type {
+  AgentEvent,
+  PermissionMode,
+  PermissionPayload,
+  SessionPayload,
+} from '@agent-orchestrator/shared';
 import {
   ClaudeCodeJsonlParser,
   createEventRegistry,
@@ -218,7 +223,7 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
       config.queryExecutor ??
       new SdkQueryExecutor({
         hooks: this.hookBridge.hooks,
-        canUseTool: this.canUseTool,
+        canUseTool: undefined, // Temporarily disabled - remove to re-enable permission interception
       });
 
     this.eventRegistry.on<SessionPayload>('session:start', async (event) => {
@@ -459,18 +464,28 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
       abortController,
     };
 
-    // Extract sessionId from extraArgs if present (for fallback scenario)
+    // Extract sessionId and other extraArgs (like permission-mode) for fallback scenario
     const sessionId = baseOptions.extraArgs?.['session-id'];
+    const permissionMode = baseOptions.extraArgs?.['permission-mode'];
 
     // If we have a sessionId, try resume first
     if (sessionId) {
+      // Build extraArgs for resume - exclude session-id (handled by resume option)
+      // but keep other args like permission-mode
+      const resumeExtraArgs: Record<string, string> | undefined = permissionMode
+        ? { 'permission-mode': permissionMode }
+        : undefined;
+
       const resumeOptions: QueryOptions = {
         ...baseOptions,
         resume: sessionId,
-        extraArgs: undefined, // Remove extraArgs when using resume
+        extraArgs: resumeExtraArgs,
       };
 
-      console.log(`[ClaudeCodeAgent] Attempting to resume session: ${sessionId}`);
+      console.log(`[ClaudeCodeAgent] Attempting to resume session: ${sessionId}`, {
+        permissionMode,
+        extraArgs: resumeExtraArgs,
+      });
 
       try {
         return await this.executeQuery(prompt, resumeOptions, onChunk, onStructuredChunk);
@@ -482,11 +497,17 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
 
         // Create a new AbortController for the retry
         const retryAbortController = new AbortController();
+        // Restore full extraArgs including permission-mode
+        const fallbackExtraArgs: Record<string, string> = { 'session-id': sessionId };
+        if (permissionMode) {
+          fallbackExtraArgs['permission-mode'] = permissionMode;
+        }
+
         const fallbackOptions: QueryOptions = {
           ...baseOptions,
           abortController: retryAbortController,
           resume: undefined, // Clear resume
-          extraArgs: { 'session-id': sessionId },
+          extraArgs: fallbackExtraArgs,
         };
 
         try {
@@ -546,12 +567,26 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     request: GenerateRequest,
     onChunk: StructuredStreamCallback
   ): Promise<Result<GenerateResponse, AgentError>> {
+    console.log('[ClaudeCodeAgent] generateStreamingStructured called', {
+      prompt: request.prompt.substring(0, 100),
+      sessionId: request.sessionId,
+      agentId: request.agentId,
+      workingDirectory: request.workingDirectory,
+      // NOTE: permission mode is NOT passed through SDK - only works for CLI REPL
+    });
+
     const initCheck = this.ensureInitialized();
     if (initCheck.success === false) {
       return { success: false, error: initCheck.error };
     }
 
     const options = this.buildQueryOptions(request, new AbortController(), true);
+    console.log('[ClaudeCodeAgent] Query options built', {
+      cwd: options.cwd,
+      resume: options.resume,
+      extraArgs: options.extraArgs,
+      // Note: SDK doesn't support --allowedTools flag like CLI does
+    });
     // Pass undefined for plain text callback, use structured callback
     return this.runQuery(request.prompt, options, undefined, onChunk);
   }
@@ -618,7 +653,25 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     }
 
     // Pass sessionId via extraArgs - runQuery() handles resume fallback logic
-    options.extraArgs = { 'session-id': request.sessionId };
+    // Also pass permission-mode if specified
+    // SDK permission mode values differ from our UI values:
+    //   - UI 'plan' → SDK 'plan'
+    //   - UI 'auto-accept' → SDK 'acceptEdits'
+    //   - UI 'ask' → SDK 'default' (or omit)
+    const extraArgs: Record<string, string> = { 'session-id': request.sessionId };
+    if (request.permissionMode) {
+      const sdkPermissionMode = this.mapPermissionModeToSdk(request.permissionMode);
+      if (sdkPermissionMode && sdkPermissionMode !== 'default') {
+        extraArgs['permission-mode'] = sdkPermissionMode;
+      }
+    }
+    options.extraArgs = extraArgs;
+
+    console.log('[ClaudeCodeAgent] buildQueryOptions - extraArgs set', {
+      sessionId: request.sessionId,
+      permissionMode: request.permissionMode,
+      extraArgs,
+    });
 
     this.queryContexts.set(abortController.signal, {
       agentId: request.agentId,
@@ -633,6 +686,25 @@ export class ClaudeCodeAgent extends EventEmitter implements CodingAgent {
     }
 
     return options;
+  }
+
+  /**
+   * Map UI permission mode to SDK permission mode value.
+   * SDK uses different naming conventions:
+   *   - UI 'plan' → SDK 'plan'
+   *   - UI 'auto-accept' → SDK 'acceptEdits'
+   *   - UI 'ask' → SDK 'default'
+   */
+  private mapPermissionModeToSdk(mode: PermissionMode): string {
+    switch (mode) {
+      case 'plan':
+        return 'plan';
+      case 'auto-accept':
+        return 'acceptEdits';
+      case 'ask':
+      default:
+        return 'default';
+    }
   }
 
   // ============================================
