@@ -80,3 +80,10 @@ export {
 // =============================================================================
 
 export { createLoaderRegistry, LoaderRegistry } from './registry.js';
+
+// =============================================================================
+// Readers (implementations of IChatHistoryLoader)
+// =============================================================================
+// NOTE: Readers are NOT re-exported here because they use Node.js APIs (fs, path, better-sqlite3)
+// which cannot be bundled for browser/renderer contexts.
+// Import directly from '@agent-orchestrator/shared/readers' when needed in Node.js environments.

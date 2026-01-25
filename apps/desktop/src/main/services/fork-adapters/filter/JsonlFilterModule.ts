@@ -36,10 +36,17 @@ function parseJsonlLine(line: string): ParsedJsonlLine | null {
 
 /**
  * Check if a message matches the target message ID
- * Checks the uuid field
+ * Only matches on uuid for user/assistant messages to avoid matching
+ * file-history-snapshot or other metadata entries that may share the same messageId
  */
 function matchesMessageId(message: ParsedJsonlLine, targetId: string): boolean {
-  return message.uuid === targetId || message.messageId === targetId;
+  // Only match uuid for actual conversation messages (user/assistant)
+  // file-history-snapshot and other types may share messageId but shouldn't be the filter target
+  if (message.type === 'user' || message.type === 'assistant') {
+    return message.uuid === targetId;
+  }
+  // For other types, don't match (they're metadata, not conversation messages)
+  return false;
 }
 
 /**

@@ -473,6 +473,7 @@ function IssueDetailsModal({ issueId, onClose }: IssueDetailsModalProps) {
                 className="issue-property-select"
               >
                 {priorityLabels.map((label, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: Static array with stable indices
                   <option key={index} value={index}>
                     {label}
                   </option>

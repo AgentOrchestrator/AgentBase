@@ -34,7 +34,7 @@ export function AgentChatNodePresentation({
   agentType,
   workspacePath,
   title,
-  initialMessages,
+  initialMessages: _initialMessages,
   isDraft,
   initialExpanded = true,
   onMessagesChange,

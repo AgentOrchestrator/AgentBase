@@ -206,7 +206,7 @@ export default function AgentChatView({
   // Find the message ID from the current selection by walking up the DOM tree
   const findMessageIdFromSelection = useCallback((): string | undefined => {
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return undefined;
+    if (!selection || selection.rangeCount === 0) return;
 
     const range = selection.getRangeAt(0);
     let node: Node | null = range.commonAncestorContainer;
@@ -219,7 +219,7 @@ export default function AgentChatView({
       }
       node = node.parentNode;
     }
-    return undefined;
+    return;
   }, []);
 
   // Detect text selection and calculate position from selection bounds
@@ -490,6 +490,7 @@ export default function AgentChatView({
         <div
           key={item.key}
           className="conversation-assistant-text-content"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown rendering requires innerHTML
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
@@ -572,6 +573,7 @@ export default function AgentChatView({
         <div className="conversation-assistant-content">
           <div
             className="conversation-assistant-text-content"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown rendering requires innerHTML
             dangerouslySetInnerHTML={{ __html: html }}
           />
           {showCursor && <span className="agent-chat-view-cursor">▊</span>}

@@ -58,7 +58,7 @@ async function main() {
   const mostRecent = summaries[0];
   console.log(`\nFetching full content for most recent session: ${mostRecent.id}\n`);
 
-  const sessionResult = await agent.getFilteredSession(mostRecent.id);
+  const sessionResult = await agent.getSession(mostRecent.id);
   if (!sessionResult.success || !sessionResult.data) {
     console.error('Failed to get session:', sessionResult.error?.message);
     return;

@@ -9,6 +9,8 @@
  * - PermissionPolicy for per-project permission configuration
  * - Handlers for permission requests and other events
  * - Adapters to translate vendor events (Claude Code, Codex) to unified format
+ * - Agent setup utilities for terminal-based agents
+ * - Notification server for lifecycle events
  *
  * @example
  * ```typescript
@@ -41,9 +43,12 @@
 
 // Agent adapters
 export * from './adapters/index.js';
+// Agent setup utilities (terminal env, scripts, etc.)
+export * from './agent-setup/index.js';
 // Event handlers
 export * from './handlers/index.js';
-
+// Notification server (lifecycle events via HTTP)
+export * from './notification-server/index.js';
 // Permission policies
 export * from './policy.js';
 // Event registry

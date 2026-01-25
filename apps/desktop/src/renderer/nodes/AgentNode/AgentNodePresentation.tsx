@@ -579,6 +579,12 @@ export function AgentNodePresentation({
         />
         <Handle
           type="source"
+          position={Position.Bottom}
+          id="source-bottom"
+          className="agent-node-side-handle"
+        />
+        <Handle
+          type="source"
           position={Position.Left}
           id="source-left"
           className="agent-node-side-handle"

@@ -38,6 +38,7 @@ Agent Base is local-first — everything runs on your machine.
 [![Last Commit](https://img.shields.io/github/last-commit/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/commits/main)
 [![Commit Activity](https://img.shields.io/github/commit-activity/m/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/graphs/commit-activity)
 [![Issues](https://img.shields.io/github/issues/AgentOrchestrator/agent-orchestrator?labelColor=333333&color=666666)](https://github.com/AgentOrchestrator/agent-orchestrator/issues)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AgentOrchestrator/AgentBase)
 
 [Installation](#-installation) • [Commands](#-available-commands) • [Preview](#-preview) • [Features](#-features) • [Integrations](#-integrations)
 </div>
@@ -75,8 +76,7 @@ npm run dev
 | Command | Description |
 |---------|-------------|
 | `npm install` | Install all dependencies for the monorepo |
-| `npm run dev` | Start all services in development mode (daemon + desktop with hot reload) |
-| `npm run dev:daemon` | Start only the daemon service in development mode |
+| `npm run dev` | Start the desktop app in development mode with hot reload |
 | `npm run dev:desktop` | Start only the desktop app in development mode |
 | `npm run build` | Build all apps for production |
 | `npm run start` | Start all services in production mode (requires build first) |
@@ -154,7 +154,6 @@ Want to help integrate your favorite AI assistant? [Open an issue](https://githu
 ## 🤝 Contributing
 
 Contributions welcome! This is a monorepo, so all code lives in one place:
-- **Backend (daemon)**: `apps/daemon/`
 - **Desktop App**: `apps/desktop/`
 - **Shared code**: `packages/shared/`
 

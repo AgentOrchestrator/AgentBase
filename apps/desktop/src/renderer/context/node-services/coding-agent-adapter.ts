@@ -391,17 +391,17 @@ export interface ICodingAgentAdapter {
   // ============================================
 
   /**
-   * Get session content with optional filtering
+   * Get session content with optional message filtering
    */
-  getFilteredSession(
+  getSession(
     sessionId: string,
     filter?: MessageFilterOptions
   ): Promise<Result<CodingAgentSessionContent | null, AgentError>>;
 
   /**
-   * Check if a session file exists (is active)
+   * Check if a session file exists on disk
    */
-  checkSessionActive(sessionId: string, workspacePath: string): Promise<boolean>;
+  sessionFileExists(sessionId: string, workspacePath: string): Promise<boolean>;
 
   // ============================================
   // Optional Capabilities

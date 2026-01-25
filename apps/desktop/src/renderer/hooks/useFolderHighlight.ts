@@ -80,13 +80,18 @@ export function useFolderHighlight(
 /**
  * Utility function to apply highlight styles to nodes
  * Called from Canvas.tsx useEffect
+ *
+ * IMPORTANT: Only returns new node objects when styles actually change
+ * to prevent infinite render loops from reference changes.
  */
 export function applyHighlightStylesToNodes(
   nodes: Node[],
   highlightedFolders: Set<string>,
   folderColors: Map<string, string>
 ): Node[] {
-  return nodes.map((node) => {
+  let hasChanges = false;
+
+  const newNodes = nodes.map((node) => {
     if (node.type !== 'agent') return node;
 
     const agentData = node.data as { workspacePath?: string };
@@ -94,21 +99,45 @@ export function applyHighlightStylesToNodes(
     const isHighlighted = projectPath && highlightedFolders.has(projectPath);
     const highlightColor = projectPath ? folderColors.get(projectPath) : null;
 
-    const currentStyle = node.style || {};
+    const currentStyle = (node.style || {}) as Record<string, unknown>;
+    const currentBoxShadow = currentStyle.boxShadow as string | undefined;
+    const currentBorderRadius = currentStyle.borderRadius as string | undefined;
 
     if (isHighlighted && highlightColor) {
+      const expectedBoxShadow = `0 0 0 3px ${highlightColor}`;
+      const expectedBorderRadius = '12px';
+
+      // Check if style already matches - if so, return same node
+      if (currentBoxShadow === expectedBoxShadow && currentBorderRadius === expectedBorderRadius) {
+        return node;
+      }
+
+      hasChanges = true;
       return {
         ...node,
         style: {
           ...currentStyle,
-          boxShadow: `0 0 0 3px ${highlightColor}`,
-          borderRadius: '12px',
+          boxShadow: expectedBoxShadow,
+          borderRadius: expectedBorderRadius,
         },
       };
     } else {
-      // Remove highlight styles if present
-      const { boxShadow, borderRadius, ...restStyle } = currentStyle as Record<string, unknown>;
-      return { ...node, style: restStyle };
+      // Check if there are highlight styles to remove
+      if (currentBoxShadow === undefined && currentBorderRadius === undefined) {
+        return node; // No highlight styles present, return same node
+      }
+
+      // Only create new object if we're actually removing styles
+      const { boxShadow, borderRadius, ...restStyle } = currentStyle;
+      if (boxShadow !== undefined || borderRadius !== undefined) {
+        hasChanges = true;
+        return { ...node, style: restStyle };
+      }
+
+      return node;
     }
   });
+
+  // Return original array if nothing changed (prevents unnecessary re-renders)
+  return hasChanges ? newNodes : nodes;
 }

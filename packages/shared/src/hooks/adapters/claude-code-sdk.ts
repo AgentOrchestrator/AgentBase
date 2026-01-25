@@ -37,6 +37,7 @@ import type {
   PreToolUseHookInput,
   SessionEndHookInput,
   SessionStartHookInput,
+  SetupHookInput,
   StopHookInput,
   SubagentStartHookInput,
   SubagentStopHookInput,
@@ -80,6 +81,7 @@ const SDK_EVENT_MAP: Record<HookEvent, AgentEventType> = {
   PreCompact: 'context:compact',
   PermissionRequest: 'permission:request',
   Notification: 'system:info',
+  Setup: 'session:start',
 };
 
 // =============================================================================
@@ -222,6 +224,17 @@ function buildSystemPayload(input: NotificationHookInput): SystemPayload {
   };
 }
 
+/**
+ * Build vendor-agnostic payload from SDK Setup input
+ */
+function buildSetupPayload(input: SetupHookInput): SessionPayload {
+  return {
+    sessionId: input.session_id,
+    workspacePath: input.cwd,
+    reason: input.trigger,
+  };
+}
+
 // =============================================================================
 // TOOL CATEGORIZATION
 // =============================================================================
@@ -262,6 +275,14 @@ function categorizeToolName(toolName: string): ToolPayload['toolCategory'] {
 // =============================================================================
 
 /**
+ * Context required for building AgentEvents
+ */
+export interface SDKHookContext {
+  agentId: string;
+  gitBranch: string;
+}
+
+/**
  * Options for creating the SDK hook bridge
  */
 export interface SDKHookBridgeOptions {
@@ -270,6 +291,12 @@ export interface SDKHookBridgeOptions {
    * @default false
    */
   debug?: boolean;
+
+  /**
+   * Function to get the current context (agentId, gitBranch) for building events.
+   * If not provided, defaults to 'unknown' values.
+   */
+  getContext?: () => SDKHookContext;
 
   /**
    * Custom handler for converting EventResult to HookJSONOutput
@@ -323,7 +350,7 @@ export function createSDKHookBridge(
   registry: EventRegistry,
   options: SDKHookBridgeOptions = {}
 ): SDKHookBridge {
-  const { debug = false, resultMapper } = options;
+  const { debug = false, resultMapper, getContext } = options;
 
   /**
    * Create a hook callback that bridges to the registry
@@ -333,13 +360,31 @@ export function createSDKHookBridge(
     payloadBuilder: (input: T) => unknown
   ): HookCallback {
     return async (input, _toolUseId, _context): Promise<HookJSONOutput> => {
+      // Get context from provider - REQUIRED
+      if (!getContext) {
+        throw new Error(
+          `[SDKHookBridge] getContext is required. Cannot create event without agentId and gitBranch context.`
+        );
+      }
+      const ctx = getContext();
+
+      // Validate required context from input
+      if (!input.session_id) {
+        throw new Error(`[SDKHookBridge] input.session_id is required for event ${eventType}`);
+      }
+      if (!input.cwd) {
+        throw new Error(`[SDKHookBridge] input.cwd is required for event ${eventType}`);
+      }
+
       // Build vendor-agnostic event
       const event: AgentEvent = {
         id: randomUUID(),
         type: eventType,
         agent: 'claude_code',
+        agentId: ctx.agentId,
         sessionId: input.session_id,
         workspacePath: input.cwd,
+        gitBranch: ctx.gitBranch,
         timestamp: new Date().toISOString(),
         payload: payloadBuilder(input as T),
         raw: input,
@@ -476,6 +521,11 @@ export function createSDKHookBridge(
         hooks: [createBridgeCallback<NotificationHookInput>('system:info', buildSystemPayload)],
       },
     ],
+    Setup: [
+      {
+        hooks: [createBridgeCallback<SetupHookInput>('session:start', buildSetupPayload)],
+      },
+    ],
   };
 
   return {
@@ -511,4 +561,5 @@ export const SDK_HOOK_EVENTS: HookEvent[] = [
   'PreCompact',
   'PermissionRequest',
   'Notification',
+  'Setup',
 ];

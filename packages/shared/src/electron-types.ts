@@ -29,8 +29,8 @@ export type CodingAgentType = AgentType;
  * Manages pseudo-terminal creation, input/output, and lifecycle.
  */
 export interface ElectronAPI {
-  /** Create a new terminal instance */
-  createTerminal: (terminalId: string) => void;
+  /** Create a new terminal instance. workspacePath is optional - if provided, hooks env vars are injected */
+  createTerminal: (terminalId: string, workspacePath?: string) => void;
   /** Subscribe to terminal output data */
   onTerminalData: (callback: (data: { terminalId: string; data: string }) => void) => void;
   /** Subscribe to terminal exit events */

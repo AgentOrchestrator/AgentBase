@@ -13,6 +13,9 @@ __pycache__/
 .env*.local
 lenv
 
+# Act secrets (for local workflow testing)
+.secrets
+
 # Build outputs
 dist/
 build/
@@ -33,9 +36,6 @@ Thumbs.db
 *.tmp
 tmp/
 temp/
-
-# Supabase temp files
-supabase/.temp/
 
 # Lock files
 bun.lockb

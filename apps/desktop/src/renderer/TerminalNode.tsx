@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import './TerminalNode.css';
 import AttachmentHeader from './AttachmentHeader';
+import { useNodeActions } from './features/canvas/context';
 import IssueDetailsModal from './IssueDetailsModal';
 import {
   createLinearIssueAttachment,
@@ -16,6 +17,8 @@ import {
 
 interface TerminalNodeData {
   terminalId: string;
+  /** Workspace path for agent context - enables hook env injection */
+  workspacePath?: string;
   attachments?: TerminalAttachment[];
   autoStartClaude?: boolean; // Flag to auto-start claude command
   // Legacy support - will be migrated to attachments array
@@ -28,6 +31,7 @@ interface TerminalNodeData {
 }
 
 function TerminalNode({ data, id, selected }: NodeProps) {
+  const nodeActions = useNodeActions();
   const nodeData = data as unknown as TerminalNodeData;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -622,9 +626,11 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       terminalProcessCreatedRef.current = true;
       console.log('[TerminalNode] Creating terminal process', {
         terminalId,
+        workspacePath: nodeData.workspacePath,
         autoStartClaude: nodeData.autoStartClaude,
       });
-      window.electronAPI.createTerminal(terminalId);
+      // Pass workspacePath to enable hook env injection for agent lifecycle events
+      window.electronAPI.createTerminal(terminalId, nodeData.workspacePath);
 
       // Auto-start claude command if flag is set
       if (nodeData.autoStartClaude) {
@@ -700,7 +706,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
                 // Reset the flag to allow recreation
                 terminalProcessCreatedRef.current = false;
                 console.log('[TerminalNode] Restarting terminal process', { terminalId });
-                window.electronAPI?.createTerminal(terminalId);
+                window.electronAPI?.createTerminal(terminalId, nodeData.workspacePath);
                 terminalProcessCreatedRef.current = true;
               },
               isImmediateExit ? 1000 : 100
@@ -922,7 +928,7 @@ function TerminalNode({ data, id, selected }: NodeProps) {
         window.electronAPI.destroyTerminal(terminalId);
       }
     };
-  }, [terminalId, nodeData.autoStartClaude]);
+  }, [terminalId, nodeData.autoStartClaude, nodeData.workspacePath]);
 
   // Migrate legacy issue to attachments array
   const attachments = nodeData.attachments || [];
@@ -979,12 +985,8 @@ function TerminalNode({ data, id, selected }: NodeProps) {
       const currentAttachments = nodeData.attachments || [];
       const updatedAttachments = [...currentAttachments, newAttachment];
 
-      // Trigger a re-render by updating the node
-      window.dispatchEvent(
-        new CustomEvent('update-node', {
-          detail: { nodeId: id, data: { ...nodeData, attachments: updatedAttachments } },
-        })
-      );
+      // Update attachments via context (not events) to prevent infinite loops
+      nodeActions.updateAttachments(id, updatedAttachments);
     } catch (error) {
       console.error('Error handling drop on terminal:', error);
     }

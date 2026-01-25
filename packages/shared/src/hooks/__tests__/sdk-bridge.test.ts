@@ -25,18 +25,27 @@ const createMockContext = () => ({
   signal: new AbortController().signal,
 });
 
+// Mock context provider for tests
+const mockGetContext = () => ({
+  agentId: 'test-agent-1',
+  gitBranch: 'main',
+});
+
 describe('SDK Hook Bridge', () => {
   let registry: EventRegistry;
   let bridge: SDKHookBridge;
 
   beforeEach(() => {
     registry = createEventRegistry();
-    bridge = createSDKHookBridge(registry, { debug: false });
+    bridge = createSDKHookBridge(registry, {
+      debug: false,
+      getContext: mockGetContext,
+    });
   });
 
   describe('Hook Event Mapping', () => {
-    it('should map all 12 SDK hook events', () => {
-      expect(SDK_HOOK_EVENTS).toHaveLength(12);
+    it('should map all 13 SDK hook events', () => {
+      expect(SDK_HOOK_EVENTS).toHaveLength(13);
       expect(SDK_HOOK_EVENTS).toContain('PreToolUse');
       expect(SDK_HOOK_EVENTS).toContain('PostToolUse');
       expect(SDK_HOOK_EVENTS).toContain('PostToolUseFailure');
@@ -49,6 +58,7 @@ describe('SDK Hook Bridge', () => {
       expect(SDK_HOOK_EVENTS).toContain('PreCompact');
       expect(SDK_HOOK_EVENTS).toContain('PermissionRequest');
       expect(SDK_HOOK_EVENTS).toContain('Notification');
+      expect(SDK_HOOK_EVENTS).toContain('Setup');
     });
 
     it('should create hooks for all SDK events', () => {
@@ -65,6 +75,7 @@ describe('SDK Hook Bridge', () => {
       expect(bridge.hooks.PreCompact).toBeDefined();
       expect(bridge.hooks.PermissionRequest).toBeDefined();
       expect(bridge.hooks.Notification).toBeDefined();
+      expect(bridge.hooks.Setup).toBeDefined();
     });
   });
 

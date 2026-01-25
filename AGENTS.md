@@ -12,28 +12,16 @@ Monorepo using **npm workspaces** and **Turborepo**.
 
 ```
 apps/
-  daemon/           # Background sync service (Node.js + SQLite)
   desktop/          # Electron app (Vite + React + xterm.js)
 packages/
-  shared/           # Shared TypeScript types
-supabase/
-  migrations/       # Database migrations
+  shared/           # Shared TypeScript types and readers
 ```
 
 ## Setup
 
 ```bash
 npm install                 # Install all dependencies
-```
-
-**Choose your storage backend:**
-
-```bash
-# Option 1: Local SQLite (simple, no external services)
-cp .env.local.example .env
-
-# Option 2: Remote Supabase (team collaboration, cloud sync)
-cp .env.remote.example .env
+cp .env.local.example .env  # Configure environment
 ```
 
 For git worktrees, copy `.env` from the main worktree instead:
@@ -45,8 +33,7 @@ cp /path/to/main-worktree/.env .env
 
 ```bash
 npm install                 # Install all dependencies
-npm run dev                 # Run all apps
-npm run dev:daemon          # Run daemon only
+npm run dev                 # Run the desktop app
 npm run dev:desktop         # Run desktop only
 npm run build               # Build all apps
 ```
@@ -56,11 +43,11 @@ npm run build               # Build all apps
 ```
 IDE files (~/.claude/, Cursor storage, etc.)
     ↓
-Daemon (reads, normalizes to ChatHistory, syncs every 10 min)
+Readers (packages/shared/src/readers/) - read and normalize to ChatHistory
     ↓
-Storage (SQLite local OR Supabase remote)
+Desktop App (Electron main process)
     ↓
-Desktop App
+Storage (SQLite)
 ```
 
 
@@ -73,6 +60,54 @@ They should only do one thing:
 connect a runtime object to a real imported type.
 
 Rule: Avoid using the spread operator; use explicit replacement instead as much as possible, because the spread operator hides what is being replaced.
+
+Rule: Never use defensive defaults. Let the code fail explicitly or ask for user input during implementation. Defensive defaults hide missing configuration and create silent failures.
+
+This applies to:
+- Configuration values
+- Function parameters (prefer required parameters over optional with defaults)
+- Object construction (throw if required fields are missing)
+- Event/action building (require context, don't use placeholder values like 'unknown')
+
+Correct pattern:
+
+```typescript
+// ❌ Wrong: Defensive default hides missing config
+const apiUrl = config.apiUrl || 'http://localhost:3000';
+
+// ✅ Correct: Fail explicitly
+if (!config.apiUrl) {
+  throw new Error('config.apiUrl is required');
+}
+const apiUrl = config.apiUrl;
+
+// ✅ Also correct: Ask user during implementation
+const apiUrl = config.apiUrl; // Will fail at runtime if missing, prompting proper setup
+```
+
+```typescript
+// ❌ Wrong: Default parameter hides missing context
+function buildEvent(context?: EventContext) {
+  return {
+    agentId: context?.agentId ?? 'unknown',  // Silent failure - bugs hidden
+    sessionId: context?.sessionId ?? 'unknown',
+  };
+}
+
+// ✅ Correct: Require the context parameter
+function buildEvent(context: EventContext) {
+  if (!context.agentId) {
+    throw new Error('context.agentId is required');
+  }
+  if (!context.sessionId) {
+    throw new Error('context.sessionId is required');
+  }
+  return {
+    agentId: context.agentId,
+    sessionId: context.sessionId,
+  };
+}
+```
 
 Correct pattern:
 

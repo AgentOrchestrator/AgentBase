@@ -140,6 +140,7 @@ function AssistantMessageNode({ data, id: _id, selected }: NodeProps) {
         <div
           key={item.key}
           className="assistant-text-content"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown rendering requires innerHTML
           dangerouslySetInnerHTML={{ __html: html }}
         />
       );
