@@ -8,6 +8,7 @@
 
 import type { CanvasState, CanvasMetadata } from '../main/types/database';
 import type { CodingAgentAPI } from '../main/services/coding-agent';
+import type { OrchestratorAPI } from '../main/preload';
 
 // Re-export types from shared for consumers that import from this file
 export type {
@@ -45,5 +46,6 @@ declare global {
     shellAPI?: ShellAPI;
     worktreeAPI?: WorktreeAPI;
     agentStatusAPI?: AgentStatusAPI;
+    orchestratorAPI?: OrchestratorAPI;
   }
 }

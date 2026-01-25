@@ -117,6 +117,7 @@ function AgentChatNode({ data, id, selected }: NodeProps) {
         />
         <AgentChatView
           nodeId={id}
+          agentId={agent.config.agentId}
           sessionId={sessionId}
           workspacePath={agent.workspace.path}
           agentType={agent.config.agentType}

@@ -20,6 +20,7 @@ export interface ActionPillPresentationProps {
   actions: AgentAction[];
   actionAnswers: Record<string, Record<string, string>>;
   submittingActions: Set<string>;
+  dismissingActions: Set<string>;
 
   // UI state
   isExpanded: boolean;
@@ -43,6 +44,7 @@ export function ActionPillPresentation({
   actions,
   actionAnswers,
   submittingActions,
+  dismissingActions,
   isExpanded,
   animationState,
   shouldHighlightPill,
@@ -94,13 +96,14 @@ export function ActionPillPresentation({
 
               // Highlight the topmost action (index 0)
               const isTopmost = index === 0 && isExpanded;
+              const isDismissing = dismissingActions.has(action.id);
 
               if (action.type === 'clarifying_question') {
                 const questionAction = action as ClarifyingQuestionAction;
                 return (
                   <div
                     key={action.id}
-                    className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}
+                    className={`action-pill-card ${isTopmost ? 'highlighted' : ''} ${isDismissing ? 'dismissing' : ''}`}
                   >
                     <div className="action-pill-agent-label">{agentLabel}</div>
                     <div className="action-pill-card-body">
@@ -167,7 +170,7 @@ export function ActionPillPresentation({
               return (
                 <div
                   key={action.id}
-                  className={`action-pill-card ${isTopmost ? 'highlighted' : ''}`}
+                  className={`action-pill-card ${isTopmost ? 'highlighted' : ''} ${isDismissing ? 'dismissing' : ''}`}
                 >
                   <div className="action-pill-agent-label">{agentLabel}</div>
                   <div className="action-pill-card-body">

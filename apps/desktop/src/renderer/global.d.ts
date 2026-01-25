@@ -13,6 +13,7 @@ import type {
   GitAPI,
   ShellAPI,
   SessionSummaryCacheAPI,
+  CanvasStateRequestAPI,
 } from '../main/preload';
 import type {
   TerminalSessionAPI,
@@ -38,5 +39,7 @@ declare global {
     sessionWatcherAPI?: SessionWatcherAPI;
     recentWorkspacesAPI?: RecentWorkspacesAPI;
     sessionSummaryCacheAPI?: SessionSummaryCacheAPI;
+    orchestratorAPI?: import('./features/action-pill/store/orchestratorPillTypes').OrchestratorAPI;
+    canvasStateRequestAPI?: CanvasStateRequestAPI;
   }
 }

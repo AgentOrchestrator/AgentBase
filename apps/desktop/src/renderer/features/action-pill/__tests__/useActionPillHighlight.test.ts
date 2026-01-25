@@ -37,8 +37,10 @@ describe('useActionPillHighlight behavior', () => {
         isContentVisible: false,
         isTextVisible: true,
       },
+      selectedAgentId: null,
       actionAnswers: {},
       submittingActions: new Set(),
+      dismissingActions: new Set(),
       highlightedAgentId: null,
     });
   });

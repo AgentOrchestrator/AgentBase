@@ -171,7 +171,14 @@ class SharedEventDispatcher {
    */
   private mapLifecycleTypeToEventType(
     type: string
-  ): 'session:start' | 'session:end' | 'permission:request' | 'tool:begin' | null {
+  ):
+    | 'session:start'
+    | 'session:end'
+    | 'permission:request'
+    | 'tool:begin'
+    | 'tool:complete'
+    | 'tool:error'
+    | null {
     switch (type) {
       case 'Start':
         return 'session:start';
@@ -181,6 +188,10 @@ class SharedEventDispatcher {
         return 'permission:request';
       case 'PreToolUse':
         return 'tool:begin';
+      case 'PostToolUse':
+        return 'tool:complete';
+      case 'PostToolUseFailure':
+        return 'tool:error';
       default:
         return null;
     }
@@ -290,6 +301,13 @@ class SharedEventDispatcher {
           payload: {
             sessionId: event.sessionId,
             workspacePath: event.workspacePath,
+            toolUseId: event.toolUseId,
+            toolName: event.toolName,
+          },
+          raw: {
+            toolUseId: event.toolUseId,
+            toolName: event.toolName,
+            toolInput: event.toolInput,
           },
         } as unknown as AgentAdapterEvent);
       } catch (err) {

@@ -32,9 +32,15 @@ export interface ActionPillState {
   hasNewActions: boolean;
   animationState: PillAnimationState;
 
+  // Selected agent (independent of action pill state)
+  selectedAgentId: string | null;
+
   // Form state for clarifying questions
   actionAnswers: Record<string, Record<string, string>>;
   submittingActions: Set<string>;
+
+  // Dismissal state for visual feedback
+  dismissingActions: Set<string>;
 
   // Derived state exposed for Canvas.tsx
   highlightedAgentId: string | null;
@@ -49,8 +55,17 @@ export interface ActionPillState {
   collapse: () => void;
   markActionsViewed: () => void;
 
+  // Actions - Selection
+  selectAgent: (agentId: string) => boolean;
+  clearSelection: () => void;
+  cycleSelectedAgent: (direction: 'next' | 'prev') => void;
+
   // Actions - Form
   updateActionAnswer: (actionId: string, question: string, value: string) => void;
   clearActionAnswers: (actionId: string) => void;
   setSubmitting: (actionId: string, isSubmitting: boolean) => void;
+
+  // Actions - Dismissal
+  markDismissing: (actionId: string) => void;
+  completeDismissal: (actionId: string) => void;
 }

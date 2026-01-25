@@ -4,20 +4,33 @@
  * Public API for the ActionPill feature.
  */
 
-// Main component
+// Main components
 export { ActionPill } from './ActionPill';
-export type { ActionPillHighlightState } from './hooks';
 // Hooks
-export { useActionPillHighlight } from './hooks';
-export type { IActionPillService } from './services';
-// Services
-export { actionPillService } from './services';
-export type { ActionPillState, PillAnimationState } from './store';
-// Store
+export type {
+  ActionPillHighlightState,
+  AgentSelectionState,
+  MessageChannel,
+  SelectedAgentState,
+} from './hooks';
+export { useActionPillHighlight, useAgentSelection, useSelectedAgent } from './hooks';
+export { MessagePill } from './MessagePill';
+// Services - ActionPill
+// Services - MessageChannel & Dispatcher
+export type { AgentMessageEvent, IActionPillService } from './services';
+export { actionPillService, createMessageChannel, messageDispatcher } from './services';
+
+// Store - ActionPill & MessagePill
+export type { ActionPillState, MessagePillState, PillAnimationState, SentMessage } from './store';
 export {
   selectActionCount,
+  selectCanSend,
   selectHasActions,
+  selectHasInput,
+  selectRecentHistory,
+  selectSelectedAction,
   selectSortedActions,
   selectTopmostAction,
   useActionPillStore,
+  useMessagePillStore,
 } from './store';
