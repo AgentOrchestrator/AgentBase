@@ -35,13 +35,6 @@ class SharedEventDispatcher {
   private initializationTime: number | null = null;
 
   /**
-   * Tracks session IDs that existed before initialization.
-   * Events from these sessions during the grace period are considered potentially stale
-   * and are filtered based on their timestamps.
-   */
-  private preExistingSessionIds = new Set<string>();
-
-  /**
    * Short grace period (in ms) after initialization for timestamp-based filtering.
    * Events with timestamps older than initialization time are filtered.
    * This is a fallback for events without parseable timestamps.
@@ -170,6 +163,12 @@ class SharedEventDispatcher {
       return false;
     }
 
+    // Threshold to distinguish Unix seconds from milliseconds:
+    // - Unix seconds are ~1.7 billion (10 digits) for current dates
+    // - Unix milliseconds are ~1.7 trillion (13 digits) for current dates
+    // Using 10 billion as threshold safely distinguishes between them
+    const SECONDS_VS_MS_THRESHOLD = 10_000_000_000;
+
     let eventTimeMs: number;
     if (typeof eventTimestamp === 'string') {
       // Try parsing as ISO string or Unix timestamp string
@@ -180,14 +179,15 @@ class SharedEventDispatcher {
         if (isNaN(asNumber)) {
           return false; // Can't parse, accept the event
         }
-        // If it looks like seconds (less than year 2100 in ms), convert to ms
-        eventTimeMs = asNumber < 4102444800000 ? asNumber * 1000 : asNumber;
+        // If it looks like seconds (< 10 billion), convert to ms
+        eventTimeMs = asNumber < SECONDS_VS_MS_THRESHOLD ? asNumber * 1000 : asNumber;
       } else {
         eventTimeMs = parsed;
       }
     } else {
       // Number - could be ms or seconds
-      eventTimeMs = eventTimestamp < 4102444800000 ? eventTimestamp * 1000 : eventTimestamp;
+      eventTimeMs =
+        eventTimestamp < SECONDS_VS_MS_THRESHOLD ? eventTimestamp * 1000 : eventTimestamp;
     }
 
     // Event is stale if it was created before we initialized
@@ -562,7 +562,6 @@ class SharedEventDispatcher {
     this.lifecycleCleanup = null;
     this.listeners.clear();
     this.processedEventIds.clear();
-    this.preExistingSessionIds.clear();
     this.initializationTime = null;
     this.initialized = false;
   }
