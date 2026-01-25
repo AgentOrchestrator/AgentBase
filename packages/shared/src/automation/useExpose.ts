@@ -66,12 +66,7 @@ export function useExpose(id: string, bindings: Bindings, tags: string[] = []): 
         },
         getOwnPropertyDescriptor(_target, prop: string): PropertyDescriptor | undefined {
           // Per JS Proxy spec: return descriptor for existing props, undefined otherwise
-          // Using Map.get() pattern to avoid literal 'return undefined'
-          const descriptors = new Map<string, PropertyDescriptor>();
-          for (const key of Object.keys(bindingsRef.current)) {
-            descriptors.set(key, { enumerable: true, configurable: true });
-          }
-          return descriptors.get(prop);
+          return prop in bindingsRef.current ? { enumerable: true, configurable: true } : undefined;
         },
         has(_target, prop: string) {
           return prop in bindingsRef.current;

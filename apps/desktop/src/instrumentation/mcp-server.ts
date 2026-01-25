@@ -200,11 +200,24 @@ export class InstrumentationMcpServer {
 
         // Cleanup when response closes
         res.on('close', async () => {
-          await transport.close();
-          await mcpServer.close();
+          try {
+            await transport.close();
+            await mcpServer.close();
+          } catch (cleanupError) {
+            console.error('[MCP] Error during cleanup:', cleanupError);
+          }
         });
       } catch (error) {
         console.error('[MCP] Error handling request:', error);
+
+        // Cleanup resources on error to prevent leaks
+        try {
+          await transport.close();
+          await mcpServer.close();
+        } catch (cleanupError) {
+          console.error('[MCP] Error during error cleanup:', cleanupError);
+        }
+
         if (!res.headersSent) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(

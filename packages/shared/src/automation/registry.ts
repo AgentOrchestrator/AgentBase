@@ -132,8 +132,9 @@ export class ExposeRegistry {
         return { success: true };
       }
 
-      // Check if it's a setter function (naming convention: setXxx)
-      if (typeof binding === 'function' && key.startsWith('set')) {
+      // Check if it's a setter function (naming convention: setXxx where X is uppercase)
+      // This avoids false positives like setup(), settings(), setInterval()
+      if (typeof binding === 'function' && /^set[A-Z]/.test(key)) {
         binding(value);
         return { success: true };
       }

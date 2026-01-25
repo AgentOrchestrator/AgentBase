@@ -486,6 +486,7 @@ export class AgentServiceImpl implements IAgentService {
   /**
    * Abort all pending operations and return to idle state.
    * Cancels SDK queries and sends Ctrl+C to terminal if running.
+   * This is a recovery mechanism, so it must be resilient to failures.
    */
   async abort(): Promise<void> {
     console.log('[AgentService] abort() called', {
@@ -495,8 +496,13 @@ export class AgentServiceImpl implements IAgentService {
     });
 
     // Cancel all adapter operations (SDK queries)
+    // Wrap in try/catch since abort() is a recovery mechanism
     if (this.adapter) {
-      await this.adapter.cancelAll();
+      try {
+        await this.adapter.cancelAll();
+      } catch (error) {
+        console.warn('[AgentService] Error during cancelAll:', error);
+      }
     }
 
     // Send Ctrl+C to terminal to interrupt any running process

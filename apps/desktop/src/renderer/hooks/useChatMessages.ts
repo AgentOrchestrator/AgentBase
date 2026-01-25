@@ -370,8 +370,12 @@ export function useChatMessages({
       return;
     }
     console.log('[useChatMessages] Aborting streaming');
-    await agentService.abort();
-    setIsStreaming(false);
+    try {
+      await agentService.abort();
+    } finally {
+      // Always reset streaming state, even if abort throws
+      setIsStreaming(false);
+    }
   }, [isStreaming, agentService]);
 
   return {
