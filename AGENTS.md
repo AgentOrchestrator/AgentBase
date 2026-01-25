@@ -1,219 +1,202 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Purpose
-
-Agent Orchestrator (branded as "Agent Base") aggregates chat histories from AI coding assistants (Claude Code, Cursor, VSCode, Factory, Codex) and displays them through a desktop application with AI-powered summaries for team collaboration.
+Agent Orchestrator ("Agent Base") - Desktop app aggregating AI coding assistant chat histories with AI-powered summaries.
 
 ## Structure
 
-Monorepo using **npm workspaces** and **Turborepo**.
-
 ```
-apps/
-  desktop/          # Electron app (Vite + React + xterm.js)
-packages/
-  shared/           # Shared TypeScript types and readers
-```
-
-## Setup
-
-```bash
-npm install                 # Install all dependencies
-cp .env.local.example .env  # Configure environment
-```
-
-For git worktrees, copy `.env` from the main worktree instead:
-```bash
-cp /path/to/main-worktree/.env .env
+apps/desktop/          # Electron + Vite + React + xterm.js
+packages/shared/       # Shared types and readers
 ```
 
 ## Commands
 
 ```bash
-npm install                 # Install all dependencies
-npm run dev                 # Run the desktop app
-npm run dev:desktop         # Run desktop only
-npm run build               # Build all apps
+npm install                 # Install dependencies
+npm run dev                 # Run desktop app
+npm run dev:mcp             # Run with MCP server (E2E automation)
+npm run build               # Build all
 ```
 
 ## Data Flow
 
 ```
-IDE files (~/.claude/, Cursor storage, etc.)
-    ↓
-Readers (packages/shared/src/readers/) - read and normalize to ChatHistory
-    ↓
-Desktop App (Electron main process)
-    ↓
-Storage (SQLite)
+IDE files → Readers → Electron Main → SQLite
 ```
 
+---
+
+## E2E Automation
+
+Start MCP mode: `npm run dev:mcp` → Server at `http://localhost:3100/mcp`
+
+### MCP Tools
+
+| Category | Tools |
+|----------|-------|
+| **Expose** | `expose_list`, `expose_get`, `expose_set`, `expose_call` |
+| **UI** | `ui_screenshot`, `ui_click`, `ui_type`, `ui_query` |
+| **Canvas** | `canvas_add_node`, `canvas_remove_node`, `canvas_connect`, `canvas_query` |
+| **State** | `state_get`, `state_set` |
+| **Logs** | `log_inject`, `log_read`, `log_clear` |
+
+### Quick Example
+
+```typescript
+expose_list()                                              // Discover components
+expose_call({ id: "chat:sess-1", key: "type", args: ["Hello"] })
+expose_call({ id: "chat:sess-1", key: "send" })
+expose_get({ id: "chat:sess-1", key: "isStreaming" })      // Check state
+ui_screenshot()                                            // Verify visually
+```
+
+---
 
 ## Patterns
 
-Rule: *.d.ts files should never define real domain types.
+### 1. useExpose (Required for Interactive Components)
 
-They should only do one thing:
-
-connect a runtime object to a real imported type.
-
-Rule: Avoid using the spread operator; use explicit replacement instead as much as possible, because the spread operator hides what is being replaced.
-
-Rule: Never use defensive defaults. Let the code fail explicitly or ask for user input during implementation. Defensive defaults hide missing configuration and create silent failures.
-
-This applies to:
-- Configuration values
-- Function parameters (prefer required parameters over optional with defaults)
-- Object construction (throw if required fields are missing)
-- Event/action building (require context, don't use placeholder values like 'unknown')
-
-Correct pattern:
+Every interactive component MUST expose state/actions for automation.
 
 ```typescript
-// ❌ Wrong: Defensive default hides missing config
-const apiUrl = config.apiUrl || 'http://localhost:3000';
+import { useExpose } from '@agent-orchestrator/shared';
 
-// ✅ Correct: Fail explicitly
-if (!config.apiUrl) {
-  throw new Error('config.apiUrl is required');
-}
-const apiUrl = config.apiUrl;
+function ChatInput({ sessionId, onSend }) {
+  const [value, setValue] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
 
-// ✅ Also correct: Ask user during implementation
-const apiUrl = config.apiUrl; // Will fail at runtime if missing, prompting proper setup
-```
+  useExpose(`chat:${sessionId}`, {
+    value, isStreaming,           // State (read)
+    setValue,                     // Setter (write)
+    send: () => onSend(value),    // Action (call)
+    clear: () => setValue(''),
+  });
 
-```typescript
-// ❌ Wrong: Default parameter hides missing context
-function buildEvent(context?: EventContext) {
-  return {
-    agentId: context?.agentId ?? 'unknown',  // Silent failure - bugs hidden
-    sessionId: context?.sessionId ?? 'unknown',
-  };
-}
-
-// ✅ Correct: Require the context parameter
-function buildEvent(context: EventContext) {
-  if (!context.agentId) {
-    throw new Error('context.agentId is required');
-  }
-  if (!context.sessionId) {
-    throw new Error('context.sessionId is required');
-  }
-  return {
-    agentId: context.agentId,
-    sessionId: context.sessionId,
-  };
+  return <input value={value} onChange={e => setValue(e.target.value)} />;
 }
 ```
 
-Correct pattern:
+**Binding Types:**
+```typescript
+useExpose('id', {
+  count: items.length,                    // Primitive → expose_get
+  setValue,                               // setXxx → expose_set
+  send: () => doSend(),                   // Function → expose_call
+  data: { get: () => x, set: v => x = v } // Accessor → get/set
+});
+```
 
-// global.d.ts
+**DOM Bindings (third-party components):**
+```typescript
+useExpose('form', {
+  value: domBinding(inputRef),    // Read/write DOM
+  submit: domClick(buttonRef),    // Trigger click
+});
+```
+
+**IDs:** `'sidebar'` (single) | `'chat:${sessionId}'` (multiple) | `useExposeId('prefix')` (auto)
+
+**Tags:** `useExpose('id', {...}, ['critical-path'])` → `expose_list({ tag: 'critical-path' })`
+
+**Non-React:** `const unregister = expose('id', {...})`
+
+---
+
+### 2. Log Injection
+
+Ring buffer (1000 entries). Sources: `console` | `ipc` | `state` | `mcp` | `injected`
+
+```typescript
+// Inject
+log_inject({ level: "info", message: "Test started" })
+log_inject({ level: "error", message: "Failure", meta: { code: 500 } })
+
+// Read with filters
+log_read({ level: "warn", source: "mcp", limit: 50, pattern: "timeout" })
+
+// Test pattern: bracket with markers
+log_clear()
+log_inject({ level: "info", message: "TEST:start" })
+// ... actions ...
+log_inject({ level: "info", message: "TEST:end" })
+log_read({ pattern: "TEST:" })
+```
+
+**In code:**
+```typescript
+import { getLogServer } from './instrumentation/logging';
+getLogServer().log('info', 'state', 'Session created', { sessionId });
+```
+
+---
+
+### 3. No Defensive Defaults
+
+Let code fail explicitly. No silent fallbacks.
+
+```typescript
+// ❌ const url = config.url || 'localhost';
+// ❌ agentId: context?.agentId ?? 'unknown'
+
+// ✅
+if (!config.url) throw new Error('config.url required');
+const url = config.url;
+```
+
+---
+
+### 4. No Spread Operator
+
+Use explicit assignment to show what's being replaced.
+
+```typescript
+// ❌ return { ...state, value: newValue };
+// ✅ return { id: state.id, name: state.name, value: newValue };
+```
+
+---
+
+### 5. Type Declarations
+
+`*.d.ts` files only connect runtime objects to imported types.
+
+```typescript
+// ✅ global.d.ts
 import type { ElectronAPI } from '@agent-orchestrator/shared';
+declare global { interface Window { electronAPI: ElectronAPI } }
 
-declare global {
-  interface Window {
-    electronAPI: ElectronAPI;
-  }
-}
+// ❌ Don't define types in .d.ts
+interface ElectronAPI { createTerminal(): void }
+```
 
-export {};
+---
 
+### 6. Component Architecture
 
-Wrong pattern:
-
-// global.d.ts
-interface ElectronAPI {
-  createTerminal(...): void;
-}
-
-## Component Architecture
-
-### Views/Components Separation of Concerns
-
-**Rule:** Views should only observe and handle UI logic. Business logic should move to appropriate services and state hook stores.
-
-**Responsibilities:**
-
-- **Views/Components:**
-  - Render UI based on props/state
-  - Handle user interactions (clicks, input, etc.)
-  - Manage local UI state (open/closed, hover, focus)
-  - Observe and display data from stores/services
-  - Trigger actions via callbacks or store methods
-
-- **Services:**
-  - Business logic and data transformations
-  - API calls and data fetching
-  - Complex calculations and algorithms
-  - External integrations
-
-- **State Hook Stores:**
-  - Global application state management
-  - State mutations and updates
-  - Derived state and computed values
-  - State persistence
-
-**Correct pattern:**
+Views = UI only. Business logic → Services + Stores.
 
 ```typescript
-// service.ts - Business logic
-export class AgentService {
-  async createAgent(config: AgentConfig): Promise<Agent> {
-    // Business logic here
-    return await this.api.create(config);
-  }
+// Service: business logic
+class AgentService { async create(config) { return api.create(config); } }
+
+// Store: state management
+function useAgentStore() {
+  const [agents, setAgents] = useState([]);
+  const create = async (c) => setAgents([...agents, await service.create(c)]);
+  return { agents, create };
 }
 
-// store.ts - State management
-export function useAgentStore() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  
-  const createAgent = async (config: AgentConfig) => {
-    const agent = await agentService.createAgent(config);
-    setAgents(prev => [...prev, agent]);
-  };
-  
-  return { agents, createAgent };
-}
-
-// Component.tsx - UI only
-export function AgentView() {
-  const { agents, createAgent } = useAgentStore();
-  
-  const handleCreate = () => {
-    createAgent({ name: 'New Agent' });
-  };
-  
-  return (
-    <div>
-      {agents.map(agent => <AgentCard key={agent.id} agent={agent} />)}
-      <button onClick={handleCreate}>Create Agent</button>
-    </div>
-  );
+// Component: UI only
+function AgentView() {
+  const { agents, create } = useAgentStore();
+  return <button onClick={() => create({ name: 'New' })}>Add</button>;
 }
 ```
 
-**Wrong pattern:**
-
 ```typescript
-// Component.tsx - Business logic mixed with UI
-export function AgentView() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  
-  const handleCreate = async () => {
-    // ❌ Business logic in component
-    const response = await fetch('/api/agents', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'New Agent' })
-    });
-    const agent = await response.json();
-    setAgents(prev => [...prev, agent]);
-  };
-  
-  return <div>...</div>;
-}
+// ❌ Don't put fetch/business logic in components
+const handleCreate = async () => {
+  const res = await fetch('/api/agents', { method: 'POST', body: '...' });
+  setAgents([...agents, await res.json()]);
+};
 ```

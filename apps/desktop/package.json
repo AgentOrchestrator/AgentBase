@@ -17,6 +17,7 @@
     "build:main": "tsc -p tsconfig.main.json",
     "dev": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "dev:vite": "vite",
+    "dev:mcp": "npm run build:main && concurrently \"vite\" \"wait-on http://localhost:5173 && electron . --mcp\"",
     "electron": "electron .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -52,6 +53,7 @@
     "@ai-sdk/google": "^2.0.26",
     "@ai-sdk/openai": "^2.0.59",
     "@anthropic-ai/claude-agent-sdk": "^0.2.7",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "@paper-design/shaders-react": "^0.0.70",
     "@types/sqlite3": "^3.1.11",
     "@xterm/addon-fit": "^0.10.0",
@@ -67,7 +69,7 @@
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.1",
     "sqlite3": "^5.1.7",
-    "zod": "^4.3.5",
+    "zod": "^4.3.6",
     "zustand": "^4.5.7"
   }
 }

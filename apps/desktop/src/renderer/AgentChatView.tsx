@@ -7,6 +7,7 @@
  */
 
 import type { AgentContentBlock } from '@agent-orchestrator/shared';
+import { useExpose } from '@agent-orchestrator/shared';
 import { useReactFlow } from '@xyflow/react';
 import { marked } from 'marked';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -87,7 +88,7 @@ export default function AgentChatView({
   const agentService = useAgentService();
 
   // Use unified chat messages hook - handles loading, file watching, and sending
-  const { messages, isLoaded, isStreaming, sendMessage } = useChatMessages({
+  const { messages, isLoaded, isStreaming, sendMessage, abort } = useChatMessages({
     sessionId,
     workspacePath,
     agentService,
@@ -95,6 +96,28 @@ export default function AgentChatView({
     enabled: isSessionReady,
     onError: setError,
     onSessionCreated,
+  });
+
+  // Expose for automation testing
+  useExpose(`chat:${sessionId}`, {
+    // State (readable)
+    inputValue,
+    isStreaming,
+    isLoaded,
+    messageCount: messages.length,
+    // Actions
+    type: (text: string) => setInputValue(text),
+    // Send accepts optional message param (for automation - React state is async)
+    // Fire-and-forget: don't await so automation can capture streaming state
+    send: (message?: string) => {
+      const msg = message?.trim() || inputValue.trim();
+      if (!isSessionReady || !msg || isStreaming) return;
+      setInputValue('');
+      setError(null);
+      sendMessage(msg);
+    },
+    abort,
+    clear: () => setInputValue(''),
   });
 
   // Set attached text from initialInputText prop (only if we haven't sent a message yet)
@@ -647,15 +670,26 @@ export default function AgentChatView({
             disabled={!isSessionReady || isStreaming}
             rows={1}
           />
-          <button
-            className="agent-chat-view-send"
-            onClick={handleSend}
-            disabled={!isSessionReady || !inputValue.trim() || isStreaming}
-            type="button"
-            aria-label="Send"
-          >
-            <span className="agent-chat-view-send-icon">↑</span>
-          </button>
+          {isStreaming ? (
+            <button
+              className="agent-chat-view-stop"
+              onClick={abort}
+              type="button"
+              aria-label="Stop"
+            >
+              <span className="agent-chat-view-stop-icon">■</span>
+            </button>
+          ) : (
+            <button
+              className="agent-chat-view-send"
+              onClick={handleSend}
+              disabled={!isSessionReady || !inputValue.trim()}
+              type="button"
+              aria-label="Send"
+            >
+              <span className="agent-chat-view-send-icon">↑</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

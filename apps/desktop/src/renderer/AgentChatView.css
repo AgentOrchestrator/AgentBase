@@ -492,6 +492,34 @@
   color: #ffffff;
 }
 
+/* Stop button - red square icon for aborting streaming */
+.agent-chat-view-stop {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #e53935;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.agent-chat-view-stop:hover {
+  background: #c62828;
+}
+
+.agent-chat-view-stop-icon {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  color: #ffffff;
+}
+
 /* Cursor animation for streaming */
 .agent-chat-view-cursor {
   animation: blink 1s infinite;

@@ -52,6 +52,19 @@ import type {
   WorktreeReleaseOptions,
 } from './types/worktree';
 
+// MCP bridge request/response types
+interface McpBridgeRequest {
+  requestId: string;
+  channel: string;
+  payload: unknown;
+}
+
+interface McpBridgeResponse {
+  requestId: string;
+  result?: unknown;
+  error?: string;
+}
+
 // Type definitions for the electron API
 export interface ElectronAPI {
   /** Create a terminal process. workspacePath is optional - if provided, hooks env vars are injected */
@@ -65,6 +78,9 @@ export interface ElectronAPI {
   destroyTerminal: (terminalId: string) => void;
   removeAllListeners: (channel: string) => void;
   getHomeDir: () => string;
+  // MCP bridge methods for test instrumentation
+  onMcpBridgeRequest?: (callback: (request: McpBridgeRequest) => void) => void;
+  sendMcpBridgeResponse?: (response: McpBridgeResponse) => void;
 }
 
 // Type definitions for the canvas API
@@ -207,6 +223,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(channel);
   },
   getHomeDir: () => ipcRenderer.sendSync('get-home-dir'),
+  // MCP bridge methods for test instrumentation
+  onMcpBridgeRequest: (callback: (request: McpBridgeRequest) => void) => {
+    ipcRenderer.on('mcp-bridge-request', (_event, request: McpBridgeRequest) => {
+      callback(request);
+    });
+  },
+  sendMcpBridgeResponse: (response: McpBridgeResponse) => {
+    ipcRenderer.send('mcp-bridge-response', response);
+  },
 } as ElectronAPI);
 
 // Helper to unwrap IPC response (declared early for use in terminalSessionAPI)
@@ -464,6 +489,9 @@ contextBridge.exposeInMainWorld('codingAgentAPI', {
     unwrapResponse<boolean>(
       ipcRenderer.invoke('coding-agent:session-file-exists', agentType, sessionId, workspacePath)
     ),
+  abort: async (agentType: CodingAgentType) => {
+    await unwrapResponse(ipcRenderer.invoke('coding-agent:abort', agentType));
+  },
 } as CodingAgentAPI);
 
 // Expose LLM API

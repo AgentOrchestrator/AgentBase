@@ -193,6 +193,12 @@ export interface IAgentService extends INodeService {
    */
   exitRepl(timeoutMs?: number): Promise<void>;
 
+  /**
+   * Abort all pending operations and return to idle state.
+   * Cancels SDK queries and sends Ctrl+C to terminal if running.
+   */
+  abort(): Promise<void>;
+
   // =========================================================================
   // Status
   // =========================================================================
