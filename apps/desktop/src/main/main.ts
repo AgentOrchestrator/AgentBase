@@ -1927,6 +1927,13 @@ app.whenReady().then(async () => {
 
     // Forward lifecycle events to all renderer windows
     agentHooksService.on('lifecycle', (event) => {
+      console.log('[Main] Forwarding lifecycle event to renderer', {
+        type: (event as { type?: string }).type,
+        terminalId: (event as { terminalId?: string }).terminalId,
+        agentId: (event as { agentId?: string }).agentId,
+        toolName: (event as { toolName?: string }).toolName,
+        timestamp: (event as { timestamp?: string }).timestamp,
+      });
       for (const browserWindow of BrowserWindow.getAllWindows()) {
         if (
           !browserWindow.isDestroyed() &&

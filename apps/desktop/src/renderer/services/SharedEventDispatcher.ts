@@ -32,6 +32,14 @@ class SharedEventDispatcher {
   private lifecycleCleanup: (() => void) | null = null;
   private initialized = false;
   private processedEventIds = new Set<string>();
+  private initializationTime: number | null = null;
+
+  /**
+   * Grace period (in ms) after initialization during which we ignore SDK permission events.
+   * This filters out stale permission requests from session history that get re-emitted
+   * when the SDK connects to existing sessions on startup.
+   */
+  private static readonly STARTUP_GRACE_PERIOD_MS = 3000;
 
   static getInstance(): SharedEventDispatcher {
     if (!SharedEventDispatcher.instance) {
@@ -49,16 +57,30 @@ class SharedEventDispatcher {
    */
   initialize(): void {
     if (this.initialized) {
+      console.log('[SharedEventDispatcher] Already initialized, skipping');
       return;
     }
 
     // Clear any stale actions from previous session
     // This handles cases where actions might persist due to HMR or other edge cases
+    const existingActions = useActionPillStore.getState().actions;
+    console.log('[SharedEventDispatcher] Clearing stale actions on startup', {
+      actionCount: existingActions.length,
+      actions: existingActions.map((a) => ({ id: a.id, type: a.type, agentId: a.agentId })),
+    });
     useActionPillStore.getState().clearAll();
+
+    // Record initialization time to filter stale events during startup grace period
+    this.initializationTime = Date.now();
 
     // Subscribe to SDK agent events (ClaudeCodeAgent via SDK hooks)
     if (window.codingAgentAPI?.onAgentEvent) {
       this.ipcCleanup = window.codingAgentAPI.onAgentEvent((event: unknown) => {
+        console.log('[SharedEventDispatcher] Received SDK agent event', {
+          type: (event as AgentAdapterEvent).type,
+          agentId: (event as AgentAdapterEvent).agentId,
+          sessionId: (event as AgentAdapterEvent).sessionId,
+        });
         this.handleEvent(event as AgentAdapterEvent);
       });
     }
@@ -66,6 +88,12 @@ class SharedEventDispatcher {
     // Subscribe to terminal agent lifecycle events (HTTP sideband)
     if (window.codingAgentAPI?.onAgentLifecycle) {
       this.lifecycleCleanup = window.codingAgentAPI.onAgentLifecycle((event: unknown) => {
+        console.log('[SharedEventDispatcher] Received lifecycle event from terminal', {
+          type: (event as LifecycleEvent).type,
+          terminalId: (event as LifecycleEvent).terminalId,
+          agentId: (event as LifecycleEvent).agentId,
+          toolName: (event as LifecycleEvent).toolName,
+        });
         this.handleLifecycleEvent(event as LifecycleEvent);
       });
     }
@@ -122,6 +150,25 @@ class SharedEventDispatcher {
     // Handle permission requests directly → ActionPill store
     // Only show AskUserQuestion in ActionPill; other tools are handled in terminal UI
     if (event.type === 'permission:request' && this.shouldShowSdkEventInActionPill(event)) {
+      // Filter stale events during startup grace period
+      // When the app starts and SDK connects to existing sessions, stale permission requests
+      // from session history may be re-emitted. We ignore these during the grace period.
+      const timeSinceInit = this.initializationTime
+        ? Date.now() - this.initializationTime
+        : Infinity;
+      if (timeSinceInit < SharedEventDispatcher.STARTUP_GRACE_PERIOD_MS) {
+        console.log(
+          '[SharedEventDispatcher] Ignoring SDK permission event during startup grace period',
+          {
+            timeSinceInit,
+            gracePeriod: SharedEventDispatcher.STARTUP_GRACE_PERIOD_MS,
+            eventId,
+            agentId: event.agentId,
+          }
+        );
+        return;
+      }
+
       try {
         const action = this.buildActionFromPermissionEvent(event);
         if (action) {
