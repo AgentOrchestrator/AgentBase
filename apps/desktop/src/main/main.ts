@@ -1368,6 +1368,9 @@ function registerIpcHandlers(): void {
         promptPreview: request.prompt.slice(0, 100),
         promptLength: request.prompt.length,
         workingDirectory: request.workingDirectory,
+        permissionMode: request.permissionMode,
+        agentId: request.agentId,
+        sessionId: request.sessionId,
       });
 
       try {

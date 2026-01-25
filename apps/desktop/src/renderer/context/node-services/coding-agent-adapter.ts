@@ -7,6 +7,7 @@
  */
 
 import type {
+  PermissionMode,
   MessageFilterOptions as SharedMessageFilterOptions,
   StreamingBlockType,
   StreamingChunk,
@@ -80,6 +81,8 @@ export interface GenerateRequest {
   sessionId: string;
   systemPrompt?: string;
   agentId?: string;
+  /** Permission mode for tool restrictions (plan, auto-accept, ask) */
+  permissionMode?: PermissionMode;
 }
 
 /**
@@ -433,18 +436,28 @@ export interface ICodingAgentAdapter {
    * Used when creating a new agent node.
    * @param workspacePath - Directory to run the CLI in
    * @param sessionId - UUID for the new session
+   * @param permissionMode - Permission mode for the session (plan, auto-accept, ask)
    * @returns Shell command string including newline
    */
-  buildStartSessionCommand?(workspacePath: string, sessionId: string): string;
+  buildStartSessionCommand?(
+    workspacePath: string,
+    sessionId: string,
+    permissionMode?: PermissionMode
+  ): string;
 
   /**
    * Build command to resume an existing CLI REPL session.
    * Used when restoring a node from canvas or after page refresh.
    * @param workspacePath - Directory to run the CLI in
    * @param sessionId - UUID of the session to resume
+   * @param permissionMode - Permission mode for the session (plan, auto-accept, ask)
    * @returns Shell command string including newline
    */
-  buildResumeSessionCommand?(workspacePath: string, sessionId: string): string;
+  buildResumeSessionCommand?(
+    workspacePath: string,
+    sessionId: string,
+    permissionMode?: PermissionMode
+  ): string;
 
   /**
    * Get the command to gracefully exit the CLI REPL.

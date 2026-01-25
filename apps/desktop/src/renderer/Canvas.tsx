@@ -26,7 +26,7 @@ import ForkGhostNode from './ForkGhostNode';
 import IssueDetailsModal from './IssueDetailsModal';
 import './Canvas.css';
 import type { AgentNodeData } from '@agent-orchestrator/shared';
-import { createDefaultAgentTitle } from '@agent-orchestrator/shared';
+import { createDefaultAgentTitle, useExpose } from '@agent-orchestrator/shared';
 import AssistantMessageNode from './components/AssistantMessageNode';
 import { type CommandAction, CommandPalette } from './components/CommandPalette';
 import ConversationNode from './components/ConversationNode';
@@ -76,7 +76,7 @@ import {
 } from './hooks';
 import { nodeRegistry } from './nodes/registry';
 import { forkService, worktreeService } from './services';
-import { forkStore, nodeStore } from './stores';
+import { forkStore, nodeStore, permissionModeStore } from './stores';
 import { createLinearIssueAttachment } from './types/attachments';
 import { getOptimalHandles, updateEdgesWithOptimalHandles } from './utils/edgeHandles';
 
@@ -328,6 +328,38 @@ function CanvasFlow() {
       folderHighlight.folderColors
     );
   }, [folderHighlight.highlightedFolders, folderHighlight.folderColors]);
+
+  // =============================================================================
+  // E2E Automation (useExpose)
+  // =============================================================================
+
+  useExpose('canvas', {
+    // State
+    nodeCount: nodes.length,
+    hasAgents,
+    isLoading: isCanvasLoading,
+
+    // Node creation actions
+    addAgentNode: () => canvasActions.addAgentNode(),
+    addStarterNode: () => canvasActions.addStarterNode(),
+    addTerminalNode: () => canvasActions.addTerminalNode(),
+    addBrowserNode: () => canvasActions.addBrowserNode(),
+
+    // Get nodes info
+    getAgentNodes: () =>
+      nodes
+        .filter((n) => n.type === 'agent')
+        .map((n) => ({
+          id: n.id,
+          agentId: (n.data as AgentNodeData).agentId,
+          sessionId: (n.data as AgentNodeData).sessionId,
+          status: (n.data as AgentNodeData).status,
+        })),
+
+    // Zoom controls
+    zoomIn: () => zoomIn(),
+    zoomOut: () => zoomOut(),
+  });
 
   // =============================================================================
   // Node Store Sync
@@ -863,6 +895,22 @@ function CanvasFlow() {
       if (modifierKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         canvasActions.addAgentNode();
+      }
+
+      // Shift+Tab to cycle permission mode (only when ActionPill is not expanded)
+      if (event.shiftKey && event.key === 'Tab' && !window.__actionPillExpanded) {
+        // Don't interfere if user is typing in an input/textarea
+        const target = event.target as HTMLElement;
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        event.preventDefault();
+        permissionModeStore.cycleGlobalMode();
+        return;
       }
 
       if (modifierKey && event.key === 'n') {

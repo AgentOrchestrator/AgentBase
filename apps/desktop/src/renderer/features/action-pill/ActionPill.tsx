@@ -17,6 +17,13 @@ import { useActionPillHighlight } from './hooks';
 import { actionPillService } from './services';
 import { selectSortedActions, useActionPillStore } from './store';
 
+// Expose ActionPill expanded state globally for keyboard handler coordination
+declare global {
+  interface Window {
+    __actionPillExpanded?: boolean;
+  }
+}
+
 export function ActionPill() {
   // Store state
   const sortedActions = useActionPillStore(selectSortedActions);
@@ -34,6 +41,14 @@ export function ActionPill() {
   const { shouldHighlightPill } = useActionPillHighlight();
 
   const hasActions = sortedActions.length > 0;
+
+  // Sync expanded state to window for keyboard handler coordination (permission mode cycling)
+  useEffect(() => {
+    window.__actionPillExpanded = isExpanded;
+    return () => {
+      window.__actionPillExpanded = false;
+    };
+  }, [isExpanded]);
 
   // Toggle handler
   const handleToggle = useCallback(() => {
