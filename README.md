@@ -76,8 +76,7 @@ npm run dev
 | Command | Description |
 |---------|-------------|
 | `npm install` | Install all dependencies for the monorepo |
-| `npm run dev` | Start all services in development mode (daemon + desktop with hot reload) |
-| `npm run dev:daemon` | Start only the daemon service in development mode |
+| `npm run dev` | Start the desktop app in development mode with hot reload |
 | `npm run dev:desktop` | Start only the desktop app in development mode |
 | `npm run build` | Build all apps for production |
 | `npm run start` | Start all services in production mode (requires build first) |
@@ -155,7 +154,6 @@ Want to help integrate your favorite AI assistant? [Open an issue](https://githu
 ## 🤝 Contributing
 
 Contributions welcome! This is a monorepo, so all code lives in one place:
-- **Backend (daemon)**: `apps/daemon/`
 - **Desktop App**: `apps/desktop/`
 - **Shared code**: `packages/shared/`
 

@@ -191,12 +191,42 @@
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   min-width: 200px;
-  max-height: calc(5 * 36px + 8px); /* Approximately 5 items height + padding */
+  max-height: calc(6 * 36px + 60px); /* Approximately 6 items height + search input + padding */
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 1000;
   display: flex;
   flex-direction: column;
+}
+
+.new-agent-modal-branch-search-wrapper {
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-primary);
+  z-index: 1;
+}
+
+.new-agent-modal-branch-search {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.new-agent-modal-branch-search:focus {
+  border-color: var(--color-text-secondary);
+}
+
+.new-agent-modal-branch-search::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
 }
 
 .new-agent-modal-branch-dropdown-item {
@@ -512,4 +542,80 @@
   padding: 6px 16px;
   background: var(--color-bg-primary);
   border-top: 1px solid var(--color-border);
+}
+
+/* ============================================ */
+/* Worktree Config Section (non-fork mode)      */
+/* ============================================ */
+
+.worktree-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.worktree-config-checkbox {
+  flex-shrink: 0;
+}
+
+.worktree-config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.worktree-config-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.worktree-config-label {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.worktree-config-input {
+  flex: 1;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.worktree-config-input:focus {
+  border-color: var(--color-text-secondary);
+}
+
+.worktree-config-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.worktree-config-path {
+  font-size: 11px;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
+  padding-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worktree-config-path-prefix {
+  color: var(--color-text-tertiary, #666);
+}
+
+.worktree-config-path-folder {
+  color: var(--color-text-secondary);
 }
