@@ -1,0 +1,3 @@
+{"type":"summary","summary":"Helped user fix a TypeScript compilation error related to undefined types"}
+{"type":"user","timestamp":"2025-01-15T10:00:00.000Z","message":{"role":"user","content":"I have a TypeScript error"}}
+{"type":"assistant","timestamp":"2025-01-15T10:01:00.000Z","message":{"role":"assistant","content":"Let me help you fix that TypeScript error."}}
