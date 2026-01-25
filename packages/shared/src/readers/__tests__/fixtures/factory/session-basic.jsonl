@@ -1,0 +1,3 @@
+{"type":"session_start","title":"Bug fixing session"}
+{"type":"message","timestamp":"2025-01-15T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Help me fix this bug"}]}}
+{"type":"message","timestamp":"2025-01-15T10:01:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"I'll help you fix the bug. What's the error message?"}]}}

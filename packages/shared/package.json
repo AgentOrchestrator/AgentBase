@@ -14,6 +14,10 @@
     "./loaders": {
       "types": "./dist/loaders/index.d.ts",
       "default": "./dist/loaders/index.js"
+    },
+    "./readers": {
+      "types": "./dist/readers/index.d.ts",
+      "default": "./dist/readers/index.js"
     }
   },
   "scripts": {
@@ -23,11 +27,13 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.7"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.7",
+    "better-sqlite3": "^12.4.1"
   }
 }

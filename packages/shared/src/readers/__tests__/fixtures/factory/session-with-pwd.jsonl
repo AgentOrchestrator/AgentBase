@@ -1,0 +1,3 @@
+{"type":"session_start","title":"Project session"}
+{"type":"message","timestamp":"2025-01-15T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"<system-reminder>\n% pwd\n/Users/dev/my-factory-app\n</system-reminder>\nWhat can you help me with?"}]}}
+{"type":"message","timestamp":"2025-01-15T10:01:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"I can help you with many things in your project!"}]}}
