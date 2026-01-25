@@ -111,6 +111,9 @@ export function AgentNodePresentation({
 
   // Subscribe to permission mode changes
   useEffect(() => {
+    // Immediately sync state for the current agentId to avoid stale UI
+    setPermissionMode(permissionModeStore.getEffectiveMode(data.agentId));
+
     // Update when agent-specific mode changes
     const unsubAgent = permissionModeStore.subscribe(data.agentId, setPermissionMode);
     // Also update when global mode changes (in case agent has no override)

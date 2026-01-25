@@ -45,6 +45,9 @@ export function ActionPill() {
   // Sync expanded state to window for keyboard handler coordination (permission mode cycling)
   useEffect(() => {
     window.__actionPillExpanded = isExpanded;
+    return () => {
+      window.__actionPillExpanded = false;
+    };
   }, [isExpanded]);
 
   // Toggle handler

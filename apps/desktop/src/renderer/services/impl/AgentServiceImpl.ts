@@ -523,8 +523,11 @@ export class AgentServiceImpl implements IAgentService {
     // Explicitly clear session state in main process to ensure start() sends the CLI command
     await this.clearSessionStateInMainProcess();
 
-    // Small delay to ensure terminal is ready for new command
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Delay to allow terminal PTY to fully reset after REPL exit.
+    // The terminal needs time to process the exit and reinitialize before accepting new commands.
+    // Without this delay, the resume command may be sent before the terminal is ready.
+    const TERMINAL_READY_DELAY_MS = 500;
+    await new Promise((resolve) => setTimeout(resolve, TERMINAL_READY_DELAY_MS));
 
     // Start the session again - this will pick up the new permission mode from the store
     await this.start(workspacePath, sessionId);
