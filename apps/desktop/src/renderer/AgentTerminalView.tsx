@@ -142,7 +142,8 @@ export default function AgentTerminalView({
         console.log('[AgentTerminalView] Starting agent REPL', {
           workspacePath,
           sessionId,
-          initialPrompt: initialPrompt?.substring(0, 50),
+          hasInitialPrompt: !!initialPrompt,
+          initialPromptLength: initialPrompt?.length,
         });
         await agentService.start(workspacePath, sessionId, initialPrompt);
       })

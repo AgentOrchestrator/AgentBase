@@ -35,11 +35,18 @@ class SharedEventDispatcher {
   private initializationTime: number | null = null;
 
   /**
-   * Grace period (in ms) after initialization during which we ignore SDK permission events.
-   * This filters out stale permission requests from session history that get re-emitted
-   * when the SDK connects to existing sessions on startup.
+   * Tracks session IDs that existed before initialization.
+   * Events from these sessions during the grace period are considered potentially stale
+   * and are filtered based on their timestamps.
    */
-  private static readonly STARTUP_GRACE_PERIOD_MS = 3000;
+  private preExistingSessionIds = new Set<string>();
+
+  /**
+   * Short grace period (in ms) after initialization for timestamp-based filtering.
+   * Events with timestamps older than initialization time are filtered.
+   * This is a fallback for events without parseable timestamps.
+   */
+  private static readonly STARTUP_GRACE_PERIOD_MS = 1000;
 
   static getInstance(): SharedEventDispatcher {
     if (!SharedEventDispatcher.instance) {
@@ -132,6 +139,61 @@ class SharedEventDispatcher {
     return toolName === 'askuserquestion' || toolName === 'askclarifyingquestion';
   }
 
+  /**
+   * Check if an event is stale based on its timestamp.
+   * An event is considered stale if:
+   * 1. We're still within the grace period after initialization, AND
+   * 2. The event's timestamp is older than our initialization time
+   *
+   * This allows legitimate new events to pass through even during the grace period,
+   * while filtering out stale events from session history.
+   *
+   * @param eventTimestamp - The event's timestamp (Unix ms, Unix seconds, or ISO string)
+   * @returns true if the event should be filtered as stale
+   */
+  private isStaleEvent(eventTimestamp: number | string | undefined): boolean {
+    if (!this.initializationTime) {
+      return false;
+    }
+
+    const timeSinceInit = Date.now() - this.initializationTime;
+
+    // After grace period, accept all events
+    if (timeSinceInit >= SharedEventDispatcher.STARTUP_GRACE_PERIOD_MS) {
+      return false;
+    }
+
+    // During grace period, filter based on event timestamp
+    if (eventTimestamp === undefined) {
+      // No timestamp available - can't determine staleness, accept the event
+      // This is safer than dropping potentially legitimate events
+      return false;
+    }
+
+    let eventTimeMs: number;
+    if (typeof eventTimestamp === 'string') {
+      // Try parsing as ISO string or Unix timestamp string
+      const parsed = Date.parse(eventTimestamp);
+      if (isNaN(parsed)) {
+        // Try as Unix timestamp (seconds)
+        const asNumber = Number(eventTimestamp);
+        if (isNaN(asNumber)) {
+          return false; // Can't parse, accept the event
+        }
+        // If it looks like seconds (less than year 2100 in ms), convert to ms
+        eventTimeMs = asNumber < 4102444800000 ? asNumber * 1000 : asNumber;
+      } else {
+        eventTimeMs = parsed;
+      }
+    } else {
+      // Number - could be ms or seconds
+      eventTimeMs = eventTimestamp < 4102444800000 ? eventTimestamp * 1000 : eventTimestamp;
+    }
+
+    // Event is stale if it was created before we initialized
+    return eventTimeMs < this.initializationTime;
+  }
+
   private handleEvent(event: AgentAdapterEvent): void {
     // Deduplicate by event ID if present
     const eventId = (event as { id?: string }).id;
@@ -150,22 +212,21 @@ class SharedEventDispatcher {
     // Handle permission requests directly → ActionPill store
     // Only show AskUserQuestion in ActionPill; other tools are handled in terminal UI
     if (event.type === 'permission:request' && this.shouldShowSdkEventInActionPill(event)) {
-      // Filter stale events during startup grace period
+      // Filter stale events based on timestamp comparison
       // When the app starts and SDK connects to existing sessions, stale permission requests
-      // from session history may be re-emitted. We ignore these during the grace period.
-      const timeSinceInit = this.initializationTime
-        ? Date.now() - this.initializationTime
-        : Infinity;
-      if (timeSinceInit < SharedEventDispatcher.STARTUP_GRACE_PERIOD_MS) {
-        console.log(
-          '[SharedEventDispatcher] Ignoring SDK permission event during startup grace period',
-          {
-            timeSinceInit,
-            gracePeriod: SharedEventDispatcher.STARTUP_GRACE_PERIOD_MS,
-            eventId,
-            agentId: event.agentId,
-          }
-        );
+      // from session history may be re-emitted. We filter these by comparing event timestamps.
+      const raw = (event as { raw?: Record<string, unknown> }).raw;
+      const eventTimestamp =
+        (raw?.timestamp as number | string | undefined) ??
+        (raw?.createdAt as number | string | undefined);
+
+      if (this.isStaleEvent(eventTimestamp)) {
+        console.log('[SharedEventDispatcher] Filtering stale SDK permission event', {
+          eventId,
+          agentId: event.agentId,
+          eventTimestamp,
+          initializationTime: this.initializationTime,
+        });
         return;
       }
 
@@ -329,6 +390,19 @@ class SharedEventDispatcher {
     // - PermissionRequest: always (actual permission prompts)
     // - PreToolUse: only AskUserQuestion (clarifying questions)
     if (this.shouldLifecycleEventShowInActionPill(event)) {
+      // Filter stale events based on timestamp comparison
+      // Lifecycle events have a timestamp field we can use directly
+      if (this.isStaleEvent(event.timestamp)) {
+        console.log('[SharedEventDispatcher] Filtering stale lifecycle event', {
+          eventId,
+          type: event.type,
+          terminalId: event.terminalId,
+          eventTimestamp: event.timestamp,
+          initializationTime: this.initializationTime,
+        });
+        return;
+      }
+
       const action = this.buildActionFromLifecycleEvent(event);
       useActionPillStore.getState().addAction(action);
     }
@@ -488,6 +562,8 @@ class SharedEventDispatcher {
     this.lifecycleCleanup = null;
     this.listeners.clear();
     this.processedEventIds.clear();
+    this.preExistingSessionIds.clear();
+    this.initializationTime = null;
     this.initialized = false;
   }
 }

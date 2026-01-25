@@ -40,27 +40,12 @@ export const useActionPillStore = create<ActionPillState>((set, get) => ({
 
   // Core actions
   addAction: (action: AgentAction) => {
-    console.log('[ActionPillStore] addAction called', {
-      actionId: action.id,
-      type: action.type,
-      agentId: action.agentId,
-      sessionId: action.sessionId,
-      toolUseId: action.toolUseId,
-      createdAt: action.createdAt,
-      // Include stack trace to identify the caller
-      stack: new Error().stack?.split('\n').slice(1, 5).join('\n'),
-    });
     set((state) => {
       // Don't add duplicates
       if (state.actions.some((a) => a.id === action.id)) {
-        console.log('[ActionPillStore] addAction skipped - duplicate', { actionId: action.id });
         return state;
       }
       const newActions = [...state.actions, action];
-      console.log('[ActionPillStore] Action added successfully', {
-        actionId: action.id,
-        totalActions: newActions.length,
-      });
       return {
         actions: newActions,
         hasNewActions: true,
